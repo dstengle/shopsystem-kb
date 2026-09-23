@@ -25,6 +25,18 @@ So that a client can grow a collection an item at a time without rewriting the a
     Then the name the client is given for the new item is the name already taken with a number added
     And the step already there keeps the name it had
 
+  Scenario: Taking an item out does not rename the items left
+    Given an artifact holding a collection whose items carry no title of their own, each named by its place when it was added
+    When the client takes the first item out of that collection, saying which role and why
+    Then every item left keeps the name it was given when it was added
+    And no item is named again from where it now sits
+
+  Scenario: Putting items in a different order does not rename them
+    Given an artifact holding a collection whose items carry no title of their own, each named by its place when it was added
+    When the client puts the items of that collection in a different order, saying which role and why
+    Then every item keeps the name it was given when it was added
+    And anything pointing at one of them still lands on the same item
+
   @slice-38
   Scenario: An item that uses another artifact keeps its settings on itself
     When the client adds a step that points at the shared step together with its settings, saying which role and why

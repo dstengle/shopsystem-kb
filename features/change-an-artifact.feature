@@ -22,6 +22,13 @@ So that a client can keep an artifact true without rewriting the store, the clie
     Then the decision records the current version of its type
     And it is no longer listed as behind its type
 
+  Scenario: Changing an artifact that is behind its type with content the current version will not have is refused
+    Given a decision last checked against an older version of the decision type
+    When the client replaces the decision with content that does not fit the current version of its type, saying which role and why
+    Then the change is rejected because the content does not fit the current version of its type, like any change that does not fit
+    And reading the decision gives what it held before, at the version it held before
+    And it is still listed as behind its type
+
   @slice-8
   Scenario: A change that would break the type leaves the artifact as it was
     When the client replaces the decision with content that has no purpose, saying which role and why

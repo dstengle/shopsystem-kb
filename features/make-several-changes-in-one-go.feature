@@ -7,8 +7,13 @@ So that a set of changes that only makes sense together is never half-applied, t
   @slice-5
   Scenario: The client makes several changes in one go
     When the client asks, in one go, for a decision to be created and the work item to point at it, in that order, saying which role and why
-    Then each change comes back with its own result
+    Then the client is given one name for the set, which the client never asked for
+    And each change also comes back with its own result
     And the store's history shows the set as one change
+
+  Scenario: The name given for a set finds the set in the history
+    When the client asks, in one go, for a decision to be created and the work item to point at it, in that order, saying which role and why
+    Then the changes the history shows under the name the client was given for the set are exactly those two
 
   @slice-6
   Scenario: One bad change in a set leaves the store untouched
