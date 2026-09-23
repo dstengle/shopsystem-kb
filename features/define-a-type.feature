@@ -16,6 +16,13 @@ So that a client decides for itself what its artifacts are made of, the client c
     When the client defines a second type that refers to that shape
     Then artifacts of the second type are checked against the shape the first type defines
 
+  @assumes-shared-shapes-come-from-cross-type-references
+  Scenario: A type built on a shared base carries the base's fields and sections
+    Given a base type that gives every artifact an owner and a status, and requires a purpose section
+    When the client defines a decision type built on that base, adding a rationale section of its own
+    Then a decision missing its owner is rejected because it does not fit its type
+    And a decision reads back with its purpose before its rationale
+
   @assumes-types-are-data
   Scenario: Something that is not a well-formed type is refused
     When the client defines a type that does not match the type that describes types
