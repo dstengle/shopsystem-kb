@@ -19,3 +19,10 @@ So that a client can tell whether everything the store holds still fits its type
     When the client checks the store
     Then that decision is listed as behind its type
     And it is not reported as a violation
+
+  Scenario: An artifact behind its type that no longer fits it is reported both ways
+    Given a store where a decision was last checked against an older version of the decision type, and no longer fits the current version
+    When the client checks the store
+    Then that decision is listed as behind its type
+    And it is also reported as a violation, naming the artifact, the place in it and the rule broken
+    And the check itself does not fail

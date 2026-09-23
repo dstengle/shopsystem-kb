@@ -9,7 +9,14 @@ So that a client can show how the store came to hold what it holds, the client c
   Scenario: Every change leaves an entry
     When the client reads the journal for that decision
     Then there is one entry for each change
-    And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, and the message given
+    And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, the message given, and which set of changes it landed with
+
+  Scenario: The journal alone shows what landed together
+    Given a store where two artifacts were changed in one go and a third was changed on its own
+    When the client reads the journal
+    Then the two entries from the one go name the same set of changes
+    And the entry for the change made on its own names itself as its own set
+    And the client can tell what landed together from the journal without reading anything else
 
   @slice-34
   Scenario: The client reads the journal for one role

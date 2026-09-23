@@ -8,6 +8,12 @@ So that a store exists and can be checked from a shell without any client, the o
     Then there is a store at that path
     And a client can begin defining its own types in it straight away
 
+  Scenario: Setting up a store where there is one already is refused
+    Given a directory that already holds a store with content in it
+    When the operator runs kb init against that directory
+    Then setting the store up is rejected because the root already holds a store
+    And the store that is there holds what it held before
+
   @slice-44
   Scenario: The operator checks the whole store
     Given a store whose content the operator did not write
