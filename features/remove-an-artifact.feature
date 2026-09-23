@@ -5,13 +5,11 @@ So that a client can take out what is no longer used without leaving links point
     Given a store holding a tag nothing points at
     And a tag a decision points at
 
-  @assumes-refuse-is-enough-for-deletes
   Scenario: The client removes an artifact nothing points at
     When the client removes the tag nothing points at, saying which role and why
     Then the store no longer holds it
     And the removal is recorded like any other change
 
-  @assumes-refuse-is-enough-for-deletes
   Scenario: A removal something points at is refused
     When the client removes the tag the decision points at, saying which role and why
     Then the removal is rejected because something still points at it
