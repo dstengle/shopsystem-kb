@@ -4,7 +4,7 @@ So that a client can keep an artifact true without rewriting the store, the clie
   Background:
     Given a store holding a decision with a purpose and a rationale, at its first version
 
-  @slice-27
+  @slice-22
   Scenario: The client changes an artifact
     When the client replaces the decision, saying which role and why
     Then the version goes up by one

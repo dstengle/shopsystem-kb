@@ -23,7 +23,7 @@ So that a client decides for itself what its artifacts are made of, the client c
     Then a decision missing its owner is rejected because it does not fit its type
     And a decision reads back with its purpose before its rationale
 
-  @slice-34
+  @slice-26
   Scenario: Something that is not a well-formed type is refused
     When the client defines a type that does not match the type that describes types
     Then the type is rejected because it does not match the type that describes types

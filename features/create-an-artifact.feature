@@ -11,17 +11,17 @@ So that a client can put content into the store and get a name it can come back 
     And the artifact records the version of the type it was checked against
     And reading it back gives what was written, in the order the type declares
 
-  @slice-30
+  @slice-24
   Scenario: An artifact missing a required section is refused
     When the client creates a decision with a rationale and no purpose, saying which role and why
     Then the artifact is rejected because the sections the type requires must all be present, in order
 
-  @slice-31
+  @slice-24
   Scenario: An artifact pointing at something that is not there is refused
     When the client creates a decision that supersedes a decision the store does not hold, saying which role and why
     Then the artifact is rejected because a link must land on a node of a kind the type allows
 
-  @slice-32
+  @slice-24
   Scenario: An artifact with two parts of the same name is refused
     When the client creates a decision carrying two options of the same name, saying which role and why
     Then the artifact is rejected because part names must be unique within their collection

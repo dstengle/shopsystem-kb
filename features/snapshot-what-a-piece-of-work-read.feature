@@ -4,7 +4,7 @@ So that a piece of work can say which versions it was built on while the store k
   Background:
     Given a store holding a decision at its third version and a process at its first
 
-  @slice-63
+  @slice-36
   Scenario: The client snapshots what a piece of work read
     When the client snapshots the decision and the process for a piece of work
     Then the journal holds one entry listing each of them with the version read and a fingerprint of it
