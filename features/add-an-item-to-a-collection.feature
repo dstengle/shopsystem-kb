@@ -4,7 +4,7 @@ So that a client can grow a collection an item at a time without rewriting the a
   Background:
     Given a store holding a process with two steps and a shared step other processes use
 
-  @assumes-artifacts-are-typed-ordered-documents
+  @assumes-types-as-data-suffice
   Scenario: The client adds an item to a collection
     When the client adds a step to the process, saying which role and why
     Then the client is given the new item's name and the artifact's new version

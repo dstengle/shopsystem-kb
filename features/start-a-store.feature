@@ -1,7 +1,7 @@
 Feature: Start a store
 So that a client has somewhere to keep typed artifacts before it has any types of its own, the client can start a store.
 
-  @assumes-types-are-data
+  @assumes-types-as-data-suffice
   Scenario: The client starts a store
     Given an empty directory
     When the client starts a store there
