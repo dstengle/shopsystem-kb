@@ -20,6 +20,7 @@ So that a client can tell whether everything the store holds still fits its type
     Then that decision is listed as behind its type
     And it is not reported as a violation
 
+  @slice-42
   Scenario: An artifact behind its type that no longer fits it is reported both ways
     Given a store where a decision was last checked against an older version of the decision type, and no longer fits the current version
     When the client checks the store

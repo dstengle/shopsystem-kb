@@ -8,12 +8,14 @@ So that a store exists and can be checked from a shell without any client, the o
     Then there is a store inside that directory, in a place of its own
     And a client can begin defining its own types in it straight away
 
+  @slice-44
   Scenario: Setting up a store where the directory already has one inside it is refused
     Given a directory that already has a store inside it, with content in that store
     When the operator runs kb init against that directory
     Then setting the store up is rejected because that directory already has a store inside it
     And the store that is there holds what it held before
 
+  @slice-44
   Scenario: Setting up a store inside a store is refused
     Given a directory that sits inside a store
     When the operator runs kb init against that directory

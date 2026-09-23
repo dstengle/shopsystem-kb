@@ -16,12 +16,14 @@ So that a client can keep an artifact true without rewriting the store, the clie
     Then only that section changes
     And the rest of the decision reads as before
 
+  @slice-22
   Scenario: Changing an artifact that is behind its type brings it up to date
     Given a decision last checked against an older version of the decision type, which still fits the current version
     When the client replaces the decision with content that fits the current version of its type, saying which role and why
     Then the decision records the current version of its type
     And it is no longer listed as behind its type
 
+  @slice-22
   Scenario: Changing an artifact that is behind its type with content the current version will not have is refused
     Given a decision last checked against an older version of the decision type
     When the client replaces the decision with content that does not fit the current version of its type, saying which role and why

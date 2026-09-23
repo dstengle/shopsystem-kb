@@ -21,6 +21,7 @@ So that a client can show what the store holds at whatever depth it needs, the c
     When the client reads the whole decision
     Then the client is given every field, every section and every part, in the order the type declares
 
+  @slice-20
   Scenario: Without being asked to follow them, links come back as names
     When the client reads the whole decision without asking for its links to be followed
     Then the older decision is given as the name it is known by, and nothing more
@@ -31,18 +32,21 @@ So that a client can show what the store holds at whatever depth it needs, the c
     Then the older decision is given in place of the link, as the store holds it now
     And what the older decision itself points at is given as names
 
+  @slice-20
   Scenario: The client reads an artifact following its links two steps
     Given the older decision is tagged "pricing"
     When the client reads the whole decision following its links two steps
     Then the older decision is given in place of the link
     And the tag is given in place of the link inside the older decision
 
+  @slice-48
   Scenario: A loop in the links stops instead of going round
     Given two decisions that point at each other
     When the client reads the whole of one of them following its links three steps
     Then the other decision is given in place of the link
     And where that one points back, the decision being read is given as a name rather than filled in again
 
+  @slice-20
   Scenario: The branches inside a process are not followed
     Given a store holding a process whose steps branch to other steps of the same process
     When the client reads the whole process following its links one step

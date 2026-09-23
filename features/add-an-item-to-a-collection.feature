@@ -10,27 +10,32 @@ So that a client can grow a collection an item at a time without rewriting the a
     Then the client is given the new item's name and the artifact's new version
     And the new item comes after the items already there
 
+  @slice-38
   Scenario: The name of a new item comes from its title
     When the client adds a step titled "Count what is on the shelf" to the process, saying which role and why
     Then the name the client is given for the new item is made from that title
     And the client never said what the name should be
 
+  @slice-38
   Scenario: An item of a kind that carries no title is named by its place
     Given an artifact holding a collection whose items carry no title of their own
     When the client adds an item to that collection, saying which role and why
     Then the name the client is given for the new item is made from its place in the collection
 
+  @slice-38
   Scenario: A second item with a title already used in the collection gets a name of its own
     When the client adds a step whose title is already used by a step of that process, saying which role and why
     Then the name the client is given for the new item is the name already taken with a number added
     And the step already there keeps the name it had
 
+  @slice-38
   Scenario: Taking an item out does not rename the items left
     Given an artifact holding a collection whose items carry no title of their own, each named by its place when it was added
     When the client takes the first item out of that collection, saying which role and why
     Then every item left keeps the name it was given when it was added
     And no item is named again from where it now sits
 
+  @slice-49
   Scenario: Putting items in a different order does not rename them
     Given an artifact holding a collection whose items carry no title of their own, each named by its place when it was added
     When the client puts the items of that collection in a different order, saying which role and why

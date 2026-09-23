@@ -11,6 +11,7 @@ So that a client can show how the store came to hold what it holds, the client c
     Then there is one entry for each change
     And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, the message given, and which set of changes it landed with
 
+  @slice-34
   Scenario: The journal alone shows what landed together
     Given a store where two artifacts were changed in one go and a third was changed on its own
     When the client reads the journal

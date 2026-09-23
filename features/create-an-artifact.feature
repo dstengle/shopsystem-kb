@@ -11,17 +11,20 @@ So that a client can put content into the store and get a name it can come back 
     And the artifact records the version of the type it was checked against
     And reading it back gives what was written, in the order the type declares
 
+  @slice-24
   Scenario: The name of a new artifact is made from its title, not asked for
     When the client creates a decision titled "Price reviews happen weekly", saying which role and why
     Then the name the client is given is made from that title
     And the client never said what the name should be
 
+  @slice-24
   Scenario: A second artifact with a title already used gets a name of its own
     Given a decision the store already holds, titled "Price reviews happen weekly"
     When the client creates another decision with that same title, saying which role and why
     Then the client is given a name of its own for the new decision, the name already taken with a number added
     And the decision created first keeps the name it had
 
+  @slice-24
   Scenario: Two parts with the same title are given names of their own
     When the client creates a decision carrying two options with the same title, saying which role and why
     Then each option is given a name of its own, the second the name of the first with a number added
