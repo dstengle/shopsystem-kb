@@ -403,3 +403,59 @@ def _rejected_for_a_directive(created):
         "content is read plainly as written and opens with no declaration of its format; "
         "line 1 declares %YAML 1.1"
     )
+
+
+@given(parsers.parse('a store that holds no type called "{kind}"'))
+def _no_type_called(client, kind):
+    assert read(client, f"schema/{kind}").faults
+
+
+@then("the artifact is rejected because a kind must name a type the store holds, and the kind asked for is given back")
+def _rejected_as_an_unknown_kind(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert refused.faults[0].rule == "kind"
+    assert refused.faults[0].message == "a kind must name a type the store holds; the store holds no type called 'invoice'"
+
+
+@then("that fault stands on its own, apart from anything wrong with the content")
+def _the_kind_fault_alone(attempt):
+    assert [(fault.path, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
+
+
+@then("nothing is written anywhere in the store")
+def _nothing_written_in_the_store(attempt):
+    assert attempt["after"] == attempt["before"]
+
+
+@given(
+    'content for a decision carrying one field written "true", one field left as nothing, and one field written "12.5"',
+    target_fixture="written",
+)
+def _content_with_typed_values():
+    return (
+        "urgent: true\n"
+        "owner:\n"
+        "weight: 12.5\n"
+        "sections:\n"
+        "  - title: Purpose\n    body: Why.\n"
+        "  - title: Rationale\n    body: Because.\n"
+    )
+
+
+@then("the first field reads back as a yes-or-no, the second as nothing at all, and the third as a number")
+def _typed_values_read_back(root, created):
+    assert not created.faults, created.faults
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert (on_disk["urgent"], on_disk["owner"], on_disk["weight"]) == (True, None, 12.5)
+
+
+@then("none of the three reads back as text")
+def _none_of_them_text(root, created):
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert not any(isinstance(on_disk[name], str) for name in ("urgent", "owner", "weight"))
+
+
+@given("a title for a new decision that is the number 12 rather than text", target_fixture="title")
+def _a_title_that_is_a_number():
+    return 12

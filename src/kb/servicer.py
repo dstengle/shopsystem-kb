@@ -42,6 +42,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             kind = values.kind(request.type)
         except values.Refused as refused:
             return kb_pb2.CreateResponse(faults=refused.faults)
+        if not self._store.holds(ArtifactId(Kind("schema"), kind.name)):
+            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
+                rule="kind", message=f"a kind must name a type the store holds; the store holds no type called {kind.name!r}",
+            )])
         at = f"{kind.name}/{values.slug(request.title)}"
         try:
             content = loads(request.content)
