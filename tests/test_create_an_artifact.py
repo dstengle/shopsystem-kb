@@ -185,3 +185,19 @@ def _rejected_for_a_tag(refused):
     assert [(fault.rule, fault.message) for fault in refused.faults] == [
         ("content", "content is read plainly as written and carries no tags"),
     ]
+
+
+@when(
+    "the client creates a decision from content holding two documents one after the other, saying which role and why",
+    target_fixture="refused",
+)
+def _create_from_two_documents(client):
+    one = "sections:\n  - title: Purpose\n    body: Why.\n  - title: Rationale\n    body: Because.\n"
+    return _raw(client, one + "---\n" + one)
+
+
+@then("the artifact is rejected because content holds exactly one document")
+def _rejected_for_two_documents(refused):
+    assert [(fault.rule, fault.message) for fault in refused.faults] == [
+        ("content", "content holds exactly one document"),
+    ]
