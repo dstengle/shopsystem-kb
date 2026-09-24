@@ -214,20 +214,6 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return counts
 
 
-def _identity_faults(artifact_id, content):
-    """Content holds only what the type declares; the identity keys are the store's, the title travels beside."""
-    faults = []
-    for key in canonical.IDENTITY:
-        if key not in content:
-            continue
-        if key == "title":
-            message = f"a title is given alongside the content, never inside it; the content carried the title {content[key]!r}"
-        else:
-            message = f"content holds only what the type declares; {key} is settled by the store, and the content carried {key}: {content[key]!r}"
-        faults.append(kb_pb2.Fault(artifact=artifact_id, path=key, rule="identity", message=message))
-    return faults
-
-
 def _summary_fields(artifact, schema):
     return {name: artifact[name] for name in schema.get("summary", []) if name in artifact}
 
