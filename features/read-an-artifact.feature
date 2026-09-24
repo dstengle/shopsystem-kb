@@ -107,6 +107,7 @@ So that a client can show what the store holds at whatever depth it needs, the c
     Then the read is rejected because KB_ROOT names a store other than the one it is working in, and neither of the two is guessed at
     And no content comes back, from either store
 
+  @slice-68
   Scenario: A client readied before there was a store finds the store started since
     Given the client was readied to call a store while working where there was none and nothing named one
     And a store holding the decision has since been started where the client is working

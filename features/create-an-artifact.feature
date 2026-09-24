@@ -98,22 +98,27 @@ So that a client can put content into the store and get a name it can come back 
     When the client creates a decision whose purpose carries an extra entry of its own besides its title, its body and the sections inside it, saying which role and why
     Then the artifact is rejected because a section holds exactly its title, its body and the sections inside it, and the extra entry is named
 
+  @slice-66
   Scenario: A section with no title is refused
     When the client creates a decision whose first section carries a body and no title, saying which role and why
     Then the artifact is rejected because a section carries both a title and a body, and a section without one does not fit its type like anything else that does not
 
+  @slice-66
   Scenario: A section with no body is refused
     When the client creates a decision whose purpose carries a title and no body, saying which role and why
     Then the artifact is rejected because a section carries both a title and a body, and a section without one does not fit its type like anything else that does not
 
+  @slice-64
   Scenario: A value that reads as a switch or as a clock time is still the text that was written
     When the client creates a decision carrying one field written "on" and another written "1:20", saying which role and why
     Then both fields read back as the text that was written, the first not as a yes or a no and the second not as a number
 
+  @slice-65
   Scenario: Content that writes a value once and points back at it elsewhere is refused
     When the client creates a decision whose content writes a value once and points back at it from another place instead of writing it again, saying which role and why
     Then the artifact is rejected because content is read exactly as written and nothing in it stands in for a value written somewhere else
 
+  @slice-67
   Scenario: A kind that is not a plain name is refused
     When the client creates an artifact of the kind "../schema/decision", with a title and both required sections, saying which role and why
     Then the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path

@@ -44,6 +44,7 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     Then starting the store is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
 
+  @slice-69
   Scenario: Where a store is started is settled by the directory named, not by where the client is working
     Given the client is working inside a store
     And an empty directory elsewhere that sits inside no store
