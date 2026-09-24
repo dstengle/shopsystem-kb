@@ -1,5 +1,5 @@
-"""Artifact content crossing the contract as canonical YAML text."""
-import yaml
+"""Artifact content crossing the contract as canonical YAML text, read as YAML 1.2."""
+from ruamel.yaml import events
 
 from kb import canonical
 
@@ -15,9 +15,9 @@ def dumps(value: dict) -> str:
 
 def loads(text: str) -> dict:
     """Read content plainly: no tags, exactly one document."""
-    if any(isinstance(token, yaml.TagToken) for token in yaml.scan(text)):
+    parsed = list(canonical.events(text))
+    if any(getattr(event, "tag", None) is not None for event in parsed):
         raise ContentFault("content is read plainly as written and carries no tags")
-    documents = list(yaml.safe_load_all(text))
-    if len(documents) > 1:
+    if sum(isinstance(event, events.DocumentStartEvent) for event in parsed) > 1:
         raise ContentFault("content holds exactly one document")
-    return (documents[0] if documents else None) or {}
+    return canonical.load(text) or {}

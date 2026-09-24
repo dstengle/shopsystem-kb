@@ -11,7 +11,7 @@ dependencies = [
   "protobuf>=5",
   "grpcio>=1.60",
   "jsonschema>=4.18",
-  "PyYAML>=6",
+  "ruamel.yaml>=0.18",
 ]
 
 [project.optional-dependencies]

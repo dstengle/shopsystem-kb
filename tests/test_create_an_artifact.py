@@ -1,8 +1,7 @@
-import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, read, request
-from kb import client as kb_client
+from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
 scenarios("create-an-artifact.feature")
@@ -59,7 +58,7 @@ def _read_back_in_declared_order(root, client, created):
         ("options", "keep-weekly", "Keep weekly"),
         ("options", "go-monthly", "Go monthly"),
     ]
-    on_disk = yaml.safe_load((root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").read_text())
+    on_disk = canonical.load((root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").read_text())
     assert list(on_disk) == ["id", "type", "schema_version", "revision", "title", "sections", "options"]
     assert on_disk["sections"] == SECTIONS
     assert on_disk["options"] == [
@@ -98,7 +97,7 @@ def _create_titled(client, title):
 @then("the title reads back as the text that was written, not as a date")
 def _title_is_text_not_a_date(root, client, created):
     assert read(client, created.id).title == "2026-09-24"
-    on_disk = yaml.safe_load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
     assert on_disk["title"] == "2026-09-24"
 
 
@@ -164,7 +163,7 @@ def _rejected_for_an_empty_name(created):
 @then("the title reads back as the text that was written, not as a yes or a no")
 def _title_is_text_not_a_bool(root, client, created):
     assert read(client, created.id).title == "yes"
-    on_disk = yaml.safe_load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
     assert on_disk["title"] == "yes"
 
 
@@ -221,3 +220,27 @@ def _create_with_an_extra_entry_in_a_section(client):
 def _rejected_for_an_extra_entry(refused):
     assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0/author", "section")]
     assert "author" in refused.faults[0].message
+
+
+@when(
+    'the client creates a decision carrying one field written "on" and another written "1:20", saying which role and why',
+    target_fixture="created",
+)
+def _create_with_values_yaml_1_1_would_convert(client):
+    return _raw(client, (
+        "switch: on\n"
+        "time: 1:20\n"
+        "sections:\n"
+        "  - title: Purpose\n    body: Why.\n"
+        "  - title: Rationale\n    body: Because.\n"
+    ))
+
+
+@then(
+    "both fields read back as the text that was written, the first not as a yes or a no "
+    "and the second not as a number"
+)
+def _both_fields_are_text(root, created):
+    assert not created.faults, created.faults
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert (on_disk["switch"], on_disk["time"]) == ("on", "1:20")

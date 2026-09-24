@@ -2,11 +2,10 @@ import hashlib
 import subprocess
 from pathlib import Path
 
-import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, define, read
-from kb import client as kb_client
+from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
 scenarios("start-a-store.feature")
@@ -58,7 +57,7 @@ def _can_define_a_type(client):
 def _one_entry_under_the_role(root, message):
     entries = sorted((root / "kb" / "journal").rglob("*.yaml"))
     assert len(entries) == 1, entries
-    entry = yaml.safe_load(entries[0].read_text())
+    entry = canonical.load(entries[0].read_text())
     assert (entry["actor"]["role"], entry["message"]) == ("client", message)
     log = subprocess.run(
         ["git", "-C", str(root / "kb"), "log", "--format=%an%x09%s"], capture_output=True, text=True, check=True,
