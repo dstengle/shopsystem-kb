@@ -159,3 +159,10 @@ def _rejected_for_an_empty_name(created):
     assert (created.id, created.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in created.faults] == [("title", "title")]
     assert "leave something to make a name from" in created.faults[0].message
+
+
+@then("the title reads back as the text that was written, not as a yes or a no")
+def _title_is_text_not_a_bool(root, client, created):
+    assert read(client, created.id).title == "yes"
+    on_disk = yaml.safe_load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert on_disk["title"] == "yes"
