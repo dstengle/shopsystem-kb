@@ -1,0 +1,6 @@
+// kb contract, version 0.1. Regenerate with `make contract`.
+syntax = "proto3";
+
+package kb;
+
+service Kb {}
