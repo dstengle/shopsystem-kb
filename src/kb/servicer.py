@@ -21,8 +21,13 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def Create(self, request, context):
         content = loads(request.content)
         schema = self._store.schema(request.type)
-        artifact_id = f"{request.type}/{slug(content['title'])}"
-        faults = validation.validate(artifact_id, content, schema["schema"])
+        artifact_id = f"{request.type}/{slug(request.title)}"
+        if "title" in content:
+            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
+                artifact=artifact_id, path="title", rule="identity",
+                message=f"a title is given alongside the content, never inside it; the content carried the title {content['title']!r}",
+            )])
+        faults = validation.validate(artifact_id, {"title": request.title, **content}, schema["schema"])
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
         for collection in schema["schema"].get("parts", {}):
@@ -31,7 +36,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         artifact = {
             **content,
             "id": artifact_id, "type": request.type,
-            "schema_version": schema["version"], "revision": 1,
+            "schema_version": schema["version"], "revision": 1, "title": request.title,
         }
         path = self._store.save(canonical.order(artifact, schema["schema"]))
         self._store.commit([path], request.actor.role, request.message)

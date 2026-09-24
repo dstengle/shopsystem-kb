@@ -50,22 +50,25 @@ WORK_ITEM_TYPE = {
 }
 
 
-def define(client, type_content):
-    """Define a type: a Create of type `schema`."""
-    response = client.Create(kb_pb2.CreateRequest(
-        type="schema", content=dumps(type_content), actor=CLIENT,
-        message=f"Define {type_content['title']}",
+def request(client, type_name, title, content, message="Create an artifact"):
+    """A Create as the client sends it: the title beside the content. Returns the response, faults and all."""
+    return client.Create(kb_pb2.CreateRequest(
+        type=type_name, title=title, content=dumps(content), actor=CLIENT, message=message,
     ))
-    assert not response.faults, response.faults
-    return response
 
 
 def create(client, type_name, content, message="Create an artifact"):
-    response = client.Create(kb_pb2.CreateRequest(
-        type=type_name, content=dumps(content), actor=CLIENT, message=message,
-    ))
+    """Create from a dict written the way a user writes a file, title inside; the title is lifted out and sent beside."""
+    content = dict(content)
+    title = content.pop("title", "")
+    response = request(client, type_name, title, content, message)
     assert not response.faults, response.faults
     return response
+
+
+def define(client, type_content):
+    """Define a type: a Create of type `schema`."""
+    return create(client, "schema", type_content, message=f"Define {type_content['title']}")
 
 
 def read(client, artifact_id):

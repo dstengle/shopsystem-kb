@@ -40,11 +40,13 @@ message InitRequest {
 
 message InitResponse {}
 
+// The title travels here, never inside the content.
 message CreateRequest {
   string type = 1;
-  string content = 2;  // canonical YAML
+  string content = 2;  // canonical YAML: fields, sections, parts
   Actor actor = 3;
   string message = 4;
+  string title = 5;
 }
 
 message CreateResponse {

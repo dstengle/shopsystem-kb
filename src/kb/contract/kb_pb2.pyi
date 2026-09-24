@@ -47,16 +47,18 @@ class InitResponse(_message.Message):
     def __init__(self) -> None: ...
 
 class CreateRequest(_message.Message):
-    __slots__ = ("type", "content", "actor", "message")
+    __slots__ = ("type", "content", "actor", "message", "title")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     ACTOR_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
     type: str
     content: str
     actor: Actor
     message: str
-    def __init__(self, type: _Optional[str] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+    title: str
+    def __init__(self, type: _Optional[str] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
 
 class CreateResponse(_message.Message):
     __slots__ = ("id", "revision", "faults")

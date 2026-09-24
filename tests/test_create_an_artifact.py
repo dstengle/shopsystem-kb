@@ -1,7 +1,7 @@
 import yaml
 from pytest_bdd import given, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, read
+from calls import CLIENT, DECISION_TYPE, create, define, read, request
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -66,3 +66,25 @@ def _read_back_in_declared_order(root, client, created):
         {"id": "keep-weekly", **OPTIONS[0]},
         {"id": "go-monthly", **OPTIONS[1]},
     ]
+
+
+@when(
+    "the client creates a decision whose content carries a title as well as the title given alongside it, "
+    "saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_a_title_inside(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "title": "Price reviews, weekly",
+        "sections": SECTIONS,
+    }, message="Move price reviews to weekly")
+
+
+@then(
+    "the artifact is rejected because a title is given alongside the content, never inside it, "
+    "and the title the content carried is named back"
+)
+def _rejected_for_a_title_inside(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [("title", "identity")]
+    assert "Price reviews, weekly" in refused.faults[0].message
