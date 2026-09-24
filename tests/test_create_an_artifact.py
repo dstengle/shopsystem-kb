@@ -300,3 +300,35 @@ def _rejected_for_a_section_missing_a_key(refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
     assert "is a required property" in refused.faults[0].message
+
+
+def _everything_under(directory):
+    """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
+    return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
+
+
+@when(
+    parsers.parse(
+        'the client creates an artifact of the kind "{kind}", with a title and both required sections, '
+        "saying which role and why"
+    ),
+    target_fixture="attempt",
+)
+def _create_of_a_kind(client, tmp_path, kind):
+    before = _everything_under(tmp_path)
+    response = request(client, kind, "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it")
+    return {"response": response, "before": before, "after": _everything_under(tmp_path)}
+
+
+@then("the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path")
+def _rejected_as_not_a_plain_kind(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [fault.rule for fault in refused.faults] == ["kind"]
+    assert "never a path" in refused.faults[0].message
+    assert "../schema/decision" in refused.faults[0].message
+
+
+@then("nothing is looked up or written anywhere, inside the store or outside it")
+def _nothing_written_anywhere(attempt):
+    assert attempt["after"] == attempt["before"]

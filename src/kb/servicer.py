@@ -1,9 +1,16 @@
-"""The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later."""
-from kb import canonical, journal, locators, validation
+"""The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later.
+
+Each rpc first turns what the request carries into checked values (kb.values); nothing past that point sees a
+string that came from the request.
+"""
+from kb import canonical, journal, validation, values
 from kb.content import loads, dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
-from kb.store import Store, slug
+from kb.store import Store
+from kb.values import ArtifactId, Kind
+
+METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
@@ -17,54 +24,63 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             )])
         store = Store(request.root)
         store.start()
-        metaschema = {"id": "schema/schema", "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
-        path = store.save(canonical.order(metaschema, METASCHEMA["schema"]))
+        metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
+        path = store.save(METASCHEMA_ID, canonical.order(metaschema, METASCHEMA["schema"]))
         entry = journal.write(
-            store.dir, actor=request.actor, op="create", artifact="schema/schema", path="",
+            store.dir, actor=request.actor, op="create", artifact=str(METASCHEMA_ID), path="",
             revision=1, schema_version=1, written=path, message="initialise store",
         )
         store.commit([store.dir / "store.yaml", path, entry], request.actor.role, "initialise store")
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):
-        artifact_id = f"{request.type}/{slug(request.title)}"
+        try:
+            kind = values.kind(request.type)
+        except values.Refused as refused:
+            return kb_pb2.CreateResponse(faults=refused.faults)
+        at = f"{kind.name}/{values.slug(request.title)}"
         try:
             content = loads(request.content)
         except canonical.NotCanonical as fault:
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=artifact_id, rule="content", message=str(fault))])
-        faults = _title_faults(artifact_id, request.title) + _identity_faults(artifact_id, content)
+            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=at, rule="content", message=str(fault))])
+        faults = _identity_faults(at, content)
+        try:
+            artifact_id = values.named(kind, request.title)
+        except values.Refused as refused:
+            faults = refused.faults + faults
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
-        schema = self._store.schema(request.type)
-        faults = validation.validate(artifact_id, {"title": request.title, **content}, schema["schema"])
+        schema = self._store.schema(kind)
+        faults = validation.validate(at, {"title": request.title, **content}, schema["schema"])
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
         for collection in schema["schema"].get("parts", {}):
             for item in content.get(collection, []):
-                item["id"] = slug(item["title"])
+                item["id"] = values.slug(item["title"])
         artifact = {
             **content,
-            "id": artifact_id, "type": request.type,
+            "id": str(artifact_id), "type": kind.name,
             "schema_version": schema["version"], "revision": 1, "title": request.title,
         }
         try:
-            path = self._store.save(canonical.order(artifact, schema["schema"]))
+            path = self._store.save(artifact_id, canonical.order(artifact, schema["schema"]))
         except canonical.NotCanonical as fault:
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=artifact_id, rule="content", message=str(fault))])
+            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=at, rule="content", message=str(fault))])
         self._store.commit([path], request.actor.role, request.message)
-        return kb_pb2.CreateResponse(id=artifact_id, revision=1)
+        return kb_pb2.CreateResponse(id=str(artifact_id), revision=1)
 
     def Read(self, request, context):
-        faults = locators.faults(request.locator)
-        if faults:
-            return kb_pb2.ReadResponse(faults=faults)
-        if not self._store.path(request.locator.id).is_file():
+        try:
+            locator = values.locator(request.locator)
+        except values.Refused as refused:
+            return kb_pb2.ReadResponse(faults=refused.faults)
+        if not self._store.holds(locator.id):
             return kb_pb2.ReadResponse(faults=[kb_pb2.Fault(
-                artifact=request.locator.id, rule="not-found",
-                message=f"the store holds nothing by the name {request.locator.id!r}",
+                artifact=str(locator.id), rule="not-found",
+                message=f"the store holds nothing by the name {str(locator.id)!r}",
             )])
-        artifact = self._store.load(request.locator.id)
-        schema = self._store.schema(artifact["type"])["schema"]
+        artifact = self._store.load(locator.id)
+        schema = self._store.schema(locator.id.kind)["schema"]
         response = kb_pb2.ReadResponse(
             id=artifact["id"], type=artifact["type"],
             schema_version=artifact["schema_version"], revision=artifact["revision"],
@@ -73,43 +89,32 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         )
         for field in _reference_fields(schema):
             for target_id in _as_list(artifact.get(field)):
-                response.references.append(self._stub(field, target_id))
+                response.references.append(self._stub(field, values.artifact_id(target_id)))
         for collection in schema.get("parts", {}):
             for item in artifact.get(collection, []):
                 response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
-        for (type_name, field), count in self._inbound(artifact["id"]).items():
+        for (type_name, field), count in self._inbound(str(locator.id)).items():
             response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
         return response
 
-    def _stub(self, field, target_id):
+    def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
-        schema = self._store.schema(target["type"])["schema"]
+        schema = self._store.schema(target_id.kind)["schema"]
         return kb_pb2.Stub(
             field=field, id=target["id"], type=target["type"], title=target["title"],
             fields=dumps(_summary_fields(target, schema)),
         )
 
-    def _inbound(self, artifact_id):
+    def _inbound(self, artifact_id: str):
         """How many artifacts point at this one, by their type and the field they use."""
         counts = {}
         for other in self._store.artifacts():
-            schema = self._store.schema(other["type"])["schema"]
+            schema = self._store.schema(values.kind(other["type"]))["schema"]
             for field in _reference_fields(schema):
                 if artifact_id in _as_list(other.get(field)):
                     key = (other["type"], field)
                     counts[key] = counts.get(key, 0) + 1
         return counts
-
-
-def _title_faults(artifact_id, title):
-    """A title is required, and must leave something to make a name from."""
-    if not title:
-        return [kb_pb2.Fault(artifact=artifact_id, path="title", rule="title",
-                             message="an artifact cannot be created without a title")]
-    if not slug(title):
-        return [kb_pb2.Fault(artifact=artifact_id, path="title", rule="title",
-                             message=f"a title must leave something to make a name from; {title!r} leaves nothing")]
-    return []
 
 
 def _identity_faults(artifact_id, content):
