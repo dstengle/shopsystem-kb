@@ -91,3 +91,42 @@ def _rejected_without_a_role(refused):
 def _no_store_there(root):
     assert not (root / "kb").exists()
     assert list(root.iterdir()) == []
+
+
+def _everything_under(directory):
+    """Every file below a directory, with its bytes, the store's git repository included."""
+    return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
+
+
+@given("the client is working inside a store", target_fixture="working_in")
+def _working_inside_a_store(tmp_path, monkeypatch):
+    working_in = tmp_path / "shop"
+    working_in.mkdir()
+    kb_client.connect(working_in).Init(kb_pb2.InitRequest(root=str(working_in), actor=CLIENT))
+    monkeypatch.chdir(working_in)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+    return {"root": working_in, "held": _everything_under(working_in)}
+
+
+@given("an empty directory elsewhere that sits inside no store", target_fixture="root")
+def _empty_directory_elsewhere(tmp_path):
+    root = tmp_path / "elsewhere"
+    root.mkdir()
+    return root
+
+
+@when("the client starts a store in that empty directory, saying which role it is", target_fixture="started")
+def _start_a_store_in_the_named_directory(root):
+    return kb_client.connect().Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+
+
+@then("the store is made in the directory the client named")
+def _made_where_named(started, root):
+    assert not started.faults, started.faults
+    assert (root / "kb" / "store.yaml").is_file()
+    assert (root / "kb" / "schema" / "schema.yaml").is_file()
+
+
+@then("the store the client was working in is left as it was")
+def _working_store_unchanged(working_in):
+    assert _everything_under(working_in["root"]) == working_in["held"]
