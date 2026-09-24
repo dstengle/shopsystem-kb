@@ -17,6 +17,7 @@ service Kb {
   rpc Write(WriteRequest) returns (WriteResponse);
   rpc Apply(ApplyRequest) returns (ApplyResponse);
   rpc Journal(JournalRequest) returns (JournalResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
 }
 
 message Actor {
@@ -195,5 +196,25 @@ message Entry {
 // plain name, or no store found.
 message JournalResponse {
   repeated Entry entries = 1;
+  repeated Fault faults = 2;
+}
+
+// The words to look for in the prose.
+message SearchRequest {
+  string text = 1;
+}
+
+// A section that holds a word searched for: a stub of its artifact, the
+// section's title, and the words around the first match.
+message Match {
+  Stub stub = 1;
+  string section = 2;
+  string snippet = 3;
+}
+
+// The matches, the section holding the words most often first. With
+// faults, a refusal: no store found.
+message SearchResponse {
+  repeated Match matches = 1;
   repeated Fault faults = 2;
 }

@@ -101,3 +101,7 @@ def write(client, artifact_id, content, message="Change an artifact", actor=CLIE
 def journal(client, artifact=""):
     """The journal's entries, those about one artifact when it is named."""
     return client.Journal(kb_pb2.JournalRequest(artifact=artifact))
+
+def search(client, text):
+    """A search of the prose for the text."""
+    return client.Search(kb_pb2.SearchRequest(text=text))

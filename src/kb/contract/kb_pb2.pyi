@@ -261,3 +261,27 @@ class JournalResponse(_message.Message):
     entries: _containers.RepeatedCompositeFieldContainer[Entry]
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, entries: _Optional[_Iterable[_Union[Entry, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class SearchRequest(_message.Message):
+    __slots__ = ("text",)
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    text: str
+    def __init__(self, text: _Optional[str] = ...) -> None: ...
+
+class Match(_message.Message):
+    __slots__ = ("stub", "section", "snippet")
+    STUB_FIELD_NUMBER: _ClassVar[int]
+    SECTION_FIELD_NUMBER: _ClassVar[int]
+    SNIPPET_FIELD_NUMBER: _ClassVar[int]
+    stub: Stub
+    section: str
+    snippet: str
+    def __init__(self, stub: _Optional[_Union[Stub, _Mapping]] = ..., section: _Optional[str] = ..., snippet: _Optional[str] = ...) -> None: ...
+
+class SearchResponse(_message.Message):
+    __slots__ = ("matches", "faults")
+    MATCHES_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    matches: _containers.RepeatedCompositeFieldContainer[Match]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, matches: _Optional[_Iterable[_Union[Match, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

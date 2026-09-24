@@ -54,6 +54,9 @@ class InProcessClient:
     def Journal(self, request, timeout=None):
         return self._call("Journal", request, kb_pb2.JournalResponse)
 
+    def Search(self, request, timeout=None):
+        return self._call("Search", request, kb_pb2.SearchResponse)
+
 
 def connect(root=None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds."""

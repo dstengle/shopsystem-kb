@@ -3,7 +3,7 @@
 Each rpc first turns what the request carries into checked values (kb.values); nothing past that point sees a
 string that came from the request.
 """
-from kb import canonical, journal, validation, values
+from kb import canonical, journal, search, validation, values
 from kb.content import dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
@@ -205,6 +205,13 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.JournalResponse(entries=[
             _entry(entry) for entry in journal.entries(self._store.dir)
             if not artifact or entry["artifact"] == artifact
+        ])
+
+    def Search(self, request, context):
+        """Every section whose prose holds a word searched for, with a stub of its artifact, most often first."""
+        return kb_pb2.SearchResponse(matches=[
+            kb_pb2.Match(stub=self._stub("", values.artifact_id(hit.artifact)), section=hit.section, snippet=hit.snippet)
+            for hit in search.rank(self._store.artifacts(), request.text)
         ])
 
     def _stub(self, field, target_id: ArtifactId):
