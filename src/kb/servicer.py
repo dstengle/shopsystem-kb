@@ -26,6 +26,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         content = loads(request.content)
         schema = self._store.schema(request.type)
         artifact_id = f"{request.type}/{slug(request.title)}"
+        faults = _title_faults(artifact_id, request.title)
+        if faults:
+            return kb_pb2.CreateResponse(faults=faults)
         if "title" in content:
             return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
                 artifact=artifact_id, path="title", rule="identity",
@@ -83,6 +86,17 @@ class KbServicer(kb_pb2_grpc.KbServicer):
                     key = (other["type"], field)
                     counts[key] = counts.get(key, 0) + 1
         return counts
+
+
+def _title_faults(artifact_id, title):
+    """A title is required, and must leave something to make a name from."""
+    if not title:
+        return [kb_pb2.Fault(artifact=artifact_id, path="title", rule="title",
+                             message="an artifact cannot be created without a title")]
+    if not slug(title):
+        return [kb_pb2.Fault(artifact=artifact_id, path="title", rule="title",
+                             message=f"a title must leave something to make a name from; {title!r} leaves nothing")]
+    return []
 
 
 def _summary_fields(artifact, schema):

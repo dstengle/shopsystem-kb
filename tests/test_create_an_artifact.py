@@ -105,3 +105,18 @@ def _title_is_text_not_a_date(root, client, created):
 @then("the name the client is given is made from that text")
 def _name_from_that_text(client, created):
     assert created.id == f"decision/{read(client, created.id).title}"
+
+
+@when(
+    "the client creates a decision with both required sections and no title, saying which role and why",
+    target_fixture="refused",
+)
+def _create_without_a_title(client):
+    return request(client, "decision", "", {"sections": SECTIONS}, message="Record it")
+
+
+@then("the artifact is rejected because an artifact cannot be created without a title")
+def _rejected_without_a_title(refused):
+    assert [(fault.path, fault.rule, fault.message) for fault in refused.faults] == [
+        ("title", "title", "an artifact cannot be created without a title"),
+    ]
