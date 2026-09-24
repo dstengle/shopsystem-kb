@@ -1,6 +1,6 @@
 """The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later."""
 from kb import canonical, journal, locators, validation
-from kb.content import ContentFault, loads, dumps
+from kb.content import loads, dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
 from kb.store import Store, slug
@@ -30,7 +30,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         artifact_id = f"{request.type}/{slug(request.title)}"
         try:
             content = loads(request.content)
-        except ContentFault as fault:
+        except canonical.NotCanonical as fault:
             return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=artifact_id, rule="content", message=str(fault))])
         faults = _title_faults(artifact_id, request.title) + _identity_faults(artifact_id, content)
         if faults:
@@ -47,7 +47,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             "id": artifact_id, "type": request.type,
             "schema_version": schema["version"], "revision": 1, "title": request.title,
         }
-        path = self._store.save(canonical.order(artifact, schema["schema"]))
+        try:
+            path = self._store.save(canonical.order(artifact, schema["schema"]))
+        except canonical.NotCanonical as fault:
+            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=artifact_id, rule="content", message=str(fault))])
         self._store.commit([path], request.actor.role, request.message)
         return kb_pb2.CreateResponse(id=artifact_id, revision=1)
 

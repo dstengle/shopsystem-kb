@@ -244,3 +244,29 @@ def _both_fields_are_text(root, created):
     assert not created.faults, created.faults
     on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
     assert (on_disk["switch"], on_disk["time"]) == ("on", "1:20")
+
+
+@when(
+    "the client creates a decision whose content writes a value once and points back at it from another place "
+    "instead of writing it again, saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_an_alias(client):
+    return _raw(client, (
+        "reviewed: &day Monday\n"
+        "decided: *day\n"
+        "sections:\n"
+        "  - title: Purpose\n    body: Why.\n"
+        "  - title: Rationale\n    body: Because.\n"
+    ))
+
+
+@then(
+    "the artifact is rejected because content is read exactly as written and nothing in it stands in "
+    "for a value written somewhere else"
+)
+def _rejected_for_an_alias(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.rule, fault.message) for fault in refused.faults] == [
+        ("content", "content is read exactly as written and nothing in it stands in for a value written somewhere else"),
+    ]

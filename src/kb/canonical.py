@@ -4,7 +4,7 @@ kb is the only writer, so loading needs no round-trip preservation.
 """
 import io
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, events
 from ruamel.yaml.representer import SafeRepresenter
 
 IDENTITY = ("id", "type", "schema_version", "revision", "title")
@@ -54,20 +54,42 @@ def _yaml() -> YAML:
     return yaml
 
 
+class NotCanonical(ValueError):
+    """YAML that is not read plainly as written. The message says which rule it breaks."""
+
+
+def check(text: str) -> None:
+    """The one check of plain reading, run on content as it arrives and on every file kb is about to write.
+
+    No tags, no anchors or aliases, exactly one document. Raises NotCanonical naming the first rule broken.
+    """
+    parsed = list(_yaml().parse(text))
+    if any(getattr(event, "tag", None) is not None for event in parsed):
+        raise NotCanonical("content is read plainly as written and carries no tags")
+    if any(getattr(event, "anchor", None) is not None for event in parsed):
+        raise NotCanonical(
+            "content is read exactly as written and nothing in it stands in for a value written somewhere else"
+        )
+    if sum(isinstance(event, events.DocumentStartEvent) for event in parsed) > 1:
+        raise NotCanonical("content holds exactly one document")
+
+
 def dump(artifact: dict) -> str:
-    """Block style, keys in the order given, prose as literal blocks, sequences indented under their key, no line folded."""
+    """Block style, keys in the order given, prose as literal blocks, sequences indented under their key, no line folded.
+
+    The text is checked before it is handed back, so nothing kb writes can differ from what kb accepts.
+    """
     stream = io.StringIO()
     _yaml().dump(artifact, stream)
-    return stream.getvalue()
+    text = stream.getvalue()
+    check(text)
+    return text
 
 
 def load(text: str):
+    """Plain YAML 1.2: checked, then read."""
+    check(text)
     return _yaml().load(text)
-
-
-def events(text: str):
-    """The YAML 1.2 parse of `text`, as events, for checks that look at how a value is written."""
-    return _yaml().parse(text)
 
 
 def order(artifact: dict, schema: dict) -> dict:
