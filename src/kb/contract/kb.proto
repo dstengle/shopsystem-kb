@@ -16,6 +16,7 @@ service Kb {
   rpc Validate(ValidateRequest) returns (ValidateResponse);
   rpc Write(WriteRequest) returns (WriteResponse);
   rpc Apply(ApplyRequest) returns (ApplyResponse);
+  rpc Journal(JournalRequest) returns (JournalResponse);
 }
 
 message Actor {
@@ -167,4 +168,32 @@ message ApplyResponse {
 message Result {
   string id = 1;
   int32 revision = 2;
+}
+
+// Narrows the journal to the entries about one artifact; empty, every entry.
+message JournalRequest {
+  string artifact = 1;
+}
+
+// One journal entry, as the store holds it. `at` is ISO 8601 in UTC; a
+// change made alone names itself as its batch.
+message Entry {
+  string id = 1;
+  string at = 2;
+  Actor actor = 3;
+  string op = 4;
+  string artifact = 5;
+  string path = 6;
+  int32 revision = 7;
+  int32 schema_version = 8;
+  string digest = 9;
+  string message = 10;
+  string batch = 11;
+}
+
+// The entries, oldest first. With faults, a refusal: a name that is not a
+// plain name, or no store found.
+message JournalResponse {
+  repeated Entry entries = 1;
+  repeated Fault faults = 2;
 }

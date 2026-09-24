@@ -196,6 +196,17 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             violations += validation.validate(str(artifact_id), content, schema, self._store)
         return kb_pb2.ValidateResponse(violations=violations)
 
+    def Journal(self, request, context):
+        """The journal's entries, oldest first, those about one artifact when the request names it."""
+        try:
+            artifact = str(values.artifact_id(request.artifact)) if request.artifact else ""
+        except values.Refused as refused:
+            return kb_pb2.JournalResponse(faults=refused.faults)
+        return kb_pb2.JournalResponse(entries=[
+            _entry(entry) for entry in journal.entries(self._store.dir)
+            if not artifact or entry["artifact"] == artifact
+        ])
+
     def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
         schema = self._store.schema(target_id.kind)["schema"]
@@ -213,6 +224,14 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for field in pointing:
                 counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
         return counts
+
+
+def _entry(entry: dict) -> kb_pb2.Entry:
+    return kb_pb2.Entry(
+        id=entry["id"], at=entry["at"], actor=kb_pb2.Actor(**entry["actor"]), op=entry["op"],
+        artifact=entry["artifact"], path=entry["path"], revision=entry["revision"],
+        schema_version=entry["schema_version"], digest=entry["digest"], message=entry["message"], batch=entry["batch"],
+    )
 
 
 def _unclaimed(draft: Draft, named: ArtifactId) -> ArtifactId:

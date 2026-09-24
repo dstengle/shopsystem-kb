@@ -221,3 +221,43 @@ class Result(_message.Message):
     id: str
     revision: int
     def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
+
+class JournalRequest(_message.Message):
+    __slots__ = ("artifact",)
+    ARTIFACT_FIELD_NUMBER: _ClassVar[int]
+    artifact: str
+    def __init__(self, artifact: _Optional[str] = ...) -> None: ...
+
+class Entry(_message.Message):
+    __slots__ = ("id", "at", "actor", "op", "artifact", "path", "revision", "schema_version", "digest", "message", "batch")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    AT_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    OP_FIELD_NUMBER: _ClassVar[int]
+    ARTIFACT_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
+    DIGEST_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    BATCH_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    at: str
+    actor: Actor
+    op: str
+    artifact: str
+    path: str
+    revision: int
+    schema_version: int
+    digest: str
+    message: str
+    batch: str
+    def __init__(self, id: _Optional[str] = ..., at: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., op: _Optional[str] = ..., artifact: _Optional[str] = ..., path: _Optional[str] = ..., revision: _Optional[int] = ..., schema_version: _Optional[int] = ..., digest: _Optional[str] = ..., message: _Optional[str] = ..., batch: _Optional[str] = ...) -> None: ...
+
+class JournalResponse(_message.Message):
+    __slots__ = ("entries", "faults")
+    ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    entries: _containers.RepeatedCompositeFieldContainer[Entry]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, entries: _Optional[_Iterable[_Union[Entry, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

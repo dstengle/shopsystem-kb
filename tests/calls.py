@@ -50,18 +50,18 @@ WORK_ITEM_TYPE = {
 }
 
 
-def request(client, type_name, title, content, message="Create an artifact"):
+def request(client, type_name, title, content, message="Create an artifact", actor=CLIENT):
     """A Create as the client sends it: the title beside the content. Returns the response, faults and all."""
     return client.Create(kb_pb2.CreateRequest(
-        type=type_name, title=title, content=dumps(content), actor=CLIENT, message=message,
+        type=type_name, title=title, content=dumps(content), actor=actor, message=message,
     ))
 
 
-def create(client, type_name, content, message="Create an artifact"):
+def create(client, type_name, content, message="Create an artifact", actor=CLIENT):
     """Create from a dict written the way a user writes a file, title inside; the title is lifted out and sent beside."""
     content = dict(content)
     title = content.pop("title", "")
-    response = request(client, type_name, title, content, message)
+    response = request(client, type_name, title, content, message, actor)
     assert not response.faults, response.faults
     return response
 
@@ -90,8 +90,14 @@ def replacement(artifact_id, content):
     return kb_pb2.Operation(write=kb_pb2.Replacement(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content)))
 
 
-def write(client, artifact_id, content, message="Change an artifact"):
-    """A Write of a whole artifact under the client's role. Returns the response, faults and all."""
+def write(client, artifact_id, content, message="Change an artifact", actor=CLIENT):
+    """A Write of a whole artifact, under the client's role unless another actor is given. Returns the response,
+    faults and all."""
     return client.Write(kb_pb2.WriteRequest(
-        locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), actor=CLIENT, message=message,
+        locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), actor=actor, message=message,
     ))
+
+
+def journal(client, artifact=""):
+    """The journal's entries, those about one artifact when it is named."""
+    return client.Journal(kb_pb2.JournalRequest(artifact=artifact))

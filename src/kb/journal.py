@@ -38,3 +38,14 @@ def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(canonical.dump(entry))
     return target
+
+
+def entries(store_dir: Path) -> list[dict]:
+    """Every entry in the journal, oldest first: by the time in its id, then by its place in its set."""
+    found = [canonical.load(path.read_text()) for path in (store_dir / "journal").rglob("*.yaml")]
+    return sorted(found, key=_order)
+
+
+def _order(entry: dict) -> tuple[str, int]:
+    stamp, _, seq = entry["id"].rpartition("-")
+    return stamp, int(seq)
