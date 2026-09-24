@@ -1,6 +1,6 @@
 """The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later."""
 from kb import canonical, validation
-from kb.content import loads
+from kb.content import loads, dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
 from kb.store import Store, slug
@@ -44,8 +44,47 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             id=artifact["id"], type=artifact["type"],
             schema_version=artifact["schema_version"], revision=artifact["revision"],
             title=artifact["title"],
+            content=dumps(_summary_fields(artifact, schema)),
         )
+        for field in _reference_fields(schema):
+            for target_id in _as_list(artifact.get(field)):
+                response.references.append(self._stub(field, target_id))
         for collection in schema.get("parts", {}):
             for item in artifact.get(collection, []):
                 response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
+        for (type_name, field), count in self._inbound(artifact["id"]).items():
+            response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
         return response
+
+    def _stub(self, field, target_id):
+        target = self._store.load(target_id)
+        schema = self._store.schema(target["type"])["schema"]
+        return kb_pb2.Stub(
+            field=field, id=target["id"], type=target["type"], title=target["title"],
+            fields=dumps(_summary_fields(target, schema)),
+        )
+
+    def _inbound(self, artifact_id):
+        """How many artifacts point at this one, by their type and the field they use."""
+        counts = {}
+        for other in self._store.artifacts():
+            schema = self._store.schema(other["type"])["schema"]
+            for field in _reference_fields(schema):
+                if artifact_id in _as_list(other.get(field)):
+                    key = (other["type"], field)
+                    counts[key] = counts.get(key, 0) + 1
+        return counts
+
+
+def _summary_fields(artifact, schema):
+    return {name: artifact[name] for name in schema.get("summary", []) if name in artifact}
+
+
+def _reference_fields(schema):
+    return [name for name, field in schema.get("properties", {}).items() if "ref" in field]
+
+
+def _as_list(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]

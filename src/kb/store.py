@@ -47,6 +47,11 @@ class Store:
             "commit", "-q", "-m", message,
         )
 
+    def artifacts(self):
+        """Every artifact in the store, schemas included, in path order."""
+        for path in sorted(self.dir.glob("*/*.yaml")):
+            yield canonical.load(path.read_text())
+
 
 def slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
