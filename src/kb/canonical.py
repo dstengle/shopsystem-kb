@@ -4,7 +4,7 @@ kb is the only writer, so loading needs no round-trip preservation.
 """
 import io
 
-from ruamel.yaml import YAML, events, nodes
+from ruamel.yaml import YAML, events, nodes, tokens
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.representer import SafeRepresenter
 
@@ -66,10 +66,11 @@ class NotCanonical(ValueError):
 def check(text: str) -> None:
     """The one check of plain reading, run on content as it arrives and on every file kb is about to write.
 
-    No tags, no anchors or aliases, exactly one document, every entry named once. Raises NotCanonical naming the
+    No directive, no tags, no anchors or aliases, exactly one document, every entry named once. Raises NotCanonical naming the
     first rule broken.
     """
     try:
+        _no_directive(text)
         parsed = list(_yaml().parse(text))
     except YAMLError as error:
         raise NotCanonical(_unreadable(error)) from None
@@ -82,6 +83,19 @@ def check(text: str) -> None:
     if sum(isinstance(event, events.DocumentStartEvent) for event in parsed) > 1:
         raise NotCanonical("content holds exactly one document")
     _named_once(_yaml().compose(text), ())
+
+
+def _no_directive(text: str) -> None:
+    """Content cannot choose the rules it is read by: a %YAML or %TAG line is refused before anything reads past it."""
+    for token in _yaml().scan(text):
+        if isinstance(token, tokens.DirectiveToken):
+            value = ".".join(map(str, token.value)) if token.name == "YAML" else " ".join(token.value)
+            raise NotCanonical(
+                "content is read plainly as written and opens with no declaration of its format; "
+                f"line {token.start_mark.line + 1} declares %{token.name} {value}"
+            )
+        if not isinstance(token, (tokens.StreamStartToken, tokens.DirectiveToken)):
+            return
 
 
 def _named_once(node, place: tuple) -> None:

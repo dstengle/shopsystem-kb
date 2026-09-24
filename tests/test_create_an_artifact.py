@@ -375,3 +375,31 @@ def _rejected_for_an_entry_named_twice(created):
     assert [(fault.path, fault.rule) for fault in created.faults] == [("sections/0/body", "content")]
     assert created.faults[0].message.startswith("an entry is named once and only once")
     assert "line 4" in created.faults[0].message
+
+
+@given(
+    "content for a decision that opens with a line declaring which version of the writing format the rest is in",
+    target_fixture="written",
+)
+def _content_opening_with_a_directive():
+    return (
+        "%YAML 1.1\n"
+        "---\n"
+        "switch: on\n"
+        "sections:\n"
+        "  - title: Purpose\n    body: Why.\n"
+        "  - title: Rationale\n    body: Because.\n"
+    )
+
+
+@then(
+    "the artifact is rejected because content is read plainly as written and opens with no declaration of its format, "
+    "and the place the declaration stands is named"
+)
+def _rejected_for_a_directive(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [fault.rule for fault in created.faults] == ["content"]
+    assert created.faults[0].message == (
+        "content is read plainly as written and opens with no declaration of its format; "
+        "line 1 declares %YAML 1.1"
+    )
