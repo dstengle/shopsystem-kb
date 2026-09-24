@@ -159,3 +159,19 @@ def _outside_with_kb_root_naming_this_one(root, tmp_path, monkeypatch):
 @then("the client is given the decision, from the store KB_ROOT names")
 def _from_the_store_kb_root_names(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+
+
+@given("the client is working outside any store and nothing names one", target_fixture="elsewhere")
+def _outside_with_nothing_naming_one(tmp_path, monkeypatch):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+    return elsewhere
+
+
+@then("the read is rejected because no store was found, neither above where it is working nor named outright")
+def _rejected_with_no_store_found(shown, elsewhere):
+    assert [fault.rule for fault in shown.faults] == ["store"]
+    assert "no store was found" in shown.faults[0].message
+    assert str(elsewhere) in shown.faults[0].message
