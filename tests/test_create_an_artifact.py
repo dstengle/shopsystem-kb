@@ -120,3 +120,26 @@ def _rejected_without_a_title(refused):
     assert [(fault.path, fault.rule, fault.message) for fault in refused.faults] == [
         ("title", "title", "an artifact cannot be created without a title"),
     ]
+
+
+@when(
+    "the client creates a decision whose content carries a name and a version for the artifact itself, "
+    "saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_identity_inside(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "id": "decision/a-name-of-my-own",
+        "revision": 7,
+        "sections": SECTIONS,
+    }, message="Record it")
+
+
+@then(
+    "the artifact is rejected because content holds only what the type declares, "
+    "and each thing it carried that only the store settles is named back"
+)
+def _rejected_for_identity_inside(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
+    assert all(fault.path in fault.message for fault in refused.faults)

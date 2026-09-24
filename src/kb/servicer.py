@@ -26,14 +26,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         content = loads(request.content)
         schema = self._store.schema(request.type)
         artifact_id = f"{request.type}/{slug(request.title)}"
-        faults = _title_faults(artifact_id, request.title)
+        faults = _title_faults(artifact_id, request.title) + _identity_faults(artifact_id, content)
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
-        if "title" in content:
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
-                artifact=artifact_id, path="title", rule="identity",
-                message=f"a title is given alongside the content, never inside it; the content carried the title {content['title']!r}",
-            )])
         faults = validation.validate(artifact_id, {"title": request.title, **content}, schema["schema"])
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
@@ -97,6 +92,20 @@ def _title_faults(artifact_id, title):
         return [kb_pb2.Fault(artifact=artifact_id, path="title", rule="title",
                              message=f"a title must leave something to make a name from; {title!r} leaves nothing")]
     return []
+
+
+def _identity_faults(artifact_id, content):
+    """Content holds only what the type declares; the identity keys are the store's, the title travels beside."""
+    faults = []
+    for key in canonical.IDENTITY:
+        if key not in content:
+            continue
+        if key == "title":
+            message = f"a title is given alongside the content, never inside it; the content carried the title {content[key]!r}"
+        else:
+            message = f"content holds only what the type declares; {key} is settled by the store, and the content carried {key}: {content[key]!r}"
+        faults.append(kb_pb2.Fault(artifact=artifact_id, path=key, rule="identity", message=message))
+    return faults
 
 
 def _summary_fields(artifact, schema):
