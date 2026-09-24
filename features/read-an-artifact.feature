@@ -114,3 +114,9 @@ So that a client can show what the store holds at whatever depth it needs, the c
     When the client reads the decision
     Then the client is given the decision
     And the client was never readied again after the store appeared
+
+  Scenario: Reading an artifact whose stored file cannot be read is refused
+    Given someone edited the decision's file by hand and left it in a shape the store cannot read
+    When the client reads the decision
+    Then the read is rejected because that file cannot be read, and the file is named
+    And the client is given that fault as it is given any other, the call never breaking off

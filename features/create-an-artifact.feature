@@ -123,3 +123,38 @@ So that a client can put content into the store and get a name it can come back 
     When the client creates an artifact of the kind "../schema/decision", with a title and both required sections, saying which role and why
     Then the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path
     And nothing is looked up or written anywhere, inside the store or outside it
+
+  Scenario: A kind the store holds no type for is refused
+    Given a store that holds no type called "invoice"
+    When the client creates an artifact of the kind "invoice", with a title and both required sections, saying which role and why
+    Then the artifact is rejected because a kind must name a type the store holds, and the kind asked for is given back
+    And that fault stands on its own, apart from anything wrong with the content
+    And nothing is written anywhere in the store
+
+  Scenario: Content that opens by declaring the format it is written in is refused
+    Given content for a decision that opens with a line declaring which version of the writing format the rest is in
+    When the client creates a decision from that content, saying which role and why
+    Then the artifact is rejected because content is read plainly as written and opens with no declaration of its format, and the place the declaration stands is named
+
+  Scenario: Content naming the same entry twice is refused
+    Given content for a decision that names the same entry twice in the same place
+    When the client creates a decision from that content, saying which role and why
+    Then the artifact is rejected because an entry is named once and only once, and the place the second one stands is named
+
+  Scenario: Values written as a yes-or-no, as nothing and as a number keep those meanings
+    Given content for a decision carrying one field written "true", one field left as nothing, and one field written "12.5"
+    When the client creates a decision from that content, saying which role and why
+    Then the first field reads back as a yes-or-no, the second as nothing at all, and the third as a number
+    And none of the three reads back as text
+
+  Scenario: A title given as a yes-or-no is still a title
+    Given a title for a new decision that is the yes-or-no true rather than text
+    When the client creates a decision with that title, saying which role and why
+    Then the title reads back as the text "true"
+    And the name the client is given is made from that text
+
+  Scenario: A title given as a number is still a title
+    Given a title for a new decision that is the number 12 rather than text
+    When the client creates a decision with that title, saying which role and why
+    Then the title reads back as the text "12"
+    And the name the client is given is made from that text

@@ -27,3 +27,10 @@ So that a client can tell whether everything the store holds still fits its type
     Then that decision is listed as behind its type
     And it is also reported as a violation, naming the artifact, the place in it and the rule broken
     And the check itself does not fail
+
+  Scenario: A stored file that cannot be read is reported as a violation
+    Given a store where someone edited a decision's file by hand and left it in a shape the store cannot read
+    When the client checks the store
+    Then that file is reported as a violation, naming the file
+    And everything else in the store is checked and reported alongside it
+    And the check comes back with its answer rather than breaking off

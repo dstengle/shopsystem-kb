@@ -51,3 +51,21 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     When the client starts a store in that empty directory, saying which role it is
     Then the store is made in the directory the client named
     And the store the client was working in is left as it was
+
+  Scenario: Starting a store without naming a directory at all is refused
+    Given the client has nothing at all to name as the directory to start a store in
+    When the client starts a store naming nothing, saying which role it is
+    Then starting the store is rejected because a store is started in a directory that was named and that exists
+    And no store is made anywhere
+
+  Scenario: Starting a store in a directory that is not there is refused
+    Given a place on the disk where no directory exists
+    When the client starts a store there, saying which role it is
+    Then starting the store is rejected because a store is started in a directory that exists
+    And nothing is made at that place
+
+  Scenario: Starting a store where a file sits instead of a directory is refused
+    Given a place on the disk holding a file rather than a directory
+    When the client starts a store there, saying which role it is
+    Then starting the store is rejected because a store is started in a directory, and what was named is not one
+    And that file is left as it was
