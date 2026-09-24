@@ -1,7 +1,7 @@
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, read, request
-from kb import canonical, client as kb_client
+from kb import canonical, content, client as kb_client
 from kb.contract import kb_pb2
 
 scenarios("create-an-artifact.feature")
@@ -332,3 +332,21 @@ def _rejected_as_not_a_plain_kind(attempt):
 @then("nothing is looked up or written anywhere, inside the store or outside it")
 def _nothing_written_anywhere(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+@given("a title for a new decision that is the yes-or-no true rather than text", target_fixture="title")
+def _a_title_that_is_a_yes_or_no():
+    return True
+
+
+@when("the client creates a decision with that title, saying which role and why", target_fixture="created")
+def _create_with_that_title(client, title):
+    return request(client, "decision", content.text(title), {"sections": SECTIONS}, message="Record it")
+
+
+@then(parsers.parse('the title reads back as the text "{text}"'))
+def _title_reads_back_as(root, client, created, text):
+    assert not created.faults, created.faults
+    assert read(client, created.id).title == text
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert on_disk["title"] == text
