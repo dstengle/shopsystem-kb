@@ -2,7 +2,7 @@ import subprocess
 
 from pytest_bdd import given, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, replacement
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, read, replacement
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
@@ -69,3 +69,45 @@ def _one_change_in_the_history(root, applied):
     in_commit = set(_git(root, "show", "--name-only", "--format=", "HEAD").split())
     assert {f"{DECISION}.yaml", f"{WORK_ITEM}.yaml"} <= in_commit
     assert len([name for name in in_commit if name.startswith("journal/")]) == 2
+
+
+def _everything_under(directory):
+    """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
+    return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
+
+
+@given("a set whose second change is missing a section its type requires", target_fixture="bad_set")
+def _a_set_with_a_bad_second_change():
+    return [
+        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+        creation("decision", "Prices are reviewed monthly", {"sections": []}),
+    ]
+
+
+@when("the client asks for the set, saying which role and why", target_fixture="attempt")
+def _ask_for_the_set(root, client, bad_set):
+    before = _everything_under(root)
+    response = apply(client, bad_set, message="Record two decisions")
+    return {"response": response, "before": before, "after": _everything_under(root)}
+
+
+@then("the set is rejected because a change in it does not fit its type")
+def _set_rejected(attempt):
+    refused = attempt["response"]
+    assert (refused.batch, list(refused.results)) == ("", [])
+    assert {(fault.artifact, fault.rule) for fault in refused.faults} == {("decision/prices-are-reviewed-monthly", "sections")}
+
+
+@then("the store holds neither change")
+def _neither_change_held(client, attempt):
+    assert attempt["after"] == attempt["before"]
+    for name in (DECISION, "decision/prices-are-reviewed-monthly"):
+        assert [fault.rule for fault in read(client, name).faults] == ["not-found"]
+
+
+@then("every fault in the set comes back, not only the first")
+def _every_fault_back(attempt):
+    assert [(fault.path, fault.message) for fault in attempt["response"].faults] == [
+        ("sections", "the sections the type requires must all be present, in order; 'Purpose' is missing"),
+        ("sections", "the sections the type requires must all be present, in order; 'Rationale' is missing"),
+    ]
