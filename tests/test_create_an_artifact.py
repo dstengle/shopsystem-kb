@@ -152,3 +152,10 @@ def _rejected_for_identity_inside(refused):
 def _plain_name(created):
     assert not created.faults, created.faults
     assert created.id == "decision/price-reviews-weekly-from-now-on"
+
+
+@then("the artifact is rejected because a title must leave something to make a name from")
+def _rejected_for_an_empty_name(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in created.faults] == [("title", "title")]
+    assert "leave something to make a name from" in created.faults[0].message
