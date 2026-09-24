@@ -101,3 +101,20 @@ def _read_a_name_the_store_lacks(client):
 def _rejected_as_not_held(refused):
     assert [(fault.artifact, fault.rule) for fault in refused.faults] == [("decision/nothing-of-the-sort", "not-found")]
     assert "decision/nothing-of-the-sort" in refused.faults[0].message
+
+
+@when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="refused")
+def _read_by_the_name(client, name):
+    return read(client, name)
+
+
+@then("the read is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
+def _rejected_as_not_a_plain_name(refused):
+    assert [fault.rule for fault in refused.faults] == ["locator"]
+    assert "plain name" in refused.faults[0].message
+
+
+@then("no content comes back, from inside the store or outside it")
+def _no_content_at_all(refused):
+    assert (refused.id, refused.title, refused.content) == ("", "", "")
+    assert not refused.references and not refused.parts and not refused.inbound

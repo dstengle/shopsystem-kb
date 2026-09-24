@@ -1,5 +1,5 @@
 """The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later."""
-from kb import canonical, journal, validation
+from kb import canonical, journal, locators, validation
 from kb.content import ContentFault, loads, dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
@@ -48,6 +48,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.CreateResponse(id=artifact_id, revision=1)
 
     def Read(self, request, context):
+        faults = locators.faults(request.locator)
+        if faults:
+            return kb_pb2.ReadResponse(faults=faults)
         if not self._store.path(request.locator.id).is_file():
             return kb_pb2.ReadResponse(faults=[kb_pb2.Fault(
                 artifact=request.locator.id, rule="not-found",
