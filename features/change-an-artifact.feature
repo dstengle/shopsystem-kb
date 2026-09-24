@@ -42,6 +42,11 @@ So that a client can keep an artifact true without rewriting the store, the clie
     Then the change is rejected because content holds only what the type declares, and the thing it carried that only the store settles is named back
     And reading the decision gives what it held before, at the version it held before
 
+  Scenario: Changing something the store does not hold is refused
+    When the client replaces an artifact by a name the store holds nothing under, saying which role and why
+    Then the change is rejected because the store holds nothing by that name, and the name asked for is given back
+    And nothing is written anywhere in the store
+
   Scenario: A change aimed at a name that is not a plain name writes nothing
     When the client replaces an artifact named "../../elsewhere", saying which role and why
     Then the change is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens

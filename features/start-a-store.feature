@@ -12,7 +12,14 @@ So that a client has somewhere to keep typed artifacts before it has any types o
   Scenario: Starting a store is recorded in the store's history
     Given an empty directory
     When the client starts a store there, saying which role it is
-    Then the store's history holds an entry for the store being started, under that role, with the message "initialise store"
+    Then the store's history holds one entry, under that role, with the message "initialise store"
+    And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
+
+  Scenario: Starting a store without saying which role is refused
+    Given an empty directory
+    When the client starts a store there without saying which role it is
+    Then starting the store is rejected because a store can only be started under a role
+    And that directory holds no store
 
   @slice-51
   Scenario: A directory holding other things can still be given a store

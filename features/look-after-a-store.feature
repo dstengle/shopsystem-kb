@@ -8,6 +8,12 @@ So that a store exists and can be checked from a shell without any client, the o
     Then there is a store inside that directory, in a place of its own
     And a client can begin defining its own types in it straight away
 
+  Scenario: Setting up a store without naming which role is refused
+    Given a directory that has no store inside it, and nothing names which role the operator is
+    When the operator runs kb init against that directory
+    Then setting the store up is rejected because the role must be named through KB_ACTOR
+    And that directory still has no store inside it
+
   @slice-44
   Scenario: Setting up a store where the directory already has one inside it is refused
     Given a directory that already has a store inside it, with content in that store
@@ -63,3 +69,13 @@ So that a store exists and can be checked from a shell without any client, the o
     Given the operator is working outside any store and nothing names one
     When the operator runs kb validate there
     Then the check is rejected because no store was found, neither above where they are working nor named outright
+
+  Scenario: Naming a store that is not there is refused
+    Given the operator is working outside any store, with KB_ROOT naming a directory that holds no store
+    When the operator runs kb validate there
+    Then the check is rejected because KB_ROOT names a directory that holds no store
+
+  Scenario: Standing in one store while naming another is refused
+    Given the operator is working inside a store, with KB_ROOT naming a different store
+    When the operator runs kb validate there
+    Then the check is rejected because KB_ROOT names a store other than the one they are standing in, and neither of the two is guessed at

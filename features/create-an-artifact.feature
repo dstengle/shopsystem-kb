@@ -54,6 +54,10 @@ So that a client can put content into the store and get a name it can come back 
     When the client creates a decision whose content carries a name and a version for the artifact itself, saying which role and why
     Then the artifact is rejected because content holds only what the type declares, and each thing it carried that only the store settles is named back
 
+  Scenario: Content carrying a title of its own is refused
+    When the client creates a decision whose content carries a title as well as the title given alongside it, saying which role and why
+    Then the artifact is rejected because a title is given alongside the content, never inside it, and the title the content carried is named back
+
   Scenario: A title with capitals and punctuation gives a plain name
     When the client creates a decision titled "Price reviews: weekly, from now on!", saying which role and why
     Then the name the client is given is that title in lower case, with each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end

@@ -47,3 +47,13 @@ So that a client can grow a collection an item at a time without rewriting the a
     When the client adds a step that points at the shared step together with its settings, saying which role and why
     Then the settings are held by the new item
     And the shared step is unchanged
+
+  Scenario: An item whose content settles what only the store settles is refused
+    When the client adds a step whose content carries a name of its own, saying which role and why
+    Then the item is rejected because content holds only what the type declares, and the thing it carried that only the store settles is named back
+    And the process holds the steps it held before, at the version it held before
+
+  Scenario: Adding an item to something the store does not hold is refused
+    When the client adds a step to a process by a name the store holds nothing under, saying which role and why
+    Then the item is rejected because the store holds nothing by that name, and the name asked for is given back
+    And nothing is written anywhere in the store

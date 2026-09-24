@@ -85,3 +85,15 @@ So that a client can show what the store holds at whatever depth it needs, the c
     Given the client is working outside any store and nothing names one
     When the client reads the decision
     Then the read is rejected because no store was found, neither above where it is working nor named outright
+
+  Scenario: Naming a store that is not there is refused
+    Given the client is working outside any store, with KB_ROOT naming a directory that holds no store
+    When the client reads the decision
+    Then the read is rejected because KB_ROOT names a directory that holds no store
+    And no content comes back
+
+  Scenario: Working in one store while naming another is refused
+    Given the client is working inside a store, with KB_ROOT naming a different store
+    When the client reads the decision
+    Then the read is rejected because KB_ROOT names a store other than the one it is working in, and neither of the two is guessed at
+    And no content comes back, from either store
