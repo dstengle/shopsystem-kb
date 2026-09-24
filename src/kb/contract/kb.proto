@@ -1,6 +1,91 @@
 // kb contract, version 0.1. Regenerate with `make contract`.
+//
+// Artifact content crosses as canonical YAML text beside the fixed
+// identity fields, since content shape is schema-defined at runtime.
+// Errors are a typed list of faults on the response; a response that
+// carries faults is a refusal and nothing was written.
 syntax = "proto3";
 
 package kb;
 
-service Kb {}
+
+service Kb {
+  rpc Init(InitRequest) returns (InitResponse);
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Read(ReadRequest) returns (ReadResponse);
+}
+
+message Actor {
+  string role = 1;
+  string execution = 2;
+}
+
+// An artifact root when path is empty; a node inside it otherwise.
+message Locator {
+  string id = 1;
+  string path = 2;
+}
+
+message Fault {
+  string artifact = 1;
+  string path = 2;
+  string rule = 3;
+  string message = 4;
+}
+
+message InitRequest {
+  string root = 1;
+}
+
+message InitResponse {}
+
+message CreateRequest {
+  string type = 1;
+  string content = 2;  // canonical YAML
+  Actor actor = 3;
+  string message = 4;
+}
+
+message CreateResponse {
+  string id = 1;
+  int32 revision = 2;
+  repeated Fault faults = 3;
+}
+
+message ReadRequest {
+  Locator locator = 1;
+}
+
+// A summary: identity, the fields the type shows at a glance, a stub of
+// each reference target and of each part, and inbound counts.
+message ReadResponse {
+  string id = 1;
+  string type = 2;
+  int32 schema_version = 3;
+  int32 revision = 4;
+  string title = 5;
+  string content = 6;  // canonical YAML
+  repeated Stub references = 7;
+  repeated PartStub parts = 8;
+  repeated InboundCount inbound = 9;
+}
+
+message Stub {
+  string field = 1;
+  string id = 2;
+  string type = 3;
+  string title = 4;
+  string fields = 5;   // canonical YAML
+}
+
+message PartStub {
+  string collection = 1;
+  string id = 2;
+  string title = 3;
+}
+
+message InboundCount {
+  string type = 1;
+  string field = 2;
+  int32 count = 3;
+}

@@ -3,6 +3,7 @@
 import grpc
 import warnings
 
+from kb.contract import kb_pb2 as kb_dot_contract_dot_kb__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -33,14 +34,62 @@ class KbStub:
         Args:
             channel: A grpc.Channel.
         """
+        self.Init = channel.unary_unary(
+                '/kb.Kb/Init',
+                request_serializer=kb_dot_contract_dot_kb__pb2.InitRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.InitResponse.FromString,
+                _registered_method=True)
+        self.Create = channel.unary_unary(
+                '/kb.Kb/Create',
+                request_serializer=kb_dot_contract_dot_kb__pb2.CreateRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.CreateResponse.FromString,
+                _registered_method=True)
+        self.Read = channel.unary_unary(
+                '/kb.Kb/Read',
+                request_serializer=kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
+                _registered_method=True)
 
 
 class KbServicer:
     """Missing associated documentation comment in .proto file."""
 
+    def Init(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Create(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Read(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_KbServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Init': grpc.unary_unary_rpc_method_handler(
+                    servicer.Init,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.InitRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.InitResponse.SerializeToString,
+            ),
+            'Create': grpc.unary_unary_rpc_method_handler(
+                    servicer.Create,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.CreateRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.CreateResponse.SerializeToString,
+            ),
+            'Read': grpc.unary_unary_rpc_method_handler(
+                    servicer.Read,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.ReadRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.ReadResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'kb.Kb', rpc_method_handlers)
@@ -51,3 +100,84 @@ def add_KbServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Kb:
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Init(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.Kb/Init',
+            kb_dot_contract_dot_kb__pb2.InitRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.InitResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Create(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.Kb/Create',
+            kb_dot_contract_dot_kb__pb2.CreateRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.CreateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Read(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.Kb/Read',
+            kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)

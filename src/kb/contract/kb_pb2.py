@@ -24,13 +24,37 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14kb/contract/kb.proto\x12\x02kb2\x04\n\x02Kbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14kb/contract/kb.proto\x12\x02kb\"(\n\x05\x41\x63tor\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x11\n\texecution\x18\x02 \x01(\t\"#\n\x07Locator\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"F\n\x05\x46\x61ult\x12\x10\n\x08\x61rtifact\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0c\n\x04rule\x18\x03 \x01(\t\x12\x0f\n\x07message\x18\x04 \x01(\t\"\x1b\n\x0bInitRequest\x12\x0c\n\x04root\x18\x01 \x01(\t\"\x0e\n\x0cInitResponse\"Y\n\rCreateRequest\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x18\n\x05\x61\x63tor\x18\x03 \x01(\x0b\x32\t.kb.Actor\x12\x0f\n\x07message\x18\x04 \x01(\t\"I\n\x0e\x43reateResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x05\x12\x19\n\x06\x66\x61ults\x18\x03 \x03(\x0b\x32\t.kb.Fault\"+\n\x0bReadRequest\x12\x1c\n\x07locator\x18\x01 \x01(\x0b\x32\x0b.kb.Locator\"\xd0\x01\n\x0cReadResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x16\n\x0eschema_version\x18\x03 \x01(\x05\x12\x10\n\x08revision\x18\x04 \x01(\x05\x12\r\n\x05title\x18\x05 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x06 \x01(\t\x12\x1c\n\nreferences\x18\x07 \x03(\x0b\x32\x08.kb.Stub\x12\x1b\n\x05parts\x18\x08 \x03(\x0b\x32\x0c.kb.PartStub\x12!\n\x07inbound\x18\t \x03(\x0b\x32\x10.kb.InboundCount\"N\n\x04Stub\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\x0c\n\x04type\x18\x03 \x01(\t\x12\r\n\x05title\x18\x04 \x01(\t\x12\x0e\n\x06\x66ields\x18\x05 \x01(\t\"9\n\x08PartStub\x12\x12\n\ncollection\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\r\n\x05title\x18\x03 \x01(\t\":\n\x0cInboundCount\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x05\x32\x8b\x01\n\x02Kb\x12)\n\x04Init\x12\x0f.kb.InitRequest\x1a\x10.kb.InitResponse\x12/\n\x06\x43reate\x12\x11.kb.CreateRequest\x1a\x12.kb.CreateResponse\x12)\n\x04Read\x12\x0f.kb.ReadRequest\x1a\x10.kb.ReadResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'kb.contract.kb_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_KB']._serialized_start=28
-  _globals['_KB']._serialized_end=32
+  _globals['_ACTOR']._serialized_start=28
+  _globals['_ACTOR']._serialized_end=68
+  _globals['_LOCATOR']._serialized_start=70
+  _globals['_LOCATOR']._serialized_end=105
+  _globals['_FAULT']._serialized_start=107
+  _globals['_FAULT']._serialized_end=177
+  _globals['_INITREQUEST']._serialized_start=179
+  _globals['_INITREQUEST']._serialized_end=206
+  _globals['_INITRESPONSE']._serialized_start=208
+  _globals['_INITRESPONSE']._serialized_end=222
+  _globals['_CREATEREQUEST']._serialized_start=224
+  _globals['_CREATEREQUEST']._serialized_end=313
+  _globals['_CREATERESPONSE']._serialized_start=315
+  _globals['_CREATERESPONSE']._serialized_end=388
+  _globals['_READREQUEST']._serialized_start=390
+  _globals['_READREQUEST']._serialized_end=433
+  _globals['_READRESPONSE']._serialized_start=436
+  _globals['_READRESPONSE']._serialized_end=644
+  _globals['_STUB']._serialized_start=646
+  _globals['_STUB']._serialized_end=724
+  _globals['_PARTSTUB']._serialized_start=726
+  _globals['_PARTSTUB']._serialized_end=783
+  _globals['_INBOUNDCOUNT']._serialized_start=785
+  _globals['_INBOUNDCOUNT']._serialized_end=843
+  _globals['_KB']._serialized_start=846
+  _globals['_KB']._serialized_end=985
 # @@protoc_insertion_point(module_scope)
