@@ -166,3 +166,22 @@ def _title_is_text_not_a_bool(root, client, created):
     assert read(client, created.id).title == "yes"
     on_disk = yaml.safe_load((root / "kb" / f"{created.id}.yaml").read_text())
     assert on_disk["title"] == "yes"
+
+
+def _raw(client, text):
+    """A Create whose content is sent as written, so the text can carry what dumps never writes."""
+    return client.Create(kb_pb2.CreateRequest(
+        type="decision", title="Price reviews happen weekly", content=text, actor=CLIENT, message="Record it",
+    ))
+
+
+@when("the client creates a decision whose content carries a tag on one of its values, saying which role and why", target_fixture="refused")
+def _create_with_a_tag(client):
+    return _raw(client, "sections:\n  - title: Purpose\n    body: !!binary aGVsbG8=\n  - title: Rationale\n    body: Why.\n")
+
+
+@then("the artifact is rejected because content is read plainly as written and carries no tags")
+def _rejected_for_a_tag(refused):
+    assert [(fault.rule, fault.message) for fault in refused.faults] == [
+        ("content", "content is read plainly as written and carries no tags"),
+    ]
