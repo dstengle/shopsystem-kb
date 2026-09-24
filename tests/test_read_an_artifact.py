@@ -146,3 +146,16 @@ def _read_a_place_inside(client, place):
 def _rejected_as_not_a_plain_place(refused):
     assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "sections/../..", "locator")]
     assert "plain alphabet" in refused.faults[0].message
+
+
+@given("the client is working outside any store, with KB_ROOT naming this one")
+def _outside_with_kb_root_naming_this_one(root, tmp_path, monkeypatch):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setenv("KB_ROOT", str(root))
+
+
+@then("the client is given the decision, from the store KB_ROOT names")
+def _from_the_store_kb_root_names(shown):
+    assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
