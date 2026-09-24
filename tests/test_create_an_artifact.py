@@ -201,3 +201,23 @@ def _rejected_for_two_documents(refused):
     assert [(fault.rule, fault.message) for fault in refused.faults] == [
         ("content", "content holds exactly one document"),
     ]
+
+
+@when(
+    "the client creates a decision whose purpose carries an extra entry of its own besides its title, its body "
+    "and the sections inside it, saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_an_extra_entry_in_a_section(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "sections": [{**SECTIONS[0], "author": "shopkeeper"}, SECTIONS[1]],
+    }, message="Record it")
+
+
+@then(
+    "the artifact is rejected because a section holds exactly its title, its body and the sections inside it, "
+    "and the extra entry is named"
+)
+def _rejected_for_an_extra_entry(refused):
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0/author", "section")]
+    assert "author" in refused.faults[0].message
