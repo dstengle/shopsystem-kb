@@ -12,7 +12,7 @@ So that a set of changes that only makes sense together is never half-applied, t
     And each change also comes back with its own result
     And the store's history shows the set as one change
 
-  @slice-53
+  @slice-51
   Scenario: The name given for a set finds the set in the history
     Pins that the name handed back is the one the history uses, so a client can go from having made a set to seeing exactly what it did.
     When the client asks, in one go, for a decision to be created and the work item to point at it, in that order, saying which role and why

@@ -26,7 +26,7 @@ So that a client decides for itself what its artifacts are made of, the client c
     Then a decision missing its owner is rejected because it does not fit its type
     And a decision reads back with its purpose before its rationale
 
-  @slice-26
+  @slice-27
   Scenario: Something that is not a well-formed type is refused
     Pins that types are checked too, against the one type the store ships, so a broken type is caught when it is written rather than by every artifact that uses it.
     When the client defines a type that does not match the type that describes types
