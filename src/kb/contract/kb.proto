@@ -14,6 +14,7 @@ service Kb {
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Read(ReadRequest) returns (ReadResponse);
   rpc Validate(ValidateRequest) returns (ValidateResponse);
+  rpc Write(WriteRequest) returns (WriteResponse);
   rpc Apply(ApplyRequest) returns (ApplyResponse);
 }
 
@@ -108,6 +109,20 @@ message ValidateRequest {
 // With faults, a refusal: no store found.
 message ValidateResponse {
   repeated Fault violations = 1;
+  repeated Fault faults = 2;
+}
+
+// A new content for an artifact the store holds; its title is kept.
+message WriteRequest {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: fields, sections, parts
+  Actor actor = 3;
+  string message = 4;
+}
+
+// With faults, a refusal, and the artifact is as it was.
+message WriteResponse {
+  int32 revision = 1;
   repeated Fault faults = 2;
 }
 

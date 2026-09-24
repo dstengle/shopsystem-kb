@@ -45,6 +45,9 @@ class InProcessClient:
     def Validate(self, request, timeout=None):
         return self._call("Validate", request, kb_pb2.ValidateResponse)
 
+    def Write(self, request, timeout=None):
+        return self._call("Write", request, kb_pb2.WriteResponse)
+
     def Apply(self, request, timeout=None):
         return self._call("Apply", request, kb_pb2.ApplyResponse)
 

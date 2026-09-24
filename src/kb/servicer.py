@@ -44,6 +44,13 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.CreateResponse(faults=landed.faults)
         return kb_pb2.CreateResponse(id=landed.results[0].id, revision=landed.results[0].revision)
 
+    def Write(self, request, context):
+        replacement = kb_pb2.Replacement(locator=request.locator, content=request.content)
+        landed = self._land([kb_pb2.Operation(write=replacement)], request.actor, request.message)
+        if landed.faults:
+            return kb_pb2.WriteResponse(faults=landed.faults)
+        return kb_pb2.WriteResponse(revision=landed.results[0].revision)
+
     def Apply(self, request, context):
         return self._land(request.operations, request.actor, request.message)
 

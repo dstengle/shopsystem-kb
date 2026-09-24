@@ -88,3 +88,10 @@ def creation(type_name, title, content):
 def replacement(artifact_id, content):
     """A Write of a whole artifact inside a set."""
     return kb_pb2.Operation(write=kb_pb2.Replacement(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content)))
+
+
+def write(client, artifact_id, content, message="Change an artifact"):
+    """A Write of a whole artifact under the client's role. Returns the response, faults and all."""
+    return client.Write(kb_pb2.WriteRequest(
+        locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), actor=CLIENT, message=message,
+    ))

@@ -148,6 +148,26 @@ class ValidateResponse(_message.Message):
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
+class WriteRequest(_message.Message):
+    __slots__ = ("locator", "content", "actor", "message")
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    content: str
+    actor: Actor
+    message: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+
+class WriteResponse(_message.Message):
+    __slots__ = ("revision", "faults")
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    revision: int
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
 class Operation(_message.Message):
     __slots__ = ("create", "write")
     CREATE_FIELD_NUMBER: _ClassVar[int]

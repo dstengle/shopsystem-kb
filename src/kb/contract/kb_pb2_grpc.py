@@ -54,6 +54,11 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.ValidateRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ValidateResponse.FromString,
                 _registered_method=True)
+        self.Write = channel.unary_unary(
+                '/kb.Kb/Write',
+                request_serializer=kb_dot_contract_dot_kb__pb2.WriteRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.WriteResponse.FromString,
+                _registered_method=True)
         self.Apply = channel.unary_unary(
                 '/kb.Kb/Apply',
                 request_serializer=kb_dot_contract_dot_kb__pb2.ApplyRequest.SerializeToString,
@@ -88,6 +93,12 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Write(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def Apply(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -116,6 +127,11 @@ def add_KbServicer_to_server(servicer, server):
                     servicer.Validate,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.ValidateRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.ValidateResponse.SerializeToString,
+            ),
+            'Write': grpc.unary_unary_rpc_method_handler(
+                    servicer.Write,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.WriteRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.WriteResponse.SerializeToString,
             ),
             'Apply': grpc.unary_unary_rpc_method_handler(
                     servicer.Apply,
@@ -231,6 +247,33 @@ class Kb:
             '/kb.Kb/Validate',
             kb_dot_contract_dot_kb__pb2.ValidateRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.ValidateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Write(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.Kb/Write',
+            kb_dot_contract_dot_kb__pb2.WriteRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.WriteResponse.FromString,
             options,
             channel_credentials,
             insecure,
