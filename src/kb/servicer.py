@@ -4,10 +4,10 @@ Each rpc first turns what the request carries into checked values (kb.values); n
 string that came from the request.
 """
 from kb import canonical, journal, validation, values
-from kb.content import loads, dumps
+from kb.content import dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
-from kb.store import Store, Unreadable
+from kb.store import Draft, Store, Unreadable
 from kb.values import ArtifactId, Kind
 
 METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
@@ -29,7 +29,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.InitResponse(faults=refused.faults)
         store.start()
         metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
-        path = store.save(METASCHEMA_ID, canonical.order(metaschema, METASCHEMA["schema"]))
+        path = store.save(METASCHEMA_ID, canonical.dump(canonical.order(metaschema, METASCHEMA["schema"])))
         entry = journal.write(
             store.dir, actor=request.actor, op="create", artifact=str(METASCHEMA_ID), path="",
             revision=1, schema_version=1, written=path, message="initialise store",
@@ -38,46 +38,108 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):
-        try:
-            kind = values.kind(request.type)
-        except values.Refused as refused:
-            return kb_pb2.CreateResponse(faults=refused.faults)
-        if not self._store.holds(ArtifactId(Kind("schema"), kind.name)):
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
+        creation = kb_pb2.Creation(type=request.type, title=request.title, content=request.content)
+        landed = self._land([kb_pb2.Operation(create=creation)], request.actor, request.message)
+        if landed.faults:
+            return kb_pb2.CreateResponse(faults=landed.faults)
+        return kb_pb2.CreateResponse(id=landed.results[0].id, revision=landed.results[0].revision)
+
+    def Apply(self, request, context):
+        return self._land(request.operations, request.actor, request.message)
+
+    def _land(self, operations, actor, message) -> kb_pb2.ApplyResponse:
+        """The write path. Each operation is applied in order to a draft of the store and checked there, against the
+        store as the operations before it left it; only when every one passes is anything written, each artifact
+        saved, one journal entry per operation naming the set, and one commit.
+
+        A fault anywhere refuses the whole set with every fault found, and nothing is written.
+        """
+        draft = Draft(self._store)
+        touched, faults = [], []
+        for operation in operations:
+            try:
+                touched.append(self._apply(draft, operation))
+            except values.Refused as refused:
+                faults += refused.faults
+        if faults:
+            return kb_pb2.ApplyResponse(faults=faults)
+        texts = []
+        for op, artifact_id in touched:
+            try:
+                texts.append((op, artifact_id, canonical.dump(draft.load(artifact_id))))
+            except canonical.NotCanonical as fault:
+                faults.append(kb_pb2.Fault(artifact=str(artifact_id), rule="content", message=str(fault)))
+        if faults:
+            return kb_pb2.ApplyResponse(faults=faults)
+        written, results, batch = [], [], ""
+        for seq, (op, artifact_id, text) in enumerate(texts, start=1):
+            artifact = draft.load(artifact_id)
+            path = self._store.save(artifact_id, text)
+            entry = journal.write(
+                self._store.dir, actor=actor, op=op, artifact=str(artifact_id), path="",
+                revision=artifact["revision"], schema_version=artifact["schema_version"],
+                written=path, message=message, seq=seq, batch=batch,
+            )
+            batch = batch or entry.stem
+            written += [path, entry]
+            results.append(kb_pb2.Result(id=str(artifact_id), revision=artifact["revision"]))
+        self._store.commit(written, actor.role, message)
+        return kb_pb2.ApplyResponse(batch=batch, results=results)
+
+    def _apply(self, draft: Draft, operation: kb_pb2.Operation) -> tuple[str, ArtifactId]:
+        """One operation applied to the draft. Returns what it did and to which artifact; raises values.Refused."""
+        if operation.WhichOneof("operation") == "create":
+            return "create", self._create(draft, operation.create)
+        return "write", self._replace(draft, operation.write)
+
+    def _create(self, draft: Draft, creation: kb_pb2.Creation) -> ArtifactId:
+        kind = values.kind(creation.type)
+        if not draft.holds(ArtifactId(Kind("schema"), kind.name)):
+            raise values.Refused([kb_pb2.Fault(
                 rule="kind", message=f"a kind must name a type the store holds; the store holds no type called {kind.name!r}",
             )])
-        at = f"{kind.name}/{values.slug(request.title)}"
+        at = f"{kind.name}/{values.slug(creation.title)}"
+        faults = []
         try:
-            content = loads(request.content)
-        except canonical.NotCanonical as fault:
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
-                artifact=at, path=fault.path, rule="content", message=str(fault),
-            )])
-        faults = _identity_faults(at, content)
-        try:
-            artifact_id = values.named(kind, request.title)
+            artifact_id = values.named(kind, creation.title)
         except values.Refused as refused:
-            faults = refused.faults + faults
+            faults += refused.faults
+        try:
+            content = values.content(at, creation.content)
+        except values.Refused as refused:
+            faults += refused.faults
         if faults:
-            return kb_pb2.CreateResponse(faults=faults)
-        schema = self._store.schema(kind)
-        faults = validation.validate(at, {"title": request.title, **content}, schema["schema"], self._store)
+            raise values.Refused(faults)
+        schema = draft.schema(kind)
+        faults = validation.validate(at, {"title": creation.title, **content}, schema["schema"], draft)
         if faults:
-            return kb_pb2.CreateResponse(faults=faults)
+            raise values.Refused(faults)
         for collection in schema["schema"].get("parts", {}):
             for item in content.get(collection, []):
                 item["id"] = values.slug(item["title"])
         artifact = {
             **content,
             "id": str(artifact_id), "type": kind.name,
-            "schema_version": schema["version"], "revision": 1, "title": request.title,
+            "schema_version": schema["version"], "revision": 1, "title": creation.title,
         }
-        try:
-            path = self._store.save(artifact_id, canonical.order(artifact, schema["schema"]))
-        except canonical.NotCanonical as fault:
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=at, rule="content", message=str(fault))])
-        self._store.commit([path], request.actor.role, request.message)
-        return kb_pb2.CreateResponse(id=str(artifact_id), revision=1)
+        draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
+        return artifact_id
+
+    def _replace(self, draft: Draft, replacement: kb_pb2.Replacement) -> ArtifactId:
+        locator = values.locator(replacement.locator)
+        content = values.content(str(locator.id), replacement.content)
+        current = draft.load(locator.id)
+        schema = draft.schema(locator.id.kind)
+        faults = validation.validate(str(locator.id), {"title": current["title"], **content}, schema["schema"], draft)
+        if faults:
+            raise values.Refused(faults)
+        artifact = {
+            **content,
+            "id": current["id"], "type": current["type"],
+            "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
+        }
+        draft.put(locator.id, canonical.order(artifact, schema["schema"]))
+        return locator.id
 
     def Read(self, request, context):
         try:

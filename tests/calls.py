@@ -73,3 +73,18 @@ def define(client, type_content):
 
 def read(client, artifact_id):
     return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=artifact_id)))
+
+
+def apply(client, operations, message="Make several changes"):
+    """An Apply of the operations in order, under the client's role. Returns the response, faults and all."""
+    return client.Apply(kb_pb2.ApplyRequest(operations=operations, actor=CLIENT, message=message))
+
+
+def creation(type_name, title, content):
+    """A Create inside a set: the title beside the content, the role and message the set's."""
+    return kb_pb2.Operation(create=kb_pb2.Creation(type=type_name, title=title, content=dumps(content)))
+
+
+def replacement(artifact_id, content):
+    """A Write of a whole artifact inside a set."""
+    return kb_pb2.Operation(write=kb_pb2.Replacement(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content)))

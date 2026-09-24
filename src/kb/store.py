@@ -30,12 +30,12 @@ class Store:
         _git("init", "-q", "-b", "main", str(self.dir))
         (self.dir / "store.yaml").write_text(canonical.dump({"contract": CONTRACT_VERSION}))
 
-    def save(self, artifact_id: ArtifactId, artifact: dict) -> Path:
-        """Serialize canonically to a temp file and rename into place."""
+    def save(self, artifact_id: ArtifactId, text: str) -> Path:
+        """Write canonical text to a temp file and rename it into place."""
         path = self.path(artifact_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_name(path.name + ".tmp")
-        temp.write_text(canonical.dump(artifact))
+        temp.write_text(text)
         temp.replace(path)
         return path
 
@@ -76,6 +76,29 @@ class Store:
         """Every artifact in the store, schemas included, in path order. A file that cannot be read raises Unreadable."""
         for artifact_id in self.ids():
             yield self.load(artifact_id)
+
+
+class Draft:
+    """The store as a set of changes would leave it: artifacts put here stand over the stored ones, and nothing is
+    written. Read like the store: holds, load, schema."""
+
+    def __init__(self, store: Store):
+        self._store = store
+        self._pending: dict[ArtifactId, dict] = {}
+
+    def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
+        self._pending[artifact_id] = artifact
+
+    def holds(self, artifact_id: ArtifactId) -> bool:
+        return artifact_id in self._pending or self._store.holds(artifact_id)
+
+    def load(self, artifact_id: ArtifactId) -> dict:
+        if artifact_id in self._pending:
+            return self._pending[artifact_id]
+        return self._store.load(artifact_id)
+
+    def schema(self, kind: Kind) -> dict:
+        return self.load(ArtifactId(Kind("schema"), kind.name))
 
 
 def _git(*args, env=None):

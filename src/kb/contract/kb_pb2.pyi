@@ -147,3 +147,57 @@ class ValidateResponse(_message.Message):
     violations: _containers.RepeatedCompositeFieldContainer[Fault]
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class Operation(_message.Message):
+    __slots__ = ("create", "write")
+    CREATE_FIELD_NUMBER: _ClassVar[int]
+    WRITE_FIELD_NUMBER: _ClassVar[int]
+    create: Creation
+    write: Replacement
+    def __init__(self, create: _Optional[_Union[Creation, _Mapping]] = ..., write: _Optional[_Union[Replacement, _Mapping]] = ...) -> None: ...
+
+class Creation(_message.Message):
+    __slots__ = ("type", "title", "content")
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    type: str
+    title: str
+    content: str
+    def __init__(self, type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
+
+class Replacement(_message.Message):
+    __slots__ = ("locator", "content")
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    content: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ...) -> None: ...
+
+class ApplyRequest(_message.Message):
+    __slots__ = ("operations", "actor", "message")
+    OPERATIONS_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    operations: _containers.RepeatedCompositeFieldContainer[Operation]
+    actor: Actor
+    message: str
+    def __init__(self, operations: _Optional[_Iterable[_Union[Operation, _Mapping]]] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+
+class ApplyResponse(_message.Message):
+    __slots__ = ("batch", "results", "faults")
+    BATCH_FIELD_NUMBER: _ClassVar[int]
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    batch: str
+    results: _containers.RepeatedCompositeFieldContainer[Result]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, batch: _Optional[str] = ..., results: _Optional[_Iterable[_Union[Result, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class Result(_message.Message):
+    __slots__ = ("id", "revision")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    revision: int
+    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...

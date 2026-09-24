@@ -29,23 +29,24 @@ class InProcessClient:
     def Init(self, request, timeout=None):
         return KbServicer().Init(request, None)
 
-    def Create(self, request, timeout=None):
+    def _call(self, rpc: str, request, response):
+        """The rpc on the store this call finds, or the response carrying the fault that says none was found."""
         servicer, refusal = self._servicer()
         if refusal is not None:
-            return kb_pb2.CreateResponse(faults=[refusal])
-        return servicer.Create(request, None)
+            return response(faults=[refusal])
+        return getattr(servicer, rpc)(request, None)
+
+    def Create(self, request, timeout=None):
+        return self._call("Create", request, kb_pb2.CreateResponse)
 
     def Read(self, request, timeout=None):
-        servicer, refusal = self._servicer()
-        if refusal is not None:
-            return kb_pb2.ReadResponse(faults=[refusal])
-        return servicer.Read(request, None)
+        return self._call("Read", request, kb_pb2.ReadResponse)
 
     def Validate(self, request, timeout=None):
-        servicer, refusal = self._servicer()
-        if refusal is not None:
-            return kb_pb2.ValidateResponse(faults=[refusal])
-        return servicer.Validate(request, None)
+        return self._call("Validate", request, kb_pb2.ValidateResponse)
+
+    def Apply(self, request, timeout=None):
+        return self._call("Apply", request, kb_pb2.ApplyResponse)
 
 
 def connect(root=None) -> InProcessClient:

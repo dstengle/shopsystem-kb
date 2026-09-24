@@ -17,8 +17,8 @@ def digest(path: Path) -> str:
 
 
 def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision: int,
-          schema_version: int, written: Path, message: str, seq: int = 1) -> Path:
-    """Write one entry and return its file. A change made alone names itself as its batch."""
+          schema_version: int, written: Path, message: str, seq: int = 1, batch: str = "") -> Path:
+    """Write one entry and return its file; its stem is the entry's id. A change made alone names itself as its batch."""
     at = now()
     entry_id = f"{at.strftime('%Y%m%dT%H%M%S%fZ')}-{seq}"
     entry = {
@@ -32,7 +32,7 @@ def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision
         "schema_version": schema_version,
         "digest": digest(written),
         "message": message,
-        "batch": entry_id,
+        "batch": batch or entry_id,
     }
     target = store_dir / "journal" / at.strftime("%Y") / at.strftime("%m") / at.strftime("%d") / f"{entry_id}.yaml"
     target.parent.mkdir(parents=True, exist_ok=True)

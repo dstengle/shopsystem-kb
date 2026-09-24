@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from kb import canonical
+from kb.content import loads
 from kb.contract import kb_pb2
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
@@ -84,6 +86,26 @@ def named(kind: Kind, title: str) -> ArtifactId:
         raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
                                     message=f"a title must leave something to make a name from; {title!r} leaves nothing")])
     return ArtifactId(kind, slug(title))
+
+
+def content(artifact: str, text: str) -> dict:
+    """Content as a request carries it: read plainly, and holding only what a type declares. Refused with every fault."""
+    try:
+        tree = loads(text)
+    except canonical.NotCanonical as fault:
+        raise Refused([kb_pb2.Fault(artifact=artifact, path=fault.path, rule="content", message=str(fault))]) from None
+    faults = []
+    for key in canonical.IDENTITY:
+        if key not in tree:
+            continue
+        if key == "title":
+            message = f"a title is given alongside the content, never inside it; the content carried the title {tree[key]!r}"
+        else:
+            message = f"content holds only what the type declares; {key} is settled by the store, and the content carried {key}: {tree[key]!r}"
+        faults.append(kb_pb2.Fault(artifact=artifact, path=key, rule="identity", message=message))
+    if faults:
+        raise Refused(faults)
+    return tree
 
 
 def root(text: str) -> Path:
