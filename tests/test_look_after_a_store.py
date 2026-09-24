@@ -62,3 +62,38 @@ def _no_folding(text):
 @then("nothing in the file tells a reader how to build a value")
 def _no_tags(text):
     assert not re.search(r"\s!\S", text), text
+
+
+SAME_DECISION = {
+    "title": "Price reviews happen weekly",
+    "sections": [
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": "Costs move weekly.\n"},
+    ],
+    "options": [{"title": "Keep weekly", "body": "Review every Monday."}],
+}
+
+
+@given("two stores each given the same decision by the same client", target_fixture="files")
+def _two_stores_with_the_same_decision(tmp_path):
+    files = []
+    for name in ("one", "two"):
+        root = tmp_path / name
+        root.mkdir()
+        client = kb_client.connect(root)
+        client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+        define(client, DECISION_TYPE)
+        created = create(client, "decision", SAME_DECISION)
+        files.append(root / "kb" / f"{created.id}.yaml")
+    return files
+
+
+@when("the operator compares the two decision files", target_fixture="comparison")
+def _compare_the_files(files):
+    return [path.read_bytes() for path in files]
+
+
+@then("the two files are the same, byte for byte")
+def _the_same_bytes(comparison):
+    assert comparison[0] == comparison[1]
+    assert len(comparison[0]) > 0
