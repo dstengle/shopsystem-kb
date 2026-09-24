@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given
 
+from calls import CLIENT
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -29,5 +30,5 @@ def root(tmp_path):
 @given("a store", target_fixture="client")
 def _a_store(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root)))
+    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     return client

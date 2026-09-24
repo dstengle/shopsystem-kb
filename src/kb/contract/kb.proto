@@ -35,6 +35,7 @@ message Fault {
 
 message InitRequest {
   string root = 1;
+  Actor actor = 2;
 }
 
 message InitResponse {}

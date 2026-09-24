@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pytest_bdd import given, scenarios, then, when
 
-from calls import define, read
+from calls import CLIENT, define, read
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -16,10 +16,10 @@ def _empty_directory(tmp_path):
     return root
 
 
-@when("the client starts a store there", target_fixture="client")
+@when("the client starts a store there, saying which role it is", target_fixture="client")
 def _start_a_store(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root)))
+    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     return client
 
 

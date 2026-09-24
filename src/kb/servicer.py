@@ -15,7 +15,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         store.start()
         metaschema = {"id": "schema/schema", "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
         path = store.save(canonical.order(metaschema, METASCHEMA["schema"]))
-        store.commit([store.dir / "store.yaml", path], "kb", "Start the store")
+        store.commit([store.dir / "store.yaml", path], request.actor.role, "Start the store")
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):

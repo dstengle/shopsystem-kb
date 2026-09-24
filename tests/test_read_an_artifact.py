@@ -1,6 +1,6 @@
 from pytest_bdd import given, scenarios, then, when
 
-from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, read
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, read
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -18,7 +18,7 @@ DECISION = "decision/price-reviews-happen-weekly"
 )
 def _store_with_a_linked_decision(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root)))
+    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, DECISION_TYPE)
     define(client, WORK_ITEM_TYPE)
     create(client, "decision", {

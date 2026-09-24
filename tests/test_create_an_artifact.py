@@ -1,7 +1,7 @@
 import yaml
 from pytest_bdd import given, scenarios, then, when
 
-from calls import DECISION_TYPE, create, define, read
+from calls import CLIENT, DECISION_TYPE, create, define, read
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -24,7 +24,7 @@ OPTIONS = [
 )
 def _store_with_decision_type(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root)))
+    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, DECISION_TYPE)
     return client
 

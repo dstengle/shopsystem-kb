@@ -35,10 +35,12 @@ class Fault(_message.Message):
     def __init__(self, artifact: _Optional[str] = ..., path: _Optional[str] = ..., rule: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class InitRequest(_message.Message):
-    __slots__ = ("root",)
+    __slots__ = ("root", "actor")
     ROOT_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
     root: str
-    def __init__(self, root: _Optional[str] = ...) -> None: ...
+    actor: Actor
+    def __init__(self, root: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ...) -> None: ...
 
 class InitResponse(_message.Message):
     __slots__ = ()
