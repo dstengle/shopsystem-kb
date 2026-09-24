@@ -42,7 +42,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         try:
             content = loads(request.content)
         except canonical.NotCanonical as fault:
-            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(artifact=at, rule="content", message=str(fault))])
+            return kb_pb2.CreateResponse(faults=[kb_pb2.Fault(
+                artifact=at, path=fault.path, rule="content", message=str(fault),
+            )])
         faults = _identity_faults(at, content)
         try:
             artifact_id = values.named(kind, request.title)

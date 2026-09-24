@@ -4,7 +4,7 @@ kb is the only writer, so loading needs no round-trip preservation.
 """
 import io
 
-from ruamel.yaml import YAML, events
+from ruamel.yaml import YAML, events, nodes
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.representer import SafeRepresenter
 
@@ -56,13 +56,18 @@ def _yaml() -> YAML:
 
 
 class NotCanonical(ValueError):
-    """YAML that is not read plainly as written. The message says which rule it breaks."""
+    """YAML that is not read plainly as written. The message says which rule it breaks; `path` names the place, if any."""
+
+    def __init__(self, message: str, path: str = ""):
+        super().__init__(message)
+        self.path = path
 
 
 def check(text: str) -> None:
     """The one check of plain reading, run on content as it arrives and on every file kb is about to write.
 
-    No tags, no anchors or aliases, exactly one document. Raises NotCanonical naming the first rule broken.
+    No tags, no anchors or aliases, exactly one document, every entry named once. Raises NotCanonical naming the
+    first rule broken.
     """
     try:
         parsed = list(_yaml().parse(text))
@@ -76,6 +81,24 @@ def check(text: str) -> None:
         )
     if sum(isinstance(event, events.DocumentStartEvent) for event in parsed) > 1:
         raise NotCanonical("content holds exactly one document")
+    _named_once(_yaml().compose(text), ())
+
+
+def _named_once(node, place: tuple) -> None:
+    """Every entry of every mapping is named once and only once. Raises NotCanonical at the second of a pair."""
+    if isinstance(node, nodes.MappingNode):
+        seen = set()
+        for key, value in node.value:
+            if key.value in seen:
+                raise NotCanonical(
+                    f"an entry is named once and only once; {key.value!r} is named again at line {key.start_mark.line + 1}",
+                    "/".join((*place, str(key.value))),
+                )
+            seen.add(key.value)
+            _named_once(value, (*place, str(key.value)))
+    elif isinstance(node, nodes.SequenceNode):
+        for index, item in enumerate(node.value):
+            _named_once(item, (*place, str(index)))
 
 
 def dump(artifact: dict) -> str:

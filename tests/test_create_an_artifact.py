@@ -350,3 +350,28 @@ def _title_reads_back_as(root, client, created, text):
     assert read(client, created.id).title == text
     on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
     assert on_disk["title"] == text
+
+
+@given("content for a decision that names the same entry twice in the same place", target_fixture="written")
+def _content_naming_an_entry_twice():
+    return (
+        "sections:\n"
+        "  - title: Purpose\n"
+        "    body: Keep prices in step with costs.\n"
+        "    body: Keep prices low.\n"
+        "  - title: Rationale\n"
+        "    body: Because.\n"
+    )
+
+
+@when("the client creates a decision from that content, saying which role and why", target_fixture="created")
+def _create_from_that_content(client, written):
+    return _raw(client, written)
+
+
+@then("the artifact is rejected because an entry is named once and only once, and the place the second one stands is named")
+def _rejected_for_an_entry_named_twice(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in created.faults] == [("sections/0/body", "content")]
+    assert created.faults[0].message.startswith("an entry is named once and only once")
+    assert "line 4" in created.faults[0].message
