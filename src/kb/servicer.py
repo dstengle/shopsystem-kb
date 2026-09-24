@@ -14,15 +14,19 @@ METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
-    def __init__(self, root):
-        self._store = Store(root)
+    def __init__(self, root=None):
+        """Over the store at root; with none, a servicer that can only start a store, taking its root from the request."""
+        self._store = Store(root) if root is not None else None
 
     def Init(self, request, context):
         if not request.actor.role:
             return kb_pb2.InitResponse(faults=[kb_pb2.Fault(
                 rule="actor", message="a store can only be started under a role",
             )])
-        store = Store(request.root)
+        try:
+            store = Store(values.root(request.root))
+        except values.Refused as refused:
+            return kb_pb2.InitResponse(faults=refused.faults)
         store.start()
         metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
         path = store.save(METASCHEMA_ID, canonical.order(metaschema, METASCHEMA["schema"]))

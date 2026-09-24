@@ -27,7 +27,7 @@ class InProcessClient:
         return KbServicer(root), None
 
     def Init(self, request, timeout=None):
-        return KbServicer(Path(request.root)).Init(request, None)
+        return KbServicer().Init(request, None)
 
     def Create(self, request, timeout=None):
         servicer, refusal = self._servicer()

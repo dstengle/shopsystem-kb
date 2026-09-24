@@ -86,6 +86,16 @@ def named(kind: Kind, title: str) -> ArtifactId:
     return ArtifactId(kind, slug(title))
 
 
+def root(text: str) -> Path:
+    """The directory a store is started in, as the request names it; relative names stay relative."""
+    if not text:
+        raise Refused([kb_pb2.Fault(
+            rule="root",
+            message="a store is started in a directory that was named and that exists; no directory was named",
+        )])
+    return Path(text)
+
+
 def slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
 

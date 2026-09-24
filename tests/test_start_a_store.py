@@ -130,3 +130,30 @@ def _made_where_named(started, root):
 @then("the store the client was working in is left as it was")
 def _working_store_unchanged(working_in):
     assert _everything_under(working_in["root"]) == working_in["held"]
+
+
+@given("the client has nothing at all to name as the directory to start a store in", target_fixture="here")
+def _nothing_to_name(tmp_path, monkeypatch):
+    """The client works in an empty directory, so a store made where it works, for want of a name, would show."""
+    here = tmp_path / "here"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+    return {"before": _everything_under(tmp_path)}
+
+
+@when("the client starts a store naming nothing, saying which role it is", target_fixture="started")
+def _start_a_store_naming_nothing():
+    return kb_client.connect().Init(kb_pb2.InitRequest(root="", actor=CLIENT))
+
+
+@then("starting the store is rejected because a store is started in a directory that was named and that exists")
+def _rejected_as_named_nothing(started):
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", "a store is started in a directory that was named and that exists; no directory was named"),
+    ]
+
+
+@then("no store is made anywhere")
+def _no_store_anywhere(here, tmp_path):
+    assert _everything_under(tmp_path) == here["before"]
