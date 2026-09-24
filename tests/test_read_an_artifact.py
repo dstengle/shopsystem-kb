@@ -72,3 +72,21 @@ def _inbound_counts(summary):
     assert [(count.type, count.field, count.count) for count in summary.inbound] == [
         ("work-item", "decisions", 2),
     ]
+
+
+@given("the client is working in a folder deep inside the directory the store sits in")
+def _working_deep_inside_the_store(root, monkeypatch):
+    deep = root / "shelves" / "pricing" / "notes"
+    deep.mkdir(parents=True)
+    monkeypatch.chdir(deep)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+@when("the client reads the decision", target_fixture="shown")
+def _read_the_decision_from_here():
+    return read(kb_client.connect(), DECISION)
+
+
+@then("the client is given the decision, from the store found above where it is working")
+def _from_the_store_above(shown):
+    assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
