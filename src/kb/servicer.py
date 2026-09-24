@@ -61,7 +61,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
         schema = self._store.schema(kind)
-        faults = validation.validate(at, {"title": request.title, **content}, schema["schema"])
+        faults = validation.validate(at, {"title": request.title, **content}, schema["schema"], self._store)
         if faults:
             return kb_pb2.CreateResponse(faults=faults)
         for collection in schema["schema"].get("parts", {}):
@@ -124,7 +124,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
                 violations.append(unreadable.fault)
                 continue
             content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
-            violations += validation.validate(str(artifact_id), content, schema)
+            violations += validation.validate(str(artifact_id), content, schema, self._store)
         return kb_pb2.ValidateResponse(violations=violations)
 
     def _stub(self, field, target_id: ArtifactId):

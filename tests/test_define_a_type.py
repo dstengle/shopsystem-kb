@@ -1,6 +1,6 @@
-from pytest_bdd import scenarios, then, when
+from pytest_bdd import given, scenarios, then, when
 
-from calls import create, define, read
+from calls import create, define, read, request
 
 scenarios("define-a-type.feature")
 
@@ -63,3 +63,55 @@ def _create_a_note(client):
     })
     assert note.id == "note/first-note"
     assert note.revision == 1
+
+
+TOOL_TYPE = {
+    "title": "Tool",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {"title": {"type": "string"}},
+        "required": ["title"],
+        "$defs": {
+            "binding": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "value": {"type": "string"}},
+                "required": ["name", "value"],
+                "additionalProperties": False,
+            },
+        },
+    },
+}
+
+TOOL_USE_TYPE = {
+    "title": "Tool use",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "bindings": {"type": "array", "items": {"$ref": "kb:schema/tool#/$defs/binding"}},
+        },
+        "required": ["title"],
+    },
+}
+
+
+@given("a type that defines the shape of a binding")
+def _a_type_defining_a_binding(client):
+    define(client, TOOL_TYPE)
+
+
+@when("the client defines a second type that refers to that shape")
+def _define_a_type_referring_to_it(client):
+    define(client, TOOL_USE_TYPE)
+
+
+@then("artifacts of the second type are checked against the shape the first type defines")
+def _checked_against_the_shared_shape(client):
+    fits = request(client, "tool-use", "Weigh the flour", {"bindings": [{"name": "scale", "value": "kitchen"}]})
+    assert not fits.faults, fits.faults
+    misfit = request(client, "tool-use", "Weigh the sugar", {"bindings": [{"name": "scale"}]})
+    assert (misfit.id, misfit.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
+    assert "'value' is a required property" in misfit.faults[0].message
