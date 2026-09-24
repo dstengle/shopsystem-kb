@@ -143,3 +143,12 @@ def _rejected_for_identity_inside(refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
     assert all(fault.path in fault.message for fault in refused.faults)
+
+
+@then(
+    "the name the client is given is that title in lower case, with each run of anything that is not "
+    "a letter or a digit turned into a single hyphen, and no hyphen at either end"
+)
+def _plain_name(created):
+    assert not created.faults, created.faults
+    assert created.id == "decision/price-reviews-weekly-from-now-on"
