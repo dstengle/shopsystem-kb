@@ -38,7 +38,7 @@ message InitRequest {
   Actor actor = 2;
 }
 
-// With faults, a refusal: no role, or a store already there.
+// With faults, a refusal: no role.
 message InitResponse {
   repeated Fault faults = 1;
 }
@@ -62,8 +62,6 @@ message ReadRequest {
   Locator locator = 1;
 }
 
-// A summary: identity, the fields the type shows at a glance, a stub of
-// each reference target and of each part, and inbound counts.
 // A summary: identity, the fields the type shows at a glance, a stub of
 // each reference target and of each part, and inbound counts. With faults,
 // a refusal: a bad locator, a name the store lacks, or no store found.
