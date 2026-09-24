@@ -118,3 +118,17 @@ def _rejected_as_not_a_plain_name(refused):
 def _no_content_at_all(refused):
     assert (refused.id, refused.title, refused.content) == ("", "", "")
     assert not refused.references and not refused.parts and not refused.inbound
+
+
+@when("the client reads an artifact by a name that begins at the root of the disk", target_fixture="refused")
+def _read_by_an_absolute_name(client, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.yaml").write_text("title: Not for the store\n")
+    return read(client, str(outside / "secret"))
+
+
+@then("the read is rejected because a name is a kind and a plain name, never a path")
+def _rejected_as_a_path(refused):
+    assert [fault.rule for fault in refused.faults] == ["locator"]
+    assert "never a path" in refused.faults[0].message
