@@ -9,12 +9,14 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     And the store holds no other type and no content
     And the client can define its own types straight away
 
+  @slice-57
   Scenario: Starting a store is recorded in the store's history
     Given an empty directory
     When the client starts a store there, saying which role it is
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
+  @slice-63
   Scenario: Starting a store without saying which role is refused
     Given an empty directory
     When the client starts a store there without saying which role it is

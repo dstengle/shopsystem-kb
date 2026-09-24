@@ -8,6 +8,7 @@ So that a store exists and can be checked from a shell without any client, the o
     Then there is a store inside that directory, in a place of its own
     And a client can begin defining its own types in it straight away
 
+  @slice-44
   Scenario: Setting up a store without naming which role is refused
     Given a directory that has no store inside it, and nothing names which role the operator is
     When the operator runs kb init against that directory
@@ -42,6 +43,7 @@ So that a store exists and can be checked from a shell without any client, the o
     Then it offers setting a store up and checking one
     And nothing that changes what the store holds
 
+  @slice-54
   Scenario: The operator reads an artifact's file on disk
     Given a store holding a decision whose purpose is one short line and which carries a list of options
     When the operator opens the decision's file
@@ -50,31 +52,37 @@ So that a store exists and can be checked from a shell without any client, the o
     And no line of prose has been broken to fit a width
     And nothing in the file tells a reader how to build a value
 
+  @slice-62
   Scenario: The same content always lands on disk as the same bytes
     Given two stores each given the same decision by the same client
     When the operator compares the two decision files
     Then the two files are the same, byte for byte
 
+  @slice-44
   Scenario: The operator checks the store from a folder inside it
     Given a store, with the operator working in a folder deep inside the directory it sits in
     When the operator runs kb validate there
     Then the store found above where they are working is the one checked
 
+  @slice-44
   Scenario: The operator names the store instead of standing in it
     Given a store, with the operator working outside any store and KB_ROOT naming that one
     When the operator runs kb validate there
     Then the store KB_ROOT names is the one checked
 
+  @slice-44
   Scenario: Running the command line where no store can be found is refused
     Given the operator is working outside any store and nothing names one
     When the operator runs kb validate there
     Then the check is rejected because no store was found, neither above where they are working nor named outright
 
+  @slice-44
   Scenario: Naming a store that is not there is refused
     Given the operator is working outside any store, with KB_ROOT naming a directory that holds no store
     When the operator runs kb validate there
     Then the check is rejected because KB_ROOT names a directory that holds no store
 
+  @slice-44
   Scenario: Standing in one store while naming another is refused
     Given the operator is working inside a store, with KB_ROOT naming a different store
     When the operator runs kb validate there

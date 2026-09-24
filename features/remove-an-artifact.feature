@@ -17,6 +17,7 @@ So that a client can take out what is no longer used without leaving links point
     Then the removal is rejected because something still points at it
     And the client is given every link that blocks it
 
+  @slice-40
   Scenario: Removing something the store does not hold is refused
     When the client removes an artifact by a name the store holds nothing under, saying which role and why
     Then the removal is rejected because the store holds nothing by that name, and the name asked for is given back
