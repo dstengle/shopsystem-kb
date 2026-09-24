@@ -19,7 +19,7 @@ So that a client can put content into the store and get a name it can come back 
     Then the name the client is given is made from that title
     And the client never said what the name should be
 
-  @slice-25
+  @slice-8.1
   Scenario: A second artifact with a title already used gets a name of its own
     Pins how a clash is settled: the newcomer takes a numbered name and the artifact already there keeps the name everything else points at.
     Given a decision the store already holds, titled "Price reviews happen weekly"
