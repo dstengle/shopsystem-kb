@@ -45,3 +45,41 @@ So that a client can put content into the store and get a name it can come back 
     When the client creates a decision that is missing its purpose and supersedes a decision the store does not hold, saying which role and why
     Then the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken
     And the store is unchanged
+
+  Scenario: An artifact created without a title is refused
+    When the client creates a decision with both required sections and no title, saying which role and why
+    Then the artifact is rejected because an artifact cannot be created without a title
+
+  Scenario: Content that settles what only the store settles is refused
+    When the client creates a decision whose content carries a name and a version for the artifact itself, saying which role and why
+    Then the artifact is rejected because content holds only what the type declares, and each thing it carried that only the store settles is named back
+
+  Scenario: A title with capitals and punctuation gives a plain name
+    When the client creates a decision titled "Price reviews: weekly, from now on!", saying which role and why
+    Then the name the client is given is that title in lower case, with each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end
+
+  Scenario: A title that leaves nothing to make a name from is refused
+    When the client creates a decision titled "!!!", saying which role and why
+    Then the artifact is rejected because a title must leave something to make a name from
+
+  Scenario: A title that reads as a date is still a title
+    When the client creates a decision titled "2026-09-24", saying which role and why
+    Then the title reads back as the text that was written, not as a date
+    And the name the client is given is made from that text
+
+  Scenario: A title that reads as yes is still a title
+    When the client creates a decision titled "yes", saying which role and why
+    Then the title reads back as the text that was written, not as a yes or a no
+    And the name the client is given is made from that text
+
+  Scenario: Content telling the store how to build a value is refused
+    When the client creates a decision whose content carries a tag on one of its values, saying which role and why
+    Then the artifact is rejected because content is read plainly as written and carries no tags
+
+  Scenario: Content holding more than one document is refused
+    When the client creates a decision from content holding two documents one after the other, saying which role and why
+    Then the artifact is rejected because content holds exactly one document
+
+  Scenario: A section carrying anything besides its title, its body and its own sections is refused
+    When the client creates a decision whose purpose carries an extra entry of its own besides its title, its body and the sections inside it, saying which role and why
+    Then the artifact is rejected because a section holds exactly its title, its body and the sections inside it, and the extra entry is named

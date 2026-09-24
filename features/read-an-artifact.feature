@@ -51,3 +51,37 @@ So that a client can show what the store holds at whatever depth it needs, the c
     Given a store holding a process whose steps branch to other steps of the same process
     When the client reads the whole process following its links one step
     Then the branches are given as written, naming the steps of that process
+
+  Scenario: Reading something the store does not hold is refused
+    When the client reads an artifact by a name the store holds nothing under
+    Then the read is rejected because the store holds nothing by that name, and the name asked for is given back
+
+  Scenario: A name that is not a plain name is refused
+    When the client reads an artifact by the name "decision/../elsewhere"
+    Then the read is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens
+    And no content comes back, from inside the store or outside it
+
+  Scenario: A name that begins at the root of the disk is refused
+    When the client reads an artifact by a name that begins at the root of the disk
+    Then the read is rejected because a name is a kind and a plain name, never a path
+    And no content comes back, from inside the store or outside it
+
+  Scenario: A place inside an artifact that is not a plain place is refused
+    When the client reads the place "sections/../.." inside the decision
+    Then the read is rejected because a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it
+    And no content comes back, from inside the store or outside it
+
+  Scenario: The client works in a folder inside the store
+    Given the client is working in a folder deep inside the directory the store sits in
+    When the client reads the decision
+    Then the client is given the decision, from the store found above where it is working
+
+  Scenario: The client names the store instead of working inside it
+    Given the client is working outside any store, with KB_ROOT naming this one
+    When the client reads the decision
+    Then the client is given the decision, from the store KB_ROOT names
+
+  Scenario: A call with no store to be found is refused
+    Given the client is working outside any store and nothing names one
+    When the client reads the decision
+    Then the read is rejected because no store was found, neither above where it is working nor named outright
