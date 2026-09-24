@@ -3,6 +3,8 @@
 Each rpc first turns what the request carries into checked values (kb.values); nothing past that point sees a
 string that came from the request.
 """
+import copy
+
 from kb import canonical, journal, search, validation, values
 from kb.content import dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
@@ -135,8 +137,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def _replace(self, draft: Draft, replacement: kb_pb2.Replacement) -> ArtifactId:
         locator = values.locator(replacement.locator)
-        content = values.content(str(locator.id), replacement.content)
+        content = values.content(str(locator.id), replacement.content, at_root=not locator.place)
         current = draft.load(locator.id)
+        if locator.place:
+            content = _placed(current, locator, content)
         schema = draft.schema(locator.id.kind)
         faults = validation.validate(str(locator.id), {"title": current["title"], **content}, schema["schema"], draft)
         if faults:
@@ -292,6 +296,33 @@ def _entry(entry: dict) -> kb_pb2.Entry:
         artifact=entry["artifact"], path=entry["path"], revision=entry["revision"],
         schema_version=entry["schema_version"], digest=entry["digest"], message=entry["message"], batch=entry["batch"],
     )
+
+
+def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
+    """The artifact's content with the node at the locator's place replaced by the one given. A place is pairs of a
+    list and an item in it, a section named by its title's name and a part by its id, and may end in a field."""
+    content = copy.deepcopy({key: value for key, value in artifact.items() if key not in canonical.IDENTITY})
+    holder, steps = content, list(locator.place)
+    while len(steps) > 1:
+        collection, name = steps.pop(0), steps.pop(0)
+        items = holder.get(collection, [])
+        index = next((index for index, item in enumerate(items) if _node_name(collection, item) == name), None)
+        if index is None:
+            raise values.Refused([kb_pb2.Fault(
+                artifact=str(locator.id), path="/".join(locator.place), rule="not-found",
+                message=f"{str(locator.id)!r} holds nothing at {'/'.join(locator.place)!r}",
+            )])
+        if not steps:
+            items[index] = node
+            return content
+        holder = items[index]
+    holder[steps[0]] = node
+    return content
+
+
+def _node_name(collection: str, item: dict) -> str:
+    """How a place names an item: a section by its title's name, a part by its id."""
+    return values.slug(item["title"]) if collection == "sections" else item.get("id")
 
 
 def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:

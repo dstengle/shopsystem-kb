@@ -88,12 +88,16 @@ def named(kind: Kind, title: str) -> ArtifactId:
     return ArtifactId(kind, slug(title))
 
 
-def content(artifact: str, text: str) -> dict:
-    """Content as a request carries it: read plainly, and holding only what a type declares. Refused with every fault."""
+def content(artifact: str, text: str, at_root: bool = True) -> dict:
+    """Content as a request carries it: read plainly, and, for a whole artifact, holding only what a type declares.
+    The identity keys belong to an artifact's root, so a node inside it, a section with its title, is not held to
+    them. Refused with every fault."""
     try:
         tree = loads(text)
     except canonical.NotCanonical as fault:
         raise Refused([kb_pb2.Fault(artifact=artifact, path=fault.path, rule="content", message=str(fault))]) from None
+    if not at_root:
+        return tree
     faults = []
     for key in canonical.IDENTITY:
         if key not in tree:

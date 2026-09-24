@@ -2,6 +2,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, read, write
 from kb import client as kb_client
+from kb.content import loads
 from kb.contract import kb_pb2
 
 scenarios("change-an-artifact.feature")
@@ -41,3 +42,34 @@ def _rejected_for_the_sections(attempt):
 def _as_it_was(root, client, attempt):
     assert read(client, DECISION).revision == 1
     assert (root / "kb" / f"{DECISION}.yaml").read_bytes() == attempt["before"]
+
+
+@when("the client replaces the rationale of the decision, saying which role and why", target_fixture="changed")
+def _replace_the_rationale(client):
+    before = read(client, DECISION, whole=True)
+    response = write(
+        client, DECISION, {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
+        message="Say why weekly", path="sections/rationale",
+    )
+    assert not response.faults, response.faults
+    return {"response": response, "before": before, "after": read(client, DECISION, whole=True)}
+
+
+@then("only that section changes")
+def _only_the_rationale_changes(changed):
+    assert changed["response"].revision == 2
+    assert loads(changed["after"].content)["sections"] == [
+        SECTIONS[0], {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
+    ]
+
+
+@then("the rest of the decision reads as before")
+def _the_rest_as_before(changed):
+    before, after = loads(changed["before"].content), loads(changed["after"].content)
+    assert after["sections"][0] == before["sections"][0]
+    assert {key: value for key, value in after.items() if key != "sections"} == {
+        key: value for key, value in before.items() if key != "sections"
+    }
+    assert [(seen.id, seen.type, seen.title, seen.schema_version) for seen in (changed["before"], changed["after"])] == [
+        (DECISION, "decision", "Price reviews happen weekly", 1),
+    ] * 2
