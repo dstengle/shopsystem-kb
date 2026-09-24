@@ -77,7 +77,7 @@ class ReadRequest(_message.Message):
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ...) -> None: ...
 
 class ReadResponse(_message.Message):
-    __slots__ = ("id", "type", "schema_version", "revision", "title", "content", "references", "parts", "inbound")
+    __slots__ = ("id", "type", "schema_version", "revision", "title", "content", "references", "parts", "inbound", "faults")
     ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
@@ -87,6 +87,7 @@ class ReadResponse(_message.Message):
     REFERENCES_FIELD_NUMBER: _ClassVar[int]
     PARTS_FIELD_NUMBER: _ClassVar[int]
     INBOUND_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
     id: str
     type: str
     schema_version: int
@@ -96,7 +97,8 @@ class ReadResponse(_message.Message):
     references: _containers.RepeatedCompositeFieldContainer[Stub]
     parts: _containers.RepeatedCompositeFieldContainer[PartStub]
     inbound: _containers.RepeatedCompositeFieldContainer[InboundCount]
-    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., schema_version: _Optional[int] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ...) -> None: ...
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., schema_version: _Optional[int] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class Stub(_message.Message):
     __slots__ = ("field", "id", "type", "title", "fields")

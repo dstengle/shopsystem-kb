@@ -48,6 +48,11 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.CreateResponse(id=artifact_id, revision=1)
 
     def Read(self, request, context):
+        if not self._store.path(request.locator.id).is_file():
+            return kb_pb2.ReadResponse(faults=[kb_pb2.Fault(
+                artifact=request.locator.id, rule="not-found",
+                message=f"the store holds nothing by the name {request.locator.id!r}",
+            )])
         artifact = self._store.load(request.locator.id)
         schema = self._store.schema(artifact["type"])["schema"]
         response = kb_pb2.ReadResponse(

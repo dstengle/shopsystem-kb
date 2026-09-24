@@ -1,4 +1,4 @@
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, read
 from kb import client as kb_client
@@ -90,3 +90,14 @@ def _read_the_decision_from_here():
 @then("the client is given the decision, from the store found above where it is working")
 def _from_the_store_above(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+
+
+@when("the client reads an artifact by a name the store holds nothing under", target_fixture="refused")
+def _read_a_name_the_store_lacks(client):
+    return read(client, "decision/nothing-of-the-sort")
+
+
+@then("the read is rejected because the store holds nothing by that name, and the name asked for is given back")
+def _rejected_as_not_held(refused):
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [("decision/nothing-of-the-sort", "not-found")]
+    assert "decision/nothing-of-the-sort" in refused.faults[0].message

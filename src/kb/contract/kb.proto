@@ -61,6 +61,9 @@ message ReadRequest {
 
 // A summary: identity, the fields the type shows at a glance, a stub of
 // each reference target and of each part, and inbound counts.
+// A summary: identity, the fields the type shows at a glance, a stub of
+// each reference target and of each part, and inbound counts. With faults,
+// a refusal: a bad locator, a name the store lacks, or no store found.
 message ReadResponse {
   string id = 1;
   string type = 2;
@@ -71,6 +74,7 @@ message ReadResponse {
   repeated Stub references = 7;
   repeated PartStub parts = 8;
   repeated InboundCount inbound = 9;
+  repeated Fault faults = 10;
 }
 
 message Stub {
