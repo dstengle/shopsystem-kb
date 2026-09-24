@@ -43,8 +43,10 @@ class InitRequest(_message.Message):
     def __init__(self, root: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ...) -> None: ...
 
 class InitResponse(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("faults",)
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class CreateRequest(_message.Message):
     __slots__ = ("type", "content", "actor", "message", "title")

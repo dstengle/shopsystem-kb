@@ -74,3 +74,21 @@ def _one_entry_under_the_role(root, message):
 def _the_entry_is_the_metaschema_write(root, entry):
     assert (entry["op"], entry["artifact"], entry["path"], entry["revision"]) == ("create", "schema/schema", "", 1)
     assert entry["digest"] == hashlib.sha256((root / "kb" / "schema" / "schema.yaml").read_bytes()).hexdigest()
+
+
+@when("the client starts a store there without saying which role it is", target_fixture="refused")
+def _start_a_store_without_a_role(root):
+    return kb_client.connect(root).Init(kb_pb2.InitRequest(root=str(root)))
+
+
+@then("starting the store is rejected because a store can only be started under a role")
+def _rejected_without_a_role(refused):
+    assert [(fault.rule, fault.message) for fault in refused.faults] == [
+        ("actor", "a store can only be started under a role"),
+    ]
+
+
+@then("that directory holds no store")
+def _no_store_there(root):
+    assert not (root / "kb").exists()
+    assert list(root.iterdir()) == []

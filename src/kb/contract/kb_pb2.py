@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14kb/contract/kb.proto\x12\x02kb\"(\n\x05\x41\x63tor\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x11\n\texecution\x18\x02 \x01(\t\"#\n\x07Locator\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"F\n\x05\x46\x61ult\x12\x10\n\x08\x61rtifact\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0c\n\x04rule\x18\x03 \x01(\t\x12\x0f\n\x07message\x18\x04 \x01(\t\"5\n\x0bInitRequest\x12\x0c\n\x04root\x18\x01 \x01(\t\x12\x18\n\x05\x61\x63tor\x18\x02 \x01(\x0b\x32\t.kb.Actor\"\x0e\n\x0cInitResponse\"h\n\rCreateRequest\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x18\n\x05\x61\x63tor\x18\x03 \x01(\x0b\x32\t.kb.Actor\x12\x0f\n\x07message\x18\x04 \x01(\t\x12\r\n\x05title\x18\x05 \x01(\t\"I\n\x0e\x43reateResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x05\x12\x19\n\x06\x66\x61ults\x18\x03 \x03(\x0b\x32\t.kb.Fault\"+\n\x0bReadRequest\x12\x1c\n\x07locator\x18\x01 \x01(\x0b\x32\x0b.kb.Locator\"\xeb\x01\n\x0cReadResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x16\n\x0eschema_version\x18\x03 \x01(\x05\x12\x10\n\x08revision\x18\x04 \x01(\x05\x12\r\n\x05title\x18\x05 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x06 \x01(\t\x12\x1c\n\nreferences\x18\x07 \x03(\x0b\x32\x08.kb.Stub\x12\x1b\n\x05parts\x18\x08 \x03(\x0b\x32\x0c.kb.PartStub\x12!\n\x07inbound\x18\t \x03(\x0b\x32\x10.kb.InboundCount\x12\x19\n\x06\x66\x61ults\x18\n \x03(\x0b\x32\t.kb.Fault\"N\n\x04Stub\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\x0c\n\x04type\x18\x03 \x01(\t\x12\r\n\x05title\x18\x04 \x01(\t\x12\x0e\n\x06\x66ields\x18\x05 \x01(\t\"9\n\x08PartStub\x12\x12\n\ncollection\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\r\n\x05title\x18\x03 \x01(\t\":\n\x0cInboundCount\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x05\x32\x8b\x01\n\x02Kb\x12)\n\x04Init\x12\x0f.kb.InitRequest\x1a\x10.kb.InitResponse\x12/\n\x06\x43reate\x12\x11.kb.CreateRequest\x1a\x12.kb.CreateResponse\x12)\n\x04Read\x12\x0f.kb.ReadRequest\x1a\x10.kb.ReadResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14kb/contract/kb.proto\x12\x02kb\"(\n\x05\x41\x63tor\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x11\n\texecution\x18\x02 \x01(\t\"#\n\x07Locator\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"F\n\x05\x46\x61ult\x12\x10\n\x08\x61rtifact\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0c\n\x04rule\x18\x03 \x01(\t\x12\x0f\n\x07message\x18\x04 \x01(\t\"5\n\x0bInitRequest\x12\x0c\n\x04root\x18\x01 \x01(\t\x12\x18\n\x05\x61\x63tor\x18\x02 \x01(\x0b\x32\t.kb.Actor\")\n\x0cInitResponse\x12\x19\n\x06\x66\x61ults\x18\x01 \x03(\x0b\x32\t.kb.Fault\"h\n\rCreateRequest\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x18\n\x05\x61\x63tor\x18\x03 \x01(\x0b\x32\t.kb.Actor\x12\x0f\n\x07message\x18\x04 \x01(\t\x12\r\n\x05title\x18\x05 \x01(\t\"I\n\x0e\x43reateResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x05\x12\x19\n\x06\x66\x61ults\x18\x03 \x03(\x0b\x32\t.kb.Fault\"+\n\x0bReadRequest\x12\x1c\n\x07locator\x18\x01 \x01(\x0b\x32\x0b.kb.Locator\"\xeb\x01\n\x0cReadResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x16\n\x0eschema_version\x18\x03 \x01(\x05\x12\x10\n\x08revision\x18\x04 \x01(\x05\x12\r\n\x05title\x18\x05 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x06 \x01(\t\x12\x1c\n\nreferences\x18\x07 \x03(\x0b\x32\x08.kb.Stub\x12\x1b\n\x05parts\x18\x08 \x03(\x0b\x32\x0c.kb.PartStub\x12!\n\x07inbound\x18\t \x03(\x0b\x32\x10.kb.InboundCount\x12\x19\n\x06\x66\x61ults\x18\n \x03(\x0b\x32\t.kb.Fault\"N\n\x04Stub\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\x0c\n\x04type\x18\x03 \x01(\t\x12\r\n\x05title\x18\x04 \x01(\t\x12\x0e\n\x06\x66ields\x18\x05 \x01(\t\"9\n\x08PartStub\x12\x12\n\ncollection\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\r\n\x05title\x18\x03 \x01(\t\":\n\x0cInboundCount\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x05\x32\x8b\x01\n\x02Kb\x12)\n\x04Init\x12\x0f.kb.InitRequest\x1a\x10.kb.InitResponse\x12/\n\x06\x43reate\x12\x11.kb.CreateRequest\x1a\x12.kb.CreateResponse\x12)\n\x04Read\x12\x0f.kb.ReadRequest\x1a\x10.kb.ReadResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -40,21 +40,21 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_INITREQUEST']._serialized_start=179
   _globals['_INITREQUEST']._serialized_end=232
   _globals['_INITRESPONSE']._serialized_start=234
-  _globals['_INITRESPONSE']._serialized_end=248
-  _globals['_CREATEREQUEST']._serialized_start=250
-  _globals['_CREATEREQUEST']._serialized_end=354
-  _globals['_CREATERESPONSE']._serialized_start=356
-  _globals['_CREATERESPONSE']._serialized_end=429
-  _globals['_READREQUEST']._serialized_start=431
-  _globals['_READREQUEST']._serialized_end=474
-  _globals['_READRESPONSE']._serialized_start=477
-  _globals['_READRESPONSE']._serialized_end=712
-  _globals['_STUB']._serialized_start=714
-  _globals['_STUB']._serialized_end=792
-  _globals['_PARTSTUB']._serialized_start=794
-  _globals['_PARTSTUB']._serialized_end=851
-  _globals['_INBOUNDCOUNT']._serialized_start=853
-  _globals['_INBOUNDCOUNT']._serialized_end=911
-  _globals['_KB']._serialized_start=914
-  _globals['_KB']._serialized_end=1053
+  _globals['_INITRESPONSE']._serialized_end=275
+  _globals['_CREATEREQUEST']._serialized_start=277
+  _globals['_CREATEREQUEST']._serialized_end=381
+  _globals['_CREATERESPONSE']._serialized_start=383
+  _globals['_CREATERESPONSE']._serialized_end=456
+  _globals['_READREQUEST']._serialized_start=458
+  _globals['_READREQUEST']._serialized_end=501
+  _globals['_READRESPONSE']._serialized_start=504
+  _globals['_READRESPONSE']._serialized_end=739
+  _globals['_STUB']._serialized_start=741
+  _globals['_STUB']._serialized_end=819
+  _globals['_PARTSTUB']._serialized_start=821
+  _globals['_PARTSTUB']._serialized_end=878
+  _globals['_INBOUNDCOUNT']._serialized_start=880
+  _globals['_INBOUNDCOUNT']._serialized_end=938
+  _globals['_KB']._serialized_start=941
+  _globals['_KB']._serialized_end=1080
 # @@protoc_insertion_point(module_scope)

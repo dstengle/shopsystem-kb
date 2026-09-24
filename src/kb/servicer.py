@@ -11,6 +11,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         self._store = Store(root)
 
     def Init(self, request, context):
+        if not request.actor.role:
+            return kb_pb2.InitResponse(faults=[kb_pb2.Fault(
+                rule="actor", message="a store can only be started under a role",
+            )])
         store = Store(request.root)
         store.start()
         metaschema = {"id": "schema/schema", "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}

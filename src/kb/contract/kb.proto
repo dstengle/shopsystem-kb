@@ -38,7 +38,10 @@ message InitRequest {
   Actor actor = 2;
 }
 
-message InitResponse {}
+// With faults, a refusal: no role, or a store already there.
+message InitResponse {
+  repeated Fault faults = 1;
+}
 
 // The title travels here, never inside the content.
 message CreateRequest {
