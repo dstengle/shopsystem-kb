@@ -4,8 +4,27 @@ import yaml
 IDENTITY = ("id", "type", "schema_version", "revision", "title")
 
 
+class Prose(str):
+    """A prose body. Written as a literal block, however short."""
+
+
 class _Dumper(yaml.SafeDumper):
-    pass
+    def increase_indent(self, flow=False, indentless=False):
+        """Sequences sit indented under their key, never flush with it."""
+        return super().increase_indent(flow, False)
+
+
+def _represent_mapping(dumper, mapping):
+    """Every value under a `body` key is prose."""
+    items = [
+        (key, Prose(value) if key == "body" and isinstance(value, str) else value)
+        for key, value in mapping.items()
+    ]
+    return dumper.represent_mapping("tag:yaml.org,2002:map", items)
+
+
+def _represent_prose(dumper, value):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", str(value), style="|")
 
 
 def _represent_str(dumper, value):
@@ -13,11 +32,17 @@ def _represent_str(dumper, value):
     return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
 
 
+_Dumper.add_representer(dict, _represent_mapping)
+_Dumper.add_representer(Prose, _represent_prose)
 _Dumper.add_representer(str, _represent_str)
 
 
 def dump(artifact: dict) -> str:
-    return yaml.dump(artifact, Dumper=_Dumper, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    """Block style, keys in the order given, prose as literal blocks, no line folded at any width."""
+    return yaml.dump(
+        artifact, Dumper=_Dumper, sort_keys=False, default_flow_style=False,
+        allow_unicode=True, width=float("inf"),
+    )
 
 
 def load(text: str) -> dict:
