@@ -1,4 +1,5 @@
 """The store on disk: <root>/kb/, one canonical YAML file per artifact, itself a git repository."""
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -41,11 +42,12 @@ class Store:
         """One commit of the given files, message from the request, author from the actor."""
         relative = [str(Path(path).relative_to(self.dir)) for path in paths]
         _git("-C", str(self.dir), "add", "--", *relative)
-        _git(
-            "-C", str(self.dir),
-            "-c", f"user.name={role}", "-c", f"user.email={role}@kb", "-c", "commit.gpgsign=false",
-            "commit", "-q", "-m", message,
-        )
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_NAME": role, "GIT_AUTHOR_EMAIL": f"{role}@kb",
+            "GIT_COMMITTER_NAME": role, "GIT_COMMITTER_EMAIL": f"{role}@kb",
+        }
+        _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", message, env=env)
 
     def artifacts(self):
         """Every artifact in the store, schemas included, in path order."""
@@ -57,5 +59,5 @@ def slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
 
 
-def _git(*args):
-    subprocess.run(["git", *args], check=True, capture_output=True, text=True)
+def _git(*args, env=None):
+    subprocess.run(["git", *args], check=True, capture_output=True, text=True, env=env)
