@@ -43,3 +43,10 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     When the client starts a store there, saying which role it is
     Then starting the store is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
+
+  Scenario: Where a store is started is settled by the directory named, not by where the client is working
+    Given the client is working inside a store
+    And an empty directory elsewhere that sits inside no store
+    When the client starts a store in that empty directory, saying which role it is
+    Then the store is made in the directory the client named
+    And the store the client was working in is left as it was
