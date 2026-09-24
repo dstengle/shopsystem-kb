@@ -175,3 +175,26 @@ def _rejected_with_no_store_found(shown, elsewhere):
     assert [fault.rule for fault in shown.faults] == ["store"]
     assert "no store was found" in shown.faults[0].message
     assert str(elsewhere) in shown.faults[0].message
+
+
+@given("the client is working outside any store, with KB_ROOT naming a directory that holds no store", target_fixture="empty")
+def _outside_with_kb_root_naming_nothing(tmp_path, monkeypatch):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setenv("KB_ROOT", str(empty))
+    return empty
+
+
+@then("the read is rejected because KB_ROOT names a directory that holds no store")
+def _rejected_as_kb_root_holds_no_store(shown, empty):
+    assert [fault.rule for fault in shown.faults] == ["store"]
+    assert "KB_ROOT names a directory that holds no store" in shown.faults[0].message
+    assert str(empty) in shown.faults[0].message
+
+
+@then("no content comes back")
+def _no_content(shown):
+    assert (shown.id, shown.title, shown.content) == ("", "", "")
