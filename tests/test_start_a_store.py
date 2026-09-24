@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pytest_bdd import given, scenarios, then, when
 
-from calls import create, define, read
+from calls import define, read
 from kb import client as kb_client
 from kb.contract import kb_pb2
 

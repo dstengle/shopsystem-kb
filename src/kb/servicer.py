@@ -29,9 +29,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for item in content.get(collection, []):
                 item["id"] = slug(item["title"])
         artifact = {
+            **content,
             "id": artifact_id, "type": request.type,
             "schema_version": schema["version"], "revision": 1,
-            **content,
         }
         path = self._store.save(canonical.order(artifact, schema["schema"]))
         self._store.commit([path], request.actor.role, request.message)

@@ -47,7 +47,7 @@ class Store:
             "GIT_AUTHOR_NAME": role, "GIT_AUTHOR_EMAIL": f"{role}@kb",
             "GIT_COMMITTER_NAME": role, "GIT_COMMITTER_EMAIL": f"{role}@kb",
         }
-        _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", message, env=env)
+        _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", message, "--", *relative, env=env)
 
     def artifacts(self):
         """Every artifact in the store, schemas included, in path order."""

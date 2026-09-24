@@ -52,16 +52,20 @@ WORK_ITEM_TYPE = {
 
 def define(client, type_content):
     """Define a type: a Create of type `schema`."""
-    return client.Create(kb_pb2.CreateRequest(
+    response = client.Create(kb_pb2.CreateRequest(
         type="schema", content=dumps(type_content), actor=CLIENT,
         message=f"Define {type_content['title']}",
     ))
+    assert not response.faults, response.faults
+    return response
 
 
 def create(client, type_name, content, message="Create an artifact"):
-    return client.Create(kb_pb2.CreateRequest(
+    response = client.Create(kb_pb2.CreateRequest(
         type=type_name, content=dumps(content), actor=CLIENT, message=message,
     ))
+    assert not response.faults, response.faults
+    return response
 
 
 def read(client, artifact_id):
