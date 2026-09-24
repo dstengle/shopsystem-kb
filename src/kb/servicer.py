@@ -165,9 +165,8 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             title=artifact["title"],
             content=dumps(_summary_fields(artifact, schema)),
         )
-        for field in _reference_fields(schema):
-            for target_id in _as_list(artifact.get(field)):
-                response.references.append(self._stub(field, values.artifact_id(target_id)))
+        for field, _, target in validation.links(artifact, schema, self._store):
+            response.references.append(self._stub(field, values.artifact_id(target)))
         for collection in schema.get("parts", {}):
             for item in artifact.get(collection, []):
                 response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
@@ -202,10 +201,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         counts = {}
         for other in self._store.artifacts():
             schema = self._store.schema(values.kind(other["type"]))["schema"]
-            for field in _reference_fields(schema):
-                if artifact_id in _as_list(other.get(field)):
-                    key = (other["type"], field)
-                    counts[key] = counts.get(key, 0) + 1
+            pointing = {field for field, _, target in validation.links(other, schema, self._store) if target == artifact_id}
+            for field in pointing:
+                counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
         return counts
 
 
@@ -226,12 +224,3 @@ def _identity_faults(artifact_id, content):
 def _summary_fields(artifact, schema):
     return {name: artifact[name] for name in schema.get("summary", []) if name in artifact}
 
-
-def _reference_fields(schema):
-    return [name for name, field in schema.get("properties", {}).items() if "ref" in field]
-
-
-def _as_list(value):
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]

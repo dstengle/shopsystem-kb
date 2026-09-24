@@ -1,5 +1,6 @@
 """Schema validation: the type's JSON Schema composed with kb's own structural rules, checked in one pass, then
-what the schema language cannot say, checked in code: required sections in their declared order.
+what the schema language cannot say, checked in code: required sections in their declared order, and links that
+land on an artifact the corpus holds, of a kind the type allows.
 
 kb's keywords are read through the type's composition, so a type built on a base carries the base's first.
 """
@@ -75,7 +76,45 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
     if faults:
         return faults
     required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
-    return _sections(artifact_id, content.get("sections", []), required, "sections")
+    faults = _sections(artifact_id, content.get("sections", []), required, "sections")
+    allowed = references(schema, corpus)
+    for field, place, target in links(content, schema, corpus):
+        if not _lands(target, allowed[field]["targets"], corpus):
+            faults.append(kb_pb2.Fault(
+                artifact=artifact_id, path=place, rule="ref",
+                message=f"a link must land on a node of a kind the type allows; {target!r} does not",
+            ))
+    return faults
+
+
+def references(schema: dict, corpus) -> dict[str, dict]:
+    """Every field that links to other artifacts, from every schema in the composition, base first, with its `ref`."""
+    return {
+        name: field["ref"]
+        for part in composition(schema, corpus)
+        for name, field in part.get("properties", {}).items()
+        if "ref" in field
+    }
+
+
+def links(artifact: dict, schema: dict, corpus) -> list[tuple[str, str, str]]:
+    """Every link an artifact carries, as the field, the place in the artifact, and the name it points at."""
+    found = []
+    for field in references(schema, corpus):
+        value = artifact.get(field)
+        if isinstance(value, list):
+            found += [(field, f"{field}/{index}", target) for index, target in enumerate(value)]
+        elif value is not None:
+            found.append((field, field, value))
+    return found
+
+
+def _lands(target: str, allowed: list, corpus) -> bool:
+    try:
+        target_id = values.artifact_id(target)
+    except values.Refused:
+        return False
+    return target_id.kind.name in allowed and corpus.holds(target_id)
 
 
 def composition(schema: dict, corpus) -> list[dict]:

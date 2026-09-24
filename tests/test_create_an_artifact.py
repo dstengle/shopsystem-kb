@@ -459,3 +459,32 @@ def _none_of_them_text(root, created):
 @given("a title for a new decision that is the number 12 rather than text", target_fixture="title")
 def _a_title_that_is_a_number():
     return 12
+
+
+@when(
+    "the client creates a decision that is missing its purpose and supersedes a decision the store does not hold, "
+    "saying which role and why",
+    target_fixture="attempt",
+)
+def _create_with_two_faults(client, tmp_path):
+    before = _everything_under(tmp_path)
+    response = request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": "decision/prices-are-reviewed-monthly",
+        "sections": [SECTIONS[1]],
+    }, message="Record it")
+    return {"response": response, "before": before, "after": _everything_under(tmp_path)}
+
+
+@then("the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken")
+def _rejected_with_both_faults(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert sorted((fault.artifact, fault.path, fault.rule) for fault in refused.faults) == [
+        ("decision/price-reviews-happen-weekly", "sections", "sections"),
+        ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
+    ]
+
+
+@then("the store is unchanged")
+def _store_unchanged(attempt):
+    assert attempt["after"] == attempt["before"]
