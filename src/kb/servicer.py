@@ -108,7 +108,8 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         at = f"{kind.name}/{values.slug(creation.title)}"
         faults = []
         try:
-            artifact_id = values.named(kind, creation.title)
+            artifact_id = _unclaimed(draft, values.named(kind, creation.title))
+            at = str(artifact_id)
         except values.Refused as refused:
             faults += refused.faults
         try:
@@ -212,6 +213,16 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for field in pointing:
                 counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
         return counts
+
+
+def _unclaimed(draft: Draft, named: ArtifactId) -> ArtifactId:
+    """The name a title gives, or, when the store or an earlier change in the set already holds it, that name with
+    -2, -3 and so on added: the first that nothing holds. What already holds a name keeps it."""
+    candidate, number = named, 1
+    while draft.holds(candidate):
+        number += 1
+        candidate = ArtifactId(named.kind, f"{named.slug}-{number}")
+    return candidate
 
 
 def _summary_fields(artifact, schema):

@@ -488,3 +488,32 @@ def _rejected_with_both_faults(attempt):
 @then("the store is unchanged")
 def _store_unchanged(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+@given(parsers.parse('a decision the store already holds, titled "{title}"'), target_fixture="first")
+def _a_decision_already_held(root, client, title):
+    created = request(client, "decision", title, {"sections": SECTIONS}, message="Record it")
+    assert not created.faults, created.faults
+    return {"id": created.id, "title": title, "bytes": (root / "kb" / f"{created.id}.yaml").read_bytes()}
+
+
+@when("the client creates another decision with that same title, saying which role and why", target_fixture="created")
+def _create_another_with_that_title(client, first):
+    return request(client, "decision", first["title"], {"sections": [
+        {"title": "Purpose", "body": "Keep the shelf prices honest.\n"},
+        {"title": "Rationale", "body": "Suppliers change their lists every week.\n"},
+    ]}, message="Record it again")
+
+
+@then("the client is given a name of its own for the new decision, the name already taken with a number added")
+def _a_numbered_name(client, first, created):
+    assert not created.faults, created.faults
+    assert (created.id, created.revision) == (f"{first['id']}-2", 1)
+    assert read(client, created.id).title == first["title"]
+
+
+@then("the decision created first keeps the name it had")
+def _the_first_keeps_its_name(root, client, first):
+    kept = read(client, first["id"])
+    assert (kept.id, kept.revision) == (first["id"], 1)
+    assert (root / "kb" / f"{first['id']}.yaml").read_bytes() == first["bytes"]
