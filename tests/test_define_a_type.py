@@ -1,6 +1,7 @@
 from pytest_bdd import given, scenarios, then, when
 
 from calls import create, define, read, request
+from kb import canonical
 
 scenarios("define-a-type.feature")
 
@@ -115,3 +116,62 @@ def _checked_against_the_shared_shape(client):
     assert (misfit.id, misfit.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
     assert "'value' is a required property" in misfit.faults[0].message
+
+
+BASE_TYPE = {
+    "title": "Base",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {"owner": {"type": "string"}, "status": {"type": "string"}},
+        "required": ["owner", "status"],
+        "sections": [{"title": "Purpose"}],
+    },
+}
+
+DECISION_ON_BASE_TYPE = {
+    "title": "Decision",
+    "version": 1,
+    "schema": {
+        "allOf": [{"$ref": "kb:schema/base"}],
+        "type": "object",
+        "properties": {"title": {"type": "string"}},
+        "required": ["title"],
+        "sections": [{"title": "Rationale"}],
+    },
+}
+
+BASE_SECTIONS = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs move weekly.\n"},
+]
+
+
+@given(
+    "a base type that gives every artifact an owner and a status, and requires a purpose section"
+)
+def _a_base_type(client):
+    define(client, BASE_TYPE)
+
+
+@when("the client defines a decision type built on that base, adding a rationale section of its own")
+def _define_a_decision_on_the_base(client):
+    define(client, DECISION_ON_BASE_TYPE)
+
+
+@then("a decision missing its owner is rejected because it does not fit its type")
+def _rejected_without_an_owner(client):
+    refused = request(client, "decision", "Price reviews happen weekly", {"status": "accepted", "sections": BASE_SECTIONS})
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [("", "required")]
+    assert "'owner' is a required property" in refused.faults[0].message
+
+
+@then("a decision reads back with its purpose before its rationale")
+def _purpose_before_rationale(root, client):
+    created = request(client, "decision", "Price reviews happen weekly", {
+        "owner": "shopkeeper", "status": "accepted", "sections": BASE_SECTIONS,
+    })
+    assert not created.faults, created.faults
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert [section["title"] for section in on_disk["sections"]] == ["Purpose", "Rationale"]
