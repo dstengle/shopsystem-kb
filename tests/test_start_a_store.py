@@ -2,6 +2,7 @@ import hashlib
 import subprocess
 from pathlib import Path
 
+import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, define, read
@@ -18,11 +19,15 @@ def _empty_directory(tmp_path):
     return root
 
 
-@when("the client starts a store there, saying which role it is", target_fixture="client")
-def _start_a_store(root):
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    return client
+@pytest.fixture
+def client(root):
+    """A client over the store at root, for the steps that go on to use the store a scenario started."""
+    return kb_client.connect(root)
+
+
+@when("the client starts a store there, saying which role it is", target_fixture="started")
+def _start_a_store(client, root):
+    return client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
 
 
 @then("the store holds the one type that describes what a type is")
@@ -157,3 +162,42 @@ def _rejected_as_named_nothing(started):
 @then("no store is made anywhere")
 def _no_store_anywhere(here, tmp_path):
     assert _everything_under(tmp_path) == here["before"]
+
+
+@given("a place on the disk where no directory exists", target_fixture="root")
+def _a_place_with_no_directory(tmp_path):
+    return tmp_path / "nowhere" / "store"
+
+
+@then("starting the store is rejected because a store is started in a directory that exists")
+def _rejected_as_not_there(started, root):
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", f"a store is started in a directory that exists; {str(root)!r} does not"),
+    ]
+
+
+@then("nothing is made at that place")
+def _nothing_made_there(root):
+    assert not root.parent.exists()
+
+
+FILE_TEXT = b"notes the store must not write through\n"
+
+
+@given("a place on the disk holding a file rather than a directory", target_fixture="root")
+def _a_place_holding_a_file(tmp_path):
+    root = tmp_path / "store"
+    root.write_bytes(FILE_TEXT)
+    return root
+
+
+@then("starting the store is rejected because a store is started in a directory, and what was named is not one")
+def _rejected_as_not_a_directory(started, root):
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", f"a store is started in a directory, and {str(root)!r} is not one"),
+    ]
+
+
+@then("that file is left as it was")
+def _file_left_as_it_was(root):
+    assert root.read_bytes() == FILE_TEXT

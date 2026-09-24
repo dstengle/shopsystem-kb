@@ -93,7 +93,16 @@ def root(text: str) -> Path:
             rule="root",
             message="a store is started in a directory that was named and that exists; no directory was named",
         )])
-    return Path(text)
+    named = Path(text)
+    if not named.exists():
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"a store is started in a directory that exists; {text!r} does not",
+        )])
+    if not named.is_dir():
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"a store is started in a directory, and {text!r} is not one",
+        )])
+    return named
 
 
 def slug(title: str) -> str:
