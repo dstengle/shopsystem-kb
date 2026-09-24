@@ -132,3 +132,17 @@ def _read_by_an_absolute_name(client, tmp_path):
 def _rejected_as_a_path(refused):
     assert [fault.rule for fault in refused.faults] == ["locator"]
     assert "never a path" in refused.faults[0].message
+
+
+@when(parsers.parse('the client reads the place "{place}" inside the decision'), target_fixture="refused")
+def _read_a_place_inside(client, place):
+    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, path=place)))
+
+
+@then(
+    "the read is rejected because a place inside an artifact is named by parts of the same plain alphabet, "
+    "or a collection and an item in it"
+)
+def _rejected_as_not_a_plain_place(refused):
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "sections/../..", "locator")]
+    assert "plain alphabet" in refused.faults[0].message
