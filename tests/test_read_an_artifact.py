@@ -270,3 +270,25 @@ def _given_the_decision(shown):
 def _never_readied_again(readied):
     assert readied["store_there"] is False
     assert readied["used"] is readied["client"]
+
+
+MANGLED = "title: [a bracket opened by hand and never closed\n"
+
+
+@given("someone edited the decision's file by hand and left it in a shape the store cannot read")
+def _decision_file_mangled_by_hand(root, monkeypatch):
+    (root / "kb" / f"{DECISION}.yaml").write_text(MANGLED)
+    monkeypatch.chdir(root)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+@then("the read is rejected because that file cannot be read, and the file is named")
+def _rejected_as_unreadable(shown):
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(DECISION, "unreadable")]
+    assert f"{DECISION}.yaml cannot be read" in shown.faults[0].message
+
+
+@then("the client is given that fault as it is given any other, the call never breaking off")
+def _given_as_any_other_fault(shown):
+    assert isinstance(shown, kb_pb2.ReadResponse)
+    assert (shown.id, shown.title, shown.content) == ("", "", "")

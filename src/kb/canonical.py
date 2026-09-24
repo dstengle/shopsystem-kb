@@ -5,6 +5,7 @@ kb is the only writer, so loading needs no round-trip preservation.
 import io
 
 from ruamel.yaml import YAML, events
+from ruamel.yaml.error import YAMLError
 from ruamel.yaml.representer import SafeRepresenter
 
 IDENTITY = ("id", "type", "schema_version", "revision", "title")
@@ -63,7 +64,10 @@ def check(text: str) -> None:
 
     No tags, no anchors or aliases, exactly one document. Raises NotCanonical naming the first rule broken.
     """
-    parsed = list(_yaml().parse(text))
+    try:
+        parsed = list(_yaml().parse(text))
+    except YAMLError as error:
+        raise NotCanonical(_unreadable(error)) from None
     if any(getattr(event, "tag", None) is not None for event in parsed):
         raise NotCanonical("content is read plainly as written and carries no tags")
     if any(getattr(event, "anchor", None) is not None for event in parsed):
@@ -87,9 +91,18 @@ def dump(artifact: dict) -> str:
 
 
 def load(text: str):
-    """Plain YAML 1.2: checked, then read."""
+    """Plain YAML 1.2: checked, then read. Text that cannot be read raises NotCanonical, never the parser's own error."""
     check(text)
-    return _yaml().load(text)
+    try:
+        return _yaml().load(text)
+    except YAMLError as error:
+        raise NotCanonical(_unreadable(error)) from None
+
+
+def _unreadable(error: YAMLError) -> str:
+    mark = getattr(error, "problem_mark", None)
+    where = f" at line {mark.line + 1}" if mark is not None else ""
+    return f"it is not YAML that can be read: {getattr(error, 'problem', None) or error}{where}"
 
 
 def order(artifact: dict, schema: dict) -> dict:

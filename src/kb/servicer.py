@@ -7,7 +7,7 @@ from kb import canonical, journal, validation, values
 from kb.content import loads, dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
-from kb.store import Store
+from kb.store import Store, Unreadable
 from kb.values import ArtifactId, Kind
 
 METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
@@ -79,6 +79,12 @@ class KbServicer(kb_pb2_grpc.KbServicer):
                 artifact=str(locator.id), rule="not-found",
                 message=f"the store holds nothing by the name {str(locator.id)!r}",
             )])
+        try:
+            return self._summary(locator)
+        except Unreadable as unreadable:
+            return kb_pb2.ReadResponse(faults=[unreadable.fault])
+
+    def _summary(self, locator):
         artifact = self._store.load(locator.id)
         schema = self._store.schema(locator.id.kind)["schema"]
         response = kb_pb2.ReadResponse(

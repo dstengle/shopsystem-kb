@@ -4,8 +4,16 @@ import subprocess
 from pathlib import Path
 
 from kb import canonical, values
-from kb.contract import CONTRACT_VERSION
+from kb.contract import CONTRACT_VERSION, kb_pb2
 from kb.values import ArtifactId, Kind
+
+
+class Unreadable(Exception):
+    """A stored file that cannot be read. Carries the fault that names it."""
+
+    def __init__(self, fault: kb_pb2.Fault):
+        super().__init__(fault.message)
+        self.fault = fault
 
 
 class Store:
@@ -35,7 +43,15 @@ class Store:
         return self.path(artifact_id).is_file()
 
     def load(self, artifact_id: ArtifactId) -> dict:
-        return canonical.load(self.path(artifact_id).read_text())
+        """The artifact as stored. A file that cannot be read raises Unreadable, naming the file."""
+        path = self.path(artifact_id)
+        try:
+            return canonical.load(path.read_text())
+        except canonical.NotCanonical as error:
+            raise Unreadable(kb_pb2.Fault(
+                artifact=str(artifact_id), rule="unreadable",
+                message=f"the stored file {path.relative_to(self.dir)} cannot be read: {error}",
+            )) from None
 
     def schema(self, kind: Kind) -> dict:
         """The schema artifact of a kind; its JSON Schema is under `schema`."""
@@ -52,10 +68,14 @@ class Store:
         }
         _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", message, "--", *relative, env=env)
 
+    def ids(self) -> list[ArtifactId]:
+        """The name of every artifact in the store, schemas included, in path order."""
+        return [ArtifactId(Kind(path.parent.name), path.stem) for path in sorted(self.dir.glob("*/*.yaml"))]
+
     def artifacts(self):
-        """Every artifact in the store, schemas included, in path order."""
-        for path in sorted(self.dir.glob("*/*.yaml")):
-            yield canonical.load(path.read_text())
+        """Every artifact in the store, schemas included, in path order. A file that cannot be read raises Unreadable."""
+        for artifact_id in self.ids():
+            yield self.load(artifact_id)
 
 
 def _git(*args, env=None):
