@@ -1,35 +1,45 @@
-"""Schema validation: JSON Schema 2020-12 over an artifact, then the shape of its sections. The other kb keywords are checked in later slices."""
+"""Schema validation: the type's JSON Schema composed with kb's own structural rules, checked in one pass.
+
+The other kb keywords (references, required sections in order, id uniqueness) are checked in code in later slices.
+"""
 from jsonschema import Draft202012Validator
 
 from kb.contract import kb_pb2
 
-SECTION_KEYS = ("title", "body", "sections")
+SECTION = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "body": {"type": "string"},
+        "sections": {"type": "array", "items": {"$ref": "#/$defs/kb-section"}},
+    },
+    "required": ["title", "body"],
+    "additionalProperties": False,
+}
+
+STRUCTURE = {"properties": {"sections": {"type": "array", "items": {"$ref": "#/$defs/kb-section"}}}}
+
+
+def compose(schema: dict) -> dict:
+    """One effective schema: the type's, with kb's structural rules beside it under allOf.
+
+    The type stays the root, so its own `#` references still resolve; kb's shapes sit under `$defs/kb-*`.
+    """
+    return {
+        **schema,
+        "allOf": [*schema.get("allOf", []), STRUCTURE],
+        "$defs": {**schema.get("$defs", {}), "kb-section": SECTION},
+    }
 
 
 def validate(artifact_id: str, content: dict, schema: dict) -> list[kb_pb2.Fault]:
     """Every violation, as artifact, path, rule, message."""
-    faults = [
+    return [
         kb_pb2.Fault(
             artifact=artifact_id,
             path="/".join(str(step) for step in error.absolute_path),
             rule=error.validator,
             message=error.message,
         )
-        for error in Draft202012Validator(schema).iter_errors(content)
+        for error in Draft202012Validator(compose(schema)).iter_errors(content)
     ]
-    return faults + _section_faults(artifact_id, content.get("sections", []), "sections")
-
-
-def _section_faults(artifact_id: str, sections: list, at: str) -> list[kb_pb2.Fault]:
-    """A section holds exactly its title, its body and the sections inside it."""
-    faults = []
-    for index, section in enumerate(sections):
-        here = f"{at}/{index}"
-        for key in section:
-            if key not in SECTION_KEYS:
-                faults.append(kb_pb2.Fault(
-                    artifact=artifact_id, path=f"{here}/{key}", rule="section",
-                    message=f"a section holds exactly its title, its body and the sections inside it; {key} is none of these",
-                ))
-        faults += _section_faults(artifact_id, section.get("sections", []), f"{here}/sections")
-    return faults

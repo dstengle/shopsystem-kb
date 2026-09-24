@@ -218,8 +218,8 @@ def _create_with_an_extra_entry_in_a_section(client):
     "and the extra entry is named"
 )
 def _rejected_for_an_extra_entry(refused):
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0/author", "section")]
-    assert "author" in refused.faults[0].message
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "additionalProperties")]
+    assert "'author'" in refused.faults[0].message
 
 
 @when(
@@ -270,3 +270,33 @@ def _rejected_for_an_alias(refused):
     assert [(fault.rule, fault.message) for fault in refused.faults] == [
         ("content", "content is read exactly as written and nothing in it stands in for a value written somewhere else"),
     ]
+
+
+@when(
+    "the client creates a decision whose first section carries a body and no title, saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_a_section_without_a_title(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "sections": [{"body": SECTIONS[0]["body"]}, SECTIONS[1]],
+    }, message="Record it")
+
+
+@when(
+    "the client creates a decision whose purpose carries a title and no body, saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_a_section_without_a_body(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "sections": [{"title": "Purpose"}, SECTIONS[1]],
+    }, message="Record it")
+
+
+@then(
+    "the artifact is rejected because a section carries both a title and a body, and a section without one "
+    "does not fit its type like anything else that does not"
+)
+def _rejected_for_a_section_missing_a_key(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
+    assert "is a required property" in refused.faults[0].message
