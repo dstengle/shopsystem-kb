@@ -1,5 +1,5 @@
 import yaml
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, read, request
 from kb import client as kb_client
@@ -88,3 +88,20 @@ def _rejected_for_a_title_inside(refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in refused.faults] == [("title", "identity")]
     assert "Price reviews, weekly" in refused.faults[0].message
+
+
+@when(parsers.parse('the client creates a decision titled "{title}", saying which role and why'), target_fixture="created")
+def _create_titled(client, title):
+    return request(client, "decision", title, {"sections": SECTIONS}, message="Record it")
+
+
+@then("the title reads back as the text that was written, not as a date")
+def _title_is_text_not_a_date(root, client, created):
+    assert read(client, created.id).title == "2026-09-24"
+    on_disk = yaml.safe_load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert on_disk["title"] == "2026-09-24"
+
+
+@then("the name the client is given is made from that text")
+def _name_from_that_text(client, created):
+    assert created.id == f"decision/{read(client, created.id).title}"
