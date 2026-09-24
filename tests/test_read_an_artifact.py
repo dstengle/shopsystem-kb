@@ -1,7 +1,7 @@
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, read
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, read, write
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -292,3 +292,39 @@ def _rejected_as_unreadable(shown):
 def _given_as_any_other_fault(shown):
     assert isinstance(shown, kb_pb2.ReadResponse)
     assert (shown.id, shown.title, shown.content) == ("", "", "")
+
+
+DAILY = "decision/stock-is-counted-daily"
+NIGHTLY = "decision/stock-is-counted-nightly"
+COUNTING = [
+    {"title": "Purpose", "body": "Know what is on the shelves.\n"},
+    {"title": "Rationale", "body": "Counting catches shrinkage early.\n"},
+]
+
+
+@given("two decisions that point at each other")
+def _two_decisions_pointing_at_each_other(client):
+    create(client, "decision", {"title": "Stock is counted daily", "sections": COUNTING})
+    create(client, "decision", {"title": "Stock is counted nightly", "supersedes": DAILY, "sections": COUNTING})
+    changed = write(client, DAILY, {"supersedes": NIGHTLY, "sections": COUNTING}, message="Point back")
+    assert not changed.faults, changed.faults
+
+
+@when("the client reads the whole of one of them following its links three steps", target_fixture="whole")
+def _read_one_following_three_steps(client):
+    response = read(client, DAILY, whole=True, depth=3)
+    assert not response.faults, response.faults
+    return response
+
+
+@then("the other decision is given in place of the link")
+def _the_other_filled_in(whole):
+    other = loads(whole.content)["supersedes"]
+    assert (other["id"], other["title"]) == (NIGHTLY, "Stock is counted nightly")
+    assert other["sections"] == COUNTING
+
+
+@then("where that one points back, the decision being read is given as a name rather than filled in again")
+def _points_back_as_a_name(whole):
+    assert whole.id == DAILY
+    assert loads(whole.content)["supersedes"]["supersedes"] == DAILY

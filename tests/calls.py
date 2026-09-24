@@ -71,8 +71,10 @@ def define(client, type_content):
     return create(client, "schema", type_content, message=f"Define {type_content['title']}")
 
 
-def read(client, artifact_id):
-    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=artifact_id)))
+def read(client, artifact_id, whole=False, depth=0):
+    """A summary read, or a whole read following the links as many steps as depth says."""
+    level = kb_pb2.ReadRequest.WHOLE if whole else kb_pb2.ReadRequest.SUMMARY
+    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=artifact_id), level=level, depth=depth))
 
 
 def apply(client, operations, message="Make several changes"):

@@ -1,4 +1,5 @@
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
@@ -73,10 +74,20 @@ class CreateResponse(_message.Message):
     def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class ReadRequest(_message.Message):
-    __slots__ = ("locator",)
+    __slots__ = ("locator", "level", "depth")
+    class Level(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        SUMMARY: _ClassVar[ReadRequest.Level]
+        WHOLE: _ClassVar[ReadRequest.Level]
+    SUMMARY: ReadRequest.Level
+    WHOLE: ReadRequest.Level
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    LEVEL_FIELD_NUMBER: _ClassVar[int]
+    DEPTH_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ...) -> None: ...
+    level: ReadRequest.Level
+    depth: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., level: _Optional[_Union[ReadRequest.Level, str]] = ..., depth: _Optional[int] = ...) -> None: ...
 
 class ReadResponse(_message.Message):
     __slots__ = ("id", "type", "schema_version", "revision", "title", "content", "references", "parts", "inbound", "faults")

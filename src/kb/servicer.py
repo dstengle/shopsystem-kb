@@ -157,9 +157,39 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         if not self._store.holds(locator.id):
             return kb_pb2.ReadResponse(faults=[_not_found(locator.id)])
         try:
+            if request.level == kb_pb2.ReadRequest.WHOLE:
+                return self._whole(locator, request.depth)
             return self._summary(locator)
         except Unreadable as unreadable:
             return kb_pb2.ReadResponse(faults=[unreadable.fault])
+
+    def _whole(self, locator, depth: int):
+        artifact = self._resolved(locator.id, depth, {str(locator.id)})
+        return kb_pb2.ReadResponse(
+            id=artifact["id"], type=artifact["type"],
+            schema_version=artifact["schema_version"], revision=artifact["revision"],
+            title=artifact["title"],
+            content=dumps({key: value for key, value in artifact.items() if key not in canonical.IDENTITY}),
+        )
+
+    def _resolved(self, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
+        """The artifact as stored, each link followed depth steps with the target, itself resolved, in place of its
+        name. A target on the path already being filled in stays a name, so a loop ends."""
+        artifact = self._store.load(artifact_id)
+        if depth < 1:
+            return artifact
+        def fill(target):
+            if target in on_path:
+                return target
+            return self._resolved(values.artifact_id(target), depth - 1, on_path | {target})
+        resolved = dict(artifact)
+        for field in validation.references(self._store.schema(artifact_id.kind)["schema"], self._store):
+            value = artifact.get(field)
+            if isinstance(value, list):
+                resolved[field] = [fill(target) for target in value]
+            elif value is not None:
+                resolved[field] = fill(value)
+        return resolved
 
     def _summary(self, locator):
         artifact = self._store.load(locator.id)
