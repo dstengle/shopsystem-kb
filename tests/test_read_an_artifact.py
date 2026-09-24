@@ -1,3 +1,4 @@
+import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, read
@@ -17,6 +18,11 @@ DECISION = "decision/price-reviews-happen-weekly"
     target_fixture="client",
 )
 def _store_with_a_linked_decision(root):
+    return _start_with_a_linked_decision(root)
+
+
+def _start_with_a_linked_decision(root):
+    """Start a store at root holding the decision, what it supersedes, and two work items pointing at it."""
     client = kb_client.connect(root)
     client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, DECISION_TYPE)
@@ -82,9 +88,18 @@ def _working_deep_inside_the_store(root, monkeypatch):
     monkeypatch.delenv("KB_ROOT", raising=False)
 
 
+@pytest.fixture
+def readied():
+    """The client a scenario readied before it read, if one did; otherwise the read readies its own."""
+    return None
+
+
 @when("the client reads the decision", target_fixture="shown")
-def _read_the_decision_from_here():
-    return read(kb_client.connect(), DECISION)
+def _read_the_decision_from_here(readied):
+    if readied is None:
+        return read(kb_client.connect(), DECISION)
+    readied["used"] = readied["client"]
+    return read(readied["client"], DECISION)
 
 
 @then("the client is given the decision, from the store found above where it is working")
@@ -226,3 +241,32 @@ def _rejected_as_two_stores(shown, root, other):
 def _no_content_from_either(shown):
     assert (shown.id, shown.title, shown.content) == ("", "", "")
     assert not shown.references and not shown.parts and not shown.inbound
+
+
+@given(
+    "the client was readied to call a store while working where there was none and nothing named one",
+    target_fixture="readied",
+)
+def _readied_where_there_is_no_store(tmp_path, monkeypatch):
+    here = tmp_path / "shop"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+    return {"client": kb_client.connect(), "store_there": (here / "kb").exists(), "here": here}
+
+
+@given("a store holding the decision has since been started where the client is working")
+def _store_started_since(readied):
+    _start_with_a_linked_decision(readied["here"])
+
+
+@then("the client is given the decision")
+def _given_the_decision(shown):
+    assert not shown.faults, shown.faults
+    assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+
+
+@then("the client was never readied again after the store appeared")
+def _never_readied_again(readied):
+    assert readied["store_there"] is False
+    assert readied["used"] is readied["client"]

@@ -10,36 +10,38 @@ from kb.servicer import KbServicer
 class InProcessClient:
     """Same method names, requests and responses as kb_pb2_grpc.KbStub, with no channel between.
 
-    Built over a refusal instead of a servicer, every call answers with that fault and touches nothing.
+    Readied without finding a store. Each call but Init finds its store as it is made, from the root the client
+    was given or, with none, the way git finds a repository; a call that finds none answers with that fault and
+    touches nothing. Init takes its root from the request and finds nothing.
     """
 
-    def __init__(self, servicer: KbServicer | None, refusal: kb_pb2.Fault | None = None):
-        self._servicer = servicer
-        self._refusal = refusal
+    def __init__(self, root: Path | None = None):
+        self._root = root
+
+    def _servicer(self) -> tuple[KbServicer | None, kb_pb2.Fault | None]:
+        if self._root is not None:
+            return KbServicer(self._root), None
+        root, refusal = discovery.locate(Path.cwd(), os.environ)
+        if refusal is not None:
+            return None, refusal
+        return KbServicer(root), None
 
     def Init(self, request, timeout=None):
-        return self._servicer.Init(request, None)
+        return KbServicer(Path(request.root)).Init(request, None)
 
     def Create(self, request, timeout=None):
-        if self._refusal:
-            return kb_pb2.CreateResponse(faults=[self._refusal])
-        return self._servicer.Create(request, None)
+        servicer, refusal = self._servicer()
+        if refusal is not None:
+            return kb_pb2.CreateResponse(faults=[refusal])
+        return servicer.Create(request, None)
 
     def Read(self, request, timeout=None):
-        if self._refusal:
-            return kb_pb2.ReadResponse(faults=[self._refusal])
-        return self._servicer.Read(request, None)
+        servicer, refusal = self._servicer()
+        if refusal is not None:
+            return kb_pb2.ReadResponse(faults=[refusal])
+        return servicer.Read(request, None)
 
 
 def connect(root=None) -> InProcessClient:
-    """A client over the store at <root>/kb/, in this process.
-
-    With no root, over the store found the way git finds a repository: above the working directory, or
-    named by KB_ROOT; none found, or the two disagreeing, and the client refuses every call.
-    """
-    if root is not None:
-        return InProcessClient(KbServicer(Path(root)))
-    root, refusal = discovery.locate(Path.cwd(), os.environ)
-    if refusal is not None:
-        return InProcessClient(None, refusal)
-    return InProcessClient(KbServicer(root))
+    """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds."""
+    return InProcessClient(Path(root) if root is not None else None)
