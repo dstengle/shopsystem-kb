@@ -13,6 +13,7 @@ service Kb {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Read(ReadRequest) returns (ReadResponse);
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
 }
 
 message Actor {
@@ -96,4 +97,15 @@ message InboundCount {
   string type = 1;
   string field = 2;
   int32 count = 3;
+}
+
+message ValidateRequest {
+}
+
+// Every violation the store holds, each a fault naming the artifact, the
+// place and the rule; a stored file that cannot be read is one of them.
+// With faults, a refusal: no store found.
+message ValidateResponse {
+  repeated Fault violations = 1;
+  repeated Fault faults = 2;
 }

@@ -49,6 +49,11 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
                 _registered_method=True)
+        self.Validate = channel.unary_unary(
+                '/kb.Kb/Validate',
+                request_serializer=kb_dot_contract_dot_kb__pb2.ValidateRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.ValidateResponse.FromString,
+                _registered_method=True)
 
 
 class KbServicer:
@@ -72,6 +77,12 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Validate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_KbServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -89,6 +100,11 @@ def add_KbServicer_to_server(servicer, server):
                     servicer.Read,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.ReadRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.ReadResponse.SerializeToString,
+            ),
+            'Validate': grpc.unary_unary_rpc_method_handler(
+                    servicer.Validate,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.ValidateRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.ValidateResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -172,6 +188,33 @@ class Kb:
             '/kb.Kb/Read',
             kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Validate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.Kb/Validate',
+            kb_dot_contract_dot_kb__pb2.ValidateRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.ValidateResponse.FromString,
             options,
             channel_credentials,
             insecure,

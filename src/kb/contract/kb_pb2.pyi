@@ -135,3 +135,15 @@ class InboundCount(_message.Message):
     field: str
     count: int
     def __init__(self, type: _Optional[str] = ..., field: _Optional[str] = ..., count: _Optional[int] = ...) -> None: ...
+
+class ValidateRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ValidateResponse(_message.Message):
+    __slots__ = ("violations", "faults")
+    VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    violations: _containers.RepeatedCompositeFieldContainer[Fault]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

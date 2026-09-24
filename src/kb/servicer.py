@@ -103,6 +103,20 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
         return response
 
+    def Validate(self, request, context):
+        """Every artifact checked against its type; a file that cannot be read is reported and the check goes on."""
+        violations = []
+        for artifact_id in self._store.ids():
+            try:
+                artifact = self._store.load(artifact_id)
+                schema = self._store.schema(artifact_id.kind)["schema"]
+            except Unreadable as unreadable:
+                violations.append(unreadable.fault)
+                continue
+            content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
+            violations += validation.validate(str(artifact_id), content, schema)
+        return kb_pb2.ValidateResponse(violations=violations)
+
     def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
         schema = self._store.schema(target_id.kind)["schema"]

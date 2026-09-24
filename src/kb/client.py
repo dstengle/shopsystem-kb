@@ -41,6 +41,12 @@ class InProcessClient:
             return kb_pb2.ReadResponse(faults=[refusal])
         return servicer.Read(request, None)
 
+    def Validate(self, request, timeout=None):
+        servicer, refusal = self._servicer()
+        if refusal is not None:
+            return kb_pb2.ValidateResponse(faults=[refusal])
+        return servicer.Validate(request, None)
+
 
 def connect(root=None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds."""
