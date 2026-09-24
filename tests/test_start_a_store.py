@@ -1,6 +1,9 @@
+import hashlib
+import subprocess
 from pathlib import Path
 
-from pytest_bdd import given, scenarios, then, when
+import yaml
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, define, read
 from kb import client as kb_client
@@ -34,7 +37,7 @@ def _holds_the_metaschema(client):
 def _holds_nothing_else(root):
     store = root / "kb"
     files = sorted(p.relative_to(store) for p in store.rglob("*") if p.is_file() and ".git" not in p.parts)
-    assert files == [Path("schema/schema.yaml"), Path("store.yaml")]
+    assert [f for f in files if f.parts[0] != "journal"] == [Path("schema/schema.yaml"), Path("store.yaml")]
 
 
 @then("the client can define its own types straight away")
@@ -46,3 +49,28 @@ def _can_define_a_type(client):
     })
     assert defined.id == "schema/note"
     assert defined.revision == 1
+
+
+@then(
+    parsers.parse('the store\'s history holds one entry, under that role, with the message "{message}"'),
+    target_fixture="entry",
+)
+def _one_entry_under_the_role(root, message):
+    entries = sorted((root / "kb" / "journal").rglob("*.yaml"))
+    assert len(entries) == 1, entries
+    entry = yaml.safe_load(entries[0].read_text())
+    assert (entry["actor"]["role"], entry["message"]) == ("client", message)
+    log = subprocess.run(
+        ["git", "-C", str(root / "kb"), "log", "--format=%an%x09%s"], capture_output=True, text=True, check=True,
+    ).stdout.splitlines()
+    assert log == [f"client\t{message}"]
+    return entry
+
+
+@then(
+    "that entry is the writing of the one type that describes what a type is, at its first version, "
+    "with a fingerprint of what was written"
+)
+def _the_entry_is_the_metaschema_write(root, entry):
+    assert (entry["op"], entry["artifact"], entry["path"], entry["revision"]) == ("create", "schema/schema", "", 1)
+    assert entry["digest"] == hashlib.sha256((root / "kb" / "schema" / "schema.yaml").read_bytes()).hexdigest()

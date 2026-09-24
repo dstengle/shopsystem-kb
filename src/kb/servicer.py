@@ -1,5 +1,5 @@
 """The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later."""
-from kb import canonical, validation
+from kb import canonical, journal, validation
 from kb.content import loads, dumps
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
@@ -15,7 +15,11 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         store.start()
         metaschema = {"id": "schema/schema", "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
         path = store.save(canonical.order(metaschema, METASCHEMA["schema"]))
-        store.commit([store.dir / "store.yaml", path], request.actor.role, "Start the store")
+        entry = journal.write(
+            store.dir, actor=request.actor, op="create", artifact="schema/schema", path="",
+            revision=1, schema_version=1, written=path, message="initialise store",
+        )
+        store.commit([store.dir / "store.yaml", path, entry], request.actor.role, "initialise store")
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):
