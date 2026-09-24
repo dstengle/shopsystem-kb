@@ -18,6 +18,7 @@ service Kb {
   rpc Apply(ApplyRequest) returns (ApplyResponse);
   rpc Journal(JournalRequest) returns (JournalResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Refs(RefsRequest) returns (RefsResponse);
 }
 
 message Actor {
@@ -216,5 +217,32 @@ message Match {
 // faults, a refusal: no store found.
 message SearchResponse {
   repeated Match matches = 1;
+  repeated Fault faults = 2;
+}
+
+// The links out of an artifact, followed as many steps as depth says.
+message RefsRequest {
+  Locator locator = 1;
+  int32 depth = 2;
+}
+
+// One step of a route: the link taken and the name it landed on.
+message Hop {
+  string field = 1;
+  string id = 2;
+}
+
+// An artifact the links reach, with the route taken to it from the one
+// asked about; its stub's field is the link of the last step.
+message Reached {
+  Stub stub = 1;
+  repeated Hop route = 2;
+}
+
+// Each artifact reached once, by the shortest route, nearest first. With
+// faults, a refusal: a bad locator, a name the store lacks, or no store
+// found.
+message RefsResponse {
+  repeated Reached reached = 1;
   repeated Fault faults = 2;
 }

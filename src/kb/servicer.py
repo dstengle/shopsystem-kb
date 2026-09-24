@@ -155,10 +155,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         except values.Refused as refused:
             return kb_pb2.ReadResponse(faults=refused.faults)
         if not self._store.holds(locator.id):
-            return kb_pb2.ReadResponse(faults=[kb_pb2.Fault(
-                artifact=str(locator.id), rule="not-found",
-                message=f"the store holds nothing by the name {str(locator.id)!r}",
-            )])
+            return kb_pb2.ReadResponse(faults=[_not_found(locator.id)])
         try:
             return self._summary(locator)
         except Unreadable as unreadable:
@@ -214,6 +211,32 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for hit in search.rank(self._store.artifacts(), request.text)
         ])
 
+    def Refs(self, request, context):
+        """What an artifact's links reach, a step at a time out to the depth asked: each artifact once, by the
+        shortest route, the one asked about never."""
+        try:
+            locator = values.locator(request.locator)
+        except values.Refused as refused:
+            return kb_pb2.RefsResponse(faults=refused.faults)
+        if not self._store.holds(locator.id):
+            return kb_pb2.RefsResponse(faults=[_not_found(locator.id)])
+        reached, seen, frontier = [], {str(locator.id)}, [(locator.id, [])]
+        for _ in range(request.depth):
+            following = []
+            for artifact_id, route in frontier:
+                artifact = self._store.load(artifact_id)
+                schema = self._store.schema(artifact_id.kind)["schema"]
+                for field, _, target in validation.links(artifact, schema, self._store):
+                    if target in seen:
+                        continue
+                    seen.add(target)
+                    target_id = values.artifact_id(target)
+                    taken = [*route, kb_pb2.Hop(field=field, id=target)]
+                    reached.append(kb_pb2.Reached(stub=self._stub(field, target_id), route=taken))
+                    following.append((target_id, taken))
+            frontier = following
+        return kb_pb2.RefsResponse(reached=reached)
+
     def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
         schema = self._store.schema(target_id.kind)["schema"]
@@ -238,6 +261,12 @@ def _entry(entry: dict) -> kb_pb2.Entry:
         id=entry["id"], at=entry["at"], actor=kb_pb2.Actor(**entry["actor"]), op=entry["op"],
         artifact=entry["artifact"], path=entry["path"], revision=entry["revision"],
         schema_version=entry["schema_version"], digest=entry["digest"], message=entry["message"], batch=entry["batch"],
+    )
+
+
+def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule="not-found", message=f"the store holds nothing by the name {str(artifact_id)!r}",
     )
 
 

@@ -285,3 +285,35 @@ class SearchResponse(_message.Message):
     matches: _containers.RepeatedCompositeFieldContainer[Match]
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, matches: _Optional[_Iterable[_Union[Match, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class RefsRequest(_message.Message):
+    __slots__ = ("locator", "depth")
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    DEPTH_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    depth: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ...) -> None: ...
+
+class Hop(_message.Message):
+    __slots__ = ("field", "id")
+    FIELD_FIELD_NUMBER: _ClassVar[int]
+    ID_FIELD_NUMBER: _ClassVar[int]
+    field: str
+    id: str
+    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ...) -> None: ...
+
+class Reached(_message.Message):
+    __slots__ = ("stub", "route")
+    STUB_FIELD_NUMBER: _ClassVar[int]
+    ROUTE_FIELD_NUMBER: _ClassVar[int]
+    stub: Stub
+    route: _containers.RepeatedCompositeFieldContainer[Hop]
+    def __init__(self, stub: _Optional[_Union[Stub, _Mapping]] = ..., route: _Optional[_Iterable[_Union[Hop, _Mapping]]] = ...) -> None: ...
+
+class RefsResponse(_message.Message):
+    __slots__ = ("reached", "faults")
+    REACHED_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    reached: _containers.RepeatedCompositeFieldContainer[Reached]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, reached: _Optional[_Iterable[_Union[Reached, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

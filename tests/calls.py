@@ -105,3 +105,8 @@ def journal(client, artifact=""):
 def search(client, text):
     """A search of the prose for the text."""
     return client.Search(kb_pb2.SearchRequest(text=text))
+
+
+def refs(client, artifact_id, depth):
+    """The links out of an artifact, followed as many steps as depth says."""
+    return client.Refs(kb_pb2.RefsRequest(locator=kb_pb2.Locator(id=artifact_id), depth=depth))
