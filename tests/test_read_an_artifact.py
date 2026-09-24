@@ -198,3 +198,31 @@ def _rejected_as_kb_root_holds_no_store(shown, empty):
 @then("no content comes back")
 def _no_content(shown):
     assert (shown.id, shown.title, shown.content) == ("", "", "")
+
+
+@given("the client is working inside a store, with KB_ROOT naming a different store", target_fixture="other")
+def _inside_one_store_with_kb_root_naming_another(root, tmp_path, monkeypatch):
+    other = tmp_path / "other"
+    other.mkdir()
+    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
+    deep = root / "shelves"
+    deep.mkdir()
+    monkeypatch.chdir(deep)
+    monkeypatch.setenv("KB_ROOT", str(other))
+    return other
+
+
+@then(
+    "the read is rejected because KB_ROOT names a store other than the one it is working in, "
+    "and neither of the two is guessed at"
+)
+def _rejected_as_two_stores(shown, root, other):
+    assert [fault.rule for fault in shown.faults] == ["store"]
+    assert "KB_ROOT names a store other than the one" in shown.faults[0].message
+    assert str(root) in shown.faults[0].message and str(other) in shown.faults[0].message
+
+
+@then("no content comes back, from either store")
+def _no_content_from_either(shown):
+    assert (shown.id, shown.title, shown.content) == ("", "", "")
+    assert not shown.references and not shown.parts and not shown.inbound
