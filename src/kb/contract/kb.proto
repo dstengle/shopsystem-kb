@@ -21,6 +21,7 @@ service Kb {
   rpc Refs(RefsRequest) returns (RefsResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
+  rpc Append(AppendRequest) returns (AppendResponse);
 }
 
 message Actor {
@@ -154,12 +155,13 @@ message WriteResponse {
   repeated Fault faults = 2;
 }
 
-// One change in a set: a create or a replacement, with no role or message
-// of its own, since the set carries those.
+// One change in a set: a create, a replacement, or an item added, with no
+// role or message of its own, since the set carries those.
 message Operation {
   oneof operation {
     Creation create = 1;
     Replacement write = 2;
+    Addition append = 3;
   }
 }
 
@@ -174,6 +176,13 @@ message Creation {
 message Replacement {
   Locator locator = 1;
   string content = 2;  // canonical YAML: fields, sections, parts
+}
+
+// One item for a collection inside an artifact the store holds: the
+// locator's path is the collection's name. kb names the item.
+message Addition {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: the item's fields, never its id
 }
 
 // Every operation lands, in order, as one change, or none does.
@@ -192,9 +201,12 @@ message ApplyResponse {
   repeated Fault faults = 3;
 }
 
+// The artifact changed and its version now; for an item added, the name
+// kb gave it.
 message Result {
   string id = 1;
   int32 revision = 2;
+  string item = 3;
 }
 
 // Narrows the journal to the entries about one artifact, made under one
@@ -344,4 +356,22 @@ message SnapshotRequest {
 message SnapshotResponse {
   string entry = 1;
   repeated Fault faults = 2;
+}
+
+// One item added at the end of a collection inside an artifact the store
+// holds: the locator's path is the collection's name, and kb names the
+// item.
+message AppendRequest {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: the item's fields, never its id
+  Actor actor = 3;
+  string message = 4;
+}
+
+// The name kb gave the item, and the artifact's version now. With faults,
+// a refusal, and the artifact is as it was.
+message AppendResponse {
+  string id = 1;
+  int32 revision = 2;
+  repeated Fault faults = 3;
 }

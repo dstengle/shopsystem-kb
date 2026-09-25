@@ -5,6 +5,7 @@ string that came from the request.
 """
 import copy
 from datetime import datetime
+from typing import NamedTuple
 
 from kb import canonical, journal, search, validation, values
 from kb.content import dumps, text
@@ -14,6 +15,14 @@ from kb.store import Draft, Store, Unreadable
 from kb.values import ArtifactId, Kind
 
 METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
+
+
+class Change(NamedTuple):
+    """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name."""
+    op: str
+    artifact_id: ArtifactId
+    path: str = ""
+    item: str = ""
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
@@ -54,6 +63,13 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.WriteResponse(faults=landed.faults)
         return kb_pb2.WriteResponse(revision=landed.results[0].revision)
 
+    def Append(self, request, context):
+        addition = kb_pb2.Addition(locator=request.locator, content=request.content)
+        landed = self._land([kb_pb2.Operation(append=addition)], request.actor, request.message)
+        if landed.faults:
+            return kb_pb2.AppendResponse(faults=landed.faults)
+        return kb_pb2.AppendResponse(id=landed.results[0].item, revision=landed.results[0].revision)
+
     def Apply(self, request, context):
         return self._land(request.operations, request.actor, request.message)
 
@@ -74,33 +90,36 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         if faults:
             return kb_pb2.ApplyResponse(faults=faults)
         texts = []
-        for op, artifact_id in touched:
+        for change in touched:
             try:
-                texts.append((op, artifact_id, canonical.dump(draft.load(artifact_id))))
+                texts.append((change, canonical.dump(draft.load(change.artifact_id))))
             except canonical.NotCanonical as fault:
-                faults.append(kb_pb2.Fault(artifact=str(artifact_id), rule="content", message=str(fault)))
+                faults.append(kb_pb2.Fault(artifact=str(change.artifact_id), rule="content", message=str(fault)))
         if faults:
             return kb_pb2.ApplyResponse(faults=faults)
         written, results, batch = [], [], ""
-        for seq, (op, artifact_id, text) in enumerate(texts, start=1):
-            artifact = draft.load(artifact_id)
-            path = self._store.save(artifact_id, text)
+        for seq, (change, text) in enumerate(texts, start=1):
+            artifact = draft.load(change.artifact_id)
+            path = self._store.save(change.artifact_id, text)
             entry = journal.write(
-                self._store.dir, actor=actor, op=op, artifact=str(artifact_id), path="",
+                self._store.dir, actor=actor, op=change.op, artifact=str(change.artifact_id), path=change.path,
                 revision=artifact["revision"], schema_version=artifact["schema_version"],
                 written=path, message=message, seq=seq, batch=batch,
             )
             batch = batch or entry.stem
             written += [path, entry]
-            results.append(kb_pb2.Result(id=str(artifact_id), revision=artifact["revision"]))
+            results.append(kb_pb2.Result(id=str(change.artifact_id), revision=artifact["revision"], item=change.item))
         self._store.commit(written, actor.role, message)
         return kb_pb2.ApplyResponse(batch=batch, results=results)
 
-    def _apply(self, draft: Draft, operation: kb_pb2.Operation) -> tuple[str, ArtifactId]:
-        """One operation applied to the draft. Returns what it did and to which artifact; raises values.Refused."""
-        if operation.WhichOneof("operation") == "create":
-            return "create", self._create(draft, operation.create)
-        return "write", self._replace(draft, operation.write)
+    def _apply(self, draft: Draft, operation: kb_pb2.Operation) -> Change:
+        """One operation applied to the draft. Returns what it did; raises values.Refused."""
+        which = operation.WhichOneof("operation")
+        if which == "create":
+            return Change("create", self._create(draft, operation.create))
+        if which == "append":
+            return self._append(draft, operation.append)
+        return Change("write", self._replace(draft, operation.write))
 
     def _create(self, draft: Draft, creation: kb_pb2.Creation) -> ArtifactId:
         kind = values.kind(creation.type)
@@ -142,18 +161,26 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         current = draft.load(locator.id)
         if locator.place:
             content = _placed(current, locator, content)
-        schema = draft.schema(locator.id.kind)
-        faults = validation.validate(str(locator.id), {"title": current["title"], **content}, schema["schema"], draft)
-        if faults:
-            raise values.Refused(faults)
-        _name_items(schema["schema"], content, keep_named=True)
-        artifact = {
-            **content,
-            "id": current["id"], "type": current["type"],
-            "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
-        }
-        draft.put(locator.id, canonical.order(artifact, schema["schema"]))
+        _revise(draft, locator.id, current, content)
         return locator.id
+
+    def _append(self, draft: Draft, addition: kb_pb2.Addition) -> Change:
+        """One item put at the end of a collection the artifact's type declares, and named there."""
+        locator = values.locator(addition.locator)
+        if not draft.holds(locator.id):
+            raise values.Refused([_not_found(locator.id)])
+        item = values.item(str(locator.id), addition.content)
+        collection = "/".join(locator.place)
+        if collection not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
+            raise values.Refused([kb_pb2.Fault(
+                artifact=str(locator.id), path=collection, rule="not-found",
+                message=f"{str(locator.id)!r} holds no collection called {collection!r}",
+            )])
+        current = draft.load(locator.id)
+        content = _content_of(current)
+        content.setdefault(collection, []).append(item)
+        _revise(draft, locator.id, current, content)
+        return Change("append", locator.id, f"{collection}/{item['id']}", item["id"])
 
     def Read(self, request, context):
         try:
@@ -425,10 +452,31 @@ def _entry(entry: dict) -> kb_pb2.Entry:
     )
 
 
+def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> None:
+    """The artifact's next version put in the draft: the content checked against the current version of its type,
+    its items named, its version up by one, its title kept. Raises values.Refused with every fault."""
+    schema = draft.schema(artifact_id.kind)
+    faults = validation.validate(str(artifact_id), {"title": current["title"], **content}, schema["schema"], draft)
+    if faults:
+        raise values.Refused(faults)
+    _name_items(schema["schema"], content, keep_named=True)
+    artifact = {
+        **content,
+        "id": current["id"], "type": current["type"],
+        "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
+    }
+    draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
+
+
+def _content_of(artifact: dict) -> dict:
+    """A copy of what an artifact holds but its identity keys, to be changed without changing it."""
+    return copy.deepcopy({key: value for key, value in artifact.items() if key not in canonical.IDENTITY})
+
+
 def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
     """The artifact's content with the node at the locator's place replaced by the one given. A place is pairs of a
     list and an item in it, a section named by its title's name and a part by its id, and may end in a field."""
-    content = copy.deepcopy({key: value for key, value in artifact.items() if key not in canonical.IDENTITY})
+    content = _content_of(artifact)
     holder, steps = content, list(locator.place)
     while len(steps) > 1:
         collection, name = steps.pop(0), steps.pop(0)

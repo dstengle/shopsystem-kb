@@ -89,6 +89,11 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.SnapshotRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.SnapshotResponse.FromString,
                 _registered_method=True)
+        self.Append = channel.unary_unary(
+                '/kb.Kb/Append',
+                request_serializer=kb_dot_contract_dot_kb__pb2.AppendRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.AppendResponse.FromString,
+                _registered_method=True)
 
 
 class KbServicer:
@@ -160,6 +165,12 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Append(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_KbServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -217,6 +228,11 @@ def add_KbServicer_to_server(servicer, server):
                     servicer.Snapshot,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.SnapshotRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.SnapshotResponse.SerializeToString,
+            ),
+            'Append': grpc.unary_unary_rpc_method_handler(
+                    servicer.Append,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.AppendRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.AppendResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -516,6 +532,33 @@ class Kb:
             '/kb.Kb/Snapshot',
             kb_dot_contract_dot_kb__pb2.SnapshotRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.SnapshotResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Append(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.Kb/Append',
+            kb_dot_contract_dot_kb__pb2.AppendRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.AppendResponse.FromString,
             options,
             channel_credentials,
             insecure,

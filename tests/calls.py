@@ -127,6 +127,14 @@ def write(client, artifact_id, content, message="Change an artifact", actor=CLIE
     ))
 
 
+def append(client, artifact_id, collection, content, message="Add an item", actor=CLIENT):
+    """An Append of one item to the collection named inside an artifact, under the client's role unless another actor
+    is given. Returns the response, faults and all."""
+    return client.Append(kb_pb2.AppendRequest(
+        locator=kb_pb2.Locator(id=artifact_id, path=collection), content=dumps(content), actor=actor, message=message,
+    ))
+
+
 def journal(client, artifact="", role="", execution="", since=""):
     """The journal's entries, narrowed to those about one artifact, made by one role, for one piece of work, or at or
     after a time, by whichever are given."""
@@ -178,6 +186,11 @@ PROCESS_TYPE = {
                         "title": {"type": "string"},
                         "body": {"type": "string"},
                         "branches": {"type": "array", "items": {"type": "string"}},
+                        "uses": {
+                            "type": "string",
+                            "ref": {"targets": ["step"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+                        },
+                        "settings": {"type": "object"},
                     },
                     "required": ["title"],
                 }

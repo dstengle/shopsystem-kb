@@ -196,12 +196,14 @@ class WriteResponse(_message.Message):
     def __init__(self, revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class Operation(_message.Message):
-    __slots__ = ("create", "write")
+    __slots__ = ("create", "write", "append")
     CREATE_FIELD_NUMBER: _ClassVar[int]
     WRITE_FIELD_NUMBER: _ClassVar[int]
+    APPEND_FIELD_NUMBER: _ClassVar[int]
     create: Creation
     write: Replacement
-    def __init__(self, create: _Optional[_Union[Creation, _Mapping]] = ..., write: _Optional[_Union[Replacement, _Mapping]] = ...) -> None: ...
+    append: Addition
+    def __init__(self, create: _Optional[_Union[Creation, _Mapping]] = ..., write: _Optional[_Union[Replacement, _Mapping]] = ..., append: _Optional[_Union[Addition, _Mapping]] = ...) -> None: ...
 
 class Creation(_message.Message):
     __slots__ = ("type", "title", "content")
@@ -214,6 +216,14 @@ class Creation(_message.Message):
     def __init__(self, type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
 class Replacement(_message.Message):
+    __slots__ = ("locator", "content")
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    content: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ...) -> None: ...
+
+class Addition(_message.Message):
     __slots__ = ("locator", "content")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
@@ -242,12 +252,14 @@ class ApplyResponse(_message.Message):
     def __init__(self, batch: _Optional[str] = ..., results: _Optional[_Iterable[_Union[Result, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class Result(_message.Message):
-    __slots__ = ("id", "revision")
+    __slots__ = ("id", "revision", "item")
     ID_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    ITEM_FIELD_NUMBER: _ClassVar[int]
     id: str
     revision: int
-    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
+    item: str
+    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., item: _Optional[str] = ...) -> None: ...
 
 class JournalRequest(_message.Message):
     __slots__ = ("artifact", "role", "execution", "since")
@@ -439,3 +451,25 @@ class SnapshotResponse(_message.Message):
     entry: str
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, entry: _Optional[str] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class AppendRequest(_message.Message):
+    __slots__ = ("locator", "content", "actor", "message")
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    content: str
+    actor: Actor
+    message: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+
+class AppendResponse(_message.Message):
+    __slots__ = ("id", "revision", "faults")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    revision: int
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

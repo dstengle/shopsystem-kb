@@ -131,6 +131,18 @@ def content(artifact: str, text: str, at_root: bool = True) -> dict:
     return tree
 
 
+def item(artifact: str, text: str) -> dict:
+    """An item as a request carries it: read plainly, and never carrying its own name, which kb gives. Refused with
+    the fault that names what it carried."""
+    tree = content(artifact, text, at_root=False)
+    if "id" in tree:
+        raise Refused([kb_pb2.Fault(
+            artifact=artifact, path="id", rule="identity",
+            message=f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {tree['id']!r}",
+        )])
+    return tree
+
+
 def root(text: str) -> Path:
     """The directory a store is started in, as the request names it; relative names stay relative."""
     if not text:
