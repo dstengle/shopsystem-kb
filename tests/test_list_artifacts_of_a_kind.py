@@ -47,3 +47,14 @@ def _a_stub_of_each(listed):
         (MONTHLY, "decision", "Prices are reviewed monthly", {"status": "superseded"}),
         (THURSDAYS, "decision", "Restock on Thursdays", {"status": "accepted"}),
     ]
+
+
+@when("the client lists the decisions that are superseded", target_fixture="listed")
+def _list_the_superseded(client):
+    return listing(client, "decision", fields={"status": "superseded"})
+
+
+@then("the client is given only the superseded one")
+def _only_the_superseded(listed):
+    assert not listed.faults, listed.faults
+    assert [(stub.id, stub.title) for stub in listed.stubs] == [(MONTHLY, "Prices are reviewed monthly")]

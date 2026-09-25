@@ -346,10 +346,19 @@ class RefsResponse(_message.Message):
     def __init__(self, reached: _Optional[_Iterable[_Union[Reached, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class ListRequest(_message.Message):
-    __slots__ = ("type",)
+    __slots__ = ("type", "fields")
+    class FieldsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     TYPE_FIELD_NUMBER: _ClassVar[int]
+    FIELDS_FIELD_NUMBER: _ClassVar[int]
     type: str
-    def __init__(self, type: _Optional[str] = ...) -> None: ...
+    fields: _containers.ScalarMap[str, str]
+    def __init__(self, type: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class ListResponse(_message.Message):
     __slots__ = ("stubs", "faults")

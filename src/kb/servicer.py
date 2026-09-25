@@ -6,7 +6,7 @@ string that came from the request.
 import copy
 
 from kb import canonical, journal, search, validation, values
-from kb.content import dumps
+from kb.content import dumps, text
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
 from kb.store import Draft, Store, Unreadable
@@ -295,12 +295,15 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.RefsResponse(reached=reached)
 
     def List(self, request, context):
-        """Every artifact of a kind, in path order, as stubs."""
+        """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs."""
         try:
             kind = values.kind(request.type)
         except values.Refused as refused:
             return kb_pb2.ListResponse(faults=refused.faults)
-        matched = [artifact_id for artifact_id in self._store.ids() if artifact_id.kind == kind]
+        matched = [
+            artifact_id for artifact_id in self._store.ids()
+            if artifact_id.kind == kind and _holds(self._store.load(artifact_id), request.fields)
+        ]
         return kb_pb2.ListResponse(stubs=[self._stub("", artifact_id) for artifact_id in matched])
 
     def _stub(self, field, target_id: ArtifactId):
@@ -320,6 +323,11 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for field in pointing:
                 counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
         return counts
+
+
+def _holds(artifact: dict, fields) -> bool:
+    """Whether each field named holds the value given, compared as the text the value is written as."""
+    return all(field in artifact and text(artifact[field]) == value for field, value in fields.items())
 
 
 def _entry(entry: dict) -> kb_pb2.Entry:

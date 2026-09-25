@@ -271,9 +271,11 @@ message RefsResponse {
   repeated Fault faults = 2;
 }
 
-// The artifacts of one kind.
+// The artifacts of one kind, narrowed to those whose fields hold the
+// values given, each value compared as the text it is written as.
 message ListRequest {
   string type = 1;
+  map<string, string> fields = 2;
 }
 
 // The artifacts in the order the store holds them, as stubs. With faults,

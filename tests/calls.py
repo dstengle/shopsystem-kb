@@ -165,9 +165,9 @@ PROCESS_TYPE = {
 }
 
 
-def listing(client, type_name):
-    """The artifacts of a kind, as stubs."""
-    return client.List(kb_pb2.ListRequest(type=type_name))
+def listing(client, type_name, fields=None):
+    """The artifacts of a kind, those whose fields hold the values given, as stubs."""
+    return client.List(kb_pb2.ListRequest(type=type_name, fields=fields or {}))
 
 
 def everything_under(directory):
