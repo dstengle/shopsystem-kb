@@ -212,6 +212,16 @@ def listing(client, type_name, fields=None, ids_only=False):
     return client.List(kb_pb2.ListRequest(type=type_name, fields=fields or {}, form=form))
 
 
+def next_version(client, kind, type_content, sections=None):
+    """Write the type of a kind back at its next version, the sections it requires replaced when sections are given,
+    so what the store holds of that kind falls behind it. Returns the Write's response."""
+    schema = copy.deepcopy(type_content["schema"])
+    if sections is not None:
+        schema["sections"] = [{"title": title} for title in sections]
+    return write(client, f"schema/{kind}", {"version": type_content["version"] + 1, "schema": schema},
+                 message=f"Revise {type_content['title']}")
+
+
 def everything_under(directory):
     """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
     return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
