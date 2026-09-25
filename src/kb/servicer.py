@@ -361,13 +361,17 @@ def _node_name(collection: str, item: dict) -> str:
 
 def _name_items(schema: dict, content: dict, keep_named: bool) -> None:
     """Every item of every part collection given its name: from its title when it carries one, otherwise from its
-    place in the collection, counted from 1. On a write an item already carrying a name is the item of that name,
-    moved or changed where it stands, and keeps it; a name is minted once and never worked out again."""
+    place in the collection, counted from 1, with a number added as an artifact's name has when an item beside it
+    already has that name. On a write an item already carrying a name is the item of that name, moved or changed
+    where it stands, and keeps it; a name is minted once and never worked out again."""
     for collection in schema.get("parts", {}):
-        for place, item in enumerate(content.get(collection, []), start=1):
+        items = content.get(collection, [])
+        taken = {item["id"] for item in items if keep_named and "id" in item}
+        for place, item in enumerate(items, start=1):
             if keep_named and "id" in item:
                 continue
-            item["id"] = values.slug(item["title"]) if "title" in item else str(place)
+            item["id"] = _numbered(values.slug(item["title"]) if "title" in item else str(place), taken.__contains__)
+            taken.add(item["id"])
 
 
 def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
@@ -379,10 +383,15 @@ def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
 def _unclaimed(draft: Draft, named: ArtifactId) -> ArtifactId:
     """The name a title gives, or, when the store or an earlier change in the set already holds it, that name with
     -2, -3 and so on added: the first that nothing holds. What already holds a name keeps it."""
-    candidate, number = named, 1
-    while draft.holds(candidate):
+    return ArtifactId(named.kind, _numbered(named.slug, lambda slug: draft.holds(ArtifactId(named.kind, slug))))
+
+
+def _numbered(name: str, taken) -> str:
+    """The name, or, when taken says it is taken, that name with -2, -3 and so on added: the first it does not."""
+    candidate, number = name, 1
+    while taken(candidate):
         number += 1
-        candidate = ArtifactId(named.kind, f"{named.slug}-{number}")
+        candidate = f"{name}-{number}"
     return candidate
 
 

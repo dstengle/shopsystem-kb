@@ -512,3 +512,75 @@ def _the_first_keeps_its_name(root, client, first):
     kept = read(client, first["id"])
     assert (kept.id, kept.revision) == (first["id"], 1)
     assert (root / "kb" / f"{first['id']}.yaml").read_bytes() == first["bytes"]
+
+
+TWICE = [
+    {"title": "Keep weekly", "body": "Review every Monday."},
+    {"title": "Keep weekly", "body": "Review every Monday, before opening."},
+]
+
+
+@then("the name the client is given is made from that title")
+def _name_from_the_title(created):
+    assert not created.faults, created.faults
+    assert created.id == "decision/price-reviews-happen-weekly"
+
+
+@then("the client never said what the name should be")
+@then("the client never said what either name should be")
+def _no_name_asked_for():
+    assert set(kb_pb2.CreateRequest.DESCRIPTOR.fields_by_name) == {"type", "title", "content", "actor", "message"}
+    assert all("id" not in part for part in [*SECTIONS, *TWICE])
+
+
+@when(
+    "the client creates a decision carrying two options with the same title, saying which role and why",
+    target_fixture="created",
+)
+def _create_with_two_options_titled_alike(client):
+    return request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS, "options": TWICE})
+
+
+@then("each option is given a name of its own, the second the name of the first with a number added")
+def _options_named_apart(root, client, created):
+    assert not created.faults, created.faults
+    assert [(stub.id, stub.title) for stub in read(client, created.id).parts] == [
+        ("keep-weekly", "Keep weekly"), ("keep-weekly-2", "Keep weekly"),
+    ]
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert on_disk["options"] == [{"id": "keep-weekly", **TWICE[0]}, {"id": "keep-weekly-2", **TWICE[1]}]
+
+
+@when("the client creates a decision with a rationale and no purpose, saying which role and why", target_fixture="refused")
+def _create_without_a_purpose(client):
+    return request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS[1:]}, message="Record it")
+
+
+@then("the artifact is rejected because the sections the type requires must all be present, in order")
+def _rejected_for_the_sections(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+        ("decision/price-reviews-happen-weekly", "sections", "sections"),
+    ]
+    assert refused.faults[0].message == (
+        "the sections the type requires must all be present, in order; 'Purpose' is missing"
+    )
+
+
+@when(
+    "the client creates a decision that supersedes a decision the store does not hold, saying which role and why",
+    target_fixture="refused",
+)
+def _create_superseding_nothing(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": "decision/prices-are-reviewed-monthly", "sections": SECTIONS,
+    }, message="Record it")
+
+
+@then("the artifact is rejected because a link must land on a node of a kind the type allows")
+def _rejected_for_the_link(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+        ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
+    ]
+    assert refused.faults[0].message.startswith("a link must land on a node of a kind the type allows")
