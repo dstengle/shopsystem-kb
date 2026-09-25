@@ -266,7 +266,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.JournalResponse(faults=faults)
         return kb_pb2.JournalResponse(entries=[
             _entry(entry) for entry in journal.entries(self._store.dir)
-            if (not artifact or entry["artifact"] == artifact)
+            if (not artifact or entry.get("artifact") == artifact)
             and (not request.role or entry["actor"]["role"] == request.role)
             and (not request.execution or entry["actor"]["execution"] == request.execution)
             and (since is None or datetime.fromisoformat(entry["at"]) >= since)
@@ -358,6 +358,33 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.ListResponse(ids=[str(artifact_id) for artifact_id in matched])
         return kb_pb2.ListResponse(stubs=[self._stub("", artifact_id) for artifact_id in matched])
 
+    def Snapshot(self, request, context):
+        """One journal entry listing each artifact named with its version now and the fingerprint of its file, under
+        the actor and the message given, in a commit of its own."""
+        named, faults = [], []
+        for name in request.artifacts:
+            try:
+                artifact_id = values.artifact_id(name)
+            except values.Refused as refused:
+                faults += refused.faults
+                continue
+            if not self._store.holds(artifact_id):
+                faults.append(_not_found(artifact_id))
+                continue
+            named.append(artifact_id)
+        if faults:
+            return kb_pb2.SnapshotResponse(faults=faults)
+        read = [
+            {
+                "artifact": str(artifact_id), "revision": self._store.load(artifact_id)["revision"],
+                "digest": journal.digest(self._store.path(artifact_id)),
+            }
+            for artifact_id in named
+        ]
+        entry = journal.snapshot(self._store.dir, actor=request.actor, read=read, message=request.message)
+        self._store.commit([entry], request.actor.role, request.message)
+        return kb_pb2.SnapshotResponse(entry=entry.stem)
+
     def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
         schema = self._store.schema(target_id.kind)["schema"]
@@ -388,10 +415,13 @@ def _holds(artifact: dict, fields) -> bool:
 
 
 def _entry(entry: dict) -> kb_pb2.Entry:
+    """An entry as the contract carries it. A snapshot's entry has no artifact, place, version or fingerprint of its
+    own, only what was read."""
     return kb_pb2.Entry(
         id=entry["id"], at=entry["at"], actor=kb_pb2.Actor(**entry["actor"]), op=entry["op"],
-        artifact=entry["artifact"], path=entry["path"], revision=entry["revision"],
-        schema_version=entry["schema_version"], digest=entry["digest"], message=entry["message"], batch=entry["batch"],
+        artifact=entry.get("artifact", ""), path=entry.get("path", ""), revision=entry.get("revision", 0),
+        schema_version=entry.get("schema_version", 0), digest=entry.get("digest", ""), message=entry["message"],
+        batch=entry["batch"], read=[kb_pb2.Snapshotted(**read) for read in entry.get("read", [])],
     )
 
 

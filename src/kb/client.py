@@ -63,6 +63,9 @@ class InProcessClient:
     def List(self, request, timeout=None):
         return self._call("List", request, kb_pb2.ListResponse)
 
+    def Snapshot(self, request, timeout=None):
+        return self._call("Snapshot", request, kb_pb2.SnapshotResponse)
+
 
 def connect(root=None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds."""

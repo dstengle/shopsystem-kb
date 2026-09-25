@@ -34,7 +34,28 @@ def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision
         "message": message,
         "batch": batch or entry_id,
     }
-    target = store_dir / "journal" / at.strftime("%Y") / at.strftime("%m") / at.strftime("%d") / f"{entry_id}.yaml"
+    return _save(store_dir, at, entry)
+
+
+def snapshot(store_dir: Path, *, actor, read: list[dict], message: str) -> Path:
+    """Write the entry recording what a piece of work read, each artifact as { artifact, revision, digest }, and
+    return its file. It names no artifact of its own and is a set of its own."""
+    at = now()
+    entry_id = f"{at.strftime('%Y%m%dT%H%M%S%fZ')}-1"
+    entry = {
+        "id": entry_id,
+        "at": at.isoformat(),
+        "actor": {"role": actor.role, "execution": actor.execution},
+        "op": "snapshot",
+        "read": read,
+        "message": message,
+        "batch": entry_id,
+    }
+    return _save(store_dir, at, entry)
+
+
+def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
+    target = store_dir / "journal" / at.strftime("%Y") / at.strftime("%m") / at.strftime("%d") / f"{entry['id']}.yaml"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(canonical.dump(entry))
     return target

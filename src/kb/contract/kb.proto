@@ -20,6 +20,7 @@ service Kb {
   rpc Search(SearchRequest) returns (SearchResponse);
   rpc Refs(RefsRequest) returns (RefsResponse);
   rpc List(ListRequest) returns (ListResponse);
+  rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
 }
 
 message Actor {
@@ -208,7 +209,8 @@ message JournalRequest {
 }
 
 // One journal entry, as the store holds it. `at` is ISO 8601 in UTC; a
-// change made alone names itself as its batch.
+// change made alone names itself as its batch. A snapshot's entry has op
+// `snapshot`, lists what was read, and names no artifact of its own.
 message Entry {
   string id = 1;
   string at = 2;
@@ -221,6 +223,15 @@ message Entry {
   string digest = 9;
   string message = 10;
   string batch = 11;
+  repeated Snapshotted read = 12;
+}
+
+// An artifact a piece of work read: the version read and the fingerprint
+// of the file the store held at that version.
+message Snapshotted {
+  string artifact = 1;
+  int32 revision = 2;
+  string digest = 3;
 }
 
 // The entries, oldest first. With faults, a refusal: a name that is not a
@@ -317,4 +328,20 @@ message ListResponse {
   repeated Stub stubs = 1;
   repeated string ids = 2;
   repeated Fault faults = 3;
+}
+
+// What a piece of work read, as the store holds it now: the actor names
+// the role and the piece of work, the message says why.
+message SnapshotRequest {
+  Actor actor = 1;
+  repeated string artifacts = 2;
+  string message = 3;
+}
+
+// The name of the journal entry that records the snapshot. With faults, a
+// refusal: a name that is not a plain name, a name the store lacks, or no
+// store found, and nothing was written.
+message SnapshotResponse {
+  string entry = 1;
+  repeated Fault faults = 2;
 }

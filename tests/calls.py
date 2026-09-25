@@ -136,6 +136,13 @@ def journal(client, artifact="", role="", execution="", since=""):
             setattr(request, name, value)
     return client.Journal(request)
 
+def snapshot(client, execution, artifacts, message="Say what was read", role="agent"):
+    """A snapshot of the artifacts named, as they stand now, for the piece of work named, under the role given."""
+    return client.Snapshot(kb_pb2.SnapshotRequest(
+        actor=kb_pb2.Actor(role=role, execution=execution), artifacts=artifacts, message=message,
+    ))
+
+
 def search(client, text, type_name="", everywhere=False):
     """A search of the prose for the text, or of the fields and the prose when everywhere, among artifacts of one kind
     when type_name is given."""
