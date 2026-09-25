@@ -124,9 +124,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         faults = validation.validate(at, {"title": creation.title, **content}, schema["schema"], draft)
         if faults:
             raise values.Refused(faults)
-        for collection in schema["schema"].get("parts", {}):
-            for item in content.get(collection, []):
-                item["id"] = values.slug(item["title"])
+        _name_items(schema["schema"], content, keep_named=False)
         artifact = {
             **content,
             "id": str(artifact_id), "type": kind.name,
@@ -145,6 +143,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         faults = validation.validate(str(locator.id), {"title": current["title"], **content}, schema["schema"], draft)
         if faults:
             raise values.Refused(faults)
+        _name_items(schema["schema"], content, keep_named=True)
         artifact = {
             **content,
             "id": current["id"], "type": current["type"],
@@ -313,7 +312,7 @@ def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
                 message=f"{str(locator.id)!r} holds nothing at {'/'.join(locator.place)!r}",
             )])
         if not steps:
-            items[index] = node
+            items[index] = node if collection == "sections" else {"id": name, **node}
             return content
         holder = items[index]
     holder[steps[0]] = node
@@ -323,6 +322,17 @@ def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
 def _node_name(collection: str, item: dict) -> str:
     """How a place names an item: a section by its title's name, a part by its id."""
     return values.slug(item["title"]) if collection == "sections" else item.get("id")
+
+
+def _name_items(schema: dict, content: dict, keep_named: bool) -> None:
+    """Every item of every part collection given its name: from its title when it carries one, otherwise from its
+    place in the collection, counted from 1. On a write an item already carrying a name is the item of that name,
+    moved or changed where it stands, and keeps it; a name is minted once and never worked out again."""
+    for collection in schema.get("parts", {}):
+        for place, item in enumerate(content.get(collection, []), start=1):
+            if keep_named and "id" in item:
+                continue
+            item["id"] = values.slug(item["title"]) if "title" in item else str(place)
 
 
 def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:

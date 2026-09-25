@@ -79,7 +79,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
     faults = _sections(artifact_id, content.get("sections", []), required, "sections")
     allowed = references(schema, corpus)
     for field, place, target in links(content, schema, corpus):
-        if not _lands(target, allowed[field]["targets"], corpus):
+        if not _lands(target, allowed[field], corpus):
             faults.append(kb_pb2.Fault(
                 artifact=artifact_id, path=place, rule="ref",
                 message=f"a link must land on a node of a kind the type allows; {target!r} does not",
@@ -109,12 +109,32 @@ def links(artifact: dict, schema: dict, corpus) -> list[tuple[str, str, str]]:
     return found
 
 
-def _lands(target: str, allowed: list, corpus) -> bool:
+def _lands(target: str, ref: dict, corpus) -> bool:
+    """Whether a link lands: on an artifact of a kind the field allows that the corpus holds, and, when it names a
+    place after `#` and the field allows parts, on a part that artifact holds."""
     try:
-        target_id = values.artifact_id(target)
+        link = values.target(target)
     except values.Refused:
         return False
-    return target_id.kind.name in allowed and corpus.holds(target_id)
+    if link.place and not ref.get("parts"):
+        return False
+    if link.id.kind.name not in ref["targets"] or not corpus.holds(link.id):
+        return False
+    return not link.place or _holds_part(corpus.load(link.id), link.place)
+
+
+def _holds_part(node: dict, place: tuple) -> bool:
+    """Whether a place, pairs of a collection and the name of an item in it, names a part the node holds."""
+    if len(place) % 2:
+        return False
+    for collection, name in zip(place[::2], place[1::2]):
+        items = node.get(collection)
+        if not isinstance(items, list):
+            return False
+        node = next((item for item in items if isinstance(item, dict) and item.get("id") == name), None)
+        if node is None:
+            return False
+    return True
 
 
 def composition(schema: dict, corpus) -> list[dict]:

@@ -112,3 +112,27 @@ def search(client, text):
 def refs(client, artifact_id, depth):
     """The links out of an artifact, followed as many steps as depth says."""
     return client.Refs(kb_pb2.RefsRequest(locator=kb_pb2.Locator(id=artifact_id), depth=depth))
+
+
+PROCESS_TYPE = {
+    "title": "Process",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {"title": {"type": "string"}},
+        "required": ["title"],
+        "parts": {
+            "steps": {
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "body": {"type": "string"},
+                        "branches": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["title"],
+                }
+            }
+        },
+    },
+}

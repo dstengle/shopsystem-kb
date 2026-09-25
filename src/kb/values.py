@@ -76,6 +76,13 @@ def locator(request: kb_pb2.Locator) -> Locator:
     return Locator(converted, place)
 
 
+def target(text: str) -> Locator:
+    """A link as a field holds it: a name, or a name and, after `#`, a place inside that artifact. Checked as a
+    locator is."""
+    name, _, place = text.partition("#")
+    return locator(kb_pb2.Locator(id=name, path=place))
+
+
 def named(kind: Kind, title: str) -> ArtifactId:
     """The name kb gives an artifact of this kind from its title. A title is required and must leave a name."""
     at = f"{kind.name}/{slug(title)}"
