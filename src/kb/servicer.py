@@ -295,7 +295,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.RefsResponse(reached=reached)
 
     def List(self, request, context):
-        """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs."""
+        """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names."""
         try:
             kind = values.kind(request.type)
         except values.Refused as refused:
@@ -304,6 +304,8 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             artifact_id for artifact_id in self._store.ids()
             if artifact_id.kind == kind and _holds(self._store.load(artifact_id), request.fields)
         ]
+        if request.form == kb_pb2.ListRequest.IDS:
+            return kb_pb2.ListResponse(ids=[str(artifact_id) for artifact_id in matched])
         return kb_pb2.ListResponse(stubs=[self._stub("", artifact_id) for artifact_id in matched])
 
     def _stub(self, field, target_id: ArtifactId):

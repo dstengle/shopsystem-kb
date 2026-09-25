@@ -272,15 +272,23 @@ message RefsResponse {
 }
 
 // The artifacts of one kind, narrowed to those whose fields hold the
-// values given, each value compared as the text it is written as.
+// values given, each value compared as the text it is written as. As
+// stubs by default, or as names only.
 message ListRequest {
+  enum Form {
+    STUBS = 0;
+    IDS = 1;
+  }
   string type = 1;
   map<string, string> fields = 2;
+  Form form = 3;
 }
 
-// The artifacts in the order the store holds them, as stubs. With faults,
-// a refusal: a kind that is not a plain name, or no store found.
+// The matches in the order the store holds them, as stubs or as names.
+// With faults, a refusal: a kind that is not a plain name, or no store
+// found.
 message ListResponse {
   repeated Stub stubs = 1;
+  repeated string ids = 2;
   repeated Fault faults = 3;
 }

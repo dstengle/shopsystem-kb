@@ -346,7 +346,13 @@ class RefsResponse(_message.Message):
     def __init__(self, reached: _Optional[_Iterable[_Union[Reached, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class ListRequest(_message.Message):
-    __slots__ = ("type", "fields")
+    __slots__ = ("type", "fields", "form")
+    class Form(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STUBS: _ClassVar[ListRequest.Form]
+        IDS: _ClassVar[ListRequest.Form]
+    STUBS: ListRequest.Form
+    IDS: ListRequest.Form
     class FieldsEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -356,14 +362,18 @@ class ListRequest(_message.Message):
         def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     TYPE_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
+    FORM_FIELD_NUMBER: _ClassVar[int]
     type: str
     fields: _containers.ScalarMap[str, str]
-    def __init__(self, type: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ...) -> None: ...
+    form: ListRequest.Form
+    def __init__(self, type: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ..., form: _Optional[_Union[ListRequest.Form, str]] = ...) -> None: ...
 
 class ListResponse(_message.Message):
-    __slots__ = ("stubs", "faults")
+    __slots__ = ("stubs", "ids", "faults")
     STUBS_FIELD_NUMBER: _ClassVar[int]
+    IDS_FIELD_NUMBER: _ClassVar[int]
     FAULTS_FIELD_NUMBER: _ClassVar[int]
     stubs: _containers.RepeatedCompositeFieldContainer[Stub]
+    ids: _containers.RepeatedScalarFieldContainer[str]
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, stubs: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, stubs: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., ids: _Optional[_Iterable[str]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

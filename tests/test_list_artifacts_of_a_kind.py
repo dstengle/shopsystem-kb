@@ -58,3 +58,15 @@ def _list_the_superseded(client):
 def _only_the_superseded(listed):
     assert not listed.faults, listed.faults
     assert [(stub.id, stub.title) for stub in listed.stubs] == [(MONTHLY, "Prices are reviewed monthly")]
+
+
+@when("the client lists the decisions asking for names only", target_fixture="listed")
+def _list_names_only(client):
+    return listing(client, "decision", ids_only=True)
+
+
+@then("the client is given three names and nothing else")
+def _three_names(listed):
+    assert not listed.faults, listed.faults
+    assert list(listed.ids) == [WEEKLY, MONTHLY, THURSDAYS]
+    assert not listed.stubs
