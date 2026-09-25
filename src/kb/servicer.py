@@ -294,6 +294,15 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             frontier = following
         return kb_pb2.RefsResponse(reached=reached)
 
+    def List(self, request, context):
+        """Every artifact of a kind, in path order, as stubs."""
+        try:
+            kind = values.kind(request.type)
+        except values.Refused as refused:
+            return kb_pb2.ListResponse(faults=refused.faults)
+        matched = [artifact_id for artifact_id in self._store.ids() if artifact_id.kind == kind]
+        return kb_pb2.ListResponse(stubs=[self._stub("", artifact_id) for artifact_id in matched])
+
     def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
         schema = self._store.schema(target_id.kind)["schema"]

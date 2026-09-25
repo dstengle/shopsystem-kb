@@ -344,3 +344,17 @@ class RefsResponse(_message.Message):
     reached: _containers.RepeatedCompositeFieldContainer[Reached]
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, reached: _Optional[_Iterable[_Union[Reached, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class ListRequest(_message.Message):
+    __slots__ = ("type",)
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    type: str
+    def __init__(self, type: _Optional[str] = ...) -> None: ...
+
+class ListResponse(_message.Message):
+    __slots__ = ("stubs", "faults")
+    STUBS_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    stubs: _containers.RepeatedCompositeFieldContainer[Stub]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, stubs: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

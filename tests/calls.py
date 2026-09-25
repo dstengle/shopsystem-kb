@@ -165,6 +165,11 @@ PROCESS_TYPE = {
 }
 
 
+def listing(client, type_name):
+    """The artifacts of a kind, as stubs."""
+    return client.List(kb_pb2.ListRequest(type=type_name))
+
+
 def everything_under(directory):
     """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
     return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
