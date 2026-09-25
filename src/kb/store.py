@@ -39,6 +39,12 @@ class Store:
         temp.replace(path)
         return path
 
+    def remove(self, artifact_id: ArtifactId) -> Path:
+        """Take an artifact's file out, and return where it was."""
+        path = self.path(artifact_id)
+        path.unlink()
+        return path
+
     def holds(self, artifact_id: ArtifactId) -> bool:
         return self.path(artifact_id).is_file()
 
@@ -79,18 +85,30 @@ class Store:
 
 
 class Draft:
-    """The store as a set of changes would leave it: artifacts put here stand over the stored ones, and nothing is
-    written. Read like the store: holds, load, schema."""
+    """The store as a set of changes would leave it: artifacts put here stand over the stored ones, artifacts removed
+    here are no longer held, and nothing is written. Read like the store: holds, load, schema, ids."""
 
     def __init__(self, store: Store):
         self._store = store
         self._pending: dict[ArtifactId, dict] = {}
+        self._removed: set[ArtifactId] = set()
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
+        self._removed.discard(artifact_id)
         self._pending[artifact_id] = artifact
 
+    def remove(self, artifact_id: ArtifactId) -> None:
+        self._removed.add(artifact_id)
+
     def holds(self, artifact_id: ArtifactId) -> bool:
+        if artifact_id in self._removed:
+            return False
         return artifact_id in self._pending or self._store.holds(artifact_id)
+
+    def ids(self) -> list[ArtifactId]:
+        """The name of every artifact the draft holds, in the order their paths would sort."""
+        held = (set(self._store.ids()) | set(self._pending)) - self._removed
+        return sorted(held, key=lambda artifact_id: f"{artifact_id}.yaml")
 
     def load(self, artifact_id: ArtifactId) -> dict:
         if artifact_id in self._pending:

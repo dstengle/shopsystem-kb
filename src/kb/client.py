@@ -69,6 +69,9 @@ class InProcessClient:
     def Append(self, request, timeout=None):
         return self._call("Append", request, kb_pb2.AppendResponse)
 
+    def Delete(self, request, timeout=None):
+        return self._call("Delete", request, kb_pb2.DeleteResponse)
+
 
 def connect(root=None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds."""

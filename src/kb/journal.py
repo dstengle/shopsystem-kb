@@ -17,8 +17,9 @@ def digest(path: Path) -> str:
 
 
 def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision: int,
-          schema_version: int, written: Path, message: str, seq: int = 1, batch: str = "") -> Path:
-    """Write one entry and return its file; its stem is the entry's id. A change made alone names itself as its batch."""
+          schema_version: int, written: Path | None, message: str, seq: int = 1, batch: str = "") -> Path:
+    """Write one entry and return its file; its stem is the entry's id. A change made alone names itself as its batch.
+    A removal wrote nothing, so its entry's fingerprint is empty."""
     at = now()
     entry_id = f"{at.strftime('%Y%m%dT%H%M%S%fZ')}-{seq}"
     entry = {
@@ -30,7 +31,7 @@ def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision
         "path": path,
         "revision": revision,
         "schema_version": schema_version,
-        "digest": digest(written),
+        "digest": digest(written) if written is not None else "",
         "message": message,
         "batch": batch or entry_id,
     }

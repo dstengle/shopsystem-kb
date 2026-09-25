@@ -196,14 +196,16 @@ class WriteResponse(_message.Message):
     def __init__(self, revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class Operation(_message.Message):
-    __slots__ = ("create", "write", "append")
+    __slots__ = ("create", "write", "append", "delete")
     CREATE_FIELD_NUMBER: _ClassVar[int]
     WRITE_FIELD_NUMBER: _ClassVar[int]
     APPEND_FIELD_NUMBER: _ClassVar[int]
+    DELETE_FIELD_NUMBER: _ClassVar[int]
     create: Creation
     write: Replacement
     append: Addition
-    def __init__(self, create: _Optional[_Union[Creation, _Mapping]] = ..., write: _Optional[_Union[Replacement, _Mapping]] = ..., append: _Optional[_Union[Addition, _Mapping]] = ...) -> None: ...
+    delete: Removal
+    def __init__(self, create: _Optional[_Union[Creation, _Mapping]] = ..., write: _Optional[_Union[Replacement, _Mapping]] = ..., append: _Optional[_Union[Addition, _Mapping]] = ..., delete: _Optional[_Union[Removal, _Mapping]] = ...) -> None: ...
 
 class Creation(_message.Message):
     __slots__ = ("type", "title", "content")
@@ -230,6 +232,12 @@ class Addition(_message.Message):
     locator: Locator
     content: str
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ...) -> None: ...
+
+class Removal(_message.Message):
+    __slots__ = ("locator",)
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ...) -> None: ...
 
 class ApplyRequest(_message.Message):
     __slots__ = ("operations", "actor", "message")
@@ -473,3 +481,21 @@ class AppendResponse(_message.Message):
     revision: int
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+
+class DeleteRequest(_message.Message):
+    __slots__ = ("locator", "actor", "message")
+    LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    locator: Locator
+    actor: Actor
+    message: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+
+class DeleteResponse(_message.Message):
+    __slots__ = ("revision", "faults")
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    revision: int
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...

@@ -135,6 +135,12 @@ def append(client, artifact_id, collection, content, message="Add an item", acto
     ))
 
 
+def remove(client, artifact_id, message="Remove an artifact", actor=CLIENT):
+    """A Delete of a whole artifact, under the client's role unless another actor is given. Returns the response,
+    faults and all."""
+    return client.Delete(kb_pb2.DeleteRequest(locator=kb_pb2.Locator(id=artifact_id), actor=actor, message=message))
+
+
 def journal(client, artifact="", role="", execution="", since=""):
     """The journal's entries, narrowed to those about one artifact, made by one role, for one piece of work, or at or
     after a time, by whichever are given."""

@@ -70,6 +70,13 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.AppendResponse(faults=landed.faults)
         return kb_pb2.AppendResponse(id=landed.results[0].item, revision=landed.results[0].revision)
 
+    def Delete(self, request, context):
+        removal = kb_pb2.Removal(locator=request.locator)
+        landed = self._land([kb_pb2.Operation(delete=removal)], request.actor, request.message)
+        if landed.faults:
+            return kb_pb2.DeleteResponse(faults=landed.faults)
+        return kb_pb2.DeleteResponse(revision=landed.results[0].revision)
+
     def Apply(self, request, context):
         return self._land(request.operations, request.actor, request.message)
 
@@ -91,6 +98,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.ApplyResponse(faults=faults)
         texts = []
         for change in touched:
+            if change.op == "delete":
+                texts.append((change, None))
+                continue
             try:
                 texts.append((change, canonical.dump(draft.load(change.artifact_id))))
             except canonical.NotCanonical as fault:
@@ -99,16 +109,22 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return kb_pb2.ApplyResponse(faults=faults)
         written, results, batch = [], [], ""
         for seq, (change, text) in enumerate(texts, start=1):
-            artifact = draft.load(change.artifact_id)
-            path = self._store.save(change.artifact_id, text)
+            if text is None:
+                removed = self._store.load(change.artifact_id)
+                revision, schema_version = removed["revision"] + 1, removed["schema_version"]
+                path, saved = self._store.remove(change.artifact_id), None
+            else:
+                artifact = draft.load(change.artifact_id)
+                revision, schema_version = artifact["revision"], artifact["schema_version"]
+                path = saved = self._store.save(change.artifact_id, text)
             entry = journal.write(
                 self._store.dir, actor=actor, op=change.op, artifact=str(change.artifact_id), path=change.path,
-                revision=artifact["revision"], schema_version=artifact["schema_version"],
-                written=path, message=message, seq=seq, batch=batch,
+                revision=revision, schema_version=schema_version,
+                written=saved, message=message, seq=seq, batch=batch,
             )
             batch = batch or entry.stem
             written += [path, entry]
-            results.append(kb_pb2.Result(id=str(change.artifact_id), revision=artifact["revision"], item=change.item))
+            results.append(kb_pb2.Result(id=str(change.artifact_id), revision=revision, item=change.item))
         self._store.commit(written, actor.role, message)
         return kb_pb2.ApplyResponse(batch=batch, results=results)
 
@@ -119,6 +135,8 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             return Change("create", self._create(draft, operation.create))
         if which == "append":
             return self._append(draft, operation.append)
+        if which == "delete":
+            return self._delete(draft, operation.delete)
         return Change("write", self._replace(draft, operation.write))
 
     def _create(self, draft: Draft, creation: kb_pb2.Creation) -> ArtifactId:
@@ -181,6 +199,32 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         content.setdefault(collection, []).append(item)
         _revise(draft, locator.id, current, content)
         return Change("append", locator.id, f"{collection}/{item['id']}", item["id"])
+
+    def _delete(self, draft: Draft, removal: kb_pb2.Removal) -> Change:
+        """A whole artifact taken out of the draft, refused with one fault for each link that still points at it."""
+        locator = values.locator(removal.locator)
+        if not draft.holds(locator.id):
+            raise values.Refused([_not_found(locator.id)])
+        if locator.place:
+            raise values.Refused([kb_pb2.Fault(
+                artifact=str(locator.id), path="/".join(locator.place), rule="locator",
+                message=f"a removal takes out a whole artifact; {'/'.join(locator.place)!r} is a place inside {str(locator.id)!r}",
+            )])
+        blocking = []
+        for other_id in draft.ids():
+            if other_id == locator.id:
+                continue
+            schema = draft.schema(other_id.kind)["schema"]
+            for field, place, target in validation.links(draft.load(other_id), schema, draft):
+                if _points_at(target, locator.id):
+                    blocking.append(kb_pb2.Fault(
+                        artifact=str(other_id), path=place, rule="on_delete",
+                        message=f"{str(locator.id)!r} cannot be removed while {str(other_id)!r} points at it at {place!r}",
+                    ))
+        if blocking:
+            raise values.Refused(blocking)
+        draft.remove(locator.id)
+        return Change("delete", locator.id)
 
     def Read(self, request, context):
         try:
