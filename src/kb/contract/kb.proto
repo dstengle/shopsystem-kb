@@ -244,13 +244,23 @@ message SearchResponse {
   repeated Fault faults = 2;
 }
 
-// The links out of an artifact, followed as many steps as depth says.
+// The links out of an artifact, or into it, followed as many steps as
+// depth says. A via names the one field a link may be; a type, the one
+// kind an artifact reached may be. Either narrows every step.
 message RefsRequest {
+  enum Direction {
+    OUT = 0;
+    IN = 1;
+  }
   Locator locator = 1;
   int32 depth = 2;
+  Direction direction = 3;
+  string via = 4;
+  string type = 5;
 }
 
-// One step of a route: the link taken and the name it landed on.
+// One step of a route: the link taken and the name it landed on. Going
+// in, the link is the field of the artifact landed on that points back.
 message Hop {
   string field = 1;
   string id = 2;
@@ -264,8 +274,8 @@ message Reached {
 }
 
 // Each artifact reached once, by the shortest route, nearest first. With
-// faults, a refusal: a bad locator, a name the store lacks, or no store
-// found.
+// faults, a refusal: a bad locator, a name the store lacks, a type that is
+// not a plain name, or no store found.
 message RefsResponse {
   repeated Reached reached = 1;
   repeated Fault faults = 2;

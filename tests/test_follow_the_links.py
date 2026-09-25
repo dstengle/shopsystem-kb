@@ -67,3 +67,53 @@ def _each_with_its_route(reached):
         OLDER: [("supersedes", OLDER)],
         "tag/pricing": [("supersedes", OLDER), ("tags", "tag/pricing")],
     }
+
+
+WORK_ITEMS = ["work-item/move-the-review-to-mondays", "work-item/tell-the-pricing-team"]
+
+
+@when("the client follows the links out of the decision", target_fixture="reached")
+def _follow_out(client):
+    response = refs(client, DECISION, depth=1)
+    assert not response.faults, response.faults
+    return list(response.reached)
+
+
+@then("the client is given a stub of the older decision")
+def _stub_of_the_older_decision(reached):
+    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
+    ]
+
+
+@when("the client follows the links into the decision", target_fixture="reached")
+def _follow_in(client):
+    response = refs(client, DECISION, depth=1, inward=True)
+    assert not response.faults, response.faults
+    return list(response.reached)
+
+
+@then("the client is given a stub of each work item")
+def _stub_of_each_work_item(reached):
+    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        ("decisions", WORK_ITEMS[0], "work-item", "Move the review to Mondays"),
+        ("decisions", WORK_ITEMS[1], "work-item", "Tell the pricing team"),
+    ]
+    assert [[(hop.field, hop.id) for hop in found.route] for found in reached] == [
+        [("decisions", WORK_ITEMS[0])], [("decisions", WORK_ITEMS[1])],
+    ]
+
+
+@when(
+    "the client follows the links into the decision, only through the link a work item uses, and only from work items",
+    target_fixture="reached",
+)
+def _follow_in_narrowed(client):
+    response = refs(client, DECISION, depth=1, inward=True, via="decisions", type_name="work-item")
+    assert not response.faults, response.faults
+    return list(response.reached)
+
+
+@then("the client is given both work items and nothing else")
+def _both_work_items(reached):
+    assert [found.stub.id for found in reached] == WORK_ITEMS

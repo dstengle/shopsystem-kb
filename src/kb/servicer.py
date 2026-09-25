@@ -269,30 +269,55 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         ])
 
     def Refs(self, request, context):
-        """What an artifact's links reach, a step at a time out to the depth asked: each artifact once, by the
-        shortest route, the one asked about never."""
+        """What an artifact's links reach, out of it or into it, a step at a time out to the depth asked: each artifact
+        once, by the shortest route, the one asked about never. A via or a type narrows every step."""
+        faults = []
         try:
             locator = values.locator(request.locator)
         except values.Refused as refused:
-            return kb_pb2.RefsResponse(faults=refused.faults)
+            faults += refused.faults
+        try:
+            kind = values.kind(request.type) if request.type else None
+        except values.Refused as refused:
+            faults += refused.faults
+        if faults:
+            return kb_pb2.RefsResponse(faults=faults)
         if not self._store.holds(locator.id):
             return kb_pb2.RefsResponse(faults=[_not_found(locator.id)])
+        step = self._inward if request.direction == kb_pb2.RefsRequest.IN else self._outward
         reached, seen, frontier = [], {str(locator.id)}, [(locator.id, [])]
         for _ in range(request.depth):
             following = []
             for artifact_id, route in frontier:
-                artifact = self._store.load(artifact_id)
-                schema = self._store.schema(artifact_id.kind)["schema"]
-                for field, _, target in validation.links(artifact, schema, self._store):
-                    if target in seen:
+                for field, other_id in step(artifact_id):
+                    if str(other_id) in seen or (request.via and field != request.via):
                         continue
-                    seen.add(target)
-                    target_id = values.artifact_id(target)
-                    taken = [*route, kb_pb2.Hop(field=field, id=target)]
-                    reached.append(kb_pb2.Reached(stub=self._stub(field, target_id), route=taken))
-                    following.append((target_id, taken))
+                    if kind is not None and other_id.kind != kind:
+                        continue
+                    seen.add(str(other_id))
+                    taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
+                    reached.append(kb_pb2.Reached(stub=self._stub(field, other_id), route=taken))
+                    following.append((other_id, taken))
             frontier = following
         return kb_pb2.RefsResponse(reached=reached)
+
+    def _outward(self, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
+        """Each link out of an artifact, as the field and the name it points at."""
+        artifact = self._store.load(artifact_id)
+        schema = self._store.schema(artifact_id.kind)["schema"]
+        return [(field, values.artifact_id(target)) for field, _, target in validation.links(artifact, schema, self._store)]
+
+    def _inward(self, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
+        """Each link into an artifact or a part inside it, as the field that points there and the artifact that holds
+        that field, in path order."""
+        found = []
+        for other_id in self._store.ids():
+            other = self._store.load(other_id)
+            schema = self._store.schema(other_id.kind)["schema"]
+            for field, _, target in validation.links(other, schema, self._store):
+                if _points_at(target, artifact_id):
+                    found.append((field, other_id))
+        return found
 
     def List(self, request, context):
         """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names."""
@@ -325,6 +350,11 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for field in pointing:
                 counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
         return counts
+
+
+def _points_at(target: str, artifact_id: ArtifactId) -> bool:
+    """Whether a link lands on the artifact or on a part inside it."""
+    return target.partition("#")[0] == str(artifact_id)
 
 
 def _holds(artifact: dict, fields) -> bool:

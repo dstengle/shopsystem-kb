@@ -314,12 +314,24 @@ class SearchResponse(_message.Message):
     def __init__(self, matches: _Optional[_Iterable[_Union[Match, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class RefsRequest(_message.Message):
-    __slots__ = ("locator", "depth")
+    __slots__ = ("locator", "depth", "direction", "via", "type")
+    class Direction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        OUT: _ClassVar[RefsRequest.Direction]
+        IN: _ClassVar[RefsRequest.Direction]
+    OUT: RefsRequest.Direction
+    IN: RefsRequest.Direction
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
+    DIRECTION_FIELD_NUMBER: _ClassVar[int]
+    VIA_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     depth: int
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ...) -> None: ...
+    direction: RefsRequest.Direction
+    via: str
+    type: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ..., direction: _Optional[_Union[RefsRequest.Direction, str]] = ..., via: _Optional[str] = ..., type: _Optional[str] = ...) -> None: ...
 
 class Hop(_message.Message):
     __slots__ = ("field", "id")
