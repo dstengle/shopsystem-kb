@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical
+from kb import canonical, discovery
 from kb.content import loads
 from kb.contract import kb_pb2
 
@@ -144,7 +144,8 @@ def item(artifact: str, text: str) -> dict:
 
 
 def root(text: str) -> Path:
-    """The directory a store is started in, as the request names it; relative names stay relative."""
+    """The directory a store is started in, as the request names it; relative names stay relative. It must be a
+    directory that is there, with nothing called kb/ inside it, and inside no store."""
     if not text:
         raise Refused([kb_pb2.Fault(
             rule="root",
@@ -158,6 +159,15 @@ def root(text: str) -> Path:
     if not named.is_dir():
         raise Refused([kb_pb2.Fault(
             rule="root", message=f"a store is started in a directory, and {text!r} is not one",
+        )])
+    if (named / "kb").exists():
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"a store is never started over another; {text!r} already has a store inside it",
+        )])
+    above = discovery.find_above(named.resolve().parent)
+    if above is not None:
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"stores do not nest; {text!r} is inside the store at {str(above)!r}",
         )])
     return named
 

@@ -201,3 +201,47 @@ def _rejected_as_not_a_directory(started, root):
 @then("that file is left as it was")
 def _file_left_as_it_was(root):
     assert root.read_bytes() == FILE_TEXT
+
+
+UNRELATED = {"README.md": b"# The shop\n", "src/till.py": b"print('open')\n"}
+
+
+@given("a directory holding files that have nothing to do with a store", target_fixture="root")
+def _directory_holding_other_files(root):
+    for name, data in UNRELATED.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_bytes(data)
+    return root
+
+
+@then("the store is made inside that directory, in a place of its own")
+def _made_in_a_place_of_its_own(started, root):
+    assert not started.faults, started.faults
+    assert (root / "kb" / "store.yaml").is_file()
+    assert sorted(path.name for path in root.iterdir()) == ["README.md", "kb", "src"]
+
+
+@then("the files that were already there are left as they were, and none of them is the store's concern")
+def _other_files_left_alone(client, root):
+    for name, data in UNRELATED.items():
+        assert (root / name).read_bytes() == data
+    tracked = subprocess.run(
+        ["git", "-C", str(root / "kb"), "ls-files"], capture_output=True, text=True, check=True,
+    ).stdout.split()
+    assert all(not name.startswith("..") for name in tracked), tracked
+    checked = client.Validate(kb_pb2.ValidateRequest())
+    assert (list(checked.faults), list(checked.violations), list(checked.stale)) == ([], [], [])
+
+
+@then("starting the store is rejected because that directory already has a store inside it")
+def _rejected_as_already_a_store(started, root):
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", f"a store is never started over another; {str(root)!r} already has a store inside it"),
+    ]
+
+
+@then("starting the store is rejected because that directory is inside a store")
+def _rejected_as_inside_a_store(started, root, before):
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", f"stores do not nest; {str(root)!r} is inside the store at {str(before['store'])!r}"),
+    ]
