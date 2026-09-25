@@ -5,6 +5,7 @@ path is made from a name.
 """
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from kb import canonical
@@ -81,6 +82,17 @@ def target(text: str) -> Locator:
     locator is."""
     name, _, place = text.partition("#")
     return locator(kb_pb2.Locator(id=name, path=place))
+
+
+def since(text: str) -> datetime:
+    """A time as a request names it: ISO 8601, a date alone meaning its midnight, in UTC unless it says otherwise."""
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        raise Refused([kb_pb2.Fault(
+            rule="since", message=f"a time is written in ISO 8601, as 2026-09-22 or 2026-09-22T09:00:00Z; {text!r} is not",
+        )]) from None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
 def named(kind: Kind, title: str) -> ArtifactId:

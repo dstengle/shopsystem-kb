@@ -127,9 +127,14 @@ def write(client, artifact_id, content, message="Change an artifact", actor=CLIE
     ))
 
 
-def journal(client, artifact=""):
-    """The journal's entries, those about one artifact when it is named."""
-    return client.Journal(kb_pb2.JournalRequest(artifact=artifact))
+def journal(client, artifact="", role="", execution="", since=""):
+    """The journal's entries, narrowed to those about one artifact, made by one role, for one piece of work, or at or
+    after a time, by whichever are given."""
+    request = kb_pb2.JournalRequest(artifact=artifact)
+    for name, value in (("role", role), ("execution", execution), ("since", since)):
+        if value:
+            setattr(request, name, value)
+    return client.Journal(request)
 
 def search(client, text, type_name="", everywhere=False):
     """A search of the prose for the text, or of the fields and the prose when everywhere, among artifacts of one kind

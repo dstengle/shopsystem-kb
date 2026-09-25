@@ -196,9 +196,15 @@ message Result {
   int32 revision = 2;
 }
 
-// Narrows the journal to the entries about one artifact; empty, every entry.
+// Narrows the journal to the entries about one artifact, made under one
+// role, for one piece of work, or at or after a time (ISO 8601, a date
+// alone meaning its midnight, UTC unless it says otherwise), by each one
+// given; with none, every entry.
 message JournalRequest {
   string artifact = 1;
+  string role = 2;
+  string execution = 3;
+  string since = 4;
 }
 
 // One journal entry, as the store holds it. `at` is ISO 8601 in UTC; a
@@ -218,7 +224,7 @@ message Entry {
 }
 
 // The entries, oldest first. With faults, a refusal: a name that is not a
-// plain name, or no store found.
+// plain name, a time that cannot be read, or no store found.
 message JournalResponse {
   repeated Entry entries = 1;
   repeated Fault faults = 2;

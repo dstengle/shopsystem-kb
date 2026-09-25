@@ -4,6 +4,7 @@ Each rpc first turns what the request carries into checked values (kb.values); n
 string that came from the request.
 """
 import copy
+from datetime import datetime
 
 from kb import canonical, journal, search, validation, values
 from kb.content import dumps, text
@@ -251,14 +252,24 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.ValidateResponse(violations=violations, stale=stale)
 
     def Journal(self, request, context):
-        """The journal's entries, oldest first, those about one artifact when the request names it."""
+        """The journal's entries, oldest first, narrowed by each of artifact, role, piece of work and time given."""
+        faults = []
         try:
             artifact = str(values.artifact_id(request.artifact)) if request.artifact else ""
         except values.Refused as refused:
-            return kb_pb2.JournalResponse(faults=refused.faults)
+            faults += refused.faults
+        try:
+            since = values.since(request.since) if request.since else None
+        except values.Refused as refused:
+            faults += refused.faults
+        if faults:
+            return kb_pb2.JournalResponse(faults=faults)
         return kb_pb2.JournalResponse(entries=[
             _entry(entry) for entry in journal.entries(self._store.dir)
-            if not artifact or entry["artifact"] == artifact
+            if (not artifact or entry["artifact"] == artifact)
+            and (not request.role or entry["actor"]["role"] == request.role)
+            and (not request.execution or entry["actor"]["execution"] == request.execution)
+            and (since is None or datetime.fromisoformat(entry["at"]) >= since)
         ])
 
     def Search(self, request, context):

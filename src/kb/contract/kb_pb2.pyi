@@ -250,10 +250,16 @@ class Result(_message.Message):
     def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class JournalRequest(_message.Message):
-    __slots__ = ("artifact",)
+    __slots__ = ("artifact", "role", "execution", "since")
     ARTIFACT_FIELD_NUMBER: _ClassVar[int]
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    EXECUTION_FIELD_NUMBER: _ClassVar[int]
+    SINCE_FIELD_NUMBER: _ClassVar[int]
     artifact: str
-    def __init__(self, artifact: _Optional[str] = ...) -> None: ...
+    role: str
+    execution: str
+    since: str
+    def __init__(self, artifact: _Optional[str] = ..., role: _Optional[str] = ..., execution: _Optional[str] = ..., since: _Optional[str] = ...) -> None: ...
 
 class Entry(_message.Message):
     __slots__ = ("id", "at", "actor", "op", "artifact", "path", "revision", "schema_version", "digest", "message", "batch")

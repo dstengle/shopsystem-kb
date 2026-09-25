@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, journal, write
+from calls import CLIENT, DECISION_TYPE, apply, create, creation, define, journal, write
 from kb import client as kb_client
 from kb import journal as kb_journal
 from kb.contract import kb_pb2
@@ -93,3 +93,85 @@ def _each_entry_says_everything(entries, written):
     ]
     assert [entry.digest for entry in entries] == [hashlib.sha256(text).hexdigest() for text in written]
     assert [entry.batch for entry in entries] == [entry.id for entry in entries]
+
+
+SECTIONS = [
+    {"title": "Purpose", "body": "Keep the shop running.\n"},
+    {"title": "Rationale", "body": "It was agreed.\n"},
+]
+TOGETHER = ["decision/restock-on-thursdays", "decision/count-the-till-nightly"]
+ALONE = "decision/close-early-on-sundays"
+
+
+@given("a store where two artifacts were changed in one go and a third was changed on its own")
+def _two_together_and_one_alone(client):
+    applied = apply(client, [
+        creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
+        creation("decision", "Count the till nightly", {"sections": SECTIONS}),
+    ], message="Two decisions at once")
+    assert not applied.faults, applied.faults
+    create(client, "decision", {"title": "Close early on Sundays", "sections": SECTIONS}, message="One on its own")
+
+
+@when("the client reads the journal", target_fixture="entries")
+def _read_the_whole_journal(client):
+    response = journal(client)
+    assert not response.faults, response.faults
+    return list(response.entries)
+
+
+@then("the two entries from the one go name the same set of changes")
+def _same_set(entries):
+    together = [entry for entry in entries if entry.artifact in TOGETHER]
+    assert [entry.artifact for entry in together] == TOGETHER
+    assert together[0].batch == together[1].batch
+
+
+@then("the entry for the change made on its own names itself as its own set")
+def _its_own_set(entries):
+    [alone] = [entry for entry in entries if entry.artifact == ALONE]
+    assert alone.batch == alone.id
+
+
+@then("the client can tell what landed together from the journal without reading anything else")
+def _grouped_by_the_journal_alone(entries):
+    sets = {}
+    for entry in entries:
+        sets.setdefault(entry.batch, []).append(entry.artifact)
+    assert [artifacts for artifacts in sets.values() if len(artifacts) > 1] == [TOGETHER]
+
+
+def _journal_of(client, **narrowed):
+    response = journal(client, **narrowed)
+    assert not response.faults, response.faults
+    return [(entry.op, entry.artifact, entry.actor.role, entry.actor.execution) for entry in response.entries]
+
+
+@when("the client reads the journal for the shopkeeper", target_fixture="narrowed")
+def _for_the_shopkeeper(client):
+    return _journal_of(client, role="shopkeeper")
+
+
+@then("the client is given only the creation of the decision")
+def _only_the_creation(narrowed):
+    assert narrowed == [("create", DECISION, "shopkeeper", "")]
+
+
+@when("the client reads the journal for that piece of work", target_fixture="narrowed")
+def _for_the_piece_of_work(client):
+    return _journal_of(client, execution="restock-run-12")
+
+
+@then("the client is given only the change the agent made")
+def _only_the_agents_change(narrowed):
+    assert narrowed == [("write", DECISION, "agent", "restock-run-12")]
+
+
+@when(parsers.parse("the client reads the journal since {day}"), target_fixture="narrowed")
+def _since(client, day):
+    return _journal_of(client, since=day)
+
+
+@then("the client is given only the change made today")
+def _only_todays_change(narrowed):
+    assert narrowed == [("write", DECISION, "agent", "restock-run-12")]
