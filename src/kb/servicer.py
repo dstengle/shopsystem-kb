@@ -323,7 +323,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return kb_pb2.ValidateResponse(violations=violations, stale=stale)
 
     def Journal(self, request, context):
-        """The journal's entries, oldest first, narrowed by each of artifact, role, piece of work and time given."""
+        """The journal's entries, oldest first, narrowed by each of artifact, role, piece of work, time and set given."""
         faults = []
         try:
             artifact = str(values.artifact_id(request.artifact)) if request.artifact else ""
@@ -341,6 +341,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             and (not request.role or entry["actor"]["role"] == request.role)
             and (not request.execution or entry["actor"]["execution"] == request.execution)
             and (since is None or datetime.fromisoformat(entry["at"]) >= since)
+            and (not request.batch or entry["batch"] == request.batch)
         ])
 
     def Search(self, request, context):

@@ -2,7 +2,9 @@ import subprocess
 
 from pytest_bdd import given, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, read, replacement
+from calls import (
+    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, journal, read, replacement,
+)
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
@@ -110,4 +112,14 @@ def _every_fault_back(attempt):
     assert [(fault.path, fault.message) for fault in attempt["response"].faults] == [
         ("sections", "the sections the type requires must all be present, in order; 'Purpose' is missing"),
         ("sections", "the sections the type requires must all be present, in order; 'Rationale' is missing"),
+    ]
+
+
+@then("the changes the history shows under the name the client was given for the set are exactly those two")
+def _the_set_in_the_history(client, applied):
+    assert not applied.faults, applied.faults
+    shown = journal(client, batch=applied.batch)
+    assert not shown.faults, shown.faults
+    assert [(entry.op, entry.artifact, entry.revision, entry.batch) for entry in shown.entries] == [
+        ("create", DECISION, 1, applied.batch), ("write", WORK_ITEM, 2, applied.batch),
     ]
