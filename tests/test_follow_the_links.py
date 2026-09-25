@@ -1,8 +1,6 @@
-import copy
-
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, refs, write
+from calls import CLIENT, TAG_TYPE, WORK_ITEM_TYPE, create, define, refs, tagged_decision_type, write
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -14,22 +12,6 @@ OLDER_SECTIONS = [
     {"title": "Purpose", "body": "Keep prices current.\n"},
     {"title": "Rationale", "body": "Monthly was enough once.\n"},
 ]
-TAG_TYPE = {
-    "title": "Tag",
-    "version": 1,
-    "schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]},
-}
-
-
-def _tagged_decision_type():
-    """The decision type, whose artifacts may also carry tags."""
-    decision_type = copy.deepcopy(DECISION_TYPE)
-    decision_type["schema"]["properties"]["tags"] = {
-        "type": "array",
-        "items": {"type": "string"},
-        "ref": {"targets": ["tag"], "cardinality": "many", "parts": False, "on_delete": "refuse"},
-    }
-    return decision_type
 
 
 @given("a store where a decision supersedes an older decision", target_fixture="client")
@@ -37,7 +19,7 @@ def _store_with_a_superseded_decision(root):
     client = kb_client.connect(root)
     client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, TAG_TYPE)
-    define(client, _tagged_decision_type())
+    define(client, tagged_decision_type())
     define(client, WORK_ITEM_TYPE)
     create(client, "decision", {"title": "Prices are reviewed monthly", "sections": OLDER_SECTIONS})
     create(client, "decision", {

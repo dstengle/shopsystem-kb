@@ -1,8 +1,8 @@
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, read, write
-from kb import client as kb_client
+from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, write
+from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
 
@@ -10,6 +10,11 @@ scenarios("read-an-artifact.feature")
 
 OLDER = "decision/prices-are-reviewed-monthly"
 DECISION = "decision/price-reviews-happen-weekly"
+PROCESS = "process/open-the-shop"
+OLDER_SECTIONS = [
+    {"title": "Purpose", "body": "Keep prices current.\n"},
+    {"title": "Rationale", "body": "Monthly was enough once.\n"},
+]
 
 
 @given(
@@ -25,15 +30,9 @@ def _start_with_a_linked_decision(root):
     """Start a store at root holding the decision, what it supersedes, and two work items pointing at it."""
     client = kb_client.connect(root)
     client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    define(client, DECISION_TYPE)
+    define(client, tagged_decision_type())
     define(client, WORK_ITEM_TYPE)
-    create(client, "decision", {
-        "title": "Prices are reviewed monthly",
-        "sections": [
-            {"title": "Purpose", "body": "Keep prices current.\n"},
-            {"title": "Rationale", "body": "Monthly was enough once.\n"},
-        ],
-    })
+    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": OLDER_SECTIONS})
     create(client, "decision", {
         "title": "Price reviews happen weekly",
         "supersedes": OLDER,
@@ -328,3 +327,100 @@ def _the_other_filled_in(whole):
 def _points_back_as_a_name(whole):
     assert whole.id == DAILY
     assert loads(whole.content)["supersedes"]["supersedes"] == DAILY
+
+
+@when("the client reads the rationale of the decision", target_fixture="shown")
+def _read_the_rationale(client):
+    return read(client, DECISION, section="Rationale")
+
+
+@then("the client is given that section and nothing else")
+def _that_section_alone(shown):
+    assert not shown.faults, shown.faults
+    assert loads(shown.content) == {"title": "Rationale", "body": "Costs move weekly.\n"}
+    assert not shown.references and not shown.parts and not shown.inbound
+
+
+@when("the client reads the whole decision", target_fixture="whole")
+@when("the client reads the whole decision without asking for its links to be followed", target_fixture="whole")
+def _read_the_whole_decision(client):
+    response = read(client, DECISION, whole=True)
+    assert not response.faults, response.faults
+    return response
+
+
+@then("the client is given every field, every section and every part, in the order the type declares")
+def _everything_in_declared_order(whole):
+    assert (whole.id, whole.type, whole.schema_version, whole.revision, whole.title) == (
+        DECISION, "decision", 1, 1, "Price reviews happen weekly",
+    )
+    content = loads(whole.content)
+    assert list(content) == ["supersedes", "sections", "options"]
+    assert [section["title"] for section in content["sections"]] == ["Purpose", "Rationale"]
+    assert [list(option) for option in content["options"]] == [["id", "title", "body"]] * 2
+    assert [option["id"] for option in content["options"]] == ["keep-weekly", "go-monthly"]
+
+
+@then("the older decision is given as the name it is known by, and nothing more")
+def _older_as_a_name(whole):
+    assert loads(whole.content)["supersedes"] == OLDER
+
+
+@when(
+    parsers.re(r"the client reads the whole (?P<kind>decision|process) following its links (?P<steps>one step|two steps)"),
+    target_fixture="whole",
+)
+def _read_the_whole_following(client, kind, steps):
+    response = read(client, DECISION if kind == "decision" else PROCESS, whole=True, depth={"one step": 1, "two steps": 2}[steps])
+    assert not response.faults, response.faults
+    return response
+
+
+@then("the older decision is given in place of the link, as the store holds it now")
+def _older_as_stored(root, whole):
+    assert loads(whole.content)["supersedes"] == canonical.load((root / "kb" / f"{OLDER}.yaml").read_text())
+
+
+@then("what the older decision itself points at is given as names")
+def _older_links_as_names(whole):
+    older = loads(whole.content)["supersedes"]
+    assert not any(isinstance(value, dict) for value in older.values())
+    assert all(isinstance(target, str) for target in older.get("tags", []))
+
+
+@given(parsers.parse('the older decision is tagged "{tag}"'))
+def _older_decision_tagged(client, tag):
+    define(client, TAG_TYPE)
+    tagged = create(client, "tag", {"title": tag})
+    changed = write(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
+    assert not changed.faults, changed.faults
+
+
+@then("the older decision is given in place of the link")
+def _older_filled_in(whole):
+    older = loads(whole.content)["supersedes"]
+    assert (older["id"], older["title"], older["sections"]) == (OLDER, "Prices are reviewed monthly", OLDER_SECTIONS)
+
+
+@then("the tag is given in place of the link inside the older decision")
+def _tag_filled_in(whole):
+    assert loads(whole.content)["supersedes"]["tags"] == [
+        {"id": "tag/pricing", "type": "tag", "schema_version": 1, "revision": 1, "title": "pricing"},
+    ]
+
+
+@given("a store holding a process whose steps branch to other steps of the same process")
+def _process_whose_steps_branch(client):
+    define(client, PROCESS_TYPE)
+    create(client, "process", {"title": "Open the shop", "steps": [
+        {"title": "Check the till", "body": "Is the float there?", "branches": ["count-the-float", "call-the-manager"]},
+        {"title": "Count the float", "body": "Count it into the till."},
+        {"title": "Call the manager", "body": "The float is missing."},
+    ]})
+
+
+@then("the branches are given as written, naming the steps of that process")
+def _branches_as_written(whole):
+    steps = loads(whole.content)["steps"]
+    assert steps[0]["branches"] == ["count-the-float", "call-the-manager"]
+    assert set(steps[0]["branches"]) <= {step["id"] for step in steps}

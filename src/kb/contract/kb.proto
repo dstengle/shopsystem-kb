@@ -67,14 +67,17 @@ message CreateResponse {
 // A summary by default. A whole read gives the artifact's content with
 // each link followed as many steps as depth says, the target in place of
 // its name; a target already filled in on the way is left as its name.
+// A section read gives the section with the title named, and nothing else.
 message ReadRequest {
   enum Level {
     SUMMARY = 0;
     WHOLE = 1;
+    SECTION = 2;
   }
   Locator locator = 1;
   Level level = 2;
   int32 depth = 3;
+  string section = 4;
 }
 
 // A summary: identity, the fields the type shows at a glance, a stub of

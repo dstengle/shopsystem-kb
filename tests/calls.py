@@ -1,4 +1,6 @@
 """How the steps call the contract: one helper per rpc, plus the types the Backgrounds define."""
+import copy
+
 from kb.content import dumps
 from kb.contract import kb_pb2
 
@@ -50,6 +52,24 @@ WORK_ITEM_TYPE = {
 }
 
 
+TAG_TYPE = {
+    "title": "Tag",
+    "version": 1,
+    "schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]},
+}
+
+
+def tagged_decision_type():
+    """The decision type, whose artifacts may also carry tags."""
+    decision_type = copy.deepcopy(DECISION_TYPE)
+    decision_type["schema"]["properties"]["tags"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "ref": {"targets": ["tag"], "cardinality": "many", "parts": False, "on_delete": "refuse"},
+    }
+    return decision_type
+
+
 def request(client, type_name, title, content, message="Create an artifact", actor=CLIENT):
     """A Create as the client sends it: the title beside the content. Returns the response, faults and all."""
     return client.Create(kb_pb2.CreateRequest(
@@ -71,10 +91,17 @@ def define(client, type_content):
     return create(client, "schema", type_content, message=f"Define {type_content['title']}")
 
 
-def read(client, artifact_id, whole=False, depth=0):
-    """A summary read, or a whole read following the links as many steps as depth says."""
-    level = kb_pb2.ReadRequest.WHOLE if whole else kb_pb2.ReadRequest.SUMMARY
-    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=artifact_id), level=level, depth=depth))
+def read(client, artifact_id, whole=False, depth=0, section=""):
+    """A summary read, a whole read following the links as many steps as depth says, or a read of the section
+    with the title given."""
+    level = kb_pb2.ReadRequest.SUMMARY
+    if whole:
+        level = kb_pb2.ReadRequest.WHOLE
+    if section:
+        level = kb_pb2.ReadRequest.SECTION
+    return client.Read(kb_pb2.ReadRequest(
+        locator=kb_pb2.Locator(id=artifact_id), level=level, depth=depth, section=section,
+    ))
 
 
 def apply(client, operations, message="Make several changes"):

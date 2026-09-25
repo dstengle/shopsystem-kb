@@ -162,6 +162,8 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         try:
             if request.level == kb_pb2.ReadRequest.WHOLE:
                 return self._whole(locator, request.depth)
+            if request.level == kb_pb2.ReadRequest.SECTION:
+                return self._section(locator, request.section)
             return self._summary(locator)
         except Unreadable as unreadable:
             return kb_pb2.ReadResponse(faults=[unreadable.fault])
@@ -173,6 +175,21 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             schema_version=artifact["schema_version"], revision=artifact["revision"],
             title=artifact["title"],
             content=dumps({key: value for key, value in artifact.items() if key not in canonical.IDENTITY}),
+        )
+
+    def _section(self, locator, title: str):
+        """The first section with that title, at any depth, in the order the artifact holds them, and nothing else."""
+        artifact = self._store.load(locator.id)
+        found = _find_section(artifact.get("sections", []), title)
+        if found is None:
+            return kb_pb2.ReadResponse(faults=[kb_pb2.Fault(
+                artifact=str(locator.id), path="sections", rule="not-found",
+                message=f"{str(locator.id)!r} holds no section titled {title!r}",
+            )])
+        return kb_pb2.ReadResponse(
+            id=artifact["id"], type=artifact["type"],
+            schema_version=artifact["schema_version"], revision=artifact["revision"],
+            title=artifact["title"], content=dumps(found),
         )
 
     def _resolved(self, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
@@ -317,6 +334,17 @@ def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
         holder = items[index]
     holder[steps[0]] = node
     return content
+
+
+def _find_section(sections: list, title: str) -> dict | None:
+    """The first section titled so, looking at each section before the sections inside it."""
+    for section in sections:
+        if section["title"] == title:
+            return section
+        found = _find_section(section.get("sections", []), title)
+        if found is not None:
+            return found
+    return None
 
 
 def _node_name(collection: str, item: dict) -> str:

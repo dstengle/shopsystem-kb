@@ -74,20 +74,24 @@ class CreateResponse(_message.Message):
     def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class ReadRequest(_message.Message):
-    __slots__ = ("locator", "level", "depth")
+    __slots__ = ("locator", "level", "depth", "section")
     class Level(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         SUMMARY: _ClassVar[ReadRequest.Level]
         WHOLE: _ClassVar[ReadRequest.Level]
+        SECTION: _ClassVar[ReadRequest.Level]
     SUMMARY: ReadRequest.Level
     WHOLE: ReadRequest.Level
+    SECTION: ReadRequest.Level
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     LEVEL_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
+    SECTION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     level: ReadRequest.Level
     depth: int
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., level: _Optional[_Union[ReadRequest.Level, str]] = ..., depth: _Optional[int] = ...) -> None: ...
+    section: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., level: _Optional[_Union[ReadRequest.Level, str]] = ..., depth: _Optional[int] = ..., section: _Optional[str] = ...) -> None: ...
 
 class ReadResponse(_message.Message):
     __slots__ = ("id", "type", "schema_version", "revision", "title", "content", "references", "parts", "inbound", "faults")
