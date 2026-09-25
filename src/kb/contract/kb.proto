@@ -224,21 +224,31 @@ message JournalResponse {
   repeated Fault faults = 2;
 }
 
-// The words to look for in the prose.
+// The words to look for in the prose, the fields, or both, among the
+// artifacts of one kind when a type is given.
 message SearchRequest {
+  enum Scope {
+    SECTIONS = 0;
+    FIELDS = 1;
+    ALL = 2;
+  }
   string text = 1;
+  string type = 2;
+  Scope scope = 3;
 }
 
-// A section that holds a word searched for: a stub of its artifact, the
-// section's title, and the words around the first match.
+// A section or a field that holds a word searched for: a stub of its
+// artifact, the section's title or the field's name, and the words around
+// the first match.
 message Match {
   Stub stub = 1;
   string section = 2;
   string snippet = 3;
+  string field = 4;
 }
 
-// The matches, the section holding the words most often first. With
-// faults, a refusal: no store found.
+// The matches, the one holding the words most often first. With faults, a
+// refusal: a type that is not a plain name, or no store found.
 message SearchResponse {
   repeated Match matches = 1;
   repeated Fault faults = 2;

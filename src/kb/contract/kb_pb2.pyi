@@ -290,20 +290,34 @@ class JournalResponse(_message.Message):
     def __init__(self, entries: _Optional[_Iterable[_Union[Entry, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class SearchRequest(_message.Message):
-    __slots__ = ("text",)
+    __slots__ = ("text", "type", "scope")
+    class Scope(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        SECTIONS: _ClassVar[SearchRequest.Scope]
+        FIELDS: _ClassVar[SearchRequest.Scope]
+        ALL: _ClassVar[SearchRequest.Scope]
+    SECTIONS: SearchRequest.Scope
+    FIELDS: SearchRequest.Scope
+    ALL: SearchRequest.Scope
     TEXT_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    SCOPE_FIELD_NUMBER: _ClassVar[int]
     text: str
-    def __init__(self, text: _Optional[str] = ...) -> None: ...
+    type: str
+    scope: SearchRequest.Scope
+    def __init__(self, text: _Optional[str] = ..., type: _Optional[str] = ..., scope: _Optional[_Union[SearchRequest.Scope, str]] = ...) -> None: ...
 
 class Match(_message.Message):
-    __slots__ = ("stub", "section", "snippet")
+    __slots__ = ("stub", "section", "snippet", "field")
     STUB_FIELD_NUMBER: _ClassVar[int]
     SECTION_FIELD_NUMBER: _ClassVar[int]
     SNIPPET_FIELD_NUMBER: _ClassVar[int]
+    FIELD_FIELD_NUMBER: _ClassVar[int]
     stub: Stub
     section: str
     snippet: str
-    def __init__(self, stub: _Optional[_Union[Stub, _Mapping]] = ..., section: _Optional[str] = ..., snippet: _Optional[str] = ...) -> None: ...
+    field: str
+    def __init__(self, stub: _Optional[_Union[Stub, _Mapping]] = ..., section: _Optional[str] = ..., snippet: _Optional[str] = ..., field: _Optional[str] = ...) -> None: ...
 
 class SearchResponse(_message.Message):
     __slots__ = ("matches", "faults")

@@ -1,4 +1,4 @@
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, search
 from kb import client as kb_client
@@ -39,12 +39,19 @@ def _store_mentioning_restocking(root):
             {"title": "Before opening", "body": "Unlock, then check whether restocking is due.\n"},
         ],
     })
+    create(client, "decision", {
+        "title": "Restocking needs two people",
+        "sections": [
+            {"title": "Purpose", "body": "Keep the stockroom safe.\n"},
+            {"title": "Rationale", "body": "Heavy boxes need a second pair of hands.\n"},
+        ],
+    })
     return client
 
 
-@when(parsers.parse("the client searches the prose for {text}"), target_fixture="found")
-def _search_the_prose(client, text):
-    response = search(client, text)
+@when("the client searches the prose for restocking", target_fixture="found")
+def _search_the_prose(client):
+    response = search(client, "restocking")
     assert not response.faults, response.faults
     return list(response.matches)
 
@@ -62,3 +69,35 @@ def _section_and_snippet(found):
 @then("the one whose section mentions restocking most often comes first")
 def _most_often_first(found):
     assert (found[0].stub.id, found[0].section) == ("decision/restock-on-thursdays", "Rationale")
+
+
+@when("the client searches the prose for restocking among decisions only", target_fixture="found")
+def _search_the_decisions(client):
+    response = search(client, "restocking", type_name="decision")
+    assert not response.faults, response.faults
+    return list(response.matches)
+
+
+@then("the client is given the two decisions and not the process")
+def _the_two_decisions(found):
+    assert {match.stub.id for match in found} == {"decision/restock-on-thursdays", "decision/price-reviews-happen-weekly"}
+    assert all(match.stub.type == "decision" for match in found)
+
+
+@when("the client searches the fields and the prose for restocking", target_fixture="found")
+def _search_fields_and_prose(client):
+    response = search(client, "restocking", everywhere=True)
+    assert not response.faults, response.faults
+    return list(response.matches)
+
+
+@then("the client is also given a decision whose title mentions restocking")
+def _the_decision_by_its_title(found):
+    assert [(match.stub.id, match.field, match.section, match.snippet) for match in found if match.field] == [
+        ("decision/restocking-needs-two-people", "title", "", "Restocking needs two people"),
+    ]
+    assert {(match.stub.id, match.section) for match in found if not match.field} == {
+        ("decision/restock-on-thursdays", "Rationale"),
+        ("decision/price-reviews-happen-weekly", "Purpose"),
+        ("process/open-the-shop", "Before opening"),
+    }

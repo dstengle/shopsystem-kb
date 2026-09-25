@@ -131,9 +131,15 @@ def journal(client, artifact=""):
     """The journal's entries, those about one artifact when it is named."""
     return client.Journal(kb_pb2.JournalRequest(artifact=artifact))
 
-def search(client, text):
-    """A search of the prose for the text."""
-    return client.Search(kb_pb2.SearchRequest(text=text))
+def search(client, text, type_name="", everywhere=False):
+    """A search of the prose for the text, or of the fields and the prose when everywhere, among artifacts of one kind
+    when type_name is given."""
+    request = kb_pb2.SearchRequest(text=text)
+    if type_name:
+        request.type = type_name
+    if everywhere:
+        request.scope = kb_pb2.SearchRequest.ALL
+    return client.Search(request)
 
 
 def refs(client, artifact_id, depth, inward=False, via="", type_name=""):

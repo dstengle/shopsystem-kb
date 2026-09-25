@@ -262,10 +262,24 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         ])
 
     def Search(self, request, context):
-        """Every section whose prose holds a word searched for, with a stub of its artifact, most often first."""
+        """Every section whose prose, or field whose value, holds a word searched for, as the scope asks, among the
+        artifacts of one kind when a type is given, with a stub of its artifact, most often first."""
+        try:
+            kind = values.kind(request.type) if request.type else None
+        except values.Refused as refused:
+            return kb_pb2.SearchResponse(faults=refused.faults)
+        artifacts = (artifact for artifact in self._store.artifacts() if kind is None or artifact["type"] == kind.name)
+        scope = request.scope
+        hits = search.rank(
+            artifacts, request.text,
+            sections=scope != kb_pb2.SearchRequest.FIELDS, fields=scope != kb_pb2.SearchRequest.SECTIONS,
+        )
         return kb_pb2.SearchResponse(matches=[
-            kb_pb2.Match(stub=self._stub("", values.artifact_id(hit.artifact)), section=hit.section, snippet=hit.snippet)
-            for hit in search.rank(self._store.artifacts(), request.text)
+            kb_pb2.Match(
+                stub=self._stub("", values.artifact_id(hit.artifact)), section=hit.section, field=hit.field,
+                snippet=hit.snippet,
+            )
+            for hit in hits
         ])
 
     def Refs(self, request, context):
