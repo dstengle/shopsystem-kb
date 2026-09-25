@@ -1,6 +1,6 @@
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, read, request
+from calls import CLIENT, DECISION_TYPE, create, define, everything_under, read, request
 from kb import canonical, content, client as kb_client
 from kb.contract import kb_pb2
 
@@ -302,11 +302,6 @@ def _rejected_for_a_section_missing_a_key(refused):
     assert "is a required property" in refused.faults[0].message
 
 
-def _everything_under(directory):
-    """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
-    return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
-
-
 @when(
     parsers.parse(
         'the client creates an artifact of the kind "{kind}", with a title and both required sections, '
@@ -315,9 +310,9 @@ def _everything_under(directory):
     target_fixture="attempt",
 )
 def _create_of_a_kind(client, tmp_path, kind):
-    before = _everything_under(tmp_path)
+    before = everything_under(tmp_path)
     response = request(client, kind, "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it")
-    return {"response": response, "before": before, "after": _everything_under(tmp_path)}
+    return {"response": response, "before": before, "after": everything_under(tmp_path)}
 
 
 @then("the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path")
@@ -467,12 +462,12 @@ def _a_title_that_is_a_number():
     target_fixture="attempt",
 )
 def _create_with_two_faults(client, tmp_path):
-    before = _everything_under(tmp_path)
+    before = everything_under(tmp_path)
     response = request(client, "decision", "Price reviews happen weekly", {
         "supersedes": "decision/prices-are-reviewed-monthly",
         "sections": [SECTIONS[1]],
     }, message="Record it")
-    return {"response": response, "before": before, "after": _everything_under(tmp_path)}
+    return {"response": response, "before": before, "after": everything_under(tmp_path)}
 
 
 @then("the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken")

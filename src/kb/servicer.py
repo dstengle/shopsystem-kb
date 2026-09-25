@@ -135,6 +135,8 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def _replace(self, draft: Draft, replacement: kb_pb2.Replacement) -> ArtifactId:
         locator = values.locator(replacement.locator)
+        if not draft.holds(locator.id):
+            raise values.Refused([_not_found(locator.id)])
         content = values.content(str(locator.id), replacement.content, at_root=not locator.place)
         current = draft.load(locator.id)
         if locator.place:
@@ -230,18 +232,23 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return response
 
     def Validate(self, request, context):
-        """Every artifact checked against its type; a file that cannot be read is reported and the check goes on."""
-        violations = []
+        """Every artifact checked against the current version of its type, and listed as stale when it was last
+        checked against an older one; a file that cannot be read is reported and the check goes on."""
+        violations, stale = [], []
         for artifact_id in self._store.ids():
             try:
                 artifact = self._store.load(artifact_id)
-                schema = self._store.schema(artifact_id.kind)["schema"]
+                schema = self._store.schema(artifact_id.kind)
             except Unreadable as unreadable:
                 violations.append(unreadable.fault)
                 continue
+            if artifact["schema_version"] < schema["version"]:
+                stale.append(kb_pb2.Stale(
+                    artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
+                ))
             content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
-            violations += validation.validate(str(artifact_id), content, schema, self._store)
-        return kb_pb2.ValidateResponse(violations=violations)
+            violations += validation.validate(str(artifact_id), content, schema["schema"], self._store)
+        return kb_pb2.ValidateResponse(violations=violations, stale=stale)
 
     def Journal(self, request, context):
         """The journal's entries, oldest first, those about one artifact when the request names it."""

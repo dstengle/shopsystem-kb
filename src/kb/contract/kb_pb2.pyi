@@ -156,12 +156,24 @@ class ValidateRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class ValidateResponse(_message.Message):
-    __slots__ = ("violations", "faults")
+    __slots__ = ("violations", "faults", "stale")
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
     FAULTS_FIELD_NUMBER: _ClassVar[int]
+    STALE_FIELD_NUMBER: _ClassVar[int]
     violations: _containers.RepeatedCompositeFieldContainer[Fault]
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    stale: _containers.RepeatedCompositeFieldContainer[Stale]
+    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., stale: _Optional[_Iterable[_Union[Stale, _Mapping]]] = ...) -> None: ...
+
+class Stale(_message.Message):
+    __slots__ = ("artifact", "schema_version", "current")
+    ARTIFACT_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_FIELD_NUMBER: _ClassVar[int]
+    artifact: str
+    schema_version: int
+    current: int
+    def __init__(self, artifact: _Optional[str] = ..., schema_version: _Optional[int] = ..., current: _Optional[int] = ...) -> None: ...
 
 class WriteRequest(_message.Message):
     __slots__ = ("locator", "content", "actor", "message")

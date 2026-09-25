@@ -163,3 +163,8 @@ PROCESS_TYPE = {
         },
     },
 }
+
+
+def everything_under(directory):
+    """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
+    return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
