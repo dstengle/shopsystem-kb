@@ -175,3 +175,18 @@ def _purpose_before_rationale(root, client):
     assert not created.faults, created.faults
     on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
     assert [section["title"] for section in on_disk["sections"]] == ["Purpose", "Rationale"]
+
+
+@when("the client defines a type that does not match the type that describes types", target_fixture="refused")
+def _define_a_malformed_type(client):
+    return request(client, "schema", "Shelf label", {"version": 1, "schema": {"type": "label"}}, message="Define Shelf label")
+
+
+@then("the type is rejected because it does not match the type that describes types")
+def _rejected_by_the_metaschema(client, refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+        ("schema/shelf-label", "schema/type", "anyOf"),
+    ]
+    assert "'label' is not valid" in refused.faults[0].message
+    assert [fault.rule for fault in read(client, "schema/shelf-label").faults] == ["not-found"]
