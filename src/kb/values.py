@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from kb import canonical, names
-from kb.content import entries, loads
+from kb.content import entries, loads, text as text_of
 from kb.contract import kb_pb2
 
 class Refused(ValueError):
@@ -108,9 +108,12 @@ def named(kind: Kind, title: str) -> ArtifactId:
         raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
                                     message="an artifact cannot be created without a title")])
     if not names.slug(title):
-        raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
-                                    message=f"a title must leave something to make a name from; {title!r} leaves nothing")])
+        raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title", message=_leaves_nothing(title))])
     return ArtifactId(kind, names.slug(title))
+
+
+def _leaves_nothing(title: str) -> str:
+    return f"a title must leave something to make a name from; {title!r} leaves nothing"
 
 
 @dataclass(frozen=True)
@@ -147,13 +150,27 @@ def content(text: str, at_root: bool = True) -> Content:
 
 
 def item(text: str) -> Content:
-    """An item read plainly, never carrying its own name, which kb gives. Only a set of named entries can carry a
-    name; an item of any other shape is left for its type to refuse."""
+    """An item read plainly, never carrying its own name, which kb gives, and with its title, which its name is made
+    from, as text. Only a set of named entries can carry a name or a title; an item of any other shape is left for
+    its type to refuse."""
     read = content(text, at_root=False)
-    if read.problems or not isinstance(read.tree, dict) or "id" not in read.tree:
+    if read.problems or not isinstance(read.tree, dict):
         return read
-    return Content(read.tree, (("id", "identity",
-        f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {read.tree['id']!r}"),))
+    if "id" in read.tree:
+        return Content(read.tree, (("id", "identity",
+            f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {read.tree['id']!r}"),))
+    return _titled(read.tree)
+
+
+def _titled(tree: dict) -> Content:
+    """An item whose title, when it has one, is text whatever it was written as, as an artifact's is, and leaves a
+    name to be made from it."""
+    if "title" not in tree or not isinstance(tree["title"], (str, int, float)):
+        return Content(tree)
+    title = text_of(tree["title"])
+    if not names.slug(title):
+        return Content(tree, (("title", "title", _leaves_nothing(title)),))
+    return Content({**tree, "title": title})
 
 
 @dataclass(frozen=True)

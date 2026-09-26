@@ -1,4 +1,5 @@
 import copy
+import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -140,7 +141,19 @@ def _after_the_others(client):
 
 @when(parsers.parse('the client adds a step titled "{title}" to the process, saying which role and why'), target_fixture="added")
 def _add_a_titled_step(client, title):
-    return _added(client, {"title": title})
+    return {"response": append(client, PROCESS, "steps", {"title": title}), "sent": {"title": title}}
+
+
+TITLES = {"the number 12 rather than text": 12, "the yes-or-no true rather than text": True}
+
+
+@when(
+    parsers.re(f"the client adds a step titled (?P<title>{'|'.join(map(re.escape, TITLES))}) to the process, "
+               "saying which role and why"),
+    target_fixture="added",
+)
+def _add_a_step_titled_other_than_text(client, title):
+    return _added(client, {"title": TITLES[title]})
 
 
 @then("the name the client is given for the new item is made from that title")
@@ -336,3 +349,17 @@ def _rest_unchanged(client, before):
     added = after["steps"][0]["checks"].pop()
     assert added == {"title": "Door stays open", "id": "door-stays-open"}
     assert after == before
+
+
+@then("the item is rejected because a title must leave something to make a name from")
+def _rejected_for_an_empty_name(client, added):
+    response = added["response"]
+    assert [(fault.artifact, fault.path, fault.rule) for fault in response.faults] == [(PROCESS, "title", "title")]
+    assert "leave something to make a name from" in response.faults[0].message
+    assert [step["id"] for step in _steps(client)] == ["unlock-the-door", "turn-on-the-lights"]
+
+
+@then(parsers.parse('the name the client is given for the new item is made from the text "{text}"'))
+def _named_from_the_text(client, added, text):
+    assert added["response"].id == text
+    assert _steps(client)[-1] == {"id": text, "title": text}
