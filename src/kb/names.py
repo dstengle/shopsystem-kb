@@ -1,9 +1,39 @@
-"""Names: the grammar of an artifact's and an item's name, the name a title gives, and the numbering that keeps a name
-free. Nothing here reads or writes; whether a name is taken is asked of the caller."""
+"""Names: the grammar of an artifact's and an item's name, how an artifact's name is written and read, how a link
+names a place inside one and a type is referred to, the name a title gives, and the numbering that keeps a name free.
+Nothing here reads or writes; whether a name is taken is asked of the caller."""
 import re
 from typing import NamedTuple
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+TYPES = "schema"
+TYPE_URI = "kb:"
+
+
+def written(kind: str, slug: str) -> str:
+    """An artifact's name as it is written: its kind, a slash, and its own name."""
+    return f"{kind}/{slug}"
+
+
+def parted(text: str) -> tuple[str, str]:
+    """A written name read back as its kind and its own name, neither yet checked."""
+    kind, _, slug = text.partition("/")
+    return kind, slug
+
+
+def linked(text: str) -> tuple[str, str]:
+    """A link as a field holds it read as the name it points at and, after `#`, the place inside that artifact."""
+    name, _, place = text.partition("#")
+    return name, place
+
+
+def referred(ref: str) -> tuple[str, str] | None:
+    """What a `kb:` reference names: the written name of a type, and what follows it from `#` on, empty when the
+    reference is to the whole type. None for a reference that is not kb's."""
+    if not ref.startswith(TYPE_URI):
+        return None
+    name, mark, fragment = ref.removeprefix(TYPE_URI).partition("#")
+    return name, mark + fragment
 
 
 def plain(text: str) -> bool:

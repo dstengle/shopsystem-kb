@@ -2,10 +2,7 @@
 names. kb's own keywords are read through the composition, so a type built on a base carries the base's first."""
 from referencing.exceptions import NoSuchResource
 
-from kb import values
-from kb.values import Kind
-
-TYPE_URI = "kb:"
+from kb import names, values
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -15,18 +12,20 @@ def composition(schema: dict, corpus) -> list[dict]:
     for member in schema.get("allOf", []):
         built_on += composition(member, corpus)
     ref = schema.get("$ref")
-    if isinstance(ref, str) and ref.startswith(TYPE_URI) and "#" not in ref:
+    referred = names.referred(ref) if isinstance(ref, str) else None
+    if referred is not None and not referred[1]:
         built_on += composition(type_schema(ref, corpus), corpus)
     return [*built_on, schema]
 
 
 def type_schema(uri: str, corpus) -> dict:
     """The JSON Schema of the type a kb: URI names, its name checked as any other name is. NoSuchResource if none."""
+    referred = names.referred(uri)
     try:
-        schema_id = values.artifact_id(uri.removeprefix(TYPE_URI)) if uri.startswith(TYPE_URI) else None
+        schema_id = values.artifact_id(referred[0]) if referred is not None else None
     except values.Refused:
         schema_id = None
-    if schema_id is None or schema_id.kind != Kind("schema") or not corpus.holds(schema_id):
+    if schema_id is None or schema_id.kind != values.TYPE_KIND or not corpus.holds(schema_id):
         raise NoSuchResource(ref=uri)
     return corpus.artifact(schema_id)["schema"]
 

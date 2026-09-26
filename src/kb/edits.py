@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 from kb import canonical, composition, definitions, links, names, places, refusals, requests, validation, values
 from kb.store import Draft
-from kb.values import ArtifactId, Kind, Refused
+from kb.values import ArtifactId, Refused
 
 
 class Change(NamedTuple):
@@ -41,7 +41,7 @@ def _changed(draft: Draft, operation) -> Change:
 
 def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     kind = creation.kind
-    if not draft.holds(ArtifactId(Kind("schema"), kind.name)):
+    if not draft.holds(values.type_of(kind)):
         raise Refused([refusals.no_type(kind.name)])
     at, faults = creation.at, list(creation.title_faults)
     if creation.name is not None:
@@ -145,7 +145,7 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
 def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) -> list:
     """Every fault of the content against its type; a type, once it fits the type of types, checked as a type too."""
     faults = validation.validate(str(artifact_id), content, schema["schema"], draft)
-    if not faults and artifact_id.kind == Kind("schema"):
+    if not faults and artifact_id.kind == values.TYPE_KIND:
         faults = definitions.faults(artifact_id, content, draft)
     return faults
 

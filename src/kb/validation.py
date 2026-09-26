@@ -10,7 +10,6 @@ from kb import canonical, links, values
 from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
 from kb.store import Damaged, Store
-from kb.values import Kind
 
 SECTION = {
     "type": "object",
@@ -116,7 +115,7 @@ def _with_type(store: Store, artifact_id) -> tuple[dict, dict] | Damaged:
     artifact = store.load(artifact_id)
     if isinstance(artifact, Damaged):
         return artifact
-    schema = store.load(values.ArtifactId(Kind("schema"), artifact_id.kind.name))
+    schema = store.load(values.type_of(artifact_id.kind))
     return schema if isinstance(schema, Damaged) else (artifact, schema)
 
 

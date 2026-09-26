@@ -2,6 +2,7 @@
 and whether a link points at an artifact. The checks, removal, reads and walks all read links here."""
 from typing import NamedTuple
 
+from kb import names
 from kb.composition import declared
 
 
@@ -48,4 +49,4 @@ def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -
 
 def points_at(target: str, artifact_id) -> bool:
     """Whether a link lands on the artifact or on a part inside it."""
-    return target.partition("#")[0] == str(artifact_id)
+    return names.linked(target)[0] == str(artifact_id)

@@ -1,10 +1,9 @@
 """A type checked as it is written, against the types the draft holds: every shape it refers to belongs to a type the
 store holds, it is not built on itself, and every link field says which kinds it may point at. What a type could never
 check an artifact against is refused here, once, rather than by every create that uses it."""
-from kb import refusals, values
+from kb import names, refusals, values
 from kb.contract import kb_pb2
-from kb.composition import TYPE_URI
-from kb.values import ArtifactId, Kind, Refused
+from kb.values import ArtifactId, Refused
 
 
 def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
@@ -15,7 +14,7 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
         named = _type_named(ref)
         if named is None:
             continue
-        if named == type_id and "#" not in ref:
+        if named == type_id and not names.referred(ref)[1]:
             found.append(refusals.built_on_itself(type_id, place, ref))
         elif named is False or not draft.holds(named):
             found.append(refusals.no_such_shape(type_id, place, ref))
@@ -27,13 +26,14 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
 
 def _type_named(ref: str) -> ArtifactId | None | bool:
     """The type a kb: reference names; None for a reference that is not kb's, False for one naming no type at all."""
-    if not ref.startswith(TYPE_URI):
+    referred = names.referred(ref)
+    if referred is None:
         return None
     try:
-        named = values.artifact_id(ref.removeprefix(TYPE_URI).partition("#")[0])
+        named = values.artifact_id(referred[0])
     except Refused:
         return False
-    return named if named.kind == Kind("schema") else False
+    return named if named.kind == values.TYPE_KIND else False
 
 
 def _refs(node, place: str):

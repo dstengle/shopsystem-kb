@@ -119,7 +119,7 @@ def _create(creation: kb_pb2.Creation) -> Create:
         name, title_faults = values.named(kind, creation.title), ()
     except Refused as refused:
         name, title_faults = None, tuple(refused.faults)
-    at = f"{kind.name}/{names.slug(creation.title)}"
+    at = names.written(kind.name, names.slug(creation.title))
     return Create(kind, creation.title, name, at, title_faults, values.content(creation.content))
 
 

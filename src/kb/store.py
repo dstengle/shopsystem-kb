@@ -74,7 +74,7 @@ class Store:
 
     def schema(self, kind: Kind) -> dict:
         """The schema artifact of a kind; its JSON Schema is under `schema`. Raises Refused for a damaged file."""
-        return self.artifact(ArtifactId(Kind("schema"), kind.name))
+        return self.artifact(values.type_of(kind))
 
     def commit(self, paths: list, signed: Signed) -> None:
         """One commit of the given files, under the message and the actor's role."""
@@ -133,7 +133,7 @@ class Draft:
         return readable(self.load(artifact_id))
 
     def schema(self, kind: Kind) -> dict:
-        return self.artifact(ArtifactId(Kind("schema"), kind.name))
+        return self.artifact(values.type_of(kind))
 
 
 def vacant(root: Root) -> None:

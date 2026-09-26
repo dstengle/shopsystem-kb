@@ -4,13 +4,13 @@ entry per operation naming the set, and one commit. A fault anywhere refuses the
 and nothing is written. Starting a store and recording a snapshot write and commit here too."""
 from typing import NamedTuple
 
-from kb import canonical, edits, journal, query, refusals, requests
+from kb import canonical, edits, journal, query, refusals, requests, values
 from kb.metaschema import METASCHEMA
 from kb.edits import Change
 from kb.store import Draft, Store, vacant
-from kb.values import Actor, ArtifactId, Kind, Refused, Root, Signed
+from kb.values import Actor, ArtifactId, Refused, Root, Signed
 
-METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
+METASCHEMA_ID = values.type_of(values.TYPE_KIND)
 
 
 class Result(NamedTuple):

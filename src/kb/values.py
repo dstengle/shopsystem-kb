@@ -30,7 +30,15 @@ class ArtifactId:
     slug: str
 
     def __str__(self) -> str:
-        return f"{self.kind.name}/{self.slug}"
+        return names.written(self.kind.name, self.slug)
+
+
+TYPE_KIND = Kind(names.TYPES)
+
+
+def type_of(kind: Kind) -> ArtifactId:
+    """The name of the type the artifacts of a kind are of."""
+    return ArtifactId(TYPE_KIND, kind.name)
 
 
 @dataclass(frozen=True)
@@ -49,7 +57,7 @@ def kind(text: str) -> Kind:
 
 
 def artifact_id(text: str) -> ArtifactId:
-    kind_name, _, slug = text.partition("/")
+    kind_name, slug = names.parted(text)
     if not (names.plain(kind_name) and names.plain(slug)):
         raise Refused([_not_a_plain_name(text)])
     return ArtifactId(Kind(kind_name), slug)
@@ -57,27 +65,30 @@ def artifact_id(text: str) -> ArtifactId:
 
 def locator(request: kb_pb2.Locator) -> Locator:
     """A locator's name and its place, each checked; both faults when both fail."""
-    faults = []
-    try:
-        converted = artifact_id(request.id)
-    except Refused as refused:
-        faults += refused.faults
-    place = tuple(request.path.split("/")) if request.path else ()
-    if not all(names.plain(part) for part in place):
-        faults.append(kb_pb2.Fault(
-            artifact=request.id, path=request.path, rule="locator",
-            message=f"a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it; {request.path!r} is not",
-        ))
-    if faults:
-        raise Refused(faults)
-    return Locator(converted, place)
+    return _located(request.id, request.path)
 
 
 def target(text: str) -> Locator:
     """A link as a field holds it: a name, or a name and, after `#`, a place inside that artifact. Checked as a
     locator is."""
-    name, _, place = text.partition("#")
-    return locator(kb_pb2.Locator(id=name, path=place))
+    return _located(*names.linked(text))
+
+
+def _located(name: str, path: str) -> Locator:
+    faults = []
+    try:
+        converted = artifact_id(name)
+    except Refused as refused:
+        faults += refused.faults
+    place = tuple(path.split("/")) if path else ()
+    if not all(names.plain(part) for part in place):
+        faults.append(kb_pb2.Fault(
+            artifact=name, path=path, rule="locator",
+            message=f"a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it; {path!r} is not",
+        ))
+    if faults:
+        raise Refused(faults)
+    return Locator(converted, place)
 
 
 def since(text: str) -> datetime:
@@ -93,7 +104,7 @@ def since(text: str) -> datetime:
 
 def named(kind: Kind, title: str) -> ArtifactId:
     """The name kb gives an artifact of this kind from its title. A title is required and must leave a name."""
-    at = f"{kind.name}/{names.slug(title)}"
+    at = names.written(kind.name, names.slug(title))
     if not title:
         raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
                                     message="an artifact cannot be created without a title")])
