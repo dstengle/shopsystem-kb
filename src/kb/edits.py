@@ -41,8 +41,7 @@ def _changed(draft: Draft, operation) -> Change:
 
 def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     kind = creation.kind
-    if not draft.holds(values.type_of(kind)):
-        raise Refused([refusals.no_type(kind.name)])
+    composition.kind_type(kind, draft)
     at, faults = creation.at, list(creation.title_faults)
     if creation.name is not None:
         artifact_id = _unclaimed(draft, creation.name)

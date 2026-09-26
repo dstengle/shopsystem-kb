@@ -2,7 +2,7 @@
 words occur, what the journal holds, and what a piece of work read. Nothing here writes."""
 from datetime import datetime
 
-from kb import journal, links, read, refusals, search, values
+from kb import composition, journal, links, read, refusals, search, values
 from kb.content import text
 from kb.contract import kb_pb2
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
@@ -11,7 +11,9 @@ from kb.values import ArtifactId, Refused
 
 
 def listing(store: Store, asked: Listing) -> kb_pb2.ListResponse:
-    """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names."""
+    """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names. Raises
+    Refused for a kind the store holds no type for."""
+    composition.kind_type(asked.kind, store)
     matched = [
         artifact_id for artifact_id in store.ids()
         if artifact_id.kind == asked.kind and _holds(store.artifact(artifact_id), asked.fields)
@@ -24,7 +26,9 @@ def listing(store: Store, asked: Listing) -> kb_pb2.ListResponse:
 def walk(store: Store, asked: Walk) -> kb_pb2.RefsResponse:
     """What an artifact's links reach, out of it or into it, a step at a time out to the depth asked: each artifact
     once, by the shortest route, the one asked about never. A via or a type narrows every step. Raises Refused for
-    a name the store lacks."""
+    a kind the store holds no type for, or a name the store lacks."""
+    if asked.kind is not None:
+        composition.kind_type(asked.kind, store)
     start = asked.locator.id
     if not store.holds(start):
         raise Refused([refusals.not_found(start)])
@@ -48,7 +52,10 @@ def walk(store: Store, asked: Walk) -> kb_pb2.RefsResponse:
 
 def found(store: Store, asked: Searching) -> kb_pb2.SearchResponse:
     """Every section whose prose, or field whose value, holds a word searched for, as the scope asks, among the
-    artifacts of one kind when a type is given, with a stub of its artifact, most often first."""
+    artifacts of one kind when a type is given, with a stub of its artifact, most often first. Raises Refused for a
+    kind the store holds no type for."""
+    if asked.kind is not None:
+        composition.kind_type(asked.kind, store)
     artifacts = (
         artifact for artifact in store.artifacts() if asked.kind is None or artifact["type"] == asked.kind.name
     )

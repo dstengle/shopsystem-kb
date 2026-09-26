@@ -1,8 +1,9 @@
-"""A type read through what it is built on: the schemas of its composition, base first, and the type a kb: reference
-names. kb's own keywords are read through the composition, so a type built on a base carries the base's first."""
+"""A type read through what it is built on: the schemas of its composition, base first, the type a kb: reference
+names, and the type a kind names. kb's own keywords are read through the composition, so a type built on a base
+carries the base's first."""
 from referencing.exceptions import NoSuchResource
 
-from kb import names, values
+from kb import names, refusals, values
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -40,3 +41,12 @@ def declared(schema: dict, corpus) -> dict:
         whole["parts"].update(part.get("parts", {}))
         whole["summary"] += [name for name in part.get("summary", []) if name not in whole["summary"]]
     return whole
+
+
+def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
+    """The type a kind names. Raises Refused when the corpus holds none, since a kind must name a type the store
+    holds, wherever it is given."""
+    type_id = values.type_of(kind)
+    if not corpus.holds(type_id):
+        raise values.Refused([refusals.no_type(kind.name)])
+    return type_id

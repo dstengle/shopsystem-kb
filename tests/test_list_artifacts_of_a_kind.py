@@ -1,8 +1,9 @@
 import copy
+import re
 
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, listing
+from calls import CLIENT, DECISION_TYPE, create, define, listing, read, refs, search
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -70,3 +71,30 @@ def _three_names(listed):
     assert not listed.faults, listed.faults
     assert list(listed.ids) == [WEEKLY, MONTHLY, THURSDAYS]
     assert not listed.stubs
+
+
+CALLS = {
+    'lists the artifacts of the kind "invoice"':
+        lambda client: listing(client, "invoice"),
+    "searches the prose for restocking among artifacts of that kind":
+        lambda client: search(client, "restocking", type_name="invoice"),
+    "follows the links into a decision, only from artifacts of that kind":
+        lambda client: refs(client, MONTHLY, 1, inward=True, type_name="invoice"),
+}
+
+
+@given('a store that holds no type called "invoice"')
+def _no_invoice_type(client):
+    assert [fault.rule for fault in read(client, "schema/invoice").faults] == ["not-found"]
+
+
+@when(parsers.re(f"the client (?P<call>{'|'.join(map(re.escape, CALLS))})"), target_fixture="answered")
+def _ask_by_that_kind(client, call):
+    return CALLS[call](client)
+
+
+@then("the call is rejected because a kind must name a type the store holds, and the kind asked for is given back")
+def _rejected_for_its_kind(answered):
+    assert [(fault.artifact, fault.path, fault.rule) for fault in answered.faults] == [("", "", "kind")]
+    assert "a kind must name a type the store holds" in answered.faults[0].message
+    assert "'invoice'" in answered.faults[0].message
