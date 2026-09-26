@@ -100,15 +100,6 @@ def _misread(place: str, errors: list) -> bool:
         if at[:len(steps)] == steps or (error.validator == "type" and steps[:len(at)] == at):
             return True
     return False
-    required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
-    faults = _sections(artifact_id, content.get("sections", []), required, "sections")
-    for link in links.carried(content, schema, corpus):
-        if not _lands(link.target, link.ref, corpus):
-            faults.append(kb_pb2.Fault(
-                artifact=artifact_id, path=link.place, rule="ref",
-                message=f"a link must land on a node of a kind the type allows; {link.target!r} does not",
-            ))
-    return faults
 
 
 def check(store: Store) -> kb_pb2.ValidateResponse:
