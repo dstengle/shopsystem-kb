@@ -4,7 +4,7 @@ entry that does not convert stands in its place as a Refusal, so the faults come
 from dataclasses import dataclass
 from datetime import datetime
 
-from kb import names, values
+from kb import values
 from kb.contract import kb_pb2
 from kb.values import Actor, ArtifactId, Content, Kind, Locator, Refused, Root
 
@@ -115,11 +115,7 @@ def _operation(operation: kb_pb2.Operation):
 
 def _create(creation: kb_pb2.Creation) -> Create:
     kind = values.kind(creation.type)
-    try:
-        name, title_faults = values.named(kind, creation.title), ()
-    except Refused as refused:
-        name, title_faults = None, tuple(refused.faults)
-    at = names.written(kind.name, names.slug(creation.title))
+    name, at, title_faults = values.named(kind, creation.title)
     return Create(kind, creation.title, name, at, title_faults, values.content(creation.content))
 
 

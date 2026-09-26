@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from kb import canonical, names, settled
-from kb.content import entries, loads, title as title_of
+from kb.content import entries, loads
 from kb.contract import kb_pb2
 
 class Refused(ValueError):
@@ -101,15 +101,18 @@ def since(text: str) -> datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def named(kind: Kind, title: str) -> ArtifactId:
-    """The name kb gives an artifact of this kind from its title. A title is required and must leave a name."""
-    at = names.written(kind.name, names.slug(title))
+def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
+    """The name kb gives an artifact of this kind from its title, and the name its faults are said of; None, with the
+    title's faults, when it gives none. A title is required and must leave a name."""
+    slug = names.slug(title)
+    at = names.written(kind.name, slug)
     if not title:
-        raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
-                                    message="an artifact cannot be created without a title")])
-    if not names.slug(title):
-        raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title", message=_leaves_nothing(title))])
-    return ArtifactId(kind, names.slug(title))
+        message = "an artifact cannot be created without a title"
+    elif not slug:
+        message = _leaves_nothing(title)
+    else:
+        return ArtifactId(kind, slug), at, ()
+    return None, at, (kb_pb2.Fault(artifact=at, path="title", rule="title", message=message),)
 
 
 def _leaves_nothing(title: str) -> str:
@@ -165,7 +168,7 @@ def item(text: str) -> Content:
 def _titled(tree: dict) -> Content:
     """An item whose title, when it has one, is text whatever it was written as, as an artifact's is, and leaves a
     name to be made from it."""
-    title = title_of(tree.get("title"))
+    title = names.title(tree.get("title"))
     if title is None:
         return Content(tree)
     if not names.slug(title):

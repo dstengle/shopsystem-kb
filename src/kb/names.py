@@ -4,8 +4,6 @@ Nothing here reads or writes; whether a name is taken is asked of the caller."""
 import re
 from typing import Callable, NamedTuple
 
-from kb.content import title as title_of
-
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 TYPES = "schema"
@@ -54,6 +52,16 @@ def plain(text: str) -> bool:
     return PLAIN.fullmatch(text) is not None
 
 
+def title(value) -> str | None:
+    """A title as the text a name is made from: text as it is, and a number, true or false as YAML 1.2 writes it.
+    None for anything a title is never written as: nothing, a list or a mapping."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (str, int, float)):
+        return str(value)
+    return None
+
+
 def slug(title: str) -> str:
     """The name a title gives: lower-cased, every run of anything else a hyphen, none at either end."""
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
@@ -83,8 +91,8 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
             if not isinstance(item, dict):
                 continue
             if not (keep_named and "id" in item):
-                title = title_of(item.get("title"))
-                item["id"] = numbered(slug(title) if title is not None else str(place), taken.__contains__)
+                text = title(item.get("title"))
+                item["id"] = numbered(slug(text) if text is not None else str(place), taken.__contains__)
                 taken.add(item["id"])
             items(inner(part), item, keep_named, inner)
 
