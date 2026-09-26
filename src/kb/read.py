@@ -56,7 +56,7 @@ def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
     for collection in declared["parts"]:
         for item in found.get(collection, []):
             response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
-    for (type_name, field), count in _inbound(store, str(locator.id)).items():
+    for (type_name, field), count in _inbound(store, locator.id).items():
         response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
     return response
 
@@ -88,12 +88,12 @@ def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -
     return resolved
 
 
-def _inbound(store: Store, artifact_id: str) -> dict:
-    """How many artifacts point at this one, by their type and the field they use."""
+def _inbound(store: Store, artifact_id: ArtifactId) -> dict:
+    """How many artifacts point at this one or at a part inside it, by their type and the field they use."""
     counts = {}
     for other in store.artifacts():
         schema = store.schema(values.kind(other["type"]))["schema"]
-        pointing = {link.field for link in links.carried(other, schema, store) if link.target == artifact_id}
+        pointing = {link.field for link in links.carried(other, schema, store) if links.points_at(link.target, artifact_id)}
         for field in pointing:
             counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
     return counts
