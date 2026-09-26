@@ -1,9 +1,9 @@
 """A type checked as it is written, against the types the draft holds: every shape it refers to belongs to a type the
 store holds, it is not built on itself, and every link field says which kinds it may point at. What a type could never
 check an artifact against is refused here, once, rather than by every create that uses it."""
-from kb import names, refusals, values
+from kb import composition, refusals
 from kb.contract import kb_pb2
-from kb.values import ArtifactId, Refused
+from kb.values import ArtifactId
 
 
 def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
@@ -11,29 +11,17 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
     schema = content.get("schema")
     found = []
     for place, ref in _refs(schema, "schema"):
-        named = _type_named(ref)
+        named = composition.reference(ref)
         if named is None:
             continue
-        if named == type_id and not names.referred(ref)[1]:
+        if named.type_id == type_id and named.whole:
             found.append(refusals.built_on_itself(type_id, place, ref))
-        elif named is False or not draft.holds(named):
+        elif named.type_id is None or not draft.holds(named.type_id):
             found.append(refusals.no_such_shape(type_id, place, ref))
     for place, name, field in _link_fields(schema, "schema"):
         if not isinstance(field["ref"], dict) or "targets" not in field["ref"]:
             found.append(refusals.no_targets(type_id, place, name))
     return found
-
-
-def _type_named(ref: str) -> ArtifactId | None | bool:
-    """The type a kb: reference names; None for a reference that is not kb's, False for one naming no type at all."""
-    referred = names.referred(ref)
-    if referred is None:
-        return None
-    try:
-        named = values.artifact_id(referred[0])
-    except Refused:
-        return False
-    return named if named.kind == values.TYPE_KIND else False
 
 
 def _refs(node, place: str):

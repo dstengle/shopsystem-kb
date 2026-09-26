@@ -1,6 +1,8 @@
 """A type read through what it is built on: the schemas of its composition, base first, the type a kb: reference
 names, and the type a kind names. kb's own keywords are read through the composition, so a type built on a base
 carries the base's first."""
+from typing import NamedTuple
+
 from referencing.exceptions import NoSuchResource
 
 from kb import names, refusals, values
@@ -13,22 +15,41 @@ def composition(schema: dict, corpus) -> list[dict]:
     for member in schema.get("allOf", []):
         built_on += composition(member, corpus)
     ref = schema.get("$ref")
-    referred = names.referred(ref) if isinstance(ref, str) else None
-    if referred is not None and not referred[1]:
+    referred = reference(ref) if isinstance(ref, str) else None
+    if referred is not None and referred.whole:
         built_on += composition(type_schema(ref, corpus), corpus)
     return [*built_on, schema]
 
 
-def type_schema(uri: str, corpus) -> dict:
-    """The JSON Schema of the type a kb: URI names, its name checked as any other name is. NoSuchResource if none."""
-    referred = names.referred(uri)
+class Reference(NamedTuple):
+    """What a kb: reference names: the type, None when it names no type at all, and whether it is to the whole type
+    rather than to a shape inside it."""
+    type_id: values.ArtifactId | None
+    whole: bool
+
+
+def reference(ref: str) -> Reference | None:
+    """What a kb: reference names, the type's name checked as any other name is. None for a reference that is not
+    kb's."""
+    referred = names.referred(ref)
+    if referred is None:
+        return None
+    name, fragment = referred
     try:
-        schema_id = values.artifact_id(referred[0]) if referred is not None else None
+        type_id = values.artifact_id(name)
     except values.Refused:
-        schema_id = None
-    if schema_id is None or schema_id.kind != values.TYPE_KIND or not corpus.holds(schema_id):
+        type_id = None
+    if type_id is not None and type_id.kind != values.TYPE_KIND:
+        type_id = None
+    return Reference(type_id, not fragment)
+
+
+def type_schema(uri: str, corpus) -> dict:
+    """The JSON Schema of the type a kb: URI names. NoSuchResource if it names none the corpus holds."""
+    referred = reference(uri)
+    if referred is None or referred.type_id is None or not corpus.holds(referred.type_id):
         raise NoSuchResource(ref=uri)
-    return corpus.artifact(schema_id)["schema"]
+    return corpus.artifact(referred.type_id)["schema"]
 
 
 def declared(schema: dict, corpus) -> dict:
