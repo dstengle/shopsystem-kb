@@ -145,6 +145,14 @@ def load(text: str):
         raise NotCanonical(_unreadable(error)) from None
 
 
+def decoded(data: bytes) -> str:
+    """A stored file's bytes as the text they are written as, UTF-8. Bytes that are not raise NotCanonical."""
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise NotCanonical("it is not text written in UTF-8") from None
+
+
 def entries(text: str) -> dict:
     """Plain YAML 1.2 that is a set of named entries, as an artifact always is: read as `load` reads it. Text that is
     anything else, a list, a single value or nothing, raises NotCanonical saying what it is."""

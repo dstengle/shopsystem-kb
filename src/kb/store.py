@@ -65,13 +65,18 @@ class Store:
         return self.path(artifact_id).is_file()
 
     def load(self, artifact_id: ArtifactId) -> dict | Damaged:
-        """The artifact as stored, or, when its file cannot be read, the fault naming the file. Never raises for what
-        a file holds."""
+        """The artifact as stored, or, when its file cannot be read as one, the fault naming the file. Never raises
+        for what a file holds."""
         path = self.path(artifact_id)
         try:
-            return canonical.entries(path.read_text(encoding="utf-8"))
+            loaded = canonical.entries(canonical.decoded(path.read_bytes()))
         except canonical.NotCanonical as error:
-            return Damaged(refusals.unreadable(artifact_id, path.relative_to(self.dir), str(error)))
+            problem = str(error)
+        else:
+            problem = _unsettled(loaded)
+        if problem:
+            return Damaged(refusals.unreadable(artifact_id, path.relative_to(self.dir), problem))
+        return loaded
 
     def artifact(self, artifact_id: ArtifactId) -> dict:
         """The artifact as stored, for a reader that cannot go on without it. Raises Refused for a damaged file."""
@@ -101,6 +106,21 @@ class Store:
         """Every artifact in the store, schemas included, in path order. Raises Refused at a damaged file."""
         for artifact_id in self.ids():
             yield self.artifact(artifact_id)
+
+
+SETTLED = {"id": str, "type": str, "schema_version": int, "revision": int, "title": str}
+
+
+def _unsettled(loaded: dict) -> str:
+    """What a stored artifact lacks of what the store settles for every artifact, said as the problem with its file;
+    empty when it lacks nothing."""
+    lacking = [
+        key for key, kind in SETTLED.items()
+        if not isinstance(loaded.get(key), kind) or isinstance(loaded.get(key), bool)
+    ]
+    if not lacking:
+        return ""
+    return f"it does not carry what the store settles for every artifact: {', '.join(lacking)}"
 
 
 class Draft:
