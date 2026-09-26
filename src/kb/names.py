@@ -1,6 +1,7 @@
 """Names: the grammar of an artifact's and an item's name, the name a title gives, and the numbering that keeps a name
 free. Nothing here reads or writes; whether a name is taken is asked of the caller."""
 import re
+from typing import NamedTuple
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
@@ -37,3 +38,32 @@ def items(schema: dict, content: dict, keep_named: bool) -> None:
                 continue
             item["id"] = numbered(slug(item["title"]) if "title" in item else str(place), taken.__contains__)
             taken.add(item["id"])
+
+
+class Misnamed(NamedTuple):
+    """A name handed back on an item that the store could not have given it: where it is, the name, and why not:
+    "not-plain", "repeated", or "unknown" when no item of that collection had it."""
+    collection: str
+    index: int
+    name: object
+    why: str
+
+
+def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misnamed]:
+    """Every name on an item of a collection that is not the name of an item the collection held, given once. held
+    is the names each collection held before the change."""
+    found = []
+    for collection in schema.get("parts", {}):
+        seen = set()
+        for index, item in enumerate(content.get(collection, [])):
+            if not isinstance(item, dict) or "id" not in item:
+                continue
+            name = item["id"]
+            if not isinstance(name, str) or not plain(name):
+                found.append(Misnamed(collection, index, name, "not-plain"))
+            elif name in seen:
+                found.append(Misnamed(collection, index, name, "repeated"))
+            elif name not in held.get(collection, set()):
+                found.append(Misnamed(collection, index, name, "unknown"))
+            seen.add(name)
+    return found

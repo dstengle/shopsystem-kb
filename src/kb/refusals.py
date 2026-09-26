@@ -1,6 +1,7 @@
 """The refusals the domain makes of what a store holds, each with its rule and its message. Conversions refuse in
 kb.values and type checks in kb.validation; what neither owns is made here, so no domain module names a contract type."""
 from kb.contract import kb_pb2
+from kb.names import Misnamed
 from kb.values import ArtifactId, Locator
 
 
@@ -58,6 +59,20 @@ def still_linked(removed: ArtifactId, other: ArtifactId, place: str) -> kb_pb2.F
 def unreadable(artifact_id: ArtifactId, file, problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=str(artifact_id), rule="unreadable", message=f"the stored file {file} cannot be read: {problem}",
+    )
+
+
+MISNAMED = {
+    "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
+    "repeated": "the items of a collection each have a name of their own; {name!r} is on more than one",
+    "unknown": "a name on an item names an item already in that collection; {collection!r} held no item named {name!r}",
+}
+
+
+def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), path=f"{found.collection}/{found.index}/id", rule="item-name",
+        message=MISNAMED[found.why].format(name=found.name, collection=found.collection),
     )
 
 

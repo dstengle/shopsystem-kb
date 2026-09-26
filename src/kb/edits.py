@@ -113,10 +113,14 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
 
 
 def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> None:
-    """The artifact's next version put in the draft: the content checked against the current version of its type,
-    its items named, its version up by one, its title kept. Raises Refused with every fault."""
+    """The artifact's next version put in the draft: the names its items hand back checked against those the artifact
+    held, the content checked against the current version of its type, its new items named, its version up by one,
+    its title kept. Raises Refused with every fault."""
     schema = draft.schema(artifact_id.kind)
-    faults = validation.validate(str(artifact_id), {"title": current["title"], **content}, schema["schema"], draft)
+    held = {collection: {item.get("id") for item in current.get(collection, [])}
+            for collection in schema["schema"].get("parts", {})}
+    faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(schema["schema"], content, held)]
+    faults += validation.validate(str(artifact_id), {"title": current["title"], **content}, schema["schema"], draft)
     if faults:
         raise Refused(faults)
     names.items(schema["schema"], content, keep_named=True)

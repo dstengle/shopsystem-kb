@@ -43,7 +43,7 @@ def _rejected_for_the_sections(attempt):
 
 @then("reading the decision gives what it held before, at the version it held before")
 def _as_it_was(root, client, attempt):
-    assert read(client, DECISION).revision == 1
+    assert read(client, DECISION).revision == canonical.load(attempt["before"].decode())["revision"]
     assert (root / "kb" / f"{DECISION}.yaml").read_bytes() == attempt["before"]
 
 
@@ -276,3 +276,54 @@ def _rejected_for_no_collection(attempt):
     faults = attempt["response"].faults
     assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "sections/purpose", "collection")]
     assert faults[0].message.startswith("an item is added to a collection")
+
+
+OPTIONS = [{"title": "Keep weekly", "body": "Review every Monday."}, {"title": "Go monthly", "body": "Review on the first."}]
+
+
+@given("the decision carries two options")
+def _two_options(client):
+    response = write(client, DECISION, {"sections": SECTIONS, "options": OPTIONS}, message="Weigh two options")
+    assert not response.faults, response.faults
+    assert [option["id"] for option in loads(read(client, DECISION, whole=True).content)["options"]] == [
+        "keep-weekly", "go-monthly",
+    ]
+
+
+HANDED_BACK = {
+    "one of which carries a name no option of that decision has": ["keep-weekly", "go-fortnightly"],
+    "both of which carry the same name": ["keep-weekly", "keep-weekly"],
+    "one of which carries a name that is not a plain name": ["keep-weekly", "Go Monthly!"],
+}
+
+
+@when(
+    parsers.re(f"the client replaces the decision with options (?P<items>{'|'.join(map(re.escape, HANDED_BACK))}), saying which role and why"),
+    target_fixture="attempt",
+)
+def _replace_with_misnamed_options(root, client, items):
+    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    options = [{"id": name, **option} for name, option in zip(HANDED_BACK[items], OPTIONS)]
+    response = write(client, DECISION, {"sections": SECTIONS, "options": options}, message="Rename the options")
+    return {"response": response, "before": before}
+
+
+def _misnamed(attempt, message):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "options/1/id", "item-name")]
+    assert faults[0].message.startswith(message)
+
+
+@then("the change is rejected because a name on an item names an item already in that collection")
+def _rejected_for_an_unknown_name(attempt):
+    _misnamed(attempt, "a name on an item names an item already in that collection")
+
+
+@then("the change is rejected because the items of a collection each have a name of their own")
+def _rejected_for_a_repeated_name(attempt):
+    _misnamed(attempt, "the items of a collection each have a name of their own")
+
+
+@then("the change is rejected because a name is a plain name of lower-case letters, digits and single hyphens")
+def _rejected_for_a_name_not_plain(attempt):
+    _misnamed(attempt, "a name is a plain name of lower-case letters, digits and single hyphens")
