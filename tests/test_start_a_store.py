@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, define, read
+from calls import CLIENT, DECISION_TYPE, define, read
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
@@ -120,9 +120,16 @@ def _empty_directory_elsewhere(tmp_path):
     return root
 
 
+@pytest.fixture
+def readied():
+    """The client that starts a store elsewhere, readied as the step starting it is taken, unless a step readied it
+    before."""
+    return kb_client.connect()
+
+
 @when("the client starts a store in that empty directory, saying which role it is", target_fixture="started")
-def _start_a_store_in_the_named_directory(root):
-    return kb_client.connect().Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+def _start_a_store_in_the_named_directory(readied, root):
+    return readied.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
 
 
 @then("the store is made in the directory the client named")
@@ -245,3 +252,53 @@ def _rejected_as_inside_a_store(started, root, before):
     assert [(fault.rule, fault.message) for fault in started.faults] == [
         ("root", f"stores do not nest; {str(root)!r} is inside the store at {str(before['store'])!r}"),
     ]
+
+
+CORNERS = {
+    "an empty folder where a store would go": lambda corner: corner.mkdir(),
+    "a file where a store would go": lambda corner: corner.write_bytes(FILE_TEXT),
+}
+
+
+def _held(directory):
+    """Everything below a directory, folders as well as files, a file with its bytes."""
+    return {path: path.read_bytes() if path.is_file() else None for path in sorted(directory.rglob("*"))}
+
+
+@given(parsers.re(f"a directory holding (?P<what>{'|'.join(CORNERS)})"), target_fixture="before")
+def _a_directory_holding(root, what):
+    CORNERS[what](root / "kb")
+    return _held(root)
+
+
+@then("starting the store is rejected because that directory already holds the place a store goes")
+def _rejected_as_the_place_taken(started, root):
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", f"a store goes in a place of its own, and {str(root)!r} already holds something in that place"),
+    ]
+
+
+@then("what was there is left as it was")
+def _left_as_it_was(root, before):
+    assert _held(root) == before
+
+
+@given(
+    "the client was readied to call a store while working where there was none and nothing named one",
+    target_fixture="readied",
+)
+def _readied_where_there_was_none(tmp_path, monkeypatch):
+    nowhere = tmp_path / "nowhere"
+    nowhere.mkdir()
+    monkeypatch.chdir(nowhere)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+    return kb_client.connect()
+
+
+@then("the client can read and write in it straight away")
+def _reads_and_writes_there(readied, root, monkeypatch):
+    monkeypatch.chdir(root)
+    assert read(readied, "schema/schema").id == "schema/schema"
+    defined = define(readied, DECISION_TYPE)
+    assert not defined.faults, defined.faults
+    assert read(readied, "schema/decision").revision == 1

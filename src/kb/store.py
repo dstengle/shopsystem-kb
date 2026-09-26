@@ -150,8 +150,8 @@ class Draft:
 
 
 def vacant(root: Root) -> None:
-    """Refuse a root a store cannot be started in: one that is not there, is not a directory, has anything called kb
-    inside it, or is inside a store."""
+    """Refuse a root a store cannot be started in: one that is not there, is not a directory, has a store inside it or
+    anything else in the place a store goes, or is inside a store."""
     if not root.path.exists():
         raise Refused([kb_pb2.Fault(
             rule="root", message=f"a store is started in a directory that exists; {root.named!r} does not",
@@ -160,9 +160,14 @@ def vacant(root: Root) -> None:
         raise Refused([kb_pb2.Fault(
             rule="root", message=f"a store is started in a directory, and {root.named!r} is not one",
         )])
-    if (root.path / "kb").exists():
+    if (root.path / MARKER).is_file():
         raise Refused([kb_pb2.Fault(
             rule="root", message=f"a store is never started over another; {root.named!r} already has a store inside it",
+        )])
+    if (root.path / MARKER.parent).exists() or (root.path / MARKER.parent).is_symlink():
+        raise Refused([kb_pb2.Fault(
+            rule="root",
+            message=f"a store goes in a place of its own, and {root.named!r} already holds something in that place",
         )])
     above = find_above(root.path.resolve().parent)
     if above is not None:
