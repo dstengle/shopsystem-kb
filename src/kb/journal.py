@@ -3,7 +3,8 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical
+from kb import canonical, refusals
+from kb.store import Damaged
 from kb.values import Signed
 
 
@@ -68,9 +69,16 @@ def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
     return target
 
 
-def entries(store_dir: Path) -> list[dict]:
-    """Every entry in the journal, oldest first: by the time in its id, then by its place in its set."""
-    found = [canonical.load(path.read_text(encoding="utf-8")) for path in (store_dir / "journal").rglob("*.yaml")]
+def entries(store_dir: Path) -> list[dict] | Damaged:
+    """Every entry in the journal, oldest first: by the time in its id, then by its place in its set. When an entry's
+    file cannot be read, the fault naming the first such file in place of them all. Never raises for what a file
+    holds."""
+    found = []
+    for path in sorted((store_dir / "journal").rglob("*.yaml")):
+        try:
+            found.append(canonical.entries(canonical.decoded(path.read_bytes())))
+        except canonical.NotCanonical as error:
+            return Damaged(refusals.unreadable("", path.relative_to(store_dir), str(error)))
     return sorted(found, key=_order)
 
 

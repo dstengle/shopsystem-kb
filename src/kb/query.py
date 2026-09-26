@@ -6,7 +6,7 @@ from kb import journal, links, read, refusals, search, values
 from kb.content import text
 from kb.contract import kb_pb2
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
-from kb.store import Store
+from kb.store import Store, readable
 from kb.values import ArtifactId, Refused
 
 
@@ -65,7 +65,7 @@ def found(store: Store, asked: Searching) -> kb_pb2.SearchResponse:
 def entries(store: Store, asked: JournalFilter) -> kb_pb2.JournalResponse:
     """The journal's entries, oldest first, narrowed by each of artifact, role, piece of work, time and set given."""
     return kb_pb2.JournalResponse(entries=[
-        _entry(entry) for entry in journal.entries(store.dir)
+        _entry(entry) for entry in readable(journal.entries(store.dir))
         if (asked.artifact is None or entry.get("artifact") == str(asked.artifact))
         and (not asked.role or entry["actor"]["role"] == asked.role)
         and (not asked.execution or entry["actor"]["execution"] == asked.execution)

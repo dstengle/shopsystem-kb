@@ -6,6 +6,8 @@ from kb.contract import kb_pb2
 
 CLIENT = kb_pb2.Actor(role="client")
 
+MANGLED = "title: [a bracket opened by hand and never closed\n"
+
 DECISION_TYPE = {
     "title": "Decision",
     "version": 1,

@@ -56,9 +56,10 @@ def still_linked(removed: ArtifactId, other: ArtifactId, place: str) -> kb_pb2.F
     )
 
 
-def unreadable(artifact_id: ArtifactId, file, problem: str) -> kb_pb2.Fault:
+def unreadable(named: str, file, problem: str) -> kb_pb2.Fault:
+    """A stored file that cannot be read: an artifact's, named, or an entry of the history, which names none."""
     return kb_pb2.Fault(
-        artifact=str(artifact_id), rule="unreadable", message=f"the stored file {file} cannot be read: {problem}",
+        artifact=named, rule="unreadable", message=f"the stored file {file} cannot be read: {problem}",
     )
 
 

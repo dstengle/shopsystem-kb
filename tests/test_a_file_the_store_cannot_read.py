@@ -3,8 +3,8 @@ import re
 from pytest_bdd import given, parsers, then, when, scenarios
 
 from calls import (
-    CLIENT, DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, append, create, define, everything_under, listing, refs, remove,
-    search, write,
+    CLIENT, DECISION_TYPE, MANGLED, PROCESS_TYPE, TAG_TYPE, append, create, define, everything_under, journal,
+    listing, refs, remove, request, search, write,
 )
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -32,6 +32,10 @@ CALLS = {
         lambda client: refs(client, DECISION, 1, inward=True),
     "follows the links out of the decision":
         lambda client: refs(client, DECISION, 1),
+    "creates a decision with a title and both required sections, saying which role and why":
+        lambda client: request(client, "decision", "Close early on Sundays", {"sections": SECTIONS}),
+    "reads the journal":
+        lambda client: journal(client),
 }
 
 
@@ -93,3 +97,33 @@ def _decision_file_damaged_by_hand(root, damage):
 def _the_rest_checked_alongside(checked):
     assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == [(DECISION, "", "unreadable")]
     assert list(checked.stale) == []
+
+
+@given("someone edited the decision type's file by hand and left it in a shape the store cannot read")
+def _decision_type_mangled_by_hand(root):
+    (root / "kb" / "schema" / "decision.yaml").write_text(MANGLED)
+
+
+@given(
+    "someone edited one of the store's history entries by hand and left it in a shape the store cannot read",
+    target_fixture="entry",
+)
+def _history_entry_mangled_by_hand(root):
+    """The newest entry of the Background's history left unreadable; where it is, from the store's own directory."""
+    entry = sorted((root / "kb" / "journal").rglob("*.yaml"))[-1]
+    entry.write_text(MANGLED)
+    return entry.relative_to(root / "kb")
+
+
+@then("the create is rejected because that file cannot be read, and the file is named")
+def _create_rejected_as_unreadable(answered):
+    assert [(fault.artifact, fault.rule) for fault in answered.faults] == [("schema/decision", "unreadable")]
+    assert "schema/decision.yaml cannot be read" in answered.faults[0].message
+    assert (answered.id, answered.revision) == ("", 0)
+
+
+@then("the read is rejected because that file cannot be read, and the file is named")
+def _read_rejected_as_unreadable(answered, entry):
+    assert [(fault.artifact, fault.rule) for fault in answered.faults] == [("", "unreadable")]
+    assert f"{entry} cannot be read" in answered.faults[0].message
+    assert list(answered.entries) == []

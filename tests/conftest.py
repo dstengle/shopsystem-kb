@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, everything_under
+from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -75,9 +75,6 @@ def _directory_inside_a_store(root, before):
 @then("the store it sits inside holds what it held before")
 def _store_holds_what_it_held(before):
     assert everything_under(before["store"]) == before["held"]
-
-
-MANGLED = "title: [a bracket opened by hand and never closed\n"
 
 
 @given("someone edited the decision's file by hand and left it in a shape the store cannot read")

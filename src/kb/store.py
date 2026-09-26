@@ -19,9 +19,9 @@ class Damaged:
     fault: kb_pb2.Fault
 
 
-def readable(loaded: dict | Damaged) -> dict:
-    """The artifact loaded; a file that cannot be read refuses the call with the fault naming it. The one place a
-    damaged file becomes a refusal."""
+def readable(loaded):
+    """What was loaded, an artifact or the journal's entries; a file that cannot be read refuses the call with the
+    fault naming it. The one place a damaged file becomes a refusal."""
     if isinstance(loaded, Damaged):
         raise Refused([loaded.fault])
     return loaded
@@ -75,7 +75,7 @@ class Store:
         else:
             problem = _unsettled(loaded)
         if problem:
-            return Damaged(refusals.unreadable(artifact_id, path.relative_to(self.dir), problem))
+            return Damaged(refusals.unreadable(str(artifact_id), path.relative_to(self.dir), problem))
         return loaded
 
     def artifact(self, artifact_id: ArtifactId) -> dict:
