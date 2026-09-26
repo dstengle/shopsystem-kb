@@ -6,7 +6,7 @@ here.
 """
 import functools
 
-from kb import query, read, requests, validation, values, write
+from kb import check, query, read, requests, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.store import Store
 
@@ -77,7 +77,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @_boundary(kb_pb2.ValidateResponse)
     def Validate(self, request):
-        return validation.check(self._store)
+        return check.everything(self._store)
 
     @_boundary(kb_pb2.JournalResponse)
     def Journal(self, request):

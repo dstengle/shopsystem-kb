@@ -1,15 +1,16 @@
-"""Schema validation: the type's JSON Schema composed with kb's own structural rules, checked in one pass, then
-what the schema language cannot say, checked in code: required sections in their declared order, and links that
-land on an artifact the corpus holds, of a kind the type allows. kb's keywords are read through kb.composition.
+"""Schema validation: the type's JSON Schema composed with kb's own structural rules, and beside it what the schema
+language cannot say, checked in code: required sections in their declared order, and links that land on an artifact
+the corpus holds, or a part inside it, of a kind the type allows. Every fault comes back together; kb's rules pass
+over a node JSON Schema found misshapen. kb's keywords are read through kb.composition. What is checked, and the
+corpus it is checked against, are given; nothing here finds or opens a file.
 """
 from jsonschema import Draft202012Validator
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
-from kb import canonical, links, values
+from kb import links, values
 from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
-from kb.store import Damaged, Store
 
 SECTION = {
     "type": "object",
@@ -100,34 +101,6 @@ def _misread(place: str, errors: list) -> bool:
         if at[:len(steps)] == steps or (error.validator == "type" and steps[:len(at)] == at):
             return True
     return False
-
-
-def check(store: Store) -> kb_pb2.ValidateResponse:
-    """Every artifact checked against the current version of its type, and listed as stale when it was last
-    checked against an older one; a file that cannot be read is reported and the check goes on."""
-    violations, stale = [], []
-    for artifact_id in store.ids():
-        loaded = _with_type(store, artifact_id)
-        if isinstance(loaded, Damaged):
-            violations.append(loaded.fault)
-            continue
-        artifact, schema = loaded
-        if artifact["schema_version"] < schema["version"]:
-            stale.append(kb_pb2.Stale(
-                artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
-            ))
-        content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
-        violations += validate(str(artifact_id), content, schema["schema"], store)
-    return kb_pb2.ValidateResponse(violations=violations, stale=stale)
-
-
-def _with_type(store: Store, artifact_id) -> tuple[dict, dict] | Damaged:
-    """The artifact and its type as stored, or the damage of the first of them whose file cannot be read."""
-    artifact = store.load(artifact_id)
-    if isinstance(artifact, Damaged):
-        return artifact
-    schema = store.load(values.type_of(artifact_id.kind))
-    return schema if isinstance(schema, Damaged) else (artifact, schema)
 
 
 def _lands(target: str, ref: dict, corpus) -> bool:
