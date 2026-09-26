@@ -33,15 +33,31 @@ STRUCTURE = {"properties": {"sections": {"type": "array", "items": {"$ref": "#/$
 
 
 def compose(schema: dict) -> dict:
-    """One effective schema: the type's, with kb's structural rules beside it under allOf.
+    """One effective schema: the type's, with kb's structural rules and the shape of each collection it declares
+    beside it under allOf.
 
     The type stays the root, so its own `#` references still resolve; kb's shapes sit under `$defs/kb-*`.
     """
     return {
         **schema,
-        "allOf": [*schema.get("allOf", []), STRUCTURE],
+        "allOf": [*schema.get("allOf", []), STRUCTURE, *_collections(schema)],
         "$defs": {**schema.get("$defs", {}), "kb-section": SECTION},
     }
+
+
+def _collections(schema: dict) -> list[dict]:
+    """The collections a schema declares, each a list whose items fit the item's type, and the collections that
+    type declares in turn."""
+    parts = schema.get("parts", {})
+    if not parts:
+        return []
+    return [{"properties": {
+        name: {"type": "array", "items": _item(part.get("items", {}))} for name, part in parts.items()
+    }}]
+
+
+def _item(item_schema: dict) -> dict:
+    return {**item_schema, "allOf": [*item_schema.get("allOf", []), *_collections(item_schema)]}
 
 
 def registry(corpus) -> Registry:

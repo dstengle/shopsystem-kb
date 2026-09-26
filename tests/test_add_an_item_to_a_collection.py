@@ -1,3 +1,5 @@
+import copy
+
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, PROCESS_TYPE, append, create, define, everything_under, journal, read, write
@@ -242,7 +244,6 @@ def _rejected_for_its_name(attempt):
 def _process_as_it_was(client, attempt):
     after = read(client, PROCESS, whole=True)
     assert (after.revision, loads(after.content)) == (attempt["before"].revision, loads(attempt["before"].content))
-    assert _steps(client) == STEPS
 
 
 @when("the client adds a step to a process by a name the store holds nothing under, saying which role and why", target_fixture="attempt")
@@ -276,3 +277,30 @@ def _rejected_for_its_link(attempt):
         (PROCESS, "steps/2/uses", "ref"),
     ]
     assert "'step/count-the-change'" in attempt["response"].faults[0].message
+
+
+def _steps_must_name_a_role(client):
+    """The process type at its next version, whose steps must each name a role, and the process's two steps given
+    one, so the process fits it."""
+    staffed = copy.deepcopy(PROCESS_TYPE["schema"])
+    step = staffed["parts"]["steps"]["items"]
+    step["properties"]["role"] = {"type": "string"}
+    step["required"] = ["title", "role"]
+    assert not write(client, "schema/process", {"version": 2, "schema": staffed}, message="Steps name a role").faults
+    staffed_steps = [{**STEPS[0], "role": "opener"}, {**STEPS[1], "role": "opener"}]
+    assert not write(client, PROCESS, {"steps": staffed_steps}, message="Say who does each step").faults
+
+
+@when("the client adds a step with no role named, where a step must name a role, saying which role and why", target_fixture="attempt")
+def _add_a_step_naming_no_role(client):
+    _steps_must_name_a_role(client)
+    before = read(client, PROCESS, whole=True)
+    response = append(client, PROCESS, "steps", {"title": "Count the float"})
+    return {"response": response, "before": before}
+
+
+@then("the item is rejected because the content does not fit the type")
+def _rejected_for_its_type(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(PROCESS, "steps/2", "required")]
+    assert "'role'" in faults[0].message
