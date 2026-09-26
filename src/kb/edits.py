@@ -4,7 +4,7 @@ with every fault it finds."""
 import copy
 from typing import NamedTuple
 
-from kb import canonical, names, refusals, requests, validation, values
+from kb import canonical, names, places, refusals, requests, validation, values
 from kb.store import Draft
 from kb.values import ArtifactId, Kind, Refused
 
@@ -77,14 +77,17 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
         raise Refused([refusals.not_found(locator.id)])
     if addition.item.problems:
         raise Refused(addition.item.refusal(str(locator.id)))
-    item, collection = addition.item.tree, "/".join(locator.place)
-    if collection not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
-        raise Refused([refusals.no_collection(locator.id, collection)])
+    if not locator.place:
+        raise Refused([refusals.not_a_collection(locator)])
     current = draft.artifact(locator.id)
     content = _content_of(current)
-    content.setdefault(collection, []).append(item)
+    spot = places.resolve(content, locator)
+    if spot.holder is not content or spot.key not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
+        raise Refused([refusals.not_a_collection(locator)])
+    item = addition.item.tree
+    content.setdefault(spot.key, []).append(item)
     _revise(draft, locator.id, current, content)
-    return Change("append", locator.id, f"{collection}/{item['id']}", item["id"])
+    return Change("append", locator.id, f"{spot.key}/{item['id']}", item["id"])
 
 
 def _delete(draft: Draft, removal: requests.Remove) -> Change:
@@ -131,27 +134,14 @@ def _content_of(artifact: dict) -> dict:
 
 
 def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
-    """The artifact's content with the node at the locator's place replaced by the one given. A place is pairs of a
-    list and an item in it, a section named by its title's name and a part by its id, and may end in a field."""
+    """The artifact's content with the node at the locator's place replaced by the one given; an item keeps its
+    name."""
     content = _content_of(artifact)
-    holder, steps = content, list(locator.place)
-    while len(steps) > 1:
-        collection, name = steps.pop(0), steps.pop(0)
-        found = holder.get(collection, [])
-        index = next((index for index, item in enumerate(found) if _node_name(collection, item) == name), None)
-        if index is None:
-            raise Refused([refusals.nothing_at(locator)])
-        if not steps:
-            found[index] = node if collection == "sections" else {"id": name, **node}
-            return content
-        holder = found[index]
-    holder[steps[0]] = node
+    spot = places.resolve(content, locator)
+    if spot.collection and spot.collection != "sections":
+        node = {"id": locator.place[-1], **node}
+    spot.holder[spot.key] = node
     return content
-
-
-def _node_name(collection: str, item: dict) -> str:
-    """How a place names an item: a section by its title's name, a part by its id."""
-    return names.slug(item["title"]) if collection == "sections" else item.get("id")
 
 
 def _unclaimed(draft: Draft, named: ArtifactId) -> ArtifactId:

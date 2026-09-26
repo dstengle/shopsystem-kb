@@ -1,8 +1,9 @@
 import copy
+import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, everything_under, read, write
+from calls import CLIENT, DECISION_TYPE, append, create, define, everything_under, read, write
 from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -232,3 +233,46 @@ def _rejected_as_not_a_plain_name(attempt):
 @then("nothing is written anywhere, inside the store or outside it")
 def _nothing_written_anywhere(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+PURPOSE = {"title": "Purpose", "body": "Keep prices in step with what they cost us.\n"}
+MISPLACED = {
+    "replaces a place inside the decision the decision holds nothing under":
+        lambda client: write(client, DECISION, PURPOSE, path="sections/nowhere"),
+    "replaces a place inside the decision that runs on past a piece of prose":
+        lambda client: write(client, DECISION, PURPOSE, path="sections/purpose/body/first"),
+    "replaces a place inside the decision beginning at the decision's own version":
+        lambda client: write(client, DECISION, PURPOSE, path="revision"),
+    "adds an item at a place inside the decision that is not a collection":
+        lambda client: append(client, DECISION, "sections/purpose", {"title": "Go monthly"}),
+}
+
+
+@when(
+    parsers.re(f"the client (?P<call>{'|'.join(map(re.escape, MISPLACED))}), saying which role and why"),
+    target_fixture="attempt",
+)
+def _aim_at_a_wrong_place(root, client, call):
+    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    return {"response": MISPLACED[call](client), "before": before}
+
+
+@then("the change is rejected because the decision holds nothing at that place")
+def _rejected_for_nothing_there(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.rule) for fault in faults] == [(DECISION, "not-found")]
+    assert f"holds nothing at {faults[0].path!r}" in faults[0].message
+
+
+@then("the change is rejected because a place inside an artifact never names what only the store settles")
+def _rejected_for_a_settled_place(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "revision", "identity")]
+    assert faults[0].message.startswith("a place inside an artifact never names what only the store settles")
+
+
+@then("the change is rejected because an item is added to a collection, and that place is not one")
+def _rejected_for_no_collection(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "sections/purpose", "collection")]
+    assert faults[0].message.startswith("an item is added to a collection")

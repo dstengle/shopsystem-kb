@@ -16,6 +16,7 @@ a change that breaks one is refactored into place first, then made.
 | `refusals.py` | the faults the domain makes of what a store holds, each with its rule and message | conversions, type checks |
 | `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, then write, journal and commit; starting a store, recording a snapshot | rpc types |
 | `edits.py` | what each operation of a set does to the draft, checked against the draft as the operations before it left it | rpc types, writes |
+| `places.py` | resolving a place inside an artifact to where its node stands, or the refusal saying why nothing does | I/O, what an operation does there |
 | `read.py` | reads at every level, resolution and stubs | writes |
 | `query.py` | list, refs, search, journal, snapshot gathering over the loaded corpus | writes |
 | `search.py` | ranking prose and fields for the words searched | store access |

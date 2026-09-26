@@ -16,10 +16,11 @@ def no_type(kind_name: str) -> kb_pb2.Fault:
     )
 
 
-def no_collection(artifact_id: ArtifactId, collection: str) -> kb_pb2.Fault:
+def not_a_collection(locator: Locator) -> kb_pb2.Fault:
+    place = "/".join(locator.place)
     return kb_pb2.Fault(
-        artifact=str(artifact_id), path=collection, rule="not-found",
-        message=f"{str(artifact_id)!r} holds no collection called {collection!r}",
+        artifact=str(locator.id), path=place, rule="collection",
+        message=f"an item is added to a collection, and {place!r} in {str(locator.id)!r} is not one",
     )
 
 
@@ -28,6 +29,14 @@ def nothing_at(locator: Locator) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=str(locator.id), path=place, rule="not-found",
         message=f"{str(locator.id)!r} holds nothing at {place!r}",
+    )
+
+
+def settled_place(locator: Locator) -> kb_pb2.Fault:
+    place = "/".join(locator.place)
+    return kb_pb2.Fault(
+        artifact=str(locator.id), path=place, rule="identity",
+        message=f"a place inside an artifact never names what only the store settles; {place!r} begins at {locator.place[0]!r}",
     )
 
 
