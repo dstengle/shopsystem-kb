@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from kb import canonical
+from kb.values import Signed
 
 
 def now() -> datetime:
@@ -16,8 +17,8 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision: int,
-          schema_version: int, written: Path | None, message: str, seq: int = 1, batch: str = "") -> Path:
+def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str, revision: int,
+          schema_version: int, written: Path | None, seq: int = 1, batch: str = "") -> Path:
     """Write one entry and return its file; its stem is the entry's id. A change made alone names itself as its batch.
     A removal wrote nothing, so its entry's fingerprint is empty."""
     at = now()
@@ -25,20 +26,20 @@ def write(store_dir: Path, *, actor, op: str, artifact: str, path: str, revision
     entry = {
         "id": entry_id,
         "at": at.isoformat(),
-        "actor": {"role": actor.role, "execution": actor.execution},
+        "actor": {"role": signed.actor.role, "execution": signed.actor.execution},
         "op": op,
         "artifact": artifact,
         "path": path,
         "revision": revision,
         "schema_version": schema_version,
         "digest": digest(written) if written is not None else "",
-        "message": message,
+        "message": signed.message,
         "batch": batch or entry_id,
     }
     return _save(store_dir, at, entry)
 
 
-def snapshot(store_dir: Path, *, actor, read: list[dict], message: str) -> Path:
+def snapshot(store_dir: Path, *, signed: Signed, read: list[dict]) -> Path:
     """Write the entry recording what a piece of work read, each artifact as { artifact, revision, digest }, and
     return its file. It names no artifact of its own and is a set of its own."""
     at = now()
@@ -46,10 +47,10 @@ def snapshot(store_dir: Path, *, actor, read: list[dict], message: str) -> Path:
     entry = {
         "id": entry_id,
         "at": at.isoformat(),
-        "actor": {"role": actor.role, "execution": actor.execution},
+        "actor": {"role": signed.actor.role, "execution": signed.actor.execution},
         "op": "snapshot",
         "read": read,
-        "message": message,
+        "message": signed.message,
         "batch": entry_id,
     }
     return _save(store_dir, at, entry)

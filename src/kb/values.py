@@ -107,17 +107,28 @@ def named(kind: Kind, title: str) -> ArtifactId:
     return ArtifactId(kind, slug(title))
 
 
-def content(artifact: str, text: str, at_root: bool = True) -> dict:
-    """Content as a request carries it: read plainly, and, for a whole artifact, holding only what a type declares.
-    The identity keys belong to an artifact's root, so a node inside it, a section with its title, is not held to
-    them. Refused with every fault."""
+@dataclass(frozen=True)
+class Content:
+    """Content as a request carries it: the tree read from it, and, when it cannot be taken, what is wrong with it,
+    each as a place, a rule and a message, to be said of whichever artifact the content turns out to be for."""
+    tree: object
+    problems: tuple[tuple[str, str, str], ...] = ()
+
+    def refusal(self, artifact: str) -> list[kb_pb2.Fault]:
+        return [kb_pb2.Fault(artifact=artifact, path=path, rule=rule, message=message)
+                for path, rule, message in self.problems]
+
+
+def content(text: str, at_root: bool = True) -> Content:
+    """Content read plainly, and, for a whole artifact, holding only what a type declares. The identity keys belong
+    to an artifact's root, so a node inside it, a section with its title, is not held to them. Every problem found."""
     try:
         tree = loads(text)
     except canonical.NotCanonical as fault:
-        raise Refused([kb_pb2.Fault(artifact=artifact, path=fault.path, rule="content", message=str(fault))]) from None
+        return Content(None, ((fault.path, "content", str(fault)),))
     if not at_root:
-        return tree
-    faults = []
+        return Content(tree)
+    problems = []
     for key in canonical.IDENTITY:
         if key not in tree:
             continue
@@ -125,22 +136,45 @@ def content(artifact: str, text: str, at_root: bool = True) -> dict:
             message = f"a title is given alongside the content, never inside it; the content carried the title {tree[key]!r}"
         else:
             message = f"content holds only what the type declares; {key} is settled by the store, and the content carried {key}: {tree[key]!r}"
-        faults.append(kb_pb2.Fault(artifact=artifact, path=key, rule="identity", message=message))
-    if faults:
-        raise Refused(faults)
-    return tree
+        problems.append((key, "identity", message))
+    return Content(tree, tuple(problems))
 
 
-def item(artifact: str, text: str) -> dict:
-    """An item as a request carries it: read plainly, and never carrying its own name, which kb gives. Refused with
-    the fault that names what it carried."""
-    tree = content(artifact, text, at_root=False)
-    if "id" in tree:
-        raise Refused([kb_pb2.Fault(
-            artifact=artifact, path="id", rule="identity",
-            message=f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {tree['id']!r}",
-        )])
-    return tree
+def item(text: str) -> Content:
+    """An item read plainly, never carrying its own name, which kb gives."""
+    read = content(text, at_root=False)
+    if read.problems or "id" not in read.tree:
+        return read
+    return Content(read.tree, (("id", "identity",
+        f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {read.tree['id']!r}"),))
+
+
+@dataclass(frozen=True)
+class Actor:
+    role: str
+    execution: str
+
+
+@dataclass(frozen=True)
+class Signed:
+    """Who made a change, and the message they gave for it."""
+    actor: Actor
+    message: str
+
+
+def actor(request: kb_pb2.Actor) -> Actor:
+    return Actor(request.role, request.execution)
+
+
+def signed(request: kb_pb2.Actor, message: str) -> Signed:
+    return Signed(actor(request), message)
+
+
+def starter(request: kb_pb2.Actor) -> Actor:
+    """The actor who starts a store, who must name a role."""
+    if not request.role:
+        raise Refused([kb_pb2.Fault(rule="actor", message="a store can only be started under a role")])
+    return actor(request)
 
 
 def root(text: str) -> Path:

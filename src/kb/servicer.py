@@ -7,12 +7,12 @@ import copy
 from datetime import datetime
 from typing import NamedTuple
 
-from kb import canonical, journal, search, validation, values
+from kb import canonical, journal, requests, search, validation, values
 from kb.content import dumps, text
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
 from kb.store import Draft, Store, Unreadable
-from kb.values import ArtifactId, Kind
+from kb.values import ArtifactId, Kind, Signed
 
 METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
 
@@ -31,56 +31,53 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         self._store = Store(root) if root is not None else None
 
     def Init(self, request, context):
-        if not request.actor.role:
-            return kb_pb2.InitResponse(faults=[kb_pb2.Fault(
-                rule="actor", message="a store can only be started under a role",
-            )])
         try:
-            store = Store(values.root(request.root))
+            actor, root = requests.starting(request)
         except values.Refused as refused:
             return kb_pb2.InitResponse(faults=refused.faults)
+        store, signed = Store(root), Signed(actor, "initialise store")
         store.start()
         metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
         path = store.save(METASCHEMA_ID, canonical.dump(canonical.order(metaschema, METASCHEMA["schema"])))
         entry = journal.write(
-            store.dir, actor=request.actor, op="create", artifact=str(METASCHEMA_ID), path="",
-            revision=1, schema_version=1, written=path, message="initialise store",
+            store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",
+            revision=1, schema_version=1, written=path,
         )
-        store.commit([store.dir / "store.yaml", path, entry], request.actor.role, "initialise store")
+        store.commit([store.dir / "store.yaml", path, entry], signed)
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):
         creation = kb_pb2.Creation(type=request.type, title=request.title, content=request.content)
-        landed = self._land([kb_pb2.Operation(create=creation)], request.actor, request.message)
+        landed = self._land(requests.operations([kb_pb2.Operation(create=creation)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.CreateResponse(faults=landed.faults)
         return kb_pb2.CreateResponse(id=landed.results[0].id, revision=landed.results[0].revision)
 
     def Write(self, request, context):
         replacement = kb_pb2.Replacement(locator=request.locator, content=request.content)
-        landed = self._land([kb_pb2.Operation(write=replacement)], request.actor, request.message)
+        landed = self._land(requests.operations([kb_pb2.Operation(write=replacement)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.WriteResponse(faults=landed.faults)
         return kb_pb2.WriteResponse(revision=landed.results[0].revision)
 
     def Append(self, request, context):
         addition = kb_pb2.Addition(locator=request.locator, content=request.content)
-        landed = self._land([kb_pb2.Operation(append=addition)], request.actor, request.message)
+        landed = self._land(requests.operations([kb_pb2.Operation(append=addition)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.AppendResponse(faults=landed.faults)
         return kb_pb2.AppendResponse(id=landed.results[0].item, revision=landed.results[0].revision)
 
     def Delete(self, request, context):
         removal = kb_pb2.Removal(locator=request.locator)
-        landed = self._land([kb_pb2.Operation(delete=removal)], request.actor, request.message)
+        landed = self._land(requests.operations([kb_pb2.Operation(delete=removal)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.DeleteResponse(faults=landed.faults)
         return kb_pb2.DeleteResponse(revision=landed.results[0].revision)
 
     def Apply(self, request, context):
-        return self._land(request.operations, request.actor, request.message)
+        return self._land(requests.operations(request.operations), values.signed(request.actor, request.message))
 
-    def _land(self, operations, actor, message) -> kb_pb2.ApplyResponse:
+    def _land(self, operations: list, signed: Signed) -> kb_pb2.ApplyResponse:
         """The write path. Each operation is applied in order to a draft of the store and checked there, against the
         store as the operations before it left it; only when every one passes is anything written, each artifact
         saved, one journal entry per operation naming the set, and one commit.
@@ -90,6 +87,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         draft = Draft(self._store)
         touched, faults = [], []
         for operation in operations:
+            if isinstance(operation, requests.Refusal):
+                faults += operation.faults
+                continue
             try:
                 touched.append(self._apply(draft, operation))
             except values.Refused as refused:
@@ -118,46 +118,39 @@ class KbServicer(kb_pb2_grpc.KbServicer):
                 revision, schema_version = artifact["revision"], artifact["schema_version"]
                 path = saved = self._store.save(change.artifact_id, text)
             entry = journal.write(
-                self._store.dir, actor=actor, op=change.op, artifact=str(change.artifact_id), path=change.path,
-                revision=revision, schema_version=schema_version,
-                written=saved, message=message, seq=seq, batch=batch,
+                self._store.dir, signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path,
+                revision=revision, schema_version=schema_version, written=saved, seq=seq, batch=batch,
             )
             batch = batch or entry.stem
             written += [path, entry]
             results.append(kb_pb2.Result(id=str(change.artifact_id), revision=revision, item=change.item))
-        self._store.commit(written, actor.role, message)
+        self._store.commit(written, signed)
         return kb_pb2.ApplyResponse(batch=batch, results=results)
 
-    def _apply(self, draft: Draft, operation: kb_pb2.Operation) -> Change:
+    def _apply(self, draft: Draft, operation) -> Change:
         """One operation applied to the draft. Returns what it did; raises values.Refused."""
-        which = operation.WhichOneof("operation")
-        if which == "create":
-            return Change("create", self._create(draft, operation.create))
-        if which == "append":
-            return self._append(draft, operation.append)
-        if which == "delete":
-            return self._delete(draft, operation.delete)
-        return Change("write", self._replace(draft, operation.write))
+        if isinstance(operation, requests.Create):
+            return Change("create", self._create(draft, operation))
+        if isinstance(operation, requests.Add):
+            return self._append(draft, operation)
+        if isinstance(operation, requests.Remove):
+            return self._delete(draft, operation)
+        return Change("write", self._replace(draft, operation))
 
-    def _create(self, draft: Draft, creation: kb_pb2.Creation) -> ArtifactId:
-        kind = values.kind(creation.type)
+    def _create(self, draft: Draft, creation: requests.Create) -> ArtifactId:
+        kind = creation.kind
         if not draft.holds(ArtifactId(Kind("schema"), kind.name)):
             raise values.Refused([kb_pb2.Fault(
                 rule="kind", message=f"a kind must name a type the store holds; the store holds no type called {kind.name!r}",
             )])
-        at = f"{kind.name}/{values.slug(creation.title)}"
-        faults = []
-        try:
-            artifact_id = _unclaimed(draft, values.named(kind, creation.title))
+        at, faults = creation.at, list(creation.title_faults)
+        if creation.name is not None:
+            artifact_id = _unclaimed(draft, creation.name)
             at = str(artifact_id)
-        except values.Refused as refused:
-            faults += refused.faults
-        try:
-            content = values.content(at, creation.content)
-        except values.Refused as refused:
-            faults += refused.faults
+        faults += creation.content.refusal(at)
         if faults:
             raise values.Refused(faults)
+        content = creation.content.tree
         schema = draft.schema(kind)
         faults = validation.validate(at, {"title": creation.title, **content}, schema["schema"], draft)
         if faults:
@@ -171,23 +164,27 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
         return artifact_id
 
-    def _replace(self, draft: Draft, replacement: kb_pb2.Replacement) -> ArtifactId:
-        locator = values.locator(replacement.locator)
+    def _replace(self, draft: Draft, replacement: requests.Replace) -> ArtifactId:
+        locator = replacement.locator
         if not draft.holds(locator.id):
             raise values.Refused([_not_found(locator.id)])
-        content = values.content(str(locator.id), replacement.content, at_root=not locator.place)
+        if replacement.content.problems:
+            raise values.Refused(replacement.content.refusal(str(locator.id)))
+        content = replacement.content.tree
         current = draft.load(locator.id)
         if locator.place:
             content = _placed(current, locator, content)
         _revise(draft, locator.id, current, content)
         return locator.id
 
-    def _append(self, draft: Draft, addition: kb_pb2.Addition) -> Change:
+    def _append(self, draft: Draft, addition: requests.Add) -> Change:
         """One item put at the end of a collection the artifact's type declares, and named there."""
-        locator = values.locator(addition.locator)
+        locator = addition.locator
         if not draft.holds(locator.id):
             raise values.Refused([_not_found(locator.id)])
-        item = values.item(str(locator.id), addition.content)
+        if addition.item.problems:
+            raise values.Refused(addition.item.refusal(str(locator.id)))
+        item = addition.item.tree
         collection = "/".join(locator.place)
         if collection not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
             raise values.Refused([kb_pb2.Fault(
@@ -200,9 +197,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         _revise(draft, locator.id, current, content)
         return Change("append", locator.id, f"{collection}/{item['id']}", item["id"])
 
-    def _delete(self, draft: Draft, removal: kb_pb2.Removal) -> Change:
+    def _delete(self, draft: Draft, removal: requests.Remove) -> Change:
         """A whole artifact taken out of the draft, refused with one fault for each link that still points at it."""
-        locator = values.locator(removal.locator)
+        locator = removal.locator
         if not draft.holds(locator.id):
             raise values.Refused([_not_found(locator.id)])
         if locator.place:
@@ -228,16 +225,17 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def Read(self, request, context):
         try:
-            locator = values.locator(request.locator)
+            reading = requests.reading(request)
         except values.Refused as refused:
             return kb_pb2.ReadResponse(faults=refused.faults)
+        locator = reading.locator
         if not self._store.holds(locator.id):
             return kb_pb2.ReadResponse(faults=[_not_found(locator.id)])
         try:
-            if request.level == kb_pb2.ReadRequest.WHOLE:
-                return self._whole(locator, request.depth)
-            if request.level == kb_pb2.ReadRequest.SECTION:
-                return self._section(locator, request.section)
+            if reading.level == "whole":
+                return self._whole(locator, reading.depth)
+            if reading.level == "section":
+                return self._section(locator, reading.section)
             return self._summary(locator)
         except Unreadable as unreadable:
             return kb_pb2.ReadResponse(faults=[unreadable.fault])
@@ -324,39 +322,29 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def Journal(self, request, context):
         """The journal's entries, oldest first, narrowed by each of artifact, role, piece of work, time and set given."""
-        faults = []
         try:
-            artifact = str(values.artifact_id(request.artifact)) if request.artifact else ""
+            wanted = requests.journal(request)
         except values.Refused as refused:
-            faults += refused.faults
-        try:
-            since = values.since(request.since) if request.since else None
-        except values.Refused as refused:
-            faults += refused.faults
-        if faults:
-            return kb_pb2.JournalResponse(faults=faults)
+            return kb_pb2.JournalResponse(faults=refused.faults)
         return kb_pb2.JournalResponse(entries=[
             _entry(entry) for entry in journal.entries(self._store.dir)
-            if (not artifact or entry.get("artifact") == artifact)
-            and (not request.role or entry["actor"]["role"] == request.role)
-            and (not request.execution or entry["actor"]["execution"] == request.execution)
-            and (since is None or datetime.fromisoformat(entry["at"]) >= since)
-            and (not request.batch or entry["batch"] == request.batch)
+            if (wanted.artifact is None or entry.get("artifact") == str(wanted.artifact))
+            and (not wanted.role or entry["actor"]["role"] == wanted.role)
+            and (not wanted.execution or entry["actor"]["execution"] == wanted.execution)
+            and (wanted.since is None or datetime.fromisoformat(entry["at"]) >= wanted.since)
+            and (not wanted.batch or entry["batch"] == wanted.batch)
         ])
 
     def Search(self, request, context):
         """Every section whose prose, or field whose value, holds a word searched for, as the scope asks, among the
         artifacts of one kind when a type is given, with a stub of its artifact, most often first."""
         try:
-            kind = values.kind(request.type) if request.type else None
+            searching = requests.searching(request)
         except values.Refused as refused:
             return kb_pb2.SearchResponse(faults=refused.faults)
+        kind = searching.kind
         artifacts = (artifact for artifact in self._store.artifacts() if kind is None or artifact["type"] == kind.name)
-        scope = request.scope
-        hits = search.rank(
-            artifacts, request.text,
-            sections=scope != kb_pb2.SearchRequest.FIELDS, fields=scope != kb_pb2.SearchRequest.SECTIONS,
-        )
+        hits = search.rank(artifacts, searching.text, sections=searching.sections, fields=searching.fields)
         return kb_pb2.SearchResponse(matches=[
             kb_pb2.Match(
                 stub=self._stub("", values.artifact_id(hit.artifact)), section=hit.section, field=hit.field,
@@ -368,26 +356,20 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def Refs(self, request, context):
         """What an artifact's links reach, out of it or into it, a step at a time out to the depth asked: each artifact
         once, by the shortest route, the one asked about never. A via or a type narrows every step."""
-        faults = []
         try:
-            locator = values.locator(request.locator)
+            walk = requests.walk(request)
         except values.Refused as refused:
-            faults += refused.faults
-        try:
-            kind = values.kind(request.type) if request.type else None
-        except values.Refused as refused:
-            faults += refused.faults
-        if faults:
-            return kb_pb2.RefsResponse(faults=faults)
+            return kb_pb2.RefsResponse(faults=refused.faults)
+        locator, kind = walk.locator, walk.kind
         if not self._store.holds(locator.id):
             return kb_pb2.RefsResponse(faults=[_not_found(locator.id)])
-        step = self._inward if request.direction == kb_pb2.RefsRequest.IN else self._outward
+        step = self._inward if walk.inward else self._outward
         reached, seen, frontier = [], {str(locator.id)}, [(locator.id, [])]
-        for _ in range(request.depth):
+        for _ in range(walk.depth):
             following = []
             for artifact_id, route in frontier:
                 for field, other_id in step(artifact_id):
-                    if str(other_id) in seen or (request.via and field != request.via):
+                    if str(other_id) in seen or (walk.via and field != walk.via):
                         continue
                     if kind is not None and other_id.kind != kind:
                         continue
@@ -419,14 +401,14 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def List(self, request, context):
         """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names."""
         try:
-            kind = values.kind(request.type)
+            listing = requests.listing(request)
         except values.Refused as refused:
             return kb_pb2.ListResponse(faults=refused.faults)
         matched = [
             artifact_id for artifact_id in self._store.ids()
-            if artifact_id.kind == kind and _holds(self._store.load(artifact_id), request.fields)
+            if artifact_id.kind == listing.kind and _holds(self._store.load(artifact_id), listing.fields)
         ]
-        if request.form == kb_pb2.ListRequest.IDS:
+        if listing.ids:
             return kb_pb2.ListResponse(ids=[str(artifact_id) for artifact_id in matched])
         return kb_pb2.ListResponse(stubs=[self._stub("", artifact_id) for artifact_id in matched])
 
@@ -434,11 +416,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         """One journal entry listing each artifact named with its version now and the fingerprint of its file, under
         the actor and the message given, in a commit of its own."""
         named, faults = [], []
-        for name in request.artifacts:
-            try:
-                artifact_id = values.artifact_id(name)
-            except values.Refused as refused:
-                faults += refused.faults
+        for artifact_id in requests.names(request.artifacts):
+            if isinstance(artifact_id, requests.Refusal):
+                faults += artifact_id.faults
                 continue
             if not self._store.holds(artifact_id):
                 faults.append(_not_found(artifact_id))
@@ -453,8 +433,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             }
             for artifact_id in named
         ]
-        entry = journal.snapshot(self._store.dir, actor=request.actor, read=read, message=request.message)
-        self._store.commit([entry], request.actor.role, request.message)
+        signed = values.signed(request.actor, request.message)
+        entry = journal.snapshot(self._store.dir, signed=signed, read=read)
+        self._store.commit([entry], signed)
         return kb_pb2.SnapshotResponse(entry=entry.stem)
 
     def _stub(self, field, target_id: ArtifactId):

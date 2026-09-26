@@ -5,7 +5,7 @@ from pathlib import Path
 
 from kb import canonical, values
 from kb.contract import CONTRACT_VERSION, kb_pb2
-from kb.values import ArtifactId, Kind
+from kb.values import ArtifactId, Kind, Signed
 
 
 class Unreadable(Exception):
@@ -63,8 +63,9 @@ class Store:
         """The schema artifact of a kind; its JSON Schema is under `schema`."""
         return self.load(ArtifactId(Kind("schema"), kind.name))
 
-    def commit(self, paths: list, role: str, message: str) -> None:
-        """One commit of the given files, message from the request, author from the actor."""
+    def commit(self, paths: list, signed: Signed) -> None:
+        """One commit of the given files, under the message and the actor's role."""
+        role = signed.actor.role
         relative = [str(Path(path).relative_to(self.dir)) for path in paths]
         _git("-C", str(self.dir), "add", "--", *relative)
         env = {
@@ -72,7 +73,7 @@ class Store:
             "GIT_AUTHOR_NAME": role, "GIT_AUTHOR_EMAIL": f"{role}@kb",
             "GIT_COMMITTER_NAME": role, "GIT_COMMITTER_EMAIL": f"{role}@kb",
         }
-        _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", message, "--", *relative, env=env)
+        _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", signed.message, "--", *relative, env=env)
 
     def ids(self) -> list[ArtifactId]:
         """The name of every artifact in the store, schemas included, in path order."""
