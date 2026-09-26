@@ -119,5 +119,9 @@ class Draft:
         return self.load(ArtifactId(Kind("schema"), kind.name))
 
 
+QUIET = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")
+
+
 def _git(*args, env=None):
-    subprocess.run(["git", *args], check=True, capture_output=True, text=True, env=env)
+    """git, with its automatic maintenance off, so nothing runs on in the store after a call returns."""
+    subprocess.run(["git", *QUIET, *args], check=True, capture_output=True, text=True, env=env)
