@@ -33,13 +33,18 @@ class Store:
         self.dir = self.root / "kb"
 
     def path(self, artifact_id: ArtifactId) -> Path:
-        return values.path(self.dir, artifact_id)
+        """The one place a file path is made from a name: <store>/<kind>/<name>.yaml."""
+        if not isinstance(artifact_id, ArtifactId):
+            raise TypeError(f"a path is made only from a checked name, not {artifact_id!r}")
+        return self.dir / artifact_id.kind.name / f"{artifact_id.slug}.yaml"
 
-    def start(self) -> None:
-        """Make the store directory, its git repository, and its marker file."""
+    def start(self) -> Path:
+        """Make the store directory, its git repository, and its marker file; where the marker is."""
         self.dir.mkdir(parents=True)
         _git("init", "-q", "-b", "main", str(self.dir))
-        (self.dir / "store.yaml").write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
+        marker = self.root / MARKER
+        marker.write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
+        return marker
 
     def save(self, artifact_id: ArtifactId, text: str) -> Path:
         """Write canonical text to a temp file and rename it into place."""

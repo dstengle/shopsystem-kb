@@ -39,7 +39,7 @@ def start(root: Root, actor: Actor) -> None:
     where no store can be started."""
     vacant(root)
     store, signed = Store(root.path), Signed(actor, "initialise store")
-    store.start()
+    marker = store.start()
     metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
     text = canonical.dump(canonical.order(metaschema, METASCHEMA["schema"]))
     path = store.save(METASCHEMA_ID, text)
@@ -47,7 +47,7 @@ def start(root: Root, actor: Actor) -> None:
         store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",
         revision=1, schema_version=1, text=text,
     )
-    store.commit([store.dir / "store.yaml", path, entry], signed)
+    store.commit([marker, path, entry], signed)
 
 
 def land(store: Store, operations: list, signed: Signed) -> Landed:

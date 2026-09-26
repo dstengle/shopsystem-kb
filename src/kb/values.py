@@ -1,7 +1,6 @@
 """The boundary: every value a request carries is turned here into a checked value, or refused with a fault.
 
-Storage takes only these values, never a string that came from a request, and `path` is the one place a file
-path is made from a name.
+Storage takes only these values, never a string that came from a request.
 """
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -200,13 +199,6 @@ def root(text: str) -> Root:
             message="a store is started in a directory that was named and that exists; no directory was named",
         )])
     return Root(Path(text), text)
-
-
-def path(store_dir: Path, artifact_id: ArtifactId) -> Path:
-    """The one function that makes a file path from a name."""
-    if not isinstance(artifact_id, ArtifactId):
-        raise TypeError(f"a path is made only from a checked name, not {artifact_id!r}")
-    return store_dir / artifact_id.kind.name / f"{artifact_id.slug}.yaml"
 
 
 def _not_a_plain_name(text: str) -> kb_pb2.Fault:
