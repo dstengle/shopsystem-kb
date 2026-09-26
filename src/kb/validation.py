@@ -8,7 +8,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
-from kb import links, values
+from kb import links, places, values
 from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
 
@@ -114,21 +114,7 @@ def _lands(target: str, ref: dict, corpus) -> bool:
         return False
     if link.id.kind.name not in ref["targets"] or not corpus.holds(link.id):
         return False
-    return not link.place or _holds_part(corpus.artifact(link.id), link.place)
-
-
-def _holds_part(node: dict, place: tuple) -> bool:
-    """Whether a place, pairs of a collection and the name of an item in it, names a part the node holds."""
-    if len(place) % 2:
-        return False
-    for collection, name in zip(place[::2], place[1::2]):
-        items = node.get(collection)
-        if not isinstance(items, list):
-            return False
-        node = next((item for item in items if isinstance(item, dict) and item.get("id") == name), None)
-        if node is None:
-            return False
-    return True
+    return not link.place or places.holds_part(corpus.artifact(link.id), link.place)
 
 
 def _sections(artifact_id: str, sections: list, required: list, place: str) -> list[kb_pb2.Fault]:
