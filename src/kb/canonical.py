@@ -5,6 +5,7 @@ kb is the only writer, so loading needs no round-trip preservation.
 import io
 
 from ruamel.yaml import YAML, events, nodes, tokens
+from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.representer import SafeRepresenter
 
@@ -44,10 +45,18 @@ _Representer.add_representer(Prose, _represent_prose)
 _Representer.add_representer(str, _represent_str)
 
 
+class _Constructor(SafeConstructor):
+    """A value is read as written: one that looks like a date or a time is the text it was written as."""
+
+
+_Constructor.add_constructor("tag:yaml.org,2002:timestamp", SafeConstructor.construct_yaml_str)
+
+
 def _yaml() -> YAML:
     """The pure-Python safe loader and emitter, YAML 1.2. Never the C one, which is YAML 1.1."""
     yaml = YAML(typ="safe", pure=True)
     yaml.Representer = _Representer
+    yaml.Constructor = _Constructor
     yaml.default_flow_style = False
     yaml.allow_unicode = True
     yaml.width = float("inf")

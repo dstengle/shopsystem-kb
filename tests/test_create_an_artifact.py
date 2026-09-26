@@ -651,3 +651,19 @@ def _rejected_for_senseless_content(attempt, reason):
 def _the_call_answers(attempt):
     assert isinstance(attempt["response"], kb_pb2.CreateResponse)
     assert attempt["response"].faults
+
+
+@when('the client creates a decision carrying a field written "2026-09-24", saying which role and why', target_fixture="created")
+def _create_with_a_bare_date(client):
+    text = content.dumps({"sections": SECTIONS}) + "options:\n  - title: Revisit\n    body: 2026-09-24\n"
+    return client.Create(kb_pb2.CreateRequest(
+        type="decision", title="Review prices again", content=text, actor=CLIENT, message="Say when to revisit",
+    ))
+
+
+@then("that field reads back as the text that was written, not as a date")
+def _field_is_text_not_a_date(root, client, created):
+    assert not created.faults, created.faults
+    assert content.loads(read(client, created.id, whole=True).content)["options"][0]["body"] == "2026-09-24"
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert on_disk["options"][0]["body"] == "2026-09-24"
