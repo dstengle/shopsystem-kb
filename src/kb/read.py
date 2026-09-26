@@ -68,8 +68,9 @@ def _response(found: dict, content: str) -> kb_pb2.ReadResponse:
 
 
 def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
-    """The artifact as stored, each link followed depth steps with the target, itself resolved, in place of its
-    name. A target on the path already being filled in stays a name, so a loop ends."""
+    """The artifact as stored, each link in its own fields followed depth steps with the target, itself resolved, in
+    place of its name; a link inside one of its items stays a name. A target on the path already being filled in
+    stays a name, so a loop ends."""
     found = store.artifact(artifact_id)
     if depth < 1:
         return found
@@ -78,13 +79,17 @@ def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -
             return target
         return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
     resolved = dict(found)
-    for field in links.references(store.schema(artifact_id.kind)["schema"], store):
-        value = found.get(field)
-        if isinstance(value, list):
-            resolved[field] = [fill(target) for target in value]
-        elif value is not None:
-            resolved[field] = fill(value)
+    carried = links.carried(found, store.schema(artifact_id.kind)["schema"], store)
+    for field in {link.field for link in carried if _own(link)}:
+        value = found[field]
+        resolved[field] = [fill(target) for target in value] if isinstance(value, list) else fill(value)
     return resolved
+
+
+def _own(link: links.Link) -> bool:
+    """Whether a link sits in one of the artifact's own fields, alone or in a list, rather than inside an item."""
+    head, _, rest = link.place.partition("/")
+    return head == link.field and (not rest or rest.isdigit())
 
 
 def _inbound(store: Store, artifact_id: ArtifactId) -> dict:
