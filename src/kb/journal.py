@@ -13,14 +13,19 @@ def now() -> datetime:
 
 
 def digest(path: Path) -> str:
-    """The fingerprint of what was written: sha256 of the file's bytes after the write."""
+    """The fingerprint of a stored file: sha256 of its bytes."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def fingerprint(text: str) -> str:
+    """The fingerprint of text about to be written: sha256 of the bytes it is written as."""
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
 def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str, revision: int,
-          schema_version: int, written: Path | None, seq: int = 1, batch: str = "") -> Path:
+          schema_version: int, text: str | None, seq: int = 1, batch: str = "") -> Path:
     """Write one entry and return its file; its stem is the entry's id. A change made alone names itself as its batch.
-    A removal wrote nothing, so its entry's fingerprint is empty."""
+    The fingerprint is of the text the change writes; a removal writes none, so its entry's fingerprint is empty."""
     at = now()
     entry_id = f"{at.strftime('%Y%m%dT%H%M%S%fZ')}-{seq}"
     entry = {
@@ -32,7 +37,7 @@ def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str,
         "path": path,
         "revision": revision,
         "schema_version": schema_version,
-        "digest": digest(written) if written is not None else "",
+        "digest": fingerprint(text) if text is not None else "",
         "message": signed.message,
         "batch": batch or entry_id,
     }

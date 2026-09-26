@@ -11,11 +11,14 @@ from kb.values import ArtifactId, Kind, Refused
 
 
 class Change(NamedTuple):
-    """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name."""
+    """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name. A
+    removal carries the version its entry records and the version of the type it was last checked against."""
     op: str
     artifact_id: ArtifactId
     path: str = ""
     item: str = ""
+    revision: int = 0
+    schema_version: int = 0
 
 
 def apply(draft: Draft, operation) -> Change:
@@ -113,8 +116,9 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
                 ))
     if blocking:
         raise Refused(blocking)
+    removed = draft.load(locator.id)
     draft.remove(locator.id)
-    return Change("delete", locator.id)
+    return Change("delete", locator.id, revision=removed["revision"] + 1, schema_version=removed["schema_version"])
 
 
 def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> None:

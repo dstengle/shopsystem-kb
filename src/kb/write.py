@@ -3,6 +3,7 @@ as the operations before it left it; only when every one passes is anything writ
 entry per operation naming the set, and one commit. A fault anywhere refuses the whole set with every fault found,
 and nothing is written. Starting a store and recording a snapshot write and commit here too."""
 from pathlib import Path
+from typing import NamedTuple
 
 from kb import canonical, edits, journal, requests
 from kb.contract import kb_pb2
@@ -14,15 +15,24 @@ from kb.values import Actor, ArtifactId, Kind, Refused, Signed
 METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
 
 
+class Landing(NamedTuple):
+    """A change as it will be written: its canonical text, None for a removal, and the versions its entry records."""
+    change: Change
+    text: str | None
+    revision: int
+    schema_version: int
+
+
 def start(root: Path, actor: Actor) -> None:
     """A new store at root, holding the type of types, its start in the journal and in one commit."""
     store, signed = Store(root), Signed(actor, "initialise store")
     store.start()
     metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
-    path = store.save(METASCHEMA_ID, canonical.dump(canonical.order(metaschema, METASCHEMA["schema"])))
+    text = canonical.dump(canonical.order(metaschema, METASCHEMA["schema"]))
+    path = store.save(METASCHEMA_ID, text)
     entry = journal.write(
         store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",
-        revision=1, schema_version=1, written=path,
+        revision=1, schema_version=1, text=text,
     )
     store.commit([store.dir / "store.yaml", path, entry], signed)
 
@@ -31,10 +41,10 @@ def land(store: Store, operations: list, signed: Signed) -> kb_pb2.ApplyResponse
     """The set drafted, serialised, then written and committed; refused with every fault before anything is written."""
     try:
         draft, changes = _drafted(store, operations)
-        texts = _serialised(draft, changes)
+        landings = _serialised(draft, changes)
     except Refused as refused:
         return kb_pb2.ApplyResponse(faults=refused.faults)
-    return _written(store, draft, texts, signed)
+    return _written(store, landings, signed)
 
 
 def record(store: Store, read: list[dict], signed: Signed) -> str:
@@ -61,37 +71,35 @@ def _drafted(store: Store, operations: list) -> tuple[Draft, list[Change]]:
     return draft, changes
 
 
-def _serialised(draft: Draft, changes: list[Change]) -> list[tuple[Change, str | None]]:
-    """Each change with the canonical text of what it leaves, None for a removal; refused if any cannot be written."""
-    texts, faults = [], []
+def _serialised(draft: Draft, changes: list[Change]) -> list[Landing]:
+    """Each change as it will be written, settled from the draft; refused if any cannot be written."""
+    landings, faults = [], []
     for change in changes:
         if change.op == "delete":
-            texts.append((change, None))
+            landings.append(Landing(change, None, change.revision, change.schema_version))
             continue
+        artifact = draft.load(change.artifact_id)
         try:
-            texts.append((change, canonical.dump(draft.load(change.artifact_id))))
+            landings.append(Landing(change, canonical.dump(artifact), artifact["revision"], artifact["schema_version"]))
         except canonical.NotCanonical as fault:
             faults.append(kb_pb2.Fault(artifact=str(change.artifact_id), rule="content", message=str(fault)))
     if faults:
         raise Refused(faults)
-    return texts
+    return landings
 
 
-def _written(store: Store, draft: Draft, texts: list, signed: Signed) -> kb_pb2.ApplyResponse:
-    """Each file saved or removed, its journal entry written naming the set, and all of it in one commit."""
+def _written(store: Store, landings: list[Landing], signed: Signed) -> kb_pb2.ApplyResponse:
+    """Each file saved or removed, its journal entry written naming the set, and all of it in one commit. Reads
+    nothing: everything written was settled before."""
     written, results, batch = [], [], ""
-    for seq, (change, text) in enumerate(texts, start=1):
+    for seq, (change, text, revision, schema_version) in enumerate(landings, start=1):
         if text is None:
-            removed = store.load(change.artifact_id)
-            revision, schema_version = removed["revision"] + 1, removed["schema_version"]
-            path, saved = store.remove(change.artifact_id), None
+            path = store.remove(change.artifact_id)
         else:
-            artifact = draft.load(change.artifact_id)
-            revision, schema_version = artifact["revision"], artifact["schema_version"]
-            path = saved = store.save(change.artifact_id, text)
+            path = store.save(change.artifact_id, text)
         entry = journal.write(
             store.dir, signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path,
-            revision=revision, schema_version=schema_version, written=saved, seq=seq, batch=batch,
+            revision=revision, schema_version=schema_version, text=text, seq=seq, batch=batch,
         )
         batch = batch or entry.stem
         written += [path, entry]
