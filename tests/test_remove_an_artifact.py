@@ -2,7 +2,9 @@ import subprocess
 
 from pytest_bdd import given, scenarios, then, when
 
-from calls import CLIENT, TAG_TYPE, create, define, everything_under, journal, listing, read, remove, tagged_decision_type
+from calls import (
+    CLIENT, TAG_TYPE, create, define, everything_under, journal, listing, read, remove, request, tagged_decision_type,
+)
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -102,3 +104,72 @@ def _rejected_for_nothing(attempt):
 @then("the store holds what it held before")
 def _held_as_before(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+PROCESS = "process/run-the-clearance-sale"
+TAGGED_PROCESS_TYPE = {
+    "title": "Process",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {"title": {"type": "string"}},
+        "required": ["title"],
+        "parts": {"steps": {"items": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "about": {
+                    "type": "string",
+                    "ref": {"targets": ["tag"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+                },
+            },
+            "required": ["title"],
+        }}},
+    },
+}
+
+
+@given("a process one of whose steps points at the tag nothing else points at")
+def _a_step_pointing_at_the_loose_tag(client):
+    define(client, TAGGED_PROCESS_TYPE)
+    create(client, "process", {"title": "Run the clearance sale", "steps": [
+        {"title": "Mark the shelves"}, {"title": "Price the stock", "about": LOOSE},
+    ]})
+
+
+@when("the client removes that tag, saying which role and why", target_fixture="attempt")
+def _remove_the_tag_a_step_points_at(root, client):
+    before = everything_under(root)
+    response = remove(client, LOOSE, message="Nothing is on clearance")
+    return {"response": response, "before": before, "after": everything_under(root)}
+
+
+@then("the client is given that link among the links that block it")
+def _the_steps_link_among_them(client, attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path) for fault in faults] == [(PROCESS, "steps/1/about")]
+    assert f"'{LOOSE}'" in faults[0].message
+    assert not read(client, LOOSE).faults
+
+
+@given("the client has removed the tag nothing points at")
+def _the_loose_tag_removed(client):
+    response = remove(client, LOOSE, message="Nothing is on clearance")
+    assert not response.faults, response.faults
+
+
+@when("the client creates a tag with the title the removed one had, saying which role and why", target_fixture="created")
+def _create_a_tag_titled_as_the_removed_one(client):
+    return request(client, "tag", "Clearance", {}, message="Clearance is back")
+
+
+@then("the client is given the name the removed tag had, with no number added")
+def _the_same_name(created):
+    assert not created.faults, created.faults
+    assert created.id == LOOSE
+
+
+@then("the new tag is at its first version")
+def _at_its_first_version(client, created):
+    assert created.revision == 1
+    assert read(client, LOOSE).revision == 1
