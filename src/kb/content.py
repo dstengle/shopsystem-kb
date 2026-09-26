@@ -14,6 +14,12 @@ def loads(text: str) -> dict:
     return canonical.load(text) or {}
 
 
+def entries(text: str) -> dict:
+    """A whole artifact's content: a set of named entries, read plainly. Raises canonical.NotCanonical for text that
+    is anything else, nothing at all included."""
+    return canonical.entries(text)
+
+
 def text(value) -> str:
     """A value as the text YAML 1.2 writes it. A title is text whatever arrived: true is "true", 12 is "12"."""
     if value is None:

@@ -1,3 +1,5 @@
+import re
+
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, everything_under, read, request
@@ -600,3 +602,52 @@ def _create_with_two_kinds_of_fault(root, client):
         "response": response, "before": before, "after": everything_under(root),
         "faults": [("options", "type"), ("sections", "sections")],
     }
+
+
+WHOLE = "sections:\n  - title: Purpose\n    body: Why.\n  - title: Rationale\n    body: Because.\n"
+SENSELESS = {
+    "content that cannot be read as written at all": (WHOLE + "options: [Keep weekly\n", ""),
+    "content that is a list rather than a set of named entries": ("- Purpose\n- Rationale\n", ""),
+    "content that is a single bare value": ("Keep prices in step with costs.\n", ""),
+    "content with nothing in it at all": ("", ""),
+    "content whose sections are one line of text rather than sections":
+        ("sections: Keep prices in step with costs.\n", "sections"),
+    "content whose options are a single value rather than a collection": (WHOLE + "options: Keep weekly\n", "options"),
+    "content one of whose options is a bare value": (WHOLE + "options:\n  - Keep weekly\n", "options/0"),
+}
+
+
+@when(
+    parsers.re(f"the client creates a decision from (?P<senseless>{'|'.join(map(re.escape, SENSELESS))}), "
+               "saying which role and why"),
+    target_fixture="attempt",
+)
+def _create_from_senseless_content(root, client, senseless):
+    before = everything_under(root)
+    text, place = SENSELESS[senseless]
+    response = _raw(client, text)
+    return {"response": response, "before": before, "after": everything_under(root), "place": place}
+
+
+REASONS = {
+    "content cannot be read as written": ("content", "it is not YAML that can be read"),
+    "content is a set of named entries": ("content", "content is a set of named entries"),
+    "the content does not fit the type": ("type", "is not of type"),
+}
+
+
+@then(parsers.re(
+    f"the artifact is rejected because (?P<reason>{'|'.join(map(re.escape, REASONS))}), "
+    "and the place it went wrong is named"
+))
+def _rejected_for_senseless_content(attempt, reason):
+    refused, (rule, words) = attempt["response"], REASONS[reason]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [(attempt["place"], rule)]
+    assert words in refused.faults[0].message
+
+
+@then("the call comes back with its answer rather than breaking off")
+def _the_call_answers(attempt):
+    assert isinstance(attempt["response"], kb_pb2.CreateResponse)
+    assert attempt["response"].faults

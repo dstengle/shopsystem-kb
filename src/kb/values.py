@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from kb import canonical, names
-from kb.content import loads
+from kb.content import entries, loads
 from kb.contract import kb_pb2
 
 class Refused(ValueError):
@@ -130,7 +130,7 @@ def content(text: str, at_root: bool = True) -> Content:
     """Content read plainly, and, for a whole artifact, holding only what a type declares. The identity keys belong
     to an artifact's root, so a node inside it, a section with its title, is not held to them. Every problem found."""
     try:
-        tree = loads(text)
+        tree = entries(text) if at_root else loads(text)
     except canonical.NotCanonical as fault:
         return Content(None, ((fault.path, "content", str(fault)),))
     if not at_root:
