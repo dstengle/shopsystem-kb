@@ -76,6 +76,27 @@ def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     )
 
 
+def no_such_shape(type_id: ArtifactId, place: str, ref: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(type_id), path=place, rule="shape",
+        message=f"a shape a type refers to must belong to a type the store holds; {ref!r} does not",
+    )
+
+
+def built_on_itself(type_id: ArtifactId, place: str, ref: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(type_id), path=place, rule="built-on",
+        message=f"a type cannot be built on itself; {str(type_id)!r} names {ref!r}",
+    )
+
+
+def no_targets(type_id: ArtifactId, place: str, field: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(type_id), path=place, rule="targets",
+        message=f"a link field says which kinds it may point at; {field!r} does not",
+    )
+
+
 def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(artifact=str(artifact_id), rule="content", message=problem)
 

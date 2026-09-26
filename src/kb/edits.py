@@ -4,7 +4,7 @@ with every fault it finds."""
 import copy
 from typing import NamedTuple
 
-from kb import canonical, names, places, refusals, requests, validation, values
+from kb import canonical, definitions, names, places, refusals, requests, validation, values
 from kb.store import Draft
 from kb.values import ArtifactId, Kind, Refused
 
@@ -44,7 +44,7 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
         raise Refused(faults)
     content = creation.content.tree
     schema = draft.schema(kind)
-    faults = validation.validate(at, {"title": creation.title, **content}, schema["schema"], draft)
+    faults = _fits(draft, artifact_id, {"title": creation.title, **content}, schema)
     if faults:
         raise Refused(faults)
     names.items(schema["schema"], content, keep_named=False)
@@ -120,7 +120,7 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     held = {collection: {item.get("id") for item in current.get(collection, [])}
             for collection in schema["schema"].get("parts", {})}
     faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(schema["schema"], content, held)]
-    faults += validation.validate(str(artifact_id), {"title": current["title"], **content}, schema["schema"], draft)
+    faults += _fits(draft, artifact_id, {"title": current["title"], **content}, schema)
     if faults:
         raise Refused(faults)
     names.items(schema["schema"], content, keep_named=True)
@@ -130,6 +130,14 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
         "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
     }
     draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
+
+
+def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) -> list:
+    """Every fault of the content against its type; a type, once it fits the type of types, checked as a type too."""
+    faults = validation.validate(str(artifact_id), content, schema["schema"], draft)
+    if not faults and artifact_id.kind == Kind("schema"):
+        faults = definitions.faults(artifact_id, content, draft)
+    return faults
 
 
 def _content_of(artifact: dict) -> dict:

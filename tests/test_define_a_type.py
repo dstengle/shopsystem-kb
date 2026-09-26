@@ -1,6 +1,8 @@
-from pytest_bdd import given, scenarios, then, when
+import re
 
-from calls import create, define, read, request
+from pytest_bdd import given, parsers, scenarios, then, when
+
+from calls import create, define, everything_under, read, request
 from kb import canonical
 
 scenarios("define-a-type.feature")
@@ -190,3 +192,62 @@ def _rejected_by_the_metaschema(client, refused):
     ]
     assert "'label' is not valid" in refused.faults[0].message
     assert [fault.rule for fault in read(client, "schema/shelf-label").faults] == ["not-found"]
+
+
+NEVER_CHECKABLE = {
+    "refers to a shape from a type the store does not hold": ("Tool use", {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "bindings": {"type": "array", "items": {"$ref": "kb:schema/nothing#/$defs/binding"}},
+        },
+    }),
+    "names itself as the type it is built on": ("Decision", {
+        "allOf": [{"$ref": "kb:schema/decision"}],
+        "type": "object",
+        "properties": {"title": {"type": "string"}},
+    }),
+    "declares a link field without saying which kinds it may point at": ("Note", {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "relates_to": {"type": "string", "ref": {"cardinality": "one", "parts": False, "on_delete": "refuse"}},
+        },
+    }),
+}
+
+
+@when(parsers.re(f"the client defines a type that (?P<fault>{'|'.join(map(re.escape, NEVER_CHECKABLE))})"), target_fixture="attempt")
+def _define_a_type_never_checkable(root, client, fault):
+    before = everything_under(root)
+    title, schema = NEVER_CHECKABLE[fault]
+    response = request(client, "schema", title, {"version": 1, "schema": schema}, message=f"Define {title}")
+    return {"response": response, "before": before, "after": everything_under(root)}
+
+
+def _type_rejected(attempt, rule, path, message):
+    faults = attempt["response"].faults
+    assert (attempt["response"].id, attempt["response"].revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in faults] == [(path, rule)]
+    assert faults[0].message.startswith(message)
+
+
+@then("the type is rejected because a shape a type refers to must belong to a type the store holds")
+def _rejected_for_a_shape_not_held(attempt):
+    _type_rejected(attempt, "shape", "schema/properties/bindings/items/$ref",
+                   "a shape a type refers to must belong to a type the store holds")
+
+
+@then("the type is rejected because a type cannot be built on itself")
+def _rejected_for_building_on_itself(attempt):
+    _type_rejected(attempt, "built-on", "schema/allOf/0/$ref", "a type cannot be built on itself")
+
+
+@then("the type is rejected because a link field says which kinds it may point at")
+def _rejected_for_a_link_without_kinds(attempt):
+    _type_rejected(attempt, "targets", "schema/properties/relates_to", "a link field says which kinds it may point at")
+
+
+@then("nothing is written anywhere in the store")
+def _nothing_written(attempt):
+    assert attempt["after"] == attempt["before"]
