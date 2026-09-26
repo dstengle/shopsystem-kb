@@ -9,8 +9,9 @@ from referencing import Registry
 from referencing.exceptions import NoSuchResource
 from referencing.jsonschema import DRAFT202012
 
-from kb import values
+from kb import canonical, values
 from kb.contract import kb_pb2
+from kb.store import Store, Unreadable
 from kb.values import Kind
 
 TYPE_URI = "kb:"
@@ -85,6 +86,26 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
                 message=f"a link must land on a node of a kind the type allows; {target!r} does not",
             ))
     return faults
+
+
+def check(store: Store) -> kb_pb2.ValidateResponse:
+    """Every artifact checked against the current version of its type, and listed as stale when it was last
+    checked against an older one; a file that cannot be read is reported and the check goes on."""
+    violations, stale = [], []
+    for artifact_id in store.ids():
+        try:
+            artifact = store.load(artifact_id)
+            schema = store.schema(artifact_id.kind)
+        except Unreadable as unreadable:
+            violations.append(unreadable.fault)
+            continue
+        if artifact["schema_version"] < schema["version"]:
+            stale.append(kb_pb2.Stale(
+                artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
+            ))
+        content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
+        violations += validate(str(artifact_id), content, schema["schema"], store)
+    return kb_pb2.ValidateResponse(violations=violations, stale=stale)
 
 
 def references(schema: dict, corpus) -> dict[str, dict]:
