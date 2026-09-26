@@ -6,6 +6,7 @@ from typing import NamedTuple
 from referencing.exceptions import NoSuchResource
 
 from kb import names, refusals, values
+from kb.contract import kb_pb2
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -67,7 +68,16 @@ def declared(schema: dict, corpus) -> dict:
 def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
     """The type a kind names. Raises Refused when the corpus holds none, since a kind must name a type the store
     holds, wherever it is given."""
+    found = named_type(kind, corpus)
+    if isinstance(found, kb_pb2.Fault):
+        raise values.Refused([found])
+    return found
+
+
+def named_type(kind: values.Kind, corpus, artifact: str = "") -> values.ArtifactId | kb_pb2.Fault:
+    """The type a kind names, or, when the corpus holds none, the fault saying so, of the artifact named when an
+    artifact claims the kind."""
     type_id = values.type_of(kind)
     if not corpus.holds(type_id):
-        raise values.Refused([refusals.no_type(kind.name)])
+        return refusals.no_type(kind.name, artifact=artifact)
     return type_id

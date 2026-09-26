@@ -1,7 +1,7 @@
 """The check of the whole store: every artifact against the current version of its type, the stale listed beside
 the violations, and a file that cannot be read, or an artifact of a kind with no type, reported as what it is, the
 check going on past it."""
-from kb import refusals, settled, validation, values
+from kb import composition, settled, validation
 from kb.contract import kb_pb2
 from kb.store import Damaged, Store
 
@@ -31,8 +31,8 @@ def _with_type(store: Store, artifact_id) -> tuple[dict, dict] | kb_pb2.Fault:
     artifact = store.load(artifact_id)
     if isinstance(artifact, Damaged):
         return artifact.fault
-    type_id = values.type_of(artifact_id.kind)
-    if not store.holds(type_id):
-        return refusals.no_type(artifact_id.kind.name, artifact=str(artifact_id))
+    type_id = composition.named_type(artifact_id.kind, store, artifact=str(artifact_id))
+    if isinstance(type_id, kb_pb2.Fault):
+        return type_id
     schema = store.load(type_id)
     return schema.fault if isinstance(schema, Damaged) else (artifact, schema)
