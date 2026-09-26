@@ -49,3 +49,10 @@ def still_linked(removed: ArtifactId, other: ArtifactId, place: str) -> kb_pb2.F
 def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(artifact=str(artifact_id), rule="content", message=problem)
 
+
+
+def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), path="sections", rule="not-found",
+        message=f"{str(artifact_id)!r} holds no section titled {title!r}",
+    )

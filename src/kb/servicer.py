@@ -5,8 +5,8 @@ string that came from the request.
 """
 from datetime import datetime
 
-from kb import canonical, journal, requests, search, validation, values, write
-from kb.content import dumps, text
+from kb import canonical, journal, read, requests, search, validation, values, write
+from kb.content import text
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.store import Store, Unreadable
 from kb.values import ArtifactId
@@ -74,81 +74,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def Read(self, request, context):
         try:
-            reading = requests.reading(request)
+            return read.artifact(self._store, requests.reading(request))
         except values.Refused as refused:
             return kb_pb2.ReadResponse(faults=refused.faults)
-        locator = reading.locator
-        if not self._store.holds(locator.id):
-            return kb_pb2.ReadResponse(faults=[_not_found(locator.id)])
-        try:
-            if reading.level == "whole":
-                return self._whole(locator, reading.depth)
-            if reading.level == "section":
-                return self._section(locator, reading.section)
-            return self._summary(locator)
-        except Unreadable as unreadable:
-            return kb_pb2.ReadResponse(faults=[unreadable.fault])
-
-    def _whole(self, locator, depth: int):
-        artifact = self._resolved(locator.id, depth, {str(locator.id)})
-        return kb_pb2.ReadResponse(
-            id=artifact["id"], type=artifact["type"],
-            schema_version=artifact["schema_version"], revision=artifact["revision"],
-            title=artifact["title"],
-            content=dumps({key: value for key, value in artifact.items() if key not in canonical.IDENTITY}),
-        )
-
-    def _section(self, locator, title: str):
-        """The first section with that title, at any depth, in the order the artifact holds them, and nothing else."""
-        artifact = self._store.load(locator.id)
-        found = _find_section(artifact.get("sections", []), title)
-        if found is None:
-            return kb_pb2.ReadResponse(faults=[kb_pb2.Fault(
-                artifact=str(locator.id), path="sections", rule="not-found",
-                message=f"{str(locator.id)!r} holds no section titled {title!r}",
-            )])
-        return kb_pb2.ReadResponse(
-            id=artifact["id"], type=artifact["type"],
-            schema_version=artifact["schema_version"], revision=artifact["revision"],
-            title=artifact["title"], content=dumps(found),
-        )
-
-    def _resolved(self, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
-        """The artifact as stored, each link followed depth steps with the target, itself resolved, in place of its
-        name. A target on the path already being filled in stays a name, so a loop ends."""
-        artifact = self._store.load(artifact_id)
-        if depth < 1:
-            return artifact
-        def fill(target):
-            if target in on_path:
-                return target
-            return self._resolved(values.artifact_id(target), depth - 1, on_path | {target})
-        resolved = dict(artifact)
-        for field in validation.references(self._store.schema(artifact_id.kind)["schema"], self._store):
-            value = artifact.get(field)
-            if isinstance(value, list):
-                resolved[field] = [fill(target) for target in value]
-            elif value is not None:
-                resolved[field] = fill(value)
-        return resolved
-
-    def _summary(self, locator):
-        artifact = self._store.load(locator.id)
-        schema = self._store.schema(locator.id.kind)["schema"]
-        response = kb_pb2.ReadResponse(
-            id=artifact["id"], type=artifact["type"],
-            schema_version=artifact["schema_version"], revision=artifact["revision"],
-            title=artifact["title"],
-            content=dumps(_summary_fields(artifact, schema)),
-        )
-        for field, _, target in validation.links(artifact, schema, self._store):
-            response.references.append(self._stub(field, values.artifact_id(target)))
-        for collection in schema.get("parts", {}):
-            for item in artifact.get(collection, []):
-                response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
-        for (type_name, field), count in self._inbound(str(locator.id)).items():
-            response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
-        return response
 
     def Validate(self, request, context):
         """Every artifact checked against the current version of its type, and listed as stale when it was last
@@ -196,7 +124,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         hits = search.rank(artifacts, searching.text, sections=searching.sections, fields=searching.fields)
         return kb_pb2.SearchResponse(matches=[
             kb_pb2.Match(
-                stub=self._stub("", values.artifact_id(hit.artifact)), section=hit.section, field=hit.field,
+                stub=read.stub(self._store, "", values.artifact_id(hit.artifact)), section=hit.section, field=hit.field,
                 snippet=hit.snippet,
             )
             for hit in hits
@@ -224,7 +152,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
                         continue
                     seen.add(str(other_id))
                     taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
-                    reached.append(kb_pb2.Reached(stub=self._stub(field, other_id), route=taken))
+                    reached.append(kb_pb2.Reached(stub=read.stub(self._store, field, other_id), route=taken))
                     following.append((other_id, taken))
             frontier = following
         return kb_pb2.RefsResponse(reached=reached)
@@ -259,7 +187,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         ]
         if listing.ids:
             return kb_pb2.ListResponse(ids=[str(artifact_id) for artifact_id in matched])
-        return kb_pb2.ListResponse(stubs=[self._stub("", artifact_id) for artifact_id in matched])
+        return kb_pb2.ListResponse(stubs=[read.stub(self._store, "", artifact_id) for artifact_id in matched])
 
     def Snapshot(self, request, context):
         """One journal entry listing each artifact named with its version now and the fingerprint of its file, under
@@ -285,25 +213,6 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         signed = values.signed(request.actor, request.message)
         return kb_pb2.SnapshotResponse(entry=write.record(self._store, read, signed))
 
-    def _stub(self, field, target_id: ArtifactId):
-        target = self._store.load(target_id)
-        schema = self._store.schema(target_id.kind)["schema"]
-        return kb_pb2.Stub(
-            field=field, id=target["id"], type=target["type"], title=target["title"],
-            fields=dumps(_summary_fields(target, schema)),
-        )
-
-    def _inbound(self, artifact_id: str):
-        """How many artifacts point at this one, by their type and the field they use."""
-        counts = {}
-        for other in self._store.artifacts():
-            schema = self._store.schema(values.kind(other["type"]))["schema"]
-            pointing = {field for field, _, target in validation.links(other, schema, self._store) if target == artifact_id}
-            for field in pointing:
-                counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
-        return counts
-
-
 def _holds(artifact: dict, fields) -> bool:
     """Whether each field named holds the value given, compared as the text the value is written as."""
     return all(field in artifact and text(artifact[field]) == value for field, value in fields.items())
@@ -318,19 +227,3 @@ def _entry(entry: dict) -> kb_pb2.Entry:
         schema_version=entry.get("schema_version", 0), digest=entry.get("digest", ""), message=entry["message"],
         batch=entry["batch"], read=[kb_pb2.Snapshotted(**read) for read in entry.get("read", [])],
     )
-
-
-def _find_section(sections: list, title: str) -> dict | None:
-    """The first section titled so, looking at each section before the sections inside it."""
-    for section in sections:
-        if section["title"] == title:
-            return section
-        found = _find_section(section.get("sections", []), title)
-        if found is not None:
-            return found
-    return None
-
-
-def _summary_fields(artifact, schema):
-    return {name: artifact[name] for name in schema.get("summary", []) if name in artifact}
-
