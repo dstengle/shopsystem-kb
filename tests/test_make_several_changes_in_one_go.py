@@ -123,3 +123,28 @@ def _the_set_in_the_history(client, applied):
     assert [(entry.op, entry.artifact, entry.revision, entry.batch) for entry in shown.entries] == [
         ("create", DECISION, 1, applied.batch), ("write", WORK_ITEM, 2, applied.batch),
     ]
+
+
+@when("the client asks, in one go, for the work item to be changed twice, saying which role and why", target_fixture="applied")
+def _change_the_work_item_twice(client):
+    return apply(client, [replacement(WORK_ITEM, {"decisions": []}), replacement(WORK_ITEM, {})],
+                 message="Change the work item twice")
+
+
+@then("the store's history holds an entry for each of the two changes")
+def _an_entry_for_each_change(root, applied):
+    assert not applied.faults, applied.faults
+    in_set = [entry for entry in _journal(root) if entry["batch"] == applied.batch]
+    assert [(entry["op"], entry["artifact"]) for entry in in_set] == [("write", WORK_ITEM), ("write", WORK_ITEM)]
+
+
+@then("each entry records the version that change left behind")
+def _each_entry_its_own_version(root, applied):
+    in_set = [entry for entry in _journal(root) if entry["batch"] == applied.batch]
+    assert [entry["revision"] for entry in in_set] == [2, 3]
+    assert [(result.id, result.revision) for result in applied.results] == [(WORK_ITEM, 2), (WORK_ITEM, 3)]
+
+
+@then("the work item's version has gone up by two")
+def _two_versions_on(client):
+    assert read(client, WORK_ITEM).revision == 3

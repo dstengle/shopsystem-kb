@@ -10,24 +10,32 @@ from kb.values import ArtifactId, Kind, Refused
 
 
 class Change(NamedTuple):
-    """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name. A
-    removal carries the version its entry records and the version of the type it was last checked against."""
+    """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name; the
+    version its entry records and the version of the type it was last checked against; and the artifact as this
+    operation left it, None for a removal."""
     op: str
     artifact_id: ArtifactId
     path: str = ""
     item: str = ""
     revision: int = 0
     schema_version: int = 0
+    left: dict | None = None
 
 
 def apply(draft: Draft, operation) -> Change:
-    """One operation applied to the draft. Returns what it did; raises Refused."""
+    """One operation applied to the draft. Returns what it did, settled as it did it; raises Refused."""
+    if isinstance(operation, requests.Remove):
+        return _delete(draft, operation)
+    change = _changed(draft, operation)
+    left = draft.artifact(change.artifact_id)
+    return change._replace(revision=left["revision"], schema_version=left["schema_version"], left=left)
+
+
+def _changed(draft: Draft, operation) -> Change:
     if isinstance(operation, requests.Create):
         return Change("create", _create(draft, operation))
     if isinstance(operation, requests.Add):
         return _append(draft, operation)
-    if isinstance(operation, requests.Remove):
-        return _delete(draft, operation)
     return Change("write", _replace(draft, operation))
 
 

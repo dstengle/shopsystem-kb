@@ -27,11 +27,11 @@ class Landed(NamedTuple):
 
 
 class Landing(NamedTuple):
-    """A change as it will be written: its canonical text, None for a removal, and the versions its entry records."""
+    """A change as it will be written: its canonical text as the change left the artifact, None for a removal, and
+    whether the file is written with it, which it is only for the last change the set makes to that artifact."""
     change: Change
     text: str | None
-    revision: int
-    schema_version: int
+    last: bool
 
 
 def start(root: Root, actor: Actor) -> None:
@@ -53,8 +53,8 @@ def start(root: Root, actor: Actor) -> None:
 def land(store: Store, operations: list, signed: Signed) -> Landed:
     """The set drafted, serialised, then written and committed. Raises Refused with every fault, having written
     nothing."""
-    draft, changes = _drafted(store, operations)
-    return _written(store, _serialised(draft, changes), signed)
+    changes = _drafted(store, operations)
+    return _written(store, _serialised(changes), signed)
 
 
 def record(store: Store, named: list, signed: Signed) -> str:
@@ -65,7 +65,7 @@ def record(store: Store, named: list, signed: Signed) -> str:
     return entry.stem
 
 
-def _drafted(store: Store, operations: list) -> tuple[Draft, list[Change]]:
+def _drafted(store: Store, operations: list) -> list[Change]:
     """Every operation applied in order to a draft; refused with the faults of every operation that fails."""
     draft = Draft(store)
     changes, faults = [], []
@@ -79,21 +79,20 @@ def _drafted(store: Store, operations: list) -> tuple[Draft, list[Change]]:
             faults += refused.faults
     if faults:
         raise Refused(faults)
-    return draft, changes
+    return changes
 
 
-def _serialised(draft: Draft, changes: list[Change]) -> list[Landing]:
-    """Each change as it will be written, settled from the draft; refused if any cannot be written."""
+def _serialised(changes: list[Change]) -> list[Landing]:
+    """Each change as it will be written, settled as the change left its artifact; refused if any cannot be written."""
+    last = {change.artifact_id: index for index, change in enumerate(changes)}
     landings, found = [], []
-    for change in changes:
-        if change.op == "delete":
-            landings.append(Landing(change, None, change.revision, change.schema_version))
-            continue
-        artifact = draft.artifact(change.artifact_id)
+    for index, change in enumerate(changes):
         try:
-            landings.append(Landing(change, canonical.dump(artifact), artifact["revision"], artifact["schema_version"]))
+            text = None if change.left is None else canonical.dump(change.left)
         except canonical.NotCanonical as fault:
             found.append(refusals.unwritable(change.artifact_id, str(fault)))
+            continue
+        landings.append(Landing(change, text, last[change.artifact_id] == index))
     if found:
         raise Refused(found)
     return landings
@@ -103,17 +102,20 @@ def _written(store: Store, landings: list[Landing], signed: Signed) -> Landed:
     """Each file saved or removed, its journal entry written naming the set, and all of it in one commit. Reads
     nothing: everything written was settled before."""
     written, results, batch = [], [], ""
-    for seq, (change, text, revision, schema_version) in enumerate(landings, start=1):
-        if text is None:
-            path = store.remove(change.artifact_id)
-        else:
-            path = store.save(change.artifact_id, text)
+    for seq, (change, text, last) in enumerate(landings, start=1):
+        if last:
+            written.append(_file(store, change.artifact_id, text))
         entry = journal.write(
             store.dir, signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path,
-            revision=revision, schema_version=schema_version, text=text, seq=seq, batch=batch,
+            revision=change.revision, schema_version=change.schema_version, text=text, seq=seq, batch=batch,
         )
         batch = batch or entry.stem
-        written += [path, entry]
-        results.append(Result(change.artifact_id, revision, change.item))
+        written.append(entry)
+        results.append(Result(change.artifact_id, change.revision, change.item))
     store.commit(written, signed)
     return Landed(batch, results)
+
+
+def _file(store: Store, artifact_id: ArtifactId, text: str | None):
+    """The artifact's file written with its text, or taken out when there is none; where it is."""
+    return store.remove(artifact_id) if text is None else store.save(artifact_id, text)
