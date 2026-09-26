@@ -1,22 +1,16 @@
 """Schema validation: the type's JSON Schema composed with kb's own structural rules, checked in one pass, then
 what the schema language cannot say, checked in code: required sections in their declared order, and links that
-land on an artifact the corpus holds, of a kind the type allows.
-
-kb's keywords are read through the type's composition, so a type built on a base carries the base's first.
+land on an artifact the corpus holds, of a kind the type allows. kb's keywords are read through kb.composition.
 """
-from typing import NamedTuple
-
 from jsonschema import Draft202012Validator
 from referencing import Registry
-from referencing.exceptions import NoSuchResource
 from referencing.jsonschema import DRAFT202012
 
-from kb import canonical, values
+from kb import canonical, links, values
+from kb.composition import composition, type_schema
 from kb.contract import kb_pb2
 from kb.store import Damaged, Store
 from kb.values import Kind
-
-TYPE_URI = "kb:"
 
 SECTION = {
     "type": "object",
@@ -57,25 +51,18 @@ def _collections(schema: dict) -> list[dict]:
 
 
 def _item(item_schema: dict) -> dict:
-    return {**item_schema, "allOf": [*item_schema.get("allOf", []), *_collections(item_schema)]}
+    """An item's schema with the shape of each collection it declares beside it; unchanged when it declares none."""
+    collections = _collections(item_schema)
+    if not collections:
+        return item_schema
+    return {**item_schema, "allOf": [*item_schema.get("allOf", []), *collections]}
 
 
 def registry(corpus) -> Registry:
     """Every type the corpus holds, found by the URI kb:schema/<type> when a schema refers to it, and only then."""
     def retrieve(uri: str):
-        return DRAFT202012.create_resource(_type_schema(uri, corpus))
+        return DRAFT202012.create_resource(type_schema(uri, corpus))
     return Registry(retrieve=retrieve)
-
-
-def _type_schema(uri: str, corpus) -> dict:
-    """The JSON Schema of the type a kb: URI names, its name checked as any other name is. NoSuchResource if none."""
-    try:
-        schema_id = values.artifact_id(uri.removeprefix(TYPE_URI)) if uri.startswith(TYPE_URI) else None
-    except values.Refused:
-        schema_id = None
-    if schema_id is None or schema_id.kind != Kind("schema") or not corpus.holds(schema_id):
-        raise NoSuchResource(ref=uri)
-    return corpus.artifact(schema_id)["schema"]
 
 
 def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_pb2.Fault]:
@@ -96,7 +83,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
         return faults
     required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
     faults = _sections(artifact_id, content.get("sections", []), required, "sections")
-    for link in links(content, schema, corpus):
+    for link in links.carried(content, schema, corpus):
         if not _lands(link.target, link.ref, corpus):
             faults.append(kb_pb2.Fault(
                 artifact=artifact_id, path=link.place, rule="ref",
@@ -133,57 +120,6 @@ def _with_type(store: Store, artifact_id) -> tuple[dict, dict] | Damaged:
     return schema if isinstance(schema, Damaged) else (artifact, schema)
 
 
-def references(schema: dict, corpus) -> dict[str, dict]:
-    """Every field that links to other artifacts, from every schema in the composition, base first, with its `ref`."""
-    return {
-        name: field["ref"]
-        for part in composition(schema, corpus)
-        for name, field in part.get("properties", {}).items()
-        if "ref" in field
-    }
-
-
-class Link(NamedTuple):
-    """One link an artifact carries: the field that holds it, the place of that field in the artifact, the name it
-    points at, and the field's `ref`, which says what it may land on."""
-    field: str
-    place: str
-    target: str
-    ref: dict
-
-
-def links(artifact: dict, schema: dict, corpus) -> list[Link]:
-    """Every link an artifact carries, wherever it sits: in its own fields, and in the fields of each item of each of
-    its collections, at every depth."""
-    return _links_in(artifact, references(schema, corpus), schema.get("parts", {}), "", corpus)
-
-
-def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -> list[Link]:
-    """The links in one node, an artifact or an item, its place in the artifact before each of theirs."""
-    found = []
-    for field, ref in refs.items():
-        value = node.get(field)
-        if isinstance(value, list):
-            found += [Link(field, f"{at}{field}/{index}", target, ref) for index, target in enumerate(value)]
-        elif value is not None:
-            found.append(Link(field, f"{at}{field}", value, ref))
-    for collection, part in parts.items():
-        items = node.get(collection)
-        if not isinstance(items, list):
-            continue
-        item_schema = part.get("items", {})
-        item_refs = references(item_schema, corpus)
-        for index, item in enumerate(items):
-            if isinstance(item, dict):
-                found += _links_in(item, item_refs, item_schema.get("parts", {}), f"{at}{collection}/{index}/", corpus)
-    return found
-
-
-def points_at(target: str, artifact_id) -> bool:
-    """Whether a link lands on the artifact or on a part inside it."""
-    return target.partition("#")[0] == str(artifact_id)
-
-
 def _lands(target: str, ref: dict, corpus) -> bool:
     """Whether a link lands: on an artifact of a kind the field allows that the corpus holds, and, when it names a
     place after `#` and the field allows parts, on a part that artifact holds."""
@@ -210,18 +146,6 @@ def _holds_part(node: dict, place: tuple) -> bool:
         if node is None:
             return False
     return True
-
-
-def composition(schema: dict, corpus) -> list[dict]:
-    """The schema and every schema it is built on, base first: its allOf members in order, a whole type it names by
-    $ref followed to that type's schema, and last the schema itself. kb's keywords are read through this list."""
-    built_on = []
-    for member in schema.get("allOf", []):
-        built_on += composition(member, corpus)
-    ref = schema.get("$ref")
-    if isinstance(ref, str) and ref.startswith(TYPE_URI) and "#" not in ref:
-        built_on += composition(_type_schema(ref, corpus), corpus)
-    return [*built_on, schema]
 
 
 def _sections(artifact_id: str, sections: list, required: list, place: str) -> list[kb_pb2.Fault]:

@@ -3,7 +3,7 @@ store holds, it is not built on itself, and every link field says which kinds it
 check an artifact against is refused here, once, rather than by every create that uses it."""
 from kb import refusals, values
 from kb.contract import kb_pb2
-from kb.validation import TYPE_URI
+from kb.composition import TYPE_URI
 from kb.values import ArtifactId, Kind, Refused
 
 

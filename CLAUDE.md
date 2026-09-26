@@ -13,6 +13,8 @@ a change that breaks one is refactored into place first, then made.
 | `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
 | `names.py` | minting, uniqueness, reuse and grammar of artifact and item ids | I/O |
 | `validation.py` | the composed effective schema and the checks JSON Schema cannot express | file access |
+| `composition.py` | a type read through what it is built on: its composition, base first, and the type a `kb:` reference names | checks, file access |
+| `links.py` | the one reading of links: every link an artifact carries, wherever it sits, and whether a link points at an artifact | checks, file access |
 | `definitions.py` | a type checked as it is written: what it refers to is held, it is not built on itself, its link fields say what they may point at | file access, checking artifacts against a type |
 | `refusals.py` | the faults the domain makes of what a store holds, each with its rule and message | conversions, type checks |
 | `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, then write, journal and commit; starting a store, recording a snapshot | rpc types |

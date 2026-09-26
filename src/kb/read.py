@@ -1,6 +1,6 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too."""
-from kb import canonical, refusals, validation, values
+from kb import canonical, links, refusals, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
@@ -50,7 +50,7 @@ def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
     found = store.artifact(locator.id)
     schema = store.schema(locator.id.kind)["schema"]
     response = _response(found, dumps(_summary_fields(found, schema)))
-    for link in validation.links(found, schema, store):
+    for link in links.carried(found, schema, store):
         response.references.append(stub(store, link.field, values.artifact_id(link.target)))
     for collection in schema.get("parts", {}):
         for item in found.get(collection, []):
@@ -78,7 +78,7 @@ def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -
             return target
         return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
     resolved = dict(found)
-    for field in validation.references(store.schema(artifact_id.kind)["schema"], store):
+    for field in links.references(store.schema(artifact_id.kind)["schema"], store):
         value = found.get(field)
         if isinstance(value, list):
             resolved[field] = [fill(target) for target in value]
@@ -92,7 +92,7 @@ def _inbound(store: Store, artifact_id: str) -> dict:
     counts = {}
     for other in store.artifacts():
         schema = store.schema(values.kind(other["type"]))["schema"]
-        pointing = {link.field for link in validation.links(other, schema, store) if link.target == artifact_id}
+        pointing = {link.field for link in links.carried(other, schema, store) if link.target == artifact_id}
         for field in pointing:
             counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
     return counts

@@ -2,7 +2,7 @@
 words occur, what the journal holds, and what a piece of work read. Nothing here writes."""
 from datetime import datetime
 
-from kb import journal, read, refusals, search, validation, values
+from kb import journal, links, read, refusals, search, values
 from kb.content import text
 from kb.contract import kb_pb2
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
@@ -98,7 +98,7 @@ def _outward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactI
     """Each link out of an artifact, as the field and the name it points at."""
     artifact = store.artifact(artifact_id)
     schema = store.schema(artifact_id.kind)["schema"]
-    return [(link.field, values.artifact_id(link.target)) for link in validation.links(artifact, schema, store)]
+    return [(link.field, values.artifact_id(link.target)) for link in links.carried(artifact, schema, store)]
 
 
 def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
@@ -108,8 +108,8 @@ def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId
     for other_id in store.ids():
         other = store.artifact(other_id)
         schema = store.schema(other_id.kind)["schema"]
-        for link in validation.links(other, schema, store):
-            if validation.points_at(link.target, artifact_id):
+        for link in links.carried(other, schema, store):
+            if links.points_at(link.target, artifact_id):
                 pointing.append((link.field, other_id))
     return pointing
 

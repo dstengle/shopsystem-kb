@@ -4,7 +4,7 @@ with every fault it finds."""
 import copy
 from typing import NamedTuple
 
-from kb import canonical, definitions, names, places, refusals, requests, validation, values
+from kb import canonical, definitions, links, names, places, refusals, requests, validation, values
 from kb.store import Draft
 from kb.values import ArtifactId, Kind, Refused
 
@@ -110,8 +110,8 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
         if other_id == locator.id:
             continue
         schema = draft.schema(other_id.kind)["schema"]
-        for link in validation.links(draft.artifact(other_id), schema, draft):
-            if validation.points_at(link.target, locator.id):
+        for link in links.carried(draft.artifact(other_id), schema, draft):
+            if links.points_at(link.target, locator.id):
                 blocking.append(refusals.still_linked(locator.id, other_id, link.place))
     if blocking:
         raise Refused(blocking)
