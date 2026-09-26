@@ -167,3 +167,38 @@ def _removal_refused(client):
     refused = remove(client, PROCESS)
     assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(INTO_A_STEP, "follows", "on_delete")]
     assert read(client, PROCESS).revision == 1
+
+
+NOTE = "note/weekly-reviews-need-cover"
+NOTE_TYPE = {
+    "title": "Note",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "decisions": copy.deepcopy(WORK_ITEM_TYPE["schema"]["properties"]["decisions"]),
+        },
+        "required": ["title"],
+    },
+}
+
+
+@given("a note that is not a work item also points at the decision, through the same link the work items use")
+def _a_note_pointing_at_the_decision(client):
+    define(client, NOTE_TYPE)
+    create(client, "note", {"title": "Weekly reviews need cover", "decisions": [DECISION]})
+
+
+@given("one of the two work items points at the decision a second time, through a different link of its own")
+def _a_work_item_pointing_twice(client):
+    revised = copy.deepcopy(WORK_ITEM_TYPE["schema"])
+    revised["properties"]["follows"] = {
+        "type": "string", "ref": {"targets": ["decision"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+    }
+    changed = write(client, "schema/work-item", {"version": 2, "schema": revised}, message="Let work items follow a decision")
+    assert not changed.faults, changed.faults
+    changed = write(client, WORK_ITEMS[1], {"decisions": [DECISION], "follows": DECISION}, message="Follow it too")
+    assert not changed.faults, changed.faults
+    inward = refs(client, DECISION, depth=1, inward=True)
+    assert {(found.stub.field, found.stub.id) for found in inward.reached} >= {("decisions", NOTE)}
