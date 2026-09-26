@@ -19,7 +19,7 @@ def digest(path: Path) -> str:
 
 def fingerprint(text: str) -> str:
     """The fingerprint of text about to be written: sha256 of the bytes it is written as."""
-    return hashlib.sha256(text.encode()).hexdigest()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str, revision: int,
@@ -64,13 +64,13 @@ def snapshot(store_dir: Path, *, signed: Signed, read: list[dict]) -> Path:
 def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
     target = store_dir / "journal" / at.strftime("%Y") / at.strftime("%m") / at.strftime("%d") / f"{entry['id']}.yaml"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(canonical.dump(entry))
+    target.write_text(canonical.dump(entry), encoding="utf-8")
     return target
 
 
 def entries(store_dir: Path) -> list[dict]:
     """Every entry in the journal, oldest first: by the time in its id, then by its place in its set."""
-    found = [canonical.load(path.read_text()) for path in (store_dir / "journal").rglob("*.yaml")]
+    found = [canonical.load(path.read_text(encoding="utf-8")) for path in (store_dir / "journal").rglob("*.yaml")]
     return sorted(found, key=_order)
 
 

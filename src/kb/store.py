@@ -32,14 +32,14 @@ class Store:
         """Make the store directory, its git repository, and its marker file."""
         self.dir.mkdir(parents=True)
         _git("init", "-q", "-b", "main", str(self.dir))
-        (self.dir / "store.yaml").write_text(canonical.dump({"contract": CONTRACT_VERSION}))
+        (self.dir / "store.yaml").write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
 
     def save(self, artifact_id: ArtifactId, text: str) -> Path:
         """Write canonical text to a temp file and rename it into place."""
         path = self.path(artifact_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_name(path.name + ".tmp")
-        temp.write_text(text)
+        temp.write_text(text, encoding="utf-8")
         temp.replace(path)
         return path
 
@@ -56,7 +56,7 @@ class Store:
         """The artifact as stored. A file that cannot be read raises Unreadable, naming the file."""
         path = self.path(artifact_id)
         try:
-            return canonical.load(path.read_text())
+            return canonical.load(path.read_text(encoding="utf-8"))
         except canonical.NotCanonical as error:
             raise Unreadable(kb_pb2.Fault(
                 artifact=str(artifact_id), rule="unreadable",
