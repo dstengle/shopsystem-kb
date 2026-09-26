@@ -82,16 +82,10 @@ def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -
         return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
     resolved = dict(found)
     carried = links.carried(found, composition.kind_schema(artifact_id.kind, store)["schema"], store)
-    for field in {link.field for link in carried if _own(link)}:
+    for field in {link.field for link in carried if link.own}:
         value = found[field]
         resolved[field] = [fill(target) for target in value] if isinstance(value, list) else fill(value)
     return resolved
-
-
-def _own(link: links.Link) -> bool:
-    """Whether a link sits in one of the artifact's own fields, alone or in a list, rather than inside an item."""
-    head, _, rest = link.place.partition("/")
-    return head == link.field and (not rest or rest.isdigit())
 
 
 def _inbound(store: Store, artifact_id: ArtifactId) -> dict:

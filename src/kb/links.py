@@ -8,11 +8,13 @@ from kb.composition import declared
 
 class Link(NamedTuple):
     """One link an artifact carries: the field that holds it, the place of that field in the artifact, the name it
-    points at, and the field's `ref`, which says what it may land on."""
+    points at, the field's `ref`, which says what it may land on, and whether the field is one of the artifact's own,
+    holding the link alone or in a list, rather than a field of one of its items."""
     field: str
     place: str
     target: str
     ref: dict
+    own: bool
 
 
 def references(schema: dict, corpus) -> dict[str, dict]:
@@ -32,9 +34,9 @@ def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -
     for field, ref in refs.items():
         value = node.get(field)
         if isinstance(value, list):
-            found += [Link(field, f"{at}{field}/{index}", target, ref) for index, target in enumerate(value)]
+            found += [Link(field, f"{at}{field}/{index}", target, ref, not at) for index, target in enumerate(value)]
         elif value is not None:
-            found.append(Link(field, f"{at}{field}", value, ref))
+            found.append(Link(field, f"{at}{field}", value, ref, not at))
     for collection, part in parts.items():
         items = node.get(collection)
         if not isinstance(items, list):
