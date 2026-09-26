@@ -136,6 +136,23 @@ def load(text: str):
         raise NotCanonical(_unreadable(error)) from None
 
 
+def entries(text: str) -> dict:
+    """Plain YAML 1.2 that is a set of named entries, as an artifact always is: read as `load` reads it. Text that is
+    anything else, a list, a single value or nothing, raises NotCanonical saying what it is."""
+    loaded = load(text)
+    if not isinstance(loaded, dict):
+        raise NotCanonical(f"content is a set of named entries; this is {_shape(loaded)}")
+    return loaded
+
+
+def _shape(value) -> str:
+    if value is None:
+        return "nothing at all"
+    if isinstance(value, list):
+        return "a list"
+    return f"the single value {value!r}"
+
+
 def _unreadable(error: YAMLError) -> str:
     mark = getattr(error, "problem_mark", None)
     where = f" at line {mark.line + 1}" if mark is not None else ""

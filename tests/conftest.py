@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 import pytest
-from pytest_bdd import given, then
+from pytest_bdd import given, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, everything_under
 from kb import client as kb_client
@@ -87,3 +87,21 @@ def _decision_file_mangled_by_hand(root, monkeypatch):
     (root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").write_text(MANGLED)
     monkeypatch.chdir(root)
     monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+@when("the client checks the store", target_fixture="checked")
+def _check_the_store(client):
+    return client.Validate(kb_pb2.ValidateRequest())
+
+
+@then("that file is reported as a violation, naming the file")
+def _reported_as_unreadable(checked):
+    unreadable = [fault for fault in checked.violations if fault.rule == "unreadable"]
+    assert [fault.artifact for fault in unreadable] == ["decision/price-reviews-happen-weekly"]
+    assert "decision/price-reviews-happen-weekly.yaml cannot be read" in unreadable[0].message
+
+
+@then("the check comes back with its answer rather than breaking off")
+def _answers(checked):
+    assert isinstance(checked, kb_pb2.ValidateResponse)
+    assert not checked.faults, checked.faults

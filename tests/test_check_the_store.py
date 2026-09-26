@@ -1,4 +1,4 @@
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, scenarios, then
 
 from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, next_version
 from kb import canonical, client as kb_client
@@ -32,30 +32,12 @@ def _store_with_a_file_mangled_by_hand(root):
     return client
 
 
-@when("the client checks the store", target_fixture="checked")
-def _check_the_store(client):
-    return client.Validate(kb_pb2.ValidateRequest())
-
-
-@then("that file is reported as a violation, naming the file")
-def _reported_as_unreadable(checked):
-    unreadable = [fault for fault in checked.violations if fault.rule == "unreadable"]
-    assert [fault.artifact for fault in unreadable] == ["decision/price-reviews-happen-weekly"]
-    assert "decision/price-reviews-happen-weekly.yaml cannot be read" in unreadable[0].message
-
-
 @then("everything else in the store is checked and reported alongside it")
 def _the_rest_checked_alongside(checked):
     assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == [
         ("decision/price-reviews-happen-weekly", "", "unreadable"),
         ("decision/prices-are-reviewed-monthly", "sections/0", "required"),
     ]
-
-
-@then("the check comes back with its answer rather than breaking off")
-def _answers(checked):
-    assert isinstance(checked, kb_pb2.ValidateResponse)
-    assert not checked.faults, checked.faults
 
 
 WEEKLY = "decision/price-reviews-happen-weekly"

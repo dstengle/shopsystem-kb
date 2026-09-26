@@ -64,7 +64,7 @@ class Store:
         a file holds."""
         path = self.path(artifact_id)
         try:
-            return canonical.load(path.read_text(encoding="utf-8"))
+            return canonical.entries(path.read_text(encoding="utf-8"))
         except canonical.NotCanonical as error:
             return Damaged(refusals.unreadable(artifact_id, path.relative_to(self.dir), str(error)))
 

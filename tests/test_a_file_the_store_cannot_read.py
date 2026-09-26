@@ -69,3 +69,27 @@ def _given_as_any_other_fault(answered):
 @then("nothing is written anywhere in the store")
 def _nothing_written(root, before):
     assert everything_under(root) == before["held"]
+
+
+DAMAGE = {
+    "in a shape that cannot be read at all": lambda held: "title: [a bracket opened by hand and never closed\n",
+    "empty, with nothing in it": lambda held: "",
+    "holding a list rather than a set of named entries": lambda held: "- title: Price reviews happen weekly\n- revision: 1\n",
+    "holding a second document after the first": lambda held: held + "---\n" + held,
+    "telling a reader how to build one of its values": lambda held: held + "reviewed: !!str Monday\n",
+    "pointing back at a value written elsewhere in it": lambda held: held + "reviewed: &day Monday\ndecided: *day\n",
+    "naming the same entry twice": lambda held: held + "title: Price reviews happen monthly\n",
+}
+
+
+@given(parsers.re(f"someone edited the decision's file by hand and left it (?P<damage>{'|'.join(map(re.escape, DAMAGE))})"))
+def _decision_file_damaged_by_hand(root, damage):
+    """The Background's decision left damaged in one way, the rest of what it wrote left as it was."""
+    decision = root / "kb" / f"{DECISION}.yaml"
+    decision.write_text(DAMAGE[damage](decision.read_text()))
+
+
+@then("everything else in the store is checked and reported alongside it")
+def _the_rest_checked_alongside(checked):
+    assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == [(DECISION, "", "unreadable")]
+    assert list(checked.stale) == []
