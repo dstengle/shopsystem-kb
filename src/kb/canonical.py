@@ -29,6 +29,14 @@ def _represent_mapping(representer, mapping):
 
 
 def _represent_prose(representer, value):
+    """Prose as a literal block. A line ending in a space is refused rather than written: the store writes every
+    piece of prose one way."""
+    for number, line in enumerate(value.split("\n"), start=1):
+        if line.endswith(" "):
+            raise NotCanonical(
+                "every piece of prose is written as a block, and this prose could not be written back as one; "
+                f"its line {number} ends in a space"
+            )
     return representer.represent_scalar("tag:yaml.org,2002:str", str(value), style="|")
 
 

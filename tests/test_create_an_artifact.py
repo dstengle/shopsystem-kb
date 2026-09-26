@@ -667,3 +667,52 @@ def _field_is_text_not_a_date(root, client, created):
     assert content.loads(read(client, created.id, whole=True).content)["options"][0]["body"] == "2026-09-24"
     on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
     assert on_disk["options"][0]["body"] == "2026-09-24"
+
+
+@when(
+    "the client creates a decision whose rationale carries a title and an empty body, saying which role and why",
+    target_fixture="created",
+)
+def _create_with_an_empty_rationale(client):
+    return create(client, "decision", {
+        "title": "Price reviews happen weekly",
+        "sections": [SECTIONS[0], {"title": "Rationale", "body": ""}],
+    }, message="Say why later")
+
+
+@then("the rationale reads back with an empty body")
+def _rationale_reads_back_empty(root, client, created):
+    rationale = read(client, created.id, section="Rationale")
+    assert not rationale.faults, rationale.faults
+    assert content.loads(rationale.content) == {"title": "Rationale", "body": ""}
+    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    assert on_disk["sections"][1] == {"title": "Rationale", "body": ""}
+
+
+@when(
+    "the client creates a decision one of whose lines of prose ends in a space, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_with_a_line_ending_in_a_space(root, client):
+    before = everything_under(root)
+    text = (
+        "sections:\n  - title: Purpose\n    body: |\n      Keep prices in step with costs.\n"
+        "  - title: Rationale\n    body: |\n      Costs move weekly. \n      So we review weekly.\n"
+    )
+    response = _raw(client, text)
+    return {"response": response, "before": before, "after": everything_under(root)}
+
+
+@then(
+    "the artifact is rejected because every piece of prose is written as a block, and this prose could not be "
+    "written back as one"
+)
+def _rejected_as_prose_that_is_no_block(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [
+        ("decision/price-reviews-happen-weekly", "content"),
+    ]
+    assert refused.faults[0].message.startswith(
+        "every piece of prose is written as a block, and this prose could not be written back as one"
+    )
