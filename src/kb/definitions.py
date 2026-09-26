@@ -1,6 +1,7 @@
 """A type checked as it is written, against the types the draft holds: every shape it refers to belongs to a type the
-store holds, it is not built on itself, and every link field says which kinds it may point at. What a type could never
-check an artifact against is refused here, once, rather than by every create that uses it."""
+store holds, it is not built on itself, every link field says which kinds it may point at, and a change to it moves
+its version on. What a type could never check an artifact against is refused here, once, rather than by every create
+that uses it."""
 from kb import composition, refusals
 from kb.contract import kb_pb2
 from kb.values import ArtifactId
@@ -21,7 +22,18 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
     for place, name, field in _link_fields(schema, "schema"):
         if not isinstance(field["ref"], dict) or "targets" not in field["ref"]:
             found.append(refusals.no_targets(type_id, place, name))
-    return found
+    return found + _version_kept(type_id, content, draft)
+
+
+def _version_kept(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
+    """The fault of a type whose schema changed while its version did not go up from the version the draft holds;
+    nothing for a type the draft does not hold yet."""
+    if not draft.holds(type_id):
+        return []
+    held = draft.artifact(type_id)
+    if content["schema"] == held["schema"] or content["version"] > held["version"]:
+        return []
+    return [refusals.version_kept(type_id, held["version"])]
 
 
 def _refs(node, place: str):

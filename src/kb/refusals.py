@@ -100,6 +100,13 @@ def no_targets(type_id: ArtifactId, place: str, field: str) -> kb_pb2.Fault:
     )
 
 
+def version_kept(type_id: ArtifactId, held: int) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(type_id), path="version", rule="version",
+        message=f"a type's version goes up whenever the type changes; {str(type_id)!r} changed at version {held}",
+    )
+
+
 def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(artifact=str(artifact_id), rule="content", message=problem)
 
