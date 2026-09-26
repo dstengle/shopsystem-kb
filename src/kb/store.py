@@ -188,10 +188,11 @@ def locate(cwd: Path, env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault
                 rule="store", message=f"no store was found, neither above {cwd} nor named outright",
             )
         return above, None
-    named = Path(env["KB_ROOT"])
-    if not (named / MARKER).is_file():
+    value = env["KB_ROOT"]
+    named = Path(value)
+    if not value or not (named / MARKER).is_file():
         return None, kb_pb2.Fault(
-            rule="store", message=f"KB_ROOT names a directory that holds no store: {named}",
+            rule="store", message=f"KB_ROOT names a directory that holds no store: {value}",
         )
     if above is not None and above.resolve() != named.resolve():
         return None, kb_pb2.Fault(

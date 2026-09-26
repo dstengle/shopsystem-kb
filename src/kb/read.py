@@ -1,6 +1,6 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too."""
-from kb import composition, links, refusals, settled, values
+from kb import composition, links, places, refusals, settled, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
@@ -9,11 +9,13 @@ from kb.values import ArtifactId, Locator, Refused
 
 
 def artifact(store: Store, reading: Reading) -> kb_pb2.ReadResponse:
-    """The artifact at the level asked. Raises Refused for a name the store lacks, a section it lacks, or a stored
-    file that cannot be read."""
+    """The artifact at the level asked. Raises Refused for a name the store lacks, a place or a section it holds
+    nothing at, or a stored file that cannot be read."""
     locator = reading.locator
     if not store.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])
+    if locator.place:
+        places.resolve(store.artifact(locator.id), locator)
     if reading.level == "whole":
         return _whole(store, locator, reading.depth)
     if reading.level == "section":

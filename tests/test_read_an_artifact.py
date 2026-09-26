@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -106,35 +108,35 @@ def _from_the_store_above(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
 
 
-@when("the client reads an artifact by a name the store holds nothing under", target_fixture="refused")
+@when("the client reads an artifact by a name the store holds nothing under", target_fixture="shown")
 def _read_a_name_the_store_lacks(client):
     return read(client, "decision/nothing-of-the-sort")
 
 
 @then("the read is rejected because the store holds nothing by that name, and the name asked for is given back")
-def _rejected_as_not_held(refused):
-    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [("decision/nothing-of-the-sort", "not-found")]
-    assert "decision/nothing-of-the-sort" in refused.faults[0].message
+def _rejected_as_not_held(shown):
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [("decision/nothing-of-the-sort", "not-found")]
+    assert "decision/nothing-of-the-sort" in shown.faults[0].message
 
 
-@when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="refused")
+@when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="shown")
 def _read_by_the_name(client, name):
     return read(client, name)
 
 
 @then("the read is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
-def _rejected_as_not_a_plain_name(refused):
-    assert [fault.rule for fault in refused.faults] == ["locator"]
-    assert "plain name" in refused.faults[0].message
+def _rejected_as_not_a_plain_name(shown):
+    assert [fault.rule for fault in shown.faults] == ["locator"]
+    assert "plain name" in shown.faults[0].message
 
 
 @then("no content comes back, from inside the store or outside it")
-def _no_content_at_all(refused):
-    assert (refused.id, refused.title, refused.content) == ("", "", "")
-    assert not refused.references and not refused.parts and not refused.inbound
+def _no_content_at_all(shown):
+    assert (shown.id, shown.title, shown.content) == ("", "", "")
+    assert not shown.references and not shown.parts and not shown.inbound
 
 
-@when("the client reads an artifact by a name that begins at the root of the disk", target_fixture="refused")
+@when("the client reads an artifact by a name that begins at the root of the disk", target_fixture="shown")
 def _read_by_an_absolute_name(client, tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -143,23 +145,53 @@ def _read_by_an_absolute_name(client, tmp_path):
 
 
 @then("the read is rejected because a name is a kind and a plain name, never a path")
-def _rejected_as_a_path(refused):
-    assert [fault.rule for fault in refused.faults] == ["locator"]
-    assert "never a path" in refused.faults[0].message
+def _rejected_as_a_path(shown):
+    assert [fault.rule for fault in shown.faults] == ["locator"]
+    assert "never a path" in shown.faults[0].message
 
 
-@when(parsers.parse('the client reads the place "{place}" inside the decision'), target_fixture="refused")
-def _read_a_place_inside(client, place):
-    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, path=place)))
+PLACES = {
+    'the place "sections/../.." inside the decision': "sections/../..",
+    'the place "sections/nowhere" inside the decision': "sections/nowhere",
+    'the place "sections/purpose/body/first" inside the decision, which runs on past a piece of prose':
+        "sections/purpose/body/first",
+}
+SECTIONS_NOT_HELD = {
+    'the section of the decision titled "Consequences", which it holds no section under': "Consequences",
+}
+
+
+@pytest.fixture
+def asked():
+    """What a read asked for, filled in by the When that made it."""
+    return {}
+
+
+@when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, PLACES))})"), target_fixture="shown")
+def _read_a_place_inside(client, asked, what):
+    asked["what"] = PLACES[what]
+    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, path=PLACES[what])))
+
+
+@when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, SECTIONS_NOT_HELD))})"), target_fixture="shown")
+def _read_a_section_not_held(client, asked, what):
+    asked["what"] = SECTIONS_NOT_HELD[what]
+    return read(client, DECISION, section=SECTIONS_NOT_HELD[what])
+
+
+@then("the read is rejected because the decision holds nothing at that place, and what was asked for is given back")
+def _rejected_for_nothing_at_that_place(shown, asked):
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(DECISION, "not-found")]
+    assert repr(asked["what"]) in shown.faults[0].message
 
 
 @then(
     "the read is rejected because a place inside an artifact is named by parts of the same plain alphabet, "
     "or a collection and an item in it"
 )
-def _rejected_as_not_a_plain_place(refused):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "sections/../..", "locator")]
-    assert "plain alphabet" in refused.faults[0].message
+def _rejected_as_not_a_plain_place(shown):
+    assert [(fault.artifact, fault.path, fault.rule) for fault in shown.faults] == [(DECISION, "sections/../..", "locator")]
+    assert "plain alphabet" in shown.faults[0].message
 
 
 @given("the client is working outside any store, with KB_ROOT naming this one")
@@ -414,3 +446,52 @@ def _branches_as_written(whole):
     steps = loads(whole.content)["steps"]
     assert steps[0]["branches"] == ["count-the-float", "call-the-manager"]
     assert set(steps[0]["branches"]) <= {step["id"] for step in steps}
+
+
+@then("the older decision comes with its name, its kind, its title and the version it is at, ahead of its content")
+def _older_says_what_it_is(whole):
+    older = loads(whole.content)["supersedes"]
+    assert list(older)[:5] == ["id", "type", "schema_version", "revision", "title"]
+    assert (older["id"], older["type"], older["title"], older["revision"]) == (
+        OLDER, "decision", "Prices are reviewed monthly", 1,
+    )
+
+
+KB_ROOTS = {
+    "set to nothing at all": lambda tmp_path: "",
+    "naming a directory that is not there": lambda tmp_path: str(tmp_path / "not-there"),
+    "naming a file rather than a directory": lambda tmp_path: str(_a_file(tmp_path)),
+}
+
+
+def _a_file(tmp_path):
+    path = tmp_path / "a-file"
+    path.write_text("not a store\n")
+    return path
+
+
+@given(
+    parsers.re(f"the client is working outside any store, with KB_ROOT (?P<state>{'|'.join(map(re.escape, KB_ROOTS))})"),
+    target_fixture="kb_root",
+)
+def _outside_with_kb_root(tmp_path, monkeypatch, state):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    named = KB_ROOTS[state](tmp_path)
+    monkeypatch.setenv("KB_ROOT", named)
+    return named
+
+
+@then("the read is rejected because KB_ROOT names no store, and KB_ROOT is named back")
+def _rejected_as_kb_root_names_no_store(shown, kb_root):
+    assert [(fault.rule, fault.message) for fault in shown.faults] == [
+        ("store", f"KB_ROOT names a directory that holds no store: {kb_root}"),
+    ]
+
+
+@then("where the client is working is not fallen back on")
+def _not_fallen_back_on(shown, tmp_path):
+    message = shown.faults[0].message
+    assert "no store was found" not in message
+    assert str(tmp_path / "elsewhere") not in message and not message.endswith(".")
