@@ -99,9 +99,9 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
         if other_id == locator.id:
             continue
         schema = draft.schema(other_id.kind)["schema"]
-        for field, place, target in validation.links(draft.artifact(other_id), schema, draft):
-            if validation.points_at(target, locator.id):
-                blocking.append(refusals.still_linked(locator.id, other_id, place))
+        for link in validation.links(draft.artifact(other_id), schema, draft):
+            if validation.points_at(link.target, locator.id):
+                blocking.append(refusals.still_linked(locator.id, other_id, link.place))
     if blocking:
         raise Refused(blocking)
     removed = draft.artifact(locator.id)

@@ -4,6 +4,8 @@ land on an artifact the corpus holds, of a kind the type allows.
 
 kb's keywords are read through the type's composition, so a type built on a base carries the base's first.
 """
+from typing import NamedTuple
+
 from jsonschema import Draft202012Validator
 from referencing import Registry
 from referencing.exceptions import NoSuchResource
@@ -78,12 +80,11 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
         return faults
     required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
     faults = _sections(artifact_id, content.get("sections", []), required, "sections")
-    allowed = references(schema, corpus)
-    for field, place, target in links(content, schema, corpus):
-        if not _lands(target, allowed[field], corpus):
+    for link in links(content, schema, corpus):
+        if not _lands(link.target, link.ref, corpus):
             faults.append(kb_pb2.Fault(
-                artifact=artifact_id, path=place, rule="ref",
-                message=f"a link must land on a node of a kind the type allows; {target!r} does not",
+                artifact=artifact_id, path=link.place, rule="ref",
+                message=f"a link must land on a node of a kind the type allows; {link.target!r} does not",
             ))
     return faults
 
@@ -126,15 +127,39 @@ def references(schema: dict, corpus) -> dict[str, dict]:
     }
 
 
-def links(artifact: dict, schema: dict, corpus) -> list[tuple[str, str, str]]:
-    """Every link an artifact carries, as the field, the place in the artifact, and the name it points at."""
+class Link(NamedTuple):
+    """One link an artifact carries: the field that holds it, the place of that field in the artifact, the name it
+    points at, and the field's `ref`, which says what it may land on."""
+    field: str
+    place: str
+    target: str
+    ref: dict
+
+
+def links(artifact: dict, schema: dict, corpus) -> list[Link]:
+    """Every link an artifact carries, wherever it sits: in its own fields, and in the fields of each item of each of
+    its collections, at every depth."""
+    return _links_in(artifact, references(schema, corpus), schema.get("parts", {}), "", corpus)
+
+
+def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -> list[Link]:
+    """The links in one node, an artifact or an item, its place in the artifact before each of theirs."""
     found = []
-    for field in references(schema, corpus):
-        value = artifact.get(field)
+    for field, ref in refs.items():
+        value = node.get(field)
         if isinstance(value, list):
-            found += [(field, f"{field}/{index}", target) for index, target in enumerate(value)]
+            found += [Link(field, f"{at}{field}/{index}", target, ref) for index, target in enumerate(value)]
         elif value is not None:
-            found.append((field, field, value))
+            found.append(Link(field, f"{at}{field}", value, ref))
+    for collection, part in parts.items():
+        items = node.get(collection)
+        if not isinstance(items, list):
+            continue
+        item_schema = part.get("items", {})
+        item_refs = references(item_schema, corpus)
+        for index, item in enumerate(items):
+            if isinstance(item, dict):
+                found += _links_in(item, item_refs, item_schema.get("parts", {}), f"{at}{collection}/{index}/", corpus)
     return found
 
 

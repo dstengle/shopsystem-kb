@@ -261,3 +261,18 @@ def _rejected_for_nothing(attempt):
 @then("nothing is written anywhere in the store")
 def _nothing_written(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+@when("the client adds a step that points at a shared step the store does not hold, saying which role and why", target_fixture="attempt")
+def _add_a_step_pointing_nowhere(client):
+    before = read(client, PROCESS, whole=True)
+    response = append(client, PROCESS, "steps", {"title": "Count the change", "uses": "step/count-the-change"})
+    return {"response": response, "before": before}
+
+
+@then("the item is rejected because a link must land on a node of a kind the type allows")
+def _rejected_for_its_link(attempt):
+    assert [(fault.artifact, fault.path, fault.rule) for fault in attempt["response"].faults] == [
+        (PROCESS, "steps/2/uses", "ref"),
+    ]
+    assert "'step/count-the-change'" in attempt["response"].faults[0].message

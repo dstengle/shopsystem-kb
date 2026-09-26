@@ -98,7 +98,7 @@ def _outward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactI
     """Each link out of an artifact, as the field and the name it points at."""
     artifact = store.artifact(artifact_id)
     schema = store.schema(artifact_id.kind)["schema"]
-    return [(field, values.artifact_id(target)) for field, _, target in validation.links(artifact, schema, store)]
+    return [(link.field, values.artifact_id(link.target)) for link in validation.links(artifact, schema, store)]
 
 
 def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
@@ -108,9 +108,9 @@ def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId
     for other_id in store.ids():
         other = store.artifact(other_id)
         schema = store.schema(other_id.kind)["schema"]
-        for field, _, target in validation.links(other, schema, store):
-            if validation.points_at(target, artifact_id):
-                pointing.append((field, other_id))
+        for link in validation.links(other, schema, store):
+            if validation.points_at(link.target, artifact_id):
+                pointing.append((link.field, other_id))
     return pointing
 
 
