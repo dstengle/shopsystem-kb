@@ -63,7 +63,7 @@ def _replace(draft: Draft, replacement: requests.Replace) -> ArtifactId:
         raise Refused([refusals.not_found(locator.id)])
     if replacement.content.problems:
         raise Refused(replacement.content.refusal(str(locator.id)))
-    content, current = replacement.content.tree, draft.load(locator.id)
+    content, current = replacement.content.tree, draft.artifact(locator.id)
     if locator.place:
         content = _placed(current, locator, content)
     _revise(draft, locator.id, current, content)
@@ -80,7 +80,7 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
     item, collection = addition.item.tree, "/".join(locator.place)
     if collection not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
         raise Refused([refusals.no_collection(locator.id, collection)])
-    current = draft.load(locator.id)
+    current = draft.artifact(locator.id)
     content = _content_of(current)
     content.setdefault(collection, []).append(item)
     _revise(draft, locator.id, current, content)
@@ -99,12 +99,12 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
         if other_id == locator.id:
             continue
         schema = draft.schema(other_id.kind)["schema"]
-        for field, place, target in validation.links(draft.load(other_id), schema, draft):
+        for field, place, target in validation.links(draft.artifact(other_id), schema, draft):
             if validation.points_at(target, locator.id):
                 blocking.append(refusals.still_linked(locator.id, other_id, place))
     if blocking:
         raise Refused(blocking)
-    removed = draft.load(locator.id)
+    removed = draft.artifact(locator.id)
     draft.remove(locator.id)
     return Change("delete", locator.id, revision=removed["revision"] + 1, schema_version=removed["schema_version"])
 

@@ -89,7 +89,7 @@ def _serialised(draft: Draft, changes: list[Change]) -> list[Landing]:
         if change.op == "delete":
             landings.append(Landing(change, None, change.revision, change.schema_version))
             continue
-        artifact = draft.load(change.artifact_id)
+        artifact = draft.artifact(change.artifact_id)
         try:
             landings.append(Landing(change, canonical.dump(artifact), artifact["revision"], artifact["schema_version"]))
         except canonical.NotCanonical as fault:

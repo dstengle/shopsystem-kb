@@ -46,6 +46,12 @@ def still_linked(removed: ArtifactId, other: ArtifactId, place: str) -> kb_pb2.F
     )
 
 
+def unreadable(artifact_id: ArtifactId, file, problem: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule="unreadable", message=f"the stored file {file} cannot be read: {problem}",
+    )
+
+
 def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(artifact=str(artifact_id), rule="content", message=problem)
 

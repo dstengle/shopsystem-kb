@@ -75,3 +75,15 @@ def _directory_inside_a_store(root, before):
 @then("the store it sits inside holds what it held before")
 def _store_holds_what_it_held(before):
     assert everything_under(before["store"]) == before["held"]
+
+
+MANGLED = "title: [a bracket opened by hand and never closed\n"
+
+
+@given("someone edited the decision's file by hand and left it in a shape the store cannot read")
+def _decision_file_mangled_by_hand(root, monkeypatch):
+    """The decision a feature's Background holds, decision/price-reviews-happen-weekly, left unreadable, with the
+    client working in the store and nothing naming it."""
+    (root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").write_text(MANGLED)
+    monkeypatch.chdir(root)
+    monkeypatch.delenv("KB_ROOT", raising=False)

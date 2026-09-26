@@ -11,7 +11,7 @@ from referencing.jsonschema import DRAFT202012
 
 from kb import canonical, values
 from kb.contract import kb_pb2
-from kb.store import Store, Unreadable
+from kb.store import Damaged, Store
 from kb.values import Kind
 
 TYPE_URI = "kb:"
@@ -57,7 +57,7 @@ def _type_schema(uri: str, corpus) -> dict:
         schema_id = None
     if schema_id is None or schema_id.kind != Kind("schema") or not corpus.holds(schema_id):
         raise NoSuchResource(ref=uri)
-    return corpus.load(schema_id)["schema"]
+    return corpus.artifact(schema_id)["schema"]
 
 
 def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_pb2.Fault]:
@@ -93,12 +93,11 @@ def check(store: Store) -> kb_pb2.ValidateResponse:
     checked against an older one; a file that cannot be read is reported and the check goes on."""
     violations, stale = [], []
     for artifact_id in store.ids():
-        try:
-            artifact = store.load(artifact_id)
-            schema = store.schema(artifact_id.kind)
-        except Unreadable as unreadable:
-            violations.append(unreadable.fault)
+        loaded = _with_type(store, artifact_id)
+        if isinstance(loaded, Damaged):
+            violations.append(loaded.fault)
             continue
+        artifact, schema = loaded
         if artifact["schema_version"] < schema["version"]:
             stale.append(kb_pb2.Stale(
                 artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
@@ -106,6 +105,15 @@ def check(store: Store) -> kb_pb2.ValidateResponse:
         content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
         violations += validate(str(artifact_id), content, schema["schema"], store)
     return kb_pb2.ValidateResponse(violations=violations, stale=stale)
+
+
+def _with_type(store: Store, artifact_id) -> tuple[dict, dict] | Damaged:
+    """The artifact and its type as stored, or the damage of the first of them whose file cannot be read."""
+    artifact = store.load(artifact_id)
+    if isinstance(artifact, Damaged):
+        return artifact
+    schema = store.load(values.ArtifactId(Kind("schema"), artifact_id.kind.name))
+    return schema if isinstance(schema, Damaged) else (artifact, schema)
 
 
 def references(schema: dict, corpus) -> dict[str, dict]:
@@ -146,7 +154,7 @@ def _lands(target: str, ref: dict, corpus) -> bool:
         return False
     if link.id.kind.name not in ref["targets"] or not corpus.holds(link.id):
         return False
-    return not link.place or _holds_part(corpus.load(link.id), link.place)
+    return not link.place or _holds_part(corpus.artifact(link.id), link.place)
 
 
 def _holds_part(node: dict, place: tuple) -> bool:

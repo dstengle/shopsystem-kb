@@ -2,22 +2,29 @@
 way git finds a repository: upward from the working directory, or named by KB_ROOT."""
 import os
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from kb import canonical, values
+from kb import canonical, refusals, values
 from kb.contract import CONTRACT_VERSION, kb_pb2
 from kb.values import ArtifactId, Kind, Refused, Root, Signed
 
 MARKER = Path("kb") / "store.yaml"
 
 
-class Unreadable(Exception):
-    """A stored file that cannot be read. Carries the fault that names it."""
+@dataclass(frozen=True)
+class Damaged:
+    """What loading a stored file that cannot be read gives in place of the artifact: the fault that names the file."""
+    fault: kb_pb2.Fault
 
-    def __init__(self, fault: kb_pb2.Fault):
-        super().__init__(fault.message)
-        self.fault = fault
+
+def readable(loaded: dict | Damaged) -> dict:
+    """The artifact loaded; a file that cannot be read refuses the call with the fault naming it. The one place a
+    damaged file becomes a refusal."""
+    if isinstance(loaded, Damaged):
+        raise Refused([loaded.fault])
+    return loaded
 
 
 class Store:
@@ -52,20 +59,22 @@ class Store:
     def holds(self, artifact_id: ArtifactId) -> bool:
         return self.path(artifact_id).is_file()
 
-    def load(self, artifact_id: ArtifactId) -> dict:
-        """The artifact as stored. A file that cannot be read raises Unreadable, naming the file."""
+    def load(self, artifact_id: ArtifactId) -> dict | Damaged:
+        """The artifact as stored, or, when its file cannot be read, the fault naming the file. Never raises for what
+        a file holds."""
         path = self.path(artifact_id)
         try:
             return canonical.load(path.read_text(encoding="utf-8"))
         except canonical.NotCanonical as error:
-            raise Unreadable(kb_pb2.Fault(
-                artifact=str(artifact_id), rule="unreadable",
-                message=f"the stored file {path.relative_to(self.dir)} cannot be read: {error}",
-            )) from None
+            return Damaged(refusals.unreadable(artifact_id, path.relative_to(self.dir), str(error)))
+
+    def artifact(self, artifact_id: ArtifactId) -> dict:
+        """The artifact as stored, for a reader that cannot go on without it. Raises Refused for a damaged file."""
+        return readable(self.load(artifact_id))
 
     def schema(self, kind: Kind) -> dict:
-        """The schema artifact of a kind; its JSON Schema is under `schema`."""
-        return self.load(ArtifactId(Kind("schema"), kind.name))
+        """The schema artifact of a kind; its JSON Schema is under `schema`. Raises Refused for a damaged file."""
+        return self.artifact(ArtifactId(Kind("schema"), kind.name))
 
     def commit(self, paths: list, signed: Signed) -> None:
         """One commit of the given files, under the message and the actor's role."""
@@ -84,9 +93,9 @@ class Store:
         return [ArtifactId(Kind(path.parent.name), path.stem) for path in sorted(self.dir.glob("*/*.yaml"))]
 
     def artifacts(self):
-        """Every artifact in the store, schemas included, in path order. A file that cannot be read raises Unreadable."""
+        """Every artifact in the store, schemas included, in path order. Raises Refused at a damaged file."""
         for artifact_id in self.ids():
-            yield self.load(artifact_id)
+            yield self.artifact(artifact_id)
 
 
 class Draft:
@@ -115,13 +124,16 @@ class Draft:
         held = (set(self._store.ids()) | set(self._pending)) - self._removed
         return sorted(held, key=lambda artifact_id: f"{artifact_id}.yaml")
 
-    def load(self, artifact_id: ArtifactId) -> dict:
+    def load(self, artifact_id: ArtifactId) -> dict | Damaged:
         if artifact_id in self._pending:
             return self._pending[artifact_id]
         return self._store.load(artifact_id)
 
+    def artifact(self, artifact_id: ArtifactId) -> dict:
+        return readable(self.load(artifact_id))
+
     def schema(self, kind: Kind) -> dict:
-        return self.load(ArtifactId(Kind("schema"), kind.name))
+        return self.artifact(ArtifactId(Kind("schema"), kind.name))
 
 
 def vacant(root: Root) -> None:

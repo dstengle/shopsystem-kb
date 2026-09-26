@@ -14,7 +14,7 @@ def listing(store: Store, asked: Listing) -> kb_pb2.ListResponse:
     """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names."""
     matched = [
         artifact_id for artifact_id in store.ids()
-        if artifact_id.kind == asked.kind and _holds(store.load(artifact_id), asked.fields)
+        if artifact_id.kind == asked.kind and _holds(store.artifact(artifact_id), asked.fields)
     ]
     if asked.ids:
         return kb_pb2.ListResponse(ids=[str(artifact_id) for artifact_id in matched])
@@ -87,7 +87,7 @@ def snapshotted(store: Store, named: list) -> list[dict]:
         raise Refused(faults)
     return [
         {
-            "artifact": str(artifact_id), "revision": store.load(artifact_id)["revision"],
+            "artifact": str(artifact_id), "revision": store.artifact(artifact_id)["revision"],
             "digest": journal.digest(store.path(artifact_id)),
         }
         for artifact_id in named
@@ -96,7 +96,7 @@ def snapshotted(store: Store, named: list) -> list[dict]:
 
 def _outward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
     """Each link out of an artifact, as the field and the name it points at."""
-    artifact = store.load(artifact_id)
+    artifact = store.artifact(artifact_id)
     schema = store.schema(artifact_id.kind)["schema"]
     return [(field, values.artifact_id(target)) for field, _, target in validation.links(artifact, schema, store)]
 
@@ -106,7 +106,7 @@ def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId
     that field, in path order."""
     pointing = []
     for other_id in store.ids():
-        other = store.load(other_id)
+        other = store.artifact(other_id)
         schema = store.schema(other_id.kind)["schema"]
         for field, _, target in validation.links(other, schema, store):
             if validation.points_at(target, artifact_id):

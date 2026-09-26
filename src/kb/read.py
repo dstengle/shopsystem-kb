@@ -4,7 +4,7 @@ from kb import canonical, refusals, validation, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
-from kb.store import Store, Unreadable
+from kb.store import Store
 from kb.values import ArtifactId, Locator, Refused
 
 
@@ -14,19 +14,16 @@ def artifact(store: Store, reading: Reading) -> kb_pb2.ReadResponse:
     locator = reading.locator
     if not store.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])
-    try:
-        if reading.level == "whole":
-            return _whole(store, locator, reading.depth)
-        if reading.level == "section":
-            return _section(store, locator, reading.section)
-        return _summary(store, locator)
-    except Unreadable as unreadable:
-        raise Refused([unreadable.fault]) from None
+    if reading.level == "whole":
+        return _whole(store, locator, reading.depth)
+    if reading.level == "section":
+        return _section(store, locator, reading.section)
+    return _summary(store, locator)
 
 
 def stub(store: Store, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
-    target = store.load(target_id)
+    target = store.artifact(target_id)
     schema = store.schema(target_id.kind)["schema"]
     return kb_pb2.Stub(
         field=field, id=target["id"], type=target["type"], title=target["title"],
@@ -42,7 +39,7 @@ def _whole(store: Store, locator: Locator, depth: int) -> kb_pb2.ReadResponse:
 
 def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:
     """The first section with that title, at any depth, in the order the artifact holds them, and nothing else."""
-    found = store.load(locator.id)
+    found = store.artifact(locator.id)
     section = _find_section(found.get("sections", []), title)
     if section is None:
         raise Refused([refusals.no_section(locator.id, title)])
@@ -50,7 +47,7 @@ def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:
 
 
 def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
-    found = store.load(locator.id)
+    found = store.artifact(locator.id)
     schema = store.schema(locator.id.kind)["schema"]
     response = _response(found, dumps(_summary_fields(found, schema)))
     for field, _, target in validation.links(found, schema, store):
@@ -73,7 +70,7 @@ def _response(found: dict, content: str) -> kb_pb2.ReadResponse:
 def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
     """The artifact as stored, each link followed depth steps with the target, itself resolved, in place of its
     name. A target on the path already being filled in stays a name, so a loop ends."""
-    found = store.load(artifact_id)
+    found = store.artifact(artifact_id)
     if depth < 1:
         return found
     def fill(target):
