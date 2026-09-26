@@ -41,7 +41,7 @@ def _changed(draft: Draft, operation) -> Change:
 
 def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     kind = creation.kind
-    composition.kind_type(kind, draft)
+    type_id = composition.kind_type(kind, draft)
     at, faults = creation.at, list(creation.title_faults)
     if creation.name is not None:
         artifact_id = _unclaimed(draft, creation.name)
@@ -50,7 +50,7 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     if faults:
         raise Refused(faults)
     content = creation.content.tree
-    schema = draft.schema(kind)
+    schema = draft.artifact(type_id)
     faults = _fits(draft, artifact_id, {"title": creation.title, **content}, schema)
     if faults:
         raise Refused(faults)
@@ -97,7 +97,7 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
 def _collections_at(draft: Draft, locator: values.Locator) -> dict:
     """The collections the type declares where the locator's last step stands: the artifact's own, or those of the
     item type of each collection the place passes through on the way."""
-    declared = composition.declared(draft.schema(locator.id.kind)["schema"], draft)
+    declared = composition.declared(composition.kind_schema(locator.id.kind, draft)["schema"], draft)
     for collection in locator.place[:-1:2]:
         part = declared["parts"].get(collection)
         if part is None:
@@ -117,7 +117,7 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
     for other_id in draft.ids():
         if other_id == locator.id:
             continue
-        schema = draft.schema(other_id.kind)["schema"]
+        schema = composition.kind_schema(other_id.kind, draft)["schema"]
         for link in links.carried(draft.artifact(other_id), schema, draft):
             if links.points_at(link.target, locator.id):
                 blocking.append(refusals.still_linked(locator.id, other_id, link.place))
@@ -132,7 +132,7 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     """The artifact's next version put in the draft: the names its items hand back checked against those the artifact
     held, the content checked against the current version of its type, its new items named, its version up by one,
     its title kept. Raises Refused with every fault."""
-    schema = draft.schema(artifact_id.kind)
+    schema = composition.kind_schema(artifact_id.kind, draft)
     declared = composition.declared(schema["schema"], draft)
     held = names.held(declared["parts"], current)
     faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]

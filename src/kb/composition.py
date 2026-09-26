@@ -74,6 +74,12 @@ def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
     return found
 
 
+def kind_schema(kind: values.Kind, corpus) -> dict:
+    """The type a kind names, as the corpus holds it, its JSON Schema under `schema`. Raises Refused when the corpus
+    holds none, or when its file cannot be read."""
+    return corpus.artifact(kind_type(kind, corpus))
+
+
 def named_type(kind: values.Kind, corpus, artifact: str = "") -> values.ArtifactId | kb_pb2.Fault:
     """The type a kind names, or, when the corpus holds none, the fault saying so, of the artifact named when an
     artifact claims the kind."""

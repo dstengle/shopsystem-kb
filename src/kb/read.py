@@ -26,7 +26,7 @@ def artifact(store: Store, reading: Reading) -> kb_pb2.ReadResponse:
 def stub(store: Store, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
     target = store.artifact(target_id)
-    schema = store.schema(target_id.kind)["schema"]
+    schema = composition.kind_schema(target_id.kind, store)["schema"]
     return kb_pb2.Stub(
         field=field, id=target["id"], type=target["type"], title=target["title"],
         fields=dumps(_summary_fields(target, composition.declared(schema, store))),
@@ -49,7 +49,7 @@ def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:
 
 def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
     found = store.artifact(locator.id)
-    schema = store.schema(locator.id.kind)["schema"]
+    schema = composition.kind_schema(locator.id.kind, store)["schema"]
     declared = composition.declared(schema, store)
     response = _response(found, dumps(_summary_fields(found, declared)))
     for link in links.carried(found, schema, store):
@@ -81,7 +81,7 @@ def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -
             return target
         return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
     resolved = dict(found)
-    carried = links.carried(found, store.schema(artifact_id.kind)["schema"], store)
+    carried = links.carried(found, composition.kind_schema(artifact_id.kind, store)["schema"], store)
     for field in {link.field for link in carried if _own(link)}:
         value = found[field]
         resolved[field] = [fill(target) for target in value] if isinstance(value, list) else fill(value)
@@ -98,7 +98,7 @@ def _inbound(store: Store, artifact_id: ArtifactId) -> dict:
     """How many artifacts point at this one or at a part inside it, by their type and the field they use."""
     counts = {}
     for other in store.artifacts():
-        schema = store.schema(values.kind(other["type"]))["schema"]
+        schema = composition.kind_schema(values.kind(other["type"]), store)["schema"]
         pointing = {link.field for link in links.carried(other, schema, store) if links.points_at(link.target, artifact_id)}
         for field in pointing:
             counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1

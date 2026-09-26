@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, TypeVar
 
-from kb import canonical, refusals, settled, values
+from kb import canonical, refusals, settled
 from kb.contract import CONTRACT_VERSION, kb_pb2
 from kb.values import ArtifactId, Kind, Refused, Root, Signed
 
@@ -85,10 +85,6 @@ class Store:
         """The artifact as stored, for a reader that cannot go on without it. Raises Refused for a damaged file."""
         return readable(self.load(artifact_id))
 
-    def schema(self, kind: Kind) -> dict:
-        """The schema artifact of a kind; its JSON Schema is under `schema`. Raises Refused for a damaged file."""
-        return self.artifact(values.type_of(kind))
-
     def commit(self, paths: list, signed: Signed) -> None:
         """One commit of the given files, under the message and the actor's role."""
         role = signed.actor.role
@@ -113,7 +109,7 @@ class Store:
 
 class Draft:
     """The store as a set of changes would leave it: artifacts put here stand over the stored ones, artifacts removed
-    here are no longer held, and nothing is written. Read like the store: holds, load, schema, ids."""
+    here are no longer held, and nothing is written. Read like the store: holds, load, artifact, ids."""
 
     def __init__(self, store: Store):
         self._store = store
@@ -144,9 +140,6 @@ class Draft:
 
     def artifact(self, artifact_id: ArtifactId) -> dict:
         return readable(self.load(artifact_id))
-
-    def schema(self, kind: Kind) -> dict:
-        return self.artifact(values.type_of(kind))
 
 
 def vacant(root: Root) -> None:

@@ -104,7 +104,7 @@ def snapshotted(store: Store, named: list) -> list[dict]:
 def _outward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
     """Each link out of an artifact, as the field and the name it points at."""
     artifact = store.artifact(artifact_id)
-    schema = store.schema(artifact_id.kind)["schema"]
+    schema = composition.kind_schema(artifact_id.kind, store)["schema"]
     return [(link.field, values.artifact_id(link.target)) for link in links.carried(artifact, schema, store)]
 
 
@@ -114,7 +114,7 @@ def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId
     pointing = []
     for other_id in store.ids():
         other = store.artifact(other_id)
-        schema = store.schema(other_id.kind)["schema"]
+        schema = composition.kind_schema(other_id.kind, store)["schema"]
         for link in links.carried(other, schema, store):
             if links.points_at(link.target, artifact_id):
                 pointing.append((link.field, other_id))
