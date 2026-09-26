@@ -147,9 +147,10 @@ def content(text: str, at_root: bool = True) -> Content:
 
 
 def item(text: str) -> Content:
-    """An item read plainly, never carrying its own name, which kb gives."""
+    """An item read plainly, never carrying its own name, which kb gives. Only a set of named entries can carry a
+    name; an item of any other shape is left for its type to refuse."""
     read = content(text, at_root=False)
-    if read.problems or "id" not in read.tree:
+    if read.problems or not isinstance(read.tree, dict) or "id" not in read.tree:
         return read
     return Content(read.tree, (("id", "identity",
         f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {read.tree['id']!r}"),))
