@@ -2,12 +2,12 @@
 words occur, what the journal holds, and what a piece of work read. Nothing here writes."""
 from datetime import datetime
 
-from kb import composition, journal, links, read, refusals, search, values
+from kb import composition, journal, links, places, read, refusals, search, values
 from kb.content import text
 from kb.contract import kb_pb2
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
 from kb.store import Store, readable
-from kb.values import ArtifactId, Refused
+from kb.values import ArtifactId, Locator, Refused
 
 
 def listing(store: Store, asked: Listing) -> kb_pb2.ListResponse:
@@ -24,20 +24,21 @@ def listing(store: Store, asked: Listing) -> kb_pb2.ListResponse:
 
 
 def walk(store: Store, asked: Walk) -> kb_pb2.RefsResponse:
-    """What an artifact's links reach, out of it or into it, a step at a time out to the depth asked: each artifact
-    once, by the shortest route, the one asked about never. A via or a type narrows every step. Raises Refused for
-    a kind the store holds no type for, or a name the store lacks."""
+    """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
+    a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via or a
+    type narrows every step. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
+    out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
     start = asked.locator.id
     if not store.holds(start):
         raise Refused([refusals.not_found(start)])
     step = _inward if asked.inward else _outward
-    reached, seen, frontier = [], {str(start)}, [(start, [])]
+    reached, seen, frontier = [], {str(start)}, [(asked.locator, [])]
     for _ in range(asked.depth):
         following = []
-        for artifact_id, route in frontier:
-            for field, other_id in step(store, artifact_id):
+        for locator, route in frontier:
+            for field, other_id in step(store, locator):
                 if str(other_id) in seen or (asked.via and field != asked.via):
                     continue
                 if asked.kind is not None and other_id.kind != asked.kind:
@@ -45,7 +46,7 @@ def walk(store: Store, asked: Walk) -> kb_pb2.RefsResponse:
                 seen.add(str(other_id))
                 taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
                 reached.append(kb_pb2.Reached(stub=read.stub(store, field, other_id), route=taken))
-                following.append((other_id, taken))
+                following.append((Locator(other_id, ()), taken))
         frontier = following
     return kb_pb2.RefsResponse(reached=reached)
 
@@ -101,16 +102,19 @@ def snapshotted(store: Store, named: list) -> list[dict]:
     ]
 
 
-def _outward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
-    """Each link out of an artifact, as the field and the name it points at."""
-    artifact = store.artifact(artifact_id)
-    schema = composition.kind_schema(artifact_id.kind, store)["schema"]
-    return [(link.field, values.artifact_id(link.target)) for link in links.carried(artifact, schema, store)]
+def _outward(store: Store, locator: Locator) -> list[tuple[str, ArtifactId]]:
+    """Each link out of an artifact, or out of the place inside it the locator names, as the field and the name it
+    points at."""
+    artifact = store.artifact(locator.id)
+    schema = composition.kind_schema(locator.id.kind, store)["schema"]
+    found = links.inside(artifact, schema, store, places.node(artifact, locator))
+    return [(link.field, values.artifact_id(link.target)) for link in found]
 
 
-def _inward(store: Store, artifact_id: ArtifactId) -> list[tuple[str, ArtifactId]]:
+def _inward(store: Store, locator: Locator) -> list[tuple[str, ArtifactId]]:
     """Each link into an artifact or a part inside it, as the field that points there and the artifact that holds
-    that field, in path order."""
+    that field, in path order. The place the locator names, if any, is not asked."""
+    artifact_id = locator.id
     pointing = []
     for other_id in store.ids():
         other = store.artifact(other_id)

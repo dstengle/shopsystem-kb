@@ -175,12 +175,13 @@ def search(client, text, type_name="", everywhere=False):
     return client.Search(request)
 
 
-def refs(client, artifact_id, depth, inward=False, via="", type_name=""):
-    """The links out of an artifact, or into it when inward, followed as many steps as depth says, through the field
-    via names and to artifacts of the kind type_name names when either is given."""
+def refs(client, artifact_id, depth, inward=False, via="", type_name="", place=""):
+    """The links out of an artifact, or out of the place inside it place names, or into it when inward, followed as
+    many steps as depth says, through the field via names and to artifacts of the kind type_name names when either is
+    given."""
     direction = kb_pb2.RefsRequest.IN if inward else kb_pb2.RefsRequest.OUT
     return client.Refs(kb_pb2.RefsRequest(
-        locator=kb_pb2.Locator(id=artifact_id), depth=depth, direction=direction, via=via, type=type_name,
+        locator=kb_pb2.Locator(id=artifact_id, path=place), depth=depth, direction=direction, via=via, type=type_name,
     ))
 
 

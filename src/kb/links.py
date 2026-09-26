@@ -25,18 +25,20 @@ def references(schema: dict, corpus) -> dict[str, dict]:
 def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
     """Every link an artifact carries, wherever it sits: in its own fields, and in the fields of each item of each of
     its collections, at every depth."""
-    return _links_in(artifact, references(schema, corpus), declared(schema, corpus)["parts"], "", corpus)
+    return inside(artifact, schema, corpus, artifact)
 
 
-def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -> list[Link]:
-    """The links in one node, an artifact or an item, its place in the artifact before each of theirs."""
-    found = []
-    for field, ref in refs.items():
-        value = node.get(field)
-        if isinstance(value, list):
-            found += [Link(field, f"{at}{field}/{index}", target, ref, not at) for index, target in enumerate(value)]
-        elif value is not None:
-            found.append(Link(field, f"{at}{field}", value, ref, not at))
+def inside(artifact: dict, schema: dict, corpus, node) -> list[Link]:
+    """The links an artifact carries in one node of it, as `places.node` finds it, and in the items inside that node:
+    all of them for the artifact itself, none for a field's value, which is not a node."""
+    return _links_in(artifact, references(schema, corpus), declared(schema, corpus)["parts"], "", corpus, node, False)
+
+
+def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus, within, entered: bool) -> list[Link]:
+    """The links in one node, an artifact or an item, and in the items inside it, its place in the artifact before each
+    of theirs; a node's own fields are read only once within, or a node it sits inside, has been entered."""
+    entered = entered or node is within
+    found = _fields(node, refs, at) if entered else []
     for collection, part in parts.items():
         items = node.get(collection)
         if not isinstance(items, list):
@@ -45,7 +47,22 @@ def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -
         item_refs = references(item_schema, corpus)
         for index, item in enumerate(items):
             if isinstance(item, dict):
-                found += _links_in(item, item_refs, declared(item_schema, corpus)["parts"], f"{at}{collection}/{index}/", corpus)
+                found += _links_in(
+                    item, item_refs, declared(item_schema, corpus)["parts"], f"{at}{collection}/{index}/", corpus,
+                    within, entered,
+                )
+    return found
+
+
+def _fields(node: dict, refs: dict[str, dict], at: str) -> list[Link]:
+    """The links in a node's own fields, each alone or in a list."""
+    found = []
+    for field, ref in refs.items():
+        value = node.get(field)
+        if isinstance(value, list):
+            found += [Link(field, f"{at}{field}/{index}", target, ref, not at) for index, target in enumerate(value)]
+        elif value is not None:
+            found.append(Link(field, f"{at}{field}", value, ref, not at))
     return found
 
 

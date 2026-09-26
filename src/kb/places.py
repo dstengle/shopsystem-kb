@@ -26,6 +26,16 @@ def resolve(content: dict, locator: Locator) -> Spot:
     return spot
 
 
+def node(content: dict, locator: Locator):
+    """What stands at the locator's place in an artifact's content: the content itself for no place, otherwise the
+    item, the section or the field's value there, None for a field the node there does not hold. Raises Refused as
+    resolve does."""
+    if not locator.place:
+        return content
+    spot = resolve(content, locator)
+    return spot.holder[spot.key] if spot.collection else spot.holder.get(spot.key)
+
+
 def holds_part(content: dict, place: tuple) -> bool:
     """Whether a place names a part the content holds: an item of a collection, named by its id, at any depth; never
     a section, and never a field of an item. What a link inside an artifact may land on."""

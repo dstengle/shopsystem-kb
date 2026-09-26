@@ -202,3 +202,33 @@ def _a_work_item_pointing_twice(client):
     assert not changed.faults, changed.faults
     inward = refs(client, DECISION, depth=1, inward=True)
     assert {(found.stub.field, found.stub.id) for found in inward.reached} >= {("decisions", NOTE)}
+
+
+OPENING = "tag/opening"
+
+
+@given("a process one of whose steps points at a tag of its own, while another of its steps points at the decision")
+def _a_process_whose_steps_point_out(client):
+    process_type = copy.deepcopy(PROCESS_TYPE)
+    process_type["schema"]["parts"]["steps"]["items"]["properties"]["uses"]["ref"]["targets"] = ["tag", "decision"]
+    define(client, process_type)
+    create(client, "tag", {"title": "opening"})
+    create(client, "process", {"title": "Open the shop", "steps": [
+        {"title": "Unlock the door", "uses": OPENING},
+        {"title": "Check the prices", "uses": DECISION},
+    ]})
+
+
+@when("the client follows the links out of that step of the process", target_fixture="reached")
+def _follow_out_of_a_step(client):
+    response = refs(client, PROCESS, depth=1, place="steps/unlock-the-door")
+    assert not response.faults, response.faults
+    return list(response.reached)
+
+
+@then("the client is given a stub of that tag and nothing else the process points at")
+def _only_the_tag(reached):
+    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        ("uses", OPENING, "tag", "opening"),
+    ]
+    assert [[(hop.field, hop.id) for hop in found.route] for found in reached] == [[("uses", OPENING)]]
