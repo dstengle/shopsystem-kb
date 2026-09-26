@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-from kb import discovery
+from kb import store
 from kb.contract import kb_pb2
 from kb.servicer import KbServicer
 
@@ -21,7 +21,7 @@ class InProcessClient:
     def _servicer(self) -> tuple[KbServicer | None, kb_pb2.Fault | None]:
         if self._root is not None:
             return KbServicer(self._root), None
-        root, refusal = discovery.locate(Path.cwd(), os.environ)
+        root, refusal = store.locate(Path.cwd(), os.environ)
         if refusal is not None:
             return None, refusal
         return KbServicer(root), None

@@ -3,11 +3,10 @@ does not convert is refused here, before anything else sees it. In a set, or amo
 entry that does not convert stands in its place as a Refusal, so the faults come back in the order of the entries."""
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 
 from kb import names, values
 from kb.contract import kb_pb2
-from kb.values import Actor, ArtifactId, Content, Kind, Locator, Refused
+from kb.values import Actor, ArtifactId, Content, Kind, Locator, Refused, Root
 
 
 @dataclass(frozen=True)
@@ -86,7 +85,7 @@ class Listing:
     ids: bool
 
 
-def starting(request: kb_pb2.InitRequest) -> tuple[Actor, Path]:
+def starting(request: kb_pb2.InitRequest) -> tuple[Actor, Root]:
     """Who starts a store, then where; the first refusal only."""
     return values.starter(request.actor), values.root(request.root)
 

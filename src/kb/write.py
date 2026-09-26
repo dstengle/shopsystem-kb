@@ -2,14 +2,13 @@
 as the operations before it left it; only when every one passes is anything written, each artifact saved, one journal
 entry per operation naming the set, and one commit. A fault anywhere refuses the whole set with every fault found,
 and nothing is written. Starting a store and recording a snapshot write and commit here too."""
-from pathlib import Path
 from typing import NamedTuple
 
 from kb import canonical, edits, journal, refusals, requests
 from kb.metaschema import METASCHEMA
 from kb.edits import Change
-from kb.store import Draft, Store
-from kb.values import Actor, ArtifactId, Kind, Refused, Signed
+from kb.store import Draft, Store, vacant
+from kb.values import Actor, ArtifactId, Kind, Refused, Root, Signed
 
 METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
 
@@ -35,9 +34,11 @@ class Landing(NamedTuple):
     schema_version: int
 
 
-def start(root: Path, actor: Actor) -> None:
-    """A new store at root, holding the type of types, its start in the journal and in one commit."""
-    store, signed = Store(root), Signed(actor, "initialise store")
+def start(root: Root, actor: Actor) -> None:
+    """A new store at root, holding the type of types, its start in the journal and in one commit. Raises Refused
+    where no store can be started."""
+    vacant(root)
+    store, signed = Store(root.path), Signed(actor, "initialise store")
     store.start()
     metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
     text = canonical.dump(canonical.order(metaschema, METASCHEMA["schema"]))

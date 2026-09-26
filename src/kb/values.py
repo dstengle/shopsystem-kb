@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical, discovery, names
+from kb import canonical, names
 from kb.content import loads
 from kb.contract import kb_pb2
 
@@ -173,33 +173,22 @@ def starter(request: kb_pb2.Actor) -> Actor:
     return actor(request)
 
 
-def root(text: str) -> Path:
-    """The directory a store is started in, as the request names it; relative names stay relative. It must be a
-    directory that is there, with nothing called kb/ inside it, and inside no store."""
+@dataclass(frozen=True)
+class Root:
+    """The directory a store is started in, and the name the request gave it, which a refusal quotes."""
+    path: Path
+    named: str
+
+
+def root(text: str) -> Root:
+    """The directory a store is started in, as the request names it; relative names stay relative. What stands
+    there is the store's to check."""
     if not text:
         raise Refused([kb_pb2.Fault(
             rule="root",
             message="a store is started in a directory that was named and that exists; no directory was named",
         )])
-    named = Path(text)
-    if not named.exists():
-        raise Refused([kb_pb2.Fault(
-            rule="root", message=f"a store is started in a directory that exists; {text!r} does not",
-        )])
-    if not named.is_dir():
-        raise Refused([kb_pb2.Fault(
-            rule="root", message=f"a store is started in a directory, and {text!r} is not one",
-        )])
-    if (named / "kb").exists():
-        raise Refused([kb_pb2.Fault(
-            rule="root", message=f"a store is never started over another; {text!r} already has a store inside it",
-        )])
-    above = discovery.find_above(named.resolve().parent)
-    if above is not None:
-        raise Refused([kb_pb2.Fault(
-            rule="root", message=f"stores do not nest; {text!r} is inside the store at {str(above)!r}",
-        )])
-    return named
+    return Root(Path(text), text)
 
 
 def path(store_dir: Path, artifact_id: ArtifactId) -> Path:

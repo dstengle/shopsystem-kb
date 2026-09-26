@@ -1,11 +1,15 @@
-"""The store on disk: <root>/kb/, one canonical YAML file per artifact, itself a git repository."""
+"""The store on disk: <root>/kb/, one canonical YAML file per artifact, itself a git repository; and finding it, the
+way git finds a repository: upward from the working directory, or named by KB_ROOT."""
 import os
 import subprocess
 from pathlib import Path
+from typing import Mapping
 
 from kb import canonical, values
 from kb.contract import CONTRACT_VERSION, kb_pb2
-from kb.values import ArtifactId, Kind, Signed
+from kb.values import ArtifactId, Kind, Refused, Root, Signed
+
+MARKER = Path("kb") / "store.yaml"
 
 
 class Unreadable(Exception):
@@ -118,6 +122,59 @@ class Draft:
 
     def schema(self, kind: Kind) -> dict:
         return self.load(ArtifactId(Kind("schema"), kind.name))
+
+
+def vacant(root: Root) -> None:
+    """Refuse a root a store cannot be started in: one that is not there, is not a directory, has anything called kb
+    inside it, or is inside a store."""
+    if not root.path.exists():
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"a store is started in a directory that exists; {root.named!r} does not",
+        )])
+    if not root.path.is_dir():
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"a store is started in a directory, and {root.named!r} is not one",
+        )])
+    if (root.path / "kb").exists():
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"a store is never started over another; {root.named!r} already has a store inside it",
+        )])
+    above = find_above(root.path.resolve().parent)
+    if above is not None:
+        raise Refused([kb_pb2.Fault(
+            rule="root", message=f"stores do not nest; {root.named!r} is inside the store at {str(above)!r}",
+        )])
+
+
+def find_above(start: Path) -> Path | None:
+    """The nearest directory at or above `start` with a store inside it, or None."""
+    for directory in (start, *start.parents):
+        if (directory / MARKER).is_file():
+            return directory
+    return None
+
+
+def locate(cwd: Path, env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
+    """The store a call goes to, or the fault that refuses it. Nothing is guessed at."""
+    above = find_above(cwd)
+    if "KB_ROOT" not in env:
+        if above is None:
+            return None, kb_pb2.Fault(
+                rule="store", message=f"no store was found, neither above {cwd} nor named outright",
+            )
+        return above, None
+    named = Path(env["KB_ROOT"])
+    if not (named / MARKER).is_file():
+        return None, kb_pb2.Fault(
+            rule="store", message=f"KB_ROOT names a directory that holds no store: {named}",
+        )
+    if above is not None and above.resolve() != named.resolve():
+        return None, kb_pb2.Fault(
+            rule="store",
+            message=f"KB_ROOT names a store other than the one {cwd} is working in: KB_ROOT is {named}, "
+                    f"the working directory is inside {above}; neither is guessed at",
+        )
+    return named, None
 
 
 QUIET = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")

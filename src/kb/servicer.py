@@ -21,9 +21,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def Init(self, request, context):
         try:
             actor, root = requests.starting(request)
+            write.start(root, actor)
         except values.Refused as refused:
             return kb_pb2.InitResponse(faults=refused.faults)
-        write.start(root, actor)
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):
