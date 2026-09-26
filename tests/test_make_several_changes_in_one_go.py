@@ -1,9 +1,11 @@
+import re
 import subprocess
 
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, journal, read, replacement,
+    CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, apply, create, creation, define, journal, read, removal,
+    replacement, write,
 )
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
@@ -148,3 +150,76 @@ def _each_entry_its_own_version(root, applied):
 @then("the work item's version has gone up by two")
 def _two_versions_on(client):
     assert read(client, WORK_ITEM).revision == 3
+
+
+MONTHLY = "decision/prices-are-reviewed-monthly"
+
+
+def _nothing_by_that_name(root, client):
+    return replacement(DECISION, {"sections": SECTIONS})
+
+
+def _still_pointed_at(root, client):
+    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
+    assert not write(client, WORK_ITEM, {"decisions": [DECISION]}).faults
+    return removal(DECISION)
+
+
+def _unreadable(root, client):
+    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
+    (root / "kb" / f"{DECISION}.yaml").write_text(MANGLED)
+    return replacement(DECISION, {"sections": SECTIONS})
+
+
+SECOND_CHANGES = {
+    "the second change names an artifact the store holds nothing under": _nothing_by_that_name,
+    "the second change removes an artifact something still points at": _still_pointed_at,
+    "the second change touches an artifact whose stored file cannot be read": _unreadable,
+}
+
+
+@when(
+    parsers.re(f"the client asks, in one go, for a set in which (?P<fault>{'|'.join(map(re.escape, SECOND_CHANGES))}), "
+               "saying which role and why"),
+    target_fixture="attempt",
+)
+def _ask_for_a_set_stopped(root, client, fault):
+    second = SECOND_CHANGES[fault](root, client)
+    before, history = _everything_under(root), _journal(root)
+    response = apply(client, [creation("decision", "Prices are reviewed monthly", {"sections": SECTIONS}), second],
+                     message="Record a decision and change another")
+    return {"response": response, "before": before, "after": _everything_under(root), "history": history}
+
+
+def _refused_with(attempt, faults):
+    refused = attempt["response"]
+    assert (refused.batch, list(refused.results)) == ("", [])
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == faults
+    return refused.faults[0].message
+
+
+@then("the set is rejected because the store holds nothing by that name, and the name asked for is given back")
+def _rejected_for_nothing_there(attempt):
+    assert DECISION in _refused_with(attempt, [(DECISION, "", "not-found")])
+
+
+@then("the set is rejected because something still points at it")
+def _rejected_for_a_link_in_the_way(attempt):
+    assert WORK_ITEM in _refused_with(attempt, [(WORK_ITEM, "decisions/0", "on_delete")])
+
+
+@then("the set is rejected because that file cannot be read, and the file is named")
+def _rejected_for_an_unreadable_file(attempt):
+    assert f"{DECISION}.yaml" in _refused_with(attempt, [(DECISION, "", "unreadable")])
+
+
+@then("the store holds none of the changes in the set")
+def _none_of_the_set_held(client, attempt):
+    assert attempt["after"] == attempt["before"]
+    assert [fault.rule for fault in read(client, MONTHLY).faults] == ["not-found"]
+
+
+@then("the store's history holds no entry for any of them")
+def _no_entry_for_the_set(root, attempt):
+    assert _journal(root) == attempt["history"]
+    assert not [entry for entry in attempt["history"] if entry.get("artifact") == MONTHLY]

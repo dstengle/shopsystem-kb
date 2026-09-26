@@ -121,6 +121,11 @@ def replacement(artifact_id, content):
     return kb_pb2.Operation(write=kb_pb2.Replacement(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content)))
 
 
+def removal(artifact_id):
+    """A removal of a whole artifact inside a set."""
+    return kb_pb2.Operation(delete=kb_pb2.Removal(locator=kb_pb2.Locator(id=artifact_id)))
+
+
 def write(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):
     """A Write of a whole artifact, or of the node at path inside it, under the client's role unless another actor is
     given. Returns the response, faults and all."""
