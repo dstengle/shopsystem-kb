@@ -167,7 +167,7 @@ def _only_the_agents_change(narrowed):
     assert narrowed == [("write", DECISION, "agent", "restock-run-12")]
 
 
-@when(parsers.parse("the client reads the journal since {day}"), target_fixture="narrowed")
+@when(parsers.re(r"the client reads the journal since (?P<day>\d{4}-\d{2}-\d{2})"), target_fixture="narrowed")
 def _since(client, day):
     return _journal_of(client, since=day)
 
@@ -175,3 +175,44 @@ def _since(client, day):
 @then("the client is given only the change made today")
 def _only_todays_change(narrowed):
     assert narrowed == [("write", DECISION, "agent", "restock-run-12")]
+
+
+@when("the client reads the journal for a set of changes the history holds nothing under", target_fixture="asked")
+def _for_an_unknown_set(client):
+    return journal(client, batch="20260101T000000000000Z-1")
+
+
+@when("the client reads the journal for a role nothing in the history was done under", target_fixture="asked")
+def _for_an_unknown_role(client):
+    return journal(client, role="auditor")
+
+
+@when("the client reads the journal since something that cannot be read as a moment in time", target_fixture="asked")
+def _since_what_is_no_time(client):
+    return journal(client, since="last Tuesday")
+
+
+@then("the client is given no entries and no fault")
+def _nothing_and_no_fault(asked):
+    assert (list(asked.entries), list(asked.faults)) == ([], [])
+
+
+@then("the read is rejected because since names a moment in time")
+def _rejected_since(asked):
+    assert [(fault.rule, fault.path) for fault in asked.faults] == [("since", "")]
+    assert "'last Tuesday'" in asked.faults[0].message
+    assert list(asked.entries) == []
+
+
+@given("a store where an agent replaced one section of a decision")
+def _one_section_replaced(client):
+    replaced = write(client, DECISION, {"title": "Rationale", "body": "Costs move every week.\n"},
+                     message="Say it plainer", actor=AGENT, path="sections/rationale")
+    assert not replaced.faults, replaced.faults
+
+
+@then("the entry for that change names the place inside the decision that was changed")
+def _names_the_place(entries):
+    assert [(entry.op, entry.path, entry.message) for entry in entries][-1] == (
+        "write", "sections/rationale", "Say it plainer",
+    )

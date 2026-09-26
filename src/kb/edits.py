@@ -36,7 +36,7 @@ def _changed(draft: Draft, operation) -> Change:
         return Change("create", _create(draft, operation))
     if isinstance(operation, requests.Add):
         return _append(draft, operation)
-    return Change("write", _replace(draft, operation))
+    return Change("write", _replace(draft, operation), names.placed(operation.locator.place))
 
 
 def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
