@@ -18,7 +18,7 @@ So that a client can show how the store's contents hang together, the client can
     When the client follows the links into the decision
     Then the client is given a stub of each work item
 
-  @slice-31
+  @slice-89
   Scenario: The client narrows the links to one link and one kind
     Pins that a traversal can be narrowed to one link and one kind, so a client asks its real question instead of filtering everything afterwards.
     Given a note that is not a work item also points at the decision, through the same link the work items use
@@ -33,12 +33,14 @@ So that a client can show how the store's contents hang together, the client can
     Then the client is given the older decision and the tag
     And each of them comes with the route taken to it
 
+  @slice-89
   Scenario: The client follows the links out of one place inside an artifact
     Pins that a traversal can start at a place inside an artifact rather than the whole of it, so a client can ask what one section or one step points at and get only that.
     Given the decision's rationale points at a tag of its own
     When the client follows the links out of the rationale of the decision
     Then the client is given a stub of that tag and nothing else the decision points at
 
+  @slice-72
   Scenario: A link into a part counts as a link into the artifact holding it
     Pins that pointing at a part is pointing at the artifact it sits in, so the count at a glance, the links coming in, and what blocks a removal all agree with one another.
     Given a store holding a process, and a work item that points at one step of that process rather than at the whole process

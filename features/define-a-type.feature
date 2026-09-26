@@ -32,6 +32,7 @@ So that a client decides for itself what its artifacts are made of, the client c
     When the client defines a type that does not match the type that describes types
     Then the type is rejected because it does not match the type that describes types
 
+  @slice-68
   Scenario Outline: A type the store could never check anything against is refused when it is written
     Pins that a type is checked the moment it is written, so a type that could never check an artifact is caught once here rather than by every create that tries to use it.
     When the client defines a type that <fault>
@@ -44,6 +45,7 @@ So that a client decides for itself what its artifacts are made of, the client c
       | names itself as the type it is built on                        | a type cannot be built on itself                             |
       | declares a link field without saying which kinds it may point at | a link field says which kinds it may point at              |
 
+  @slice-71
   Scenario Outline: A type built on a base carries everything the base declares, of every kind
     Pins that a base is carried in full and not only its fields and sections, so a client can put anything a type is made of into a base and have it hold for every type built on it.
     Given a base type declaring <what the base declares>
@@ -56,6 +58,7 @@ So that a client decides for itself what its artifacts are made of, the client c
       | which fields are shown at a glance              | reading a decision of that type at a glance shows the base's fields as well as the type's own |
       | a link field every artifact may carry           | a decision of that type pointing through that field at a kind the base does not allow is rejected |
 
+  @slice-84
   Scenario: A type changed without moving its version on is refused
     Pins that a type's version is the only thing that tells an artifact it has fallen behind, so a type cannot change under its artifacts while still claiming the version they were checked against.
     Given a type the store holds at its second version

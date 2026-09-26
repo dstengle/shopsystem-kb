@@ -83,6 +83,7 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     Then starting the store is rejected because a store is started in a directory, and what was named is not one
     And that file is left as it was
 
+  @slice-94
   Scenario Outline: Starting a store where the store's own corner is already taken is refused
     Pins that the store's corner of a directory is never written over or grown into, whatever is sitting in it and whether or not it is a store.
     Given a directory holding <what>
@@ -95,6 +96,7 @@ So that a client has somewhere to keep typed artifacts before it has any types o
       | an empty folder where a store would go  |
       | a file where a store would go           |
 
+  @slice-94
   Scenario: A client readied where there was no store can still start one
     Pins that starting a store is the one call needing no store to be found first, so the client that brings the first store into being does not have to exist after it.
     Given the client was readied to call a store while working where there was none and nothing named one

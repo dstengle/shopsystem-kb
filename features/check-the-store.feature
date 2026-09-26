@@ -41,6 +41,7 @@ So that a client can tell whether everything the store holds still fits its type
     And everything else in the store is checked and reported alongside it
     And the check comes back with its answer rather than breaking off
 
+  @slice-81
   Scenario: An artifact of a kind the store holds no type for is reported as a violation
     Pins that a kind with no type behind it is a finding like any other, so a store that has lost a type is told about rather than crashing the very check that would have said so.
     Given a store holding an artifact of a kind the store holds no type for

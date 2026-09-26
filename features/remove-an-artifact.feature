@@ -26,6 +26,7 @@ So that a client can take out what is no longer used without leaving links point
     Then the removal is rejected because the store holds nothing by that name, and the name asked for is given back
     And the store holds what it held before
 
+  @slice-87
   Scenario: A link from inside a part blocks a removal like any other
     Pins that a link is a link wherever it sits: one written inside an item of a collection holds back a removal too, so nothing is ever left pointing at nothing.
     Given a process one of whose steps points at the tag nothing else points at
@@ -33,6 +34,7 @@ So that a client can take out what is no longer used without leaving links point
     Then the removal is rejected because something still points at it
     And the client is given that link among the links that block it
 
+  @slice-87
   Scenario: A name is free again once what held it has been removed
     Pins that a name belongs to an artifact for its life and no longer, so the next artifact whose title gives that name simply takes it, at its own first version.
     Given the client has removed the tag nothing points at

@@ -22,6 +22,7 @@ So that a client can show everything of one kind without knowing any names, the 
     When the client lists the decisions asking for names only
     Then the client is given three names and nothing else
 
+  @slice-82
   Scenario Outline: Asking by a kind the store holds no type for is refused
     Pins that an unknown kind is the same plain refusal wherever it is asked for, so a typo is never answered with an empty result that reads exactly like an empty store.
     Given a store that holds no type called "invoice"

@@ -11,6 +11,7 @@ So that a piece of work can say which versions it was built on while the store k
     Then the journal holds one entry listing each of them with the version read and a fingerprint of it
     And the client is given the name of that entry
 
+  @slice-93
   Scenario Outline: Every way a snapshot can be asked for wrongly is refused
     Pins that a snapshot is checked like any other call before anything is recorded, so the history never gains an entry attributable to nobody or naming something the store does not hold.
     When the client snapshots <request>

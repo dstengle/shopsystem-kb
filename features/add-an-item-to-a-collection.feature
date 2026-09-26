@@ -69,6 +69,7 @@ So that a client can grow a collection an item at a time without rewriting the a
     Then the item is rejected because the store holds nothing by that name, and the name asked for is given back
     And nothing is written anywhere in the store
 
+  @slice-80
   Scenario Outline: An item's title becomes its name by the same rules as an artifact's title
     Pins that one rule turns a title into a name everywhere: an item's title is read as text whatever it looks like, and a title that leaves nothing to make a name from is refused rather than given an empty name.
     When the client adds a step titled <title> to the process, saying which role and why
@@ -80,18 +81,21 @@ So that a client can grow a collection an item at a time without rewriting the a
       | the number 12 rather than text      | the name the client is given for the new item is made from the text "12"           |
       | the yes-or-no true rather than text | the name the client is given for the new item is made from the text "true"         |
 
+  @slice-64
   Scenario: An item pointing at something that is not there is refused
     Pins that a link inside an item is a link like any other, so nothing enters the graph pointing nowhere by sitting inside a collection.
     When the client adds a step that points at a shared step the store does not hold, saying which role and why
     Then the item is rejected because a link must land on a node of a kind the type allows
     And the process holds the steps it held before, at the version it held before
 
+  @slice-73
   Scenario: An item missing something its own type requires is refused
     Pins that an item is checked against its type the way an artifact is checked against its, so a collection cannot fill up with half-filled items nobody checked.
     When the client adds a step with no role named, where a step must name a role, saying which role and why
     Then the item is rejected because the content does not fit the type
     And the process holds the steps it held before, at the version it held before
 
+  @slice-77
   Scenario: The client adds an item to a collection inside an item
     Pins that a collection inside an item is a collection like any other, named by the item it sits in, so growing one does not mean rewriting the whole artifact.
     Given the steps of the process each carry a collection of checks of their own
