@@ -3,26 +3,14 @@
 Each rpc first turns what the request carries into checked values (kb.values); nothing past that point sees a
 string that came from the request.
 """
-import copy
 from datetime import datetime
-from typing import NamedTuple
 
-from kb import canonical, journal, names, requests, search, validation, values
+from kb import canonical, journal, requests, search, validation, values, write
 from kb.content import dumps, text
 from kb.contract import kb_pb2, kb_pb2_grpc
-from kb.metaschema import METASCHEMA
-from kb.store import Draft, Store, Unreadable
-from kb.values import ArtifactId, Kind, Signed
-
-METASCHEMA_ID = ArtifactId(Kind("schema"), "schema")
-
-
-class Change(NamedTuple):
-    """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name."""
-    op: str
-    artifact_id: ArtifactId
-    path: str = ""
-    item: str = ""
+from kb.store import Store, Unreadable
+from kb.values import ArtifactId
+from kb.edits import not_found as _not_found
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
@@ -35,193 +23,39 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             actor, root = requests.starting(request)
         except values.Refused as refused:
             return kb_pb2.InitResponse(faults=refused.faults)
-        store, signed = Store(root), Signed(actor, "initialise store")
-        store.start()
-        metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
-        path = store.save(METASCHEMA_ID, canonical.dump(canonical.order(metaschema, METASCHEMA["schema"])))
-        entry = journal.write(
-            store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",
-            revision=1, schema_version=1, written=path,
-        )
-        store.commit([store.dir / "store.yaml", path, entry], signed)
+        write.start(root, actor)
         return kb_pb2.InitResponse()
 
     def Create(self, request, context):
         creation = kb_pb2.Creation(type=request.type, title=request.title, content=request.content)
-        landed = self._land(requests.operations([kb_pb2.Operation(create=creation)]), values.signed(request.actor, request.message))
+        landed = write.land(self._store, requests.operations([kb_pb2.Operation(create=creation)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.CreateResponse(faults=landed.faults)
         return kb_pb2.CreateResponse(id=landed.results[0].id, revision=landed.results[0].revision)
 
     def Write(self, request, context):
         replacement = kb_pb2.Replacement(locator=request.locator, content=request.content)
-        landed = self._land(requests.operations([kb_pb2.Operation(write=replacement)]), values.signed(request.actor, request.message))
+        landed = write.land(self._store, requests.operations([kb_pb2.Operation(write=replacement)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.WriteResponse(faults=landed.faults)
         return kb_pb2.WriteResponse(revision=landed.results[0].revision)
 
     def Append(self, request, context):
         addition = kb_pb2.Addition(locator=request.locator, content=request.content)
-        landed = self._land(requests.operations([kb_pb2.Operation(append=addition)]), values.signed(request.actor, request.message))
+        landed = write.land(self._store, requests.operations([kb_pb2.Operation(append=addition)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.AppendResponse(faults=landed.faults)
         return kb_pb2.AppendResponse(id=landed.results[0].item, revision=landed.results[0].revision)
 
     def Delete(self, request, context):
         removal = kb_pb2.Removal(locator=request.locator)
-        landed = self._land(requests.operations([kb_pb2.Operation(delete=removal)]), values.signed(request.actor, request.message))
+        landed = write.land(self._store, requests.operations([kb_pb2.Operation(delete=removal)]), values.signed(request.actor, request.message))
         if landed.faults:
             return kb_pb2.DeleteResponse(faults=landed.faults)
         return kb_pb2.DeleteResponse(revision=landed.results[0].revision)
 
     def Apply(self, request, context):
-        return self._land(requests.operations(request.operations), values.signed(request.actor, request.message))
-
-    def _land(self, operations: list, signed: Signed) -> kb_pb2.ApplyResponse:
-        """The write path. Each operation is applied in order to a draft of the store and checked there, against the
-        store as the operations before it left it; only when every one passes is anything written, each artifact
-        saved, one journal entry per operation naming the set, and one commit.
-
-        A fault anywhere refuses the whole set with every fault found, and nothing is written.
-        """
-        draft = Draft(self._store)
-        touched, faults = [], []
-        for operation in operations:
-            if isinstance(operation, requests.Refusal):
-                faults += operation.faults
-                continue
-            try:
-                touched.append(self._apply(draft, operation))
-            except values.Refused as refused:
-                faults += refused.faults
-        if faults:
-            return kb_pb2.ApplyResponse(faults=faults)
-        texts = []
-        for change in touched:
-            if change.op == "delete":
-                texts.append((change, None))
-                continue
-            try:
-                texts.append((change, canonical.dump(draft.load(change.artifact_id))))
-            except canonical.NotCanonical as fault:
-                faults.append(kb_pb2.Fault(artifact=str(change.artifact_id), rule="content", message=str(fault)))
-        if faults:
-            return kb_pb2.ApplyResponse(faults=faults)
-        written, results, batch = [], [], ""
-        for seq, (change, text) in enumerate(texts, start=1):
-            if text is None:
-                removed = self._store.load(change.artifact_id)
-                revision, schema_version = removed["revision"] + 1, removed["schema_version"]
-                path, saved = self._store.remove(change.artifact_id), None
-            else:
-                artifact = draft.load(change.artifact_id)
-                revision, schema_version = artifact["revision"], artifact["schema_version"]
-                path = saved = self._store.save(change.artifact_id, text)
-            entry = journal.write(
-                self._store.dir, signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path,
-                revision=revision, schema_version=schema_version, written=saved, seq=seq, batch=batch,
-            )
-            batch = batch or entry.stem
-            written += [path, entry]
-            results.append(kb_pb2.Result(id=str(change.artifact_id), revision=revision, item=change.item))
-        self._store.commit(written, signed)
-        return kb_pb2.ApplyResponse(batch=batch, results=results)
-
-    def _apply(self, draft: Draft, operation) -> Change:
-        """One operation applied to the draft. Returns what it did; raises values.Refused."""
-        if isinstance(operation, requests.Create):
-            return Change("create", self._create(draft, operation))
-        if isinstance(operation, requests.Add):
-            return self._append(draft, operation)
-        if isinstance(operation, requests.Remove):
-            return self._delete(draft, operation)
-        return Change("write", self._replace(draft, operation))
-
-    def _create(self, draft: Draft, creation: requests.Create) -> ArtifactId:
-        kind = creation.kind
-        if not draft.holds(ArtifactId(Kind("schema"), kind.name)):
-            raise values.Refused([kb_pb2.Fault(
-                rule="kind", message=f"a kind must name a type the store holds; the store holds no type called {kind.name!r}",
-            )])
-        at, faults = creation.at, list(creation.title_faults)
-        if creation.name is not None:
-            artifact_id = _unclaimed(draft, creation.name)
-            at = str(artifact_id)
-        faults += creation.content.refusal(at)
-        if faults:
-            raise values.Refused(faults)
-        content = creation.content.tree
-        schema = draft.schema(kind)
-        faults = validation.validate(at, {"title": creation.title, **content}, schema["schema"], draft)
-        if faults:
-            raise values.Refused(faults)
-        names.items(schema["schema"], content, keep_named=False)
-        artifact = {
-            **content,
-            "id": str(artifact_id), "type": kind.name,
-            "schema_version": schema["version"], "revision": 1, "title": creation.title,
-        }
-        draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
-        return artifact_id
-
-    def _replace(self, draft: Draft, replacement: requests.Replace) -> ArtifactId:
-        locator = replacement.locator
-        if not draft.holds(locator.id):
-            raise values.Refused([_not_found(locator.id)])
-        if replacement.content.problems:
-            raise values.Refused(replacement.content.refusal(str(locator.id)))
-        content = replacement.content.tree
-        current = draft.load(locator.id)
-        if locator.place:
-            content = _placed(current, locator, content)
-        _revise(draft, locator.id, current, content)
-        return locator.id
-
-    def _append(self, draft: Draft, addition: requests.Add) -> Change:
-        """One item put at the end of a collection the artifact's type declares, and named there."""
-        locator = addition.locator
-        if not draft.holds(locator.id):
-            raise values.Refused([_not_found(locator.id)])
-        if addition.item.problems:
-            raise values.Refused(addition.item.refusal(str(locator.id)))
-        item = addition.item.tree
-        collection = "/".join(locator.place)
-        if collection not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
-            raise values.Refused([kb_pb2.Fault(
-                artifact=str(locator.id), path=collection, rule="not-found",
-                message=f"{str(locator.id)!r} holds no collection called {collection!r}",
-            )])
-        current = draft.load(locator.id)
-        content = _content_of(current)
-        content.setdefault(collection, []).append(item)
-        _revise(draft, locator.id, current, content)
-        return Change("append", locator.id, f"{collection}/{item['id']}", item["id"])
-
-    def _delete(self, draft: Draft, removal: requests.Remove) -> Change:
-        """A whole artifact taken out of the draft, refused with one fault for each link that still points at it."""
-        locator = removal.locator
-        if not draft.holds(locator.id):
-            raise values.Refused([_not_found(locator.id)])
-        if locator.place:
-            raise values.Refused([kb_pb2.Fault(
-                artifact=str(locator.id), path="/".join(locator.place), rule="locator",
-                message=f"a removal takes out a whole artifact; {'/'.join(locator.place)!r} is a place inside {str(locator.id)!r}",
-            )])
-        blocking = []
-        for other_id in draft.ids():
-            if other_id == locator.id:
-                continue
-            schema = draft.schema(other_id.kind)["schema"]
-            for field, place, target in validation.links(draft.load(other_id), schema, draft):
-                if _points_at(target, locator.id):
-                    blocking.append(kb_pb2.Fault(
-                        artifact=str(other_id), path=place, rule="on_delete",
-                        message=f"{str(locator.id)!r} cannot be removed while {str(other_id)!r} points at it at {place!r}",
-                    ))
-        if blocking:
-            raise values.Refused(blocking)
-        draft.remove(locator.id)
-        return Change("delete", locator.id)
+        return write.land(self._store, requests.operations(request.operations), values.signed(request.actor, request.message))
 
     def Read(self, request, context):
         try:
@@ -394,7 +228,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             other = self._store.load(other_id)
             schema = self._store.schema(other_id.kind)["schema"]
             for field, _, target in validation.links(other, schema, self._store):
-                if _points_at(target, artifact_id):
+                if validation.points_at(target, artifact_id):
                     found.append((field, other_id))
         return found
 
@@ -434,9 +268,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
             for artifact_id in named
         ]
         signed = values.signed(request.actor, request.message)
-        entry = journal.snapshot(self._store.dir, signed=signed, read=read)
-        self._store.commit([entry], signed)
-        return kb_pb2.SnapshotResponse(entry=entry.stem)
+        return kb_pb2.SnapshotResponse(entry=write.record(self._store, read, signed))
 
     def _stub(self, field, target_id: ArtifactId):
         target = self._store.load(target_id)
@@ -457,11 +289,6 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         return counts
 
 
-def _points_at(target: str, artifact_id: ArtifactId) -> bool:
-    """Whether a link lands on the artifact or on a part inside it."""
-    return target.partition("#")[0] == str(artifact_id)
-
-
 def _holds(artifact: dict, fields) -> bool:
     """Whether each field named holds the value given, compared as the text the value is written as."""
     return all(field in artifact and text(artifact[field]) == value for field, value in fields.items())
@@ -478,49 +305,6 @@ def _entry(entry: dict) -> kb_pb2.Entry:
     )
 
 
-def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> None:
-    """The artifact's next version put in the draft: the content checked against the current version of its type,
-    its items named, its version up by one, its title kept. Raises values.Refused with every fault."""
-    schema = draft.schema(artifact_id.kind)
-    faults = validation.validate(str(artifact_id), {"title": current["title"], **content}, schema["schema"], draft)
-    if faults:
-        raise values.Refused(faults)
-    names.items(schema["schema"], content, keep_named=True)
-    artifact = {
-        **content,
-        "id": current["id"], "type": current["type"],
-        "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
-    }
-    draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
-
-
-def _content_of(artifact: dict) -> dict:
-    """A copy of what an artifact holds but its identity keys, to be changed without changing it."""
-    return copy.deepcopy({key: value for key, value in artifact.items() if key not in canonical.IDENTITY})
-
-
-def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:
-    """The artifact's content with the node at the locator's place replaced by the one given. A place is pairs of a
-    list and an item in it, a section named by its title's name and a part by its id, and may end in a field."""
-    content = _content_of(artifact)
-    holder, steps = content, list(locator.place)
-    while len(steps) > 1:
-        collection, name = steps.pop(0), steps.pop(0)
-        items = holder.get(collection, [])
-        index = next((index for index, item in enumerate(items) if _node_name(collection, item) == name), None)
-        if index is None:
-            raise values.Refused([kb_pb2.Fault(
-                artifact=str(locator.id), path="/".join(locator.place), rule="not-found",
-                message=f"{str(locator.id)!r} holds nothing at {'/'.join(locator.place)!r}",
-            )])
-        if not steps:
-            items[index] = node if collection == "sections" else {"id": name, **node}
-            return content
-        holder = items[index]
-    holder[steps[0]] = node
-    return content
-
-
 def _find_section(sections: list, title: str) -> dict | None:
     """The first section titled so, looking at each section before the sections inside it."""
     for section in sections:
@@ -530,23 +314,6 @@ def _find_section(sections: list, title: str) -> dict | None:
         if found is not None:
             return found
     return None
-
-
-def _node_name(collection: str, item: dict) -> str:
-    """How a place names an item: a section by its title's name, a part by its id."""
-    return names.slug(item["title"]) if collection == "sections" else item.get("id")
-
-
-def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
-    return kb_pb2.Fault(
-        artifact=str(artifact_id), rule="not-found", message=f"the store holds nothing by the name {str(artifact_id)!r}",
-    )
-
-
-def _unclaimed(draft: Draft, named: ArtifactId) -> ArtifactId:
-    """The name a title gives, or, when the store or an earlier change in the set already holds it, that name with
-    -2, -3 and so on added: the first that nothing holds. What already holds a name keeps it."""
-    return ArtifactId(named.kind, names.numbered(named.slug, lambda slug: draft.holds(ArtifactId(named.kind, slug))))
 
 
 def _summary_fields(artifact, schema):

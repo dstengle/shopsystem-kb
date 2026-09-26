@@ -109,6 +109,11 @@ def links(artifact: dict, schema: dict, corpus) -> list[tuple[str, str, str]]:
     return found
 
 
+def points_at(target: str, artifact_id) -> bool:
+    """Whether a link lands on the artifact or on a part inside it."""
+    return target.partition("#")[0] == str(artifact_id)
+
+
 def _lands(target: str, ref: dict, corpus) -> bool:
     """Whether a link lands: on an artifact of a kind the field allows that the corpus holds, and, when it names a
     place after `#` and the field allows parts, on a part that artifact holds."""
