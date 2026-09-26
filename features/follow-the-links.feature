@@ -33,7 +33,7 @@ So that a client can show how the store's contents hang together, the client can
     Then the client is given the older decision and the tag
     And each of them comes with the route taken to it
 
-  @slice-89
+  @slice-89.2
   Scenario: The client follows the links out of one place inside an artifact
     Pins that a traversal can start at a place inside an artifact rather than the whole of it, so a client can ask what one section or one step points at and get only that.
     Given the decision's rationale points at a tag of its own
