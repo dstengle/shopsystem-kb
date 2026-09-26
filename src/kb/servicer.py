@@ -97,5 +97,5 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @_boundary(kb_pb2.SnapshotResponse)
     def Snapshot(self, request):
-        named, signed = requests.snapshotted(request.artifacts), values.signed(request.actor, request.message)
+        named, signed = requests.snapshotted(request.artifacts), values.reader(request.actor, request.message)
         return kb_pb2.SnapshotResponse(entry=write.record(self._store, named, signed))

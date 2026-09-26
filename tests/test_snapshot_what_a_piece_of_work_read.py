@@ -1,6 +1,7 @@
 import hashlib
+import re
 
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, write
 from kb import client as kb_client
@@ -52,3 +53,38 @@ def _one_entry_listing_each(client, root):
 def _given_the_entry(client, snapshotted):
     [entry] = [entry for entry in journal(client).entries if entry.op == "snapshot"]
     assert snapshotted.entry == entry.id
+
+
+WRONGLY = {
+    "the decision and the process without naming the piece of work": ("", [DECISION, PROCESS], "agent"),
+    "the decision and an artifact the store holds nothing under": (EXECUTION, [DECISION, "decision/never-made"], "agent"),
+    "the decision and the process without saying which role it is": (EXECUTION, [DECISION, PROCESS], ""),
+}
+
+
+@when(parsers.re(f"the client snapshots (?P<request>{'|'.join(map(re.escape, WRONGLY))})"), target_fixture="refused")
+def _snapshot_wrongly(client, request):
+    execution, artifacts, role = WRONGLY[request]
+    return snapshot(client, execution, artifacts, message="Read before restocking", role=role)
+
+
+REASONS = {
+    "a snapshot records what a named piece of work read": [("", "", "actor")],
+    "the store holds nothing by that name, and the name asked for is given back": [
+        ("decision/never-made", "", "not-found"),
+    ],
+    "every entry in the history names the role that made it": [("", "", "actor")],
+}
+
+
+@then(parsers.parse("the snapshot is rejected because {reason}"))
+def _snapshot_rejected(refused, reason):
+    assert refused.entry == ""
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == REASONS[reason]
+    if REASONS[reason][0][2] == "actor":
+        assert refused.faults[0].message.startswith(reason)
+
+
+@then("the journal holds no entry for it")
+def _no_entry_for_it(client):
+    assert [entry for entry in journal(client).entries if entry.op == "snapshot"] == []

@@ -194,6 +194,18 @@ def signed(request: kb_pb2.Actor, message: str) -> Signed:
     return Signed(actor(request), message)
 
 
+def reader(request: kb_pb2.Actor, message: str) -> Signed:
+    """Who records what a piece of work read, who must name a role and the piece of work; both faults when both fail."""
+    faults = []
+    if not request.role:
+        faults.append(kb_pb2.Fault(rule="actor", message="every entry in the history names the role that made it"))
+    if not request.execution:
+        faults.append(kb_pb2.Fault(rule="actor", message="a snapshot records what a named piece of work read"))
+    if faults:
+        raise Refused(faults)
+    return signed(request, message)
+
+
 def starter(request: kb_pb2.Actor) -> Actor:
     """The actor who starts a store, who must name a role."""
     if not request.role:
