@@ -55,7 +55,7 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     if faults:
         raise Refused(faults)
     declared = composition.declared(schema["schema"], draft)
-    _named(draft, declared, content, keep_named=False)
+    names.items(declared["parts"], content, False, _item_parts(draft))
     artifact = {
         **content,
         "id": str(artifact_id), "type": kind.name,
@@ -138,12 +138,12 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     its title kept. Raises Refused with every fault."""
     schema = draft.schema(artifact_id.kind)
     declared = composition.declared(schema["schema"], draft)
-    held = {collection: {item.get("id") for item in current.get(collection, [])} for collection in declared["parts"]}
+    held = names.held(declared["parts"], current)
     faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
     faults += _fits(draft, artifact_id, {"title": current["title"], **content}, schema)
     if faults:
         raise Refused(faults)
-    _named(draft, declared, content, keep_named=True)
+    names.items(declared["parts"], content, True, _item_parts(draft))
     artifact = {
         **content,
         "id": current["id"], "type": current["type"],
@@ -152,14 +152,10 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     draft.put(artifact_id, canonical.order(artifact, declared))
 
 
-def _named(draft: Draft, declared: dict, node: dict, keep_named: bool) -> None:
-    """Every item of every collection the node holds given its name, and the items of the collections inside each
-    item in turn, at every depth."""
-    names.items(declared, node, keep_named)
-    for collection, part in declared["parts"].items():
-        inner = composition.declared(part.get("items", {}), draft)
-        for item in node.get(collection, []):
-            _named(draft, inner, item, keep_named)
+def _item_parts(draft: Draft):
+    """What gives the collections an item's type declares, read through its composition, from the declaration of the
+    collection the item is in."""
+    return lambda part: composition.declared(part.get("items", {}), draft)["parts"]
 
 
 def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) -> list:

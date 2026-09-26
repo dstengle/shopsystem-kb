@@ -20,6 +20,14 @@ def entries(text: str) -> dict:
     return canonical.entries(text)
 
 
+def title(value) -> str | None:
+    """A title as text: text as it is, and a number, true or false as YAML 1.2 writes it. None for anything a title
+    is never written as: nothing, a list or a mapping."""
+    if isinstance(value, (str, bool, int, float)):
+        return text(value)
+    return None
+
+
 def text(value) -> str:
     """A value as the text YAML 1.2 writes it. A title is text whatever arrived: true is "true", 12 is "12"."""
     if value is None:

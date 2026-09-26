@@ -202,7 +202,10 @@ def _section(section: dict) -> dict:
 
 
 def _item(item: dict, item_schema: dict) -> dict:
-    """An item's id first, then its fields in the item schema's order."""
+    """An item's id first, then its fields in the item schema's order; an item that is not a set of named entries as
+    it was written."""
+    if not isinstance(item, dict):
+        return item
     ordered = {"id": item["id"]}
     for name in item_schema.get("properties", {}):
         if name in item and name not in ordered:

@@ -2,7 +2,9 @@
 names a place inside one and a type is referred to, the name a title gives, and the numbering that keeps a name free.
 Nothing here reads or writes; whether a name is taken is asked of the caller."""
 import re
-from typing import NamedTuple
+from typing import Callable, NamedTuple
+
+from kb.content import title as title_of
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
@@ -55,19 +57,34 @@ def numbered(name: str, taken) -> str:
     return candidate
 
 
-def items(schema: dict, content: dict, keep_named: bool) -> None:
-    """Every item of every part collection given its name: from its title when it carries one, otherwise from its
-    place in the collection, counted from 1, with a number added as an artifact's name has when an item beside it
-    already has that name. On a write an item already carrying a name is the item of that name, moved or changed
-    where it stands, and keeps it; a name is minted once and never worked out again."""
-    for collection in schema.get("parts", {}):
-        found = content.get(collection, [])
-        taken = {item["id"] for item in found if keep_named and "id" in item}
+def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dict]) -> None:
+    """Every item of every collection the node holds given its name, and the items of the collections inside each
+    item in turn, at every depth. parts is the collections the node's type declares, and inner gives those an item's
+    type declares from the collection's declaration. An item is named from its title when the title is text, a
+    number, true or false, as an artifact's is, otherwise from its place in the collection, counted from 1, with a
+    number added as an artifact's name has when an item beside it already has that name. On a write an item already
+    carrying a name is the item of that name, moved or changed where it stands, and keeps it; a name is minted once
+    and never worked out again. An item that is not a set of named entries carries no name, and is passed over."""
+    for collection, part in parts.items():
+        found = node.get(collection, [])
+        taken = {item["id"] for item in found if isinstance(item, dict) and keep_named and "id" in item}
         for place, item in enumerate(found, start=1):
-            if keep_named and "id" in item:
+            if not isinstance(item, dict):
                 continue
-            item["id"] = numbered(slug(item["title"]) if "title" in item else str(place), taken.__contains__)
-            taken.add(item["id"])
+            if not (keep_named and "id" in item):
+                title = title_of(item.get("title"))
+                item["id"] = numbered(slug(title) if title is not None else str(place), taken.__contains__)
+                taken.add(item["id"])
+            items(inner(part), item, keep_named, inner)
+
+
+def held(parts: dict, node: dict) -> dict[str, set]:
+    """The names the items of each collection the node holds carry; an item that is not a set of named entries
+    carries none."""
+    return {
+        collection: {item.get("id") for item in node.get(collection, []) if isinstance(item, dict)}
+        for collection in parts
+    }
 
 
 class Misnamed(NamedTuple):

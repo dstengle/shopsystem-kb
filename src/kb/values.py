@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from kb import canonical, names
-from kb.content import entries, loads, text as text_of
+from kb.content import entries, loads, title as title_of
 from kb.contract import kb_pb2
 
 class Refused(ValueError):
@@ -165,9 +165,9 @@ def item(text: str) -> Content:
 def _titled(tree: dict) -> Content:
     """An item whose title, when it has one, is text whatever it was written as, as an artifact's is, and leaves a
     name to be made from it."""
-    if "title" not in tree or not isinstance(tree["title"], (str, int, float)):
+    title = title_of(tree.get("title"))
+    if title is None:
         return Content(tree)
-    title = text_of(tree["title"])
     if not names.slug(title):
         return Content(tree, (("title", "title", _leaves_nothing(title)),))
     return Content({**tree, "title": title})
