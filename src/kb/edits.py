@@ -56,7 +56,7 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     if faults:
         raise Refused(faults)
     declared = composition.declared(schema["schema"], draft)
-    names.items(declared, content, keep_named=False)
+    _named(draft, declared, content, keep_named=False)
     artifact = {
         **content,
         "id": str(artifact_id), "type": kind.name,
@@ -91,13 +91,24 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
     current = draft.artifact(locator.id)
     content = _content_of(current)
     spot = places.resolve(content, locator)
-    collections = composition.declared(draft.schema(locator.id.kind)["schema"], draft)["parts"]
-    if spot.holder is not content or spot.key not in collections:
+    if spot.key not in _collections_at(draft, locator):
         raise Refused([refusals.not_a_collection(locator)])
     item = addition.item.tree
-    content.setdefault(spot.key, []).append(item)
+    spot.holder.setdefault(spot.key, []).append(item)
     _revise(draft, locator.id, current, content)
-    return Change("append", locator.id, f"{spot.key}/{item['id']}", item["id"])
+    return Change("append", locator.id, "/".join((*locator.place, item["id"])), item["id"])
+
+
+def _collections_at(draft: Draft, locator: values.Locator) -> dict:
+    """The collections the type declares where the locator's last step stands: the artifact's own, or those of the
+    item type of each collection the place passes through on the way."""
+    declared = composition.declared(draft.schema(locator.id.kind)["schema"], draft)
+    for collection in locator.place[:-1:2]:
+        part = declared["parts"].get(collection)
+        if part is None:
+            return {}
+        declared = composition.declared(part.get("items", {}), draft)
+    return declared["parts"]
 
 
 def _delete(draft: Draft, removal: requests.Remove) -> Change:
@@ -133,13 +144,23 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     faults += _fits(draft, artifact_id, {"title": current["title"], **content}, schema)
     if faults:
         raise Refused(faults)
-    names.items(declared, content, keep_named=True)
+    _named(draft, declared, content, keep_named=True)
     artifact = {
         **content,
         "id": current["id"], "type": current["type"],
         "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
     }
     draft.put(artifact_id, canonical.order(artifact, declared))
+
+
+def _named(draft: Draft, declared: dict, node: dict, keep_named: bool) -> None:
+    """Every item of every collection the node holds given its name, and the items of the collections inside each
+    item in turn, at every depth."""
+    names.items(declared, node, keep_named)
+    for collection, part in declared["parts"].items():
+        inner = composition.declared(part.get("items", {}), draft)
+        for item in node.get(collection, []):
+            _named(draft, inner, item, keep_named)
 
 
 def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) -> list:

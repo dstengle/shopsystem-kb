@@ -304,3 +304,35 @@ def _rejected_for_its_type(attempt):
     faults = attempt["response"].faults
     assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(PROCESS, "steps/2", "required")]
     assert "'role'" in faults[0].message
+
+
+@given("the steps of the process each carry a collection of checks of their own", target_fixture="before")
+def _steps_carry_checks(client):
+    checked = copy.deepcopy(PROCESS_TYPE["schema"])
+    checked["parts"]["steps"]["items"]["parts"] = {
+        "checks": {"items": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}},
+    }
+    assert not write(client, "schema/process", {"version": 2, "schema": checked}, message="Steps carry checks").faults
+    steps = [{**STEPS[0], "checks": [{"title": "Key turns"}]}, {**STEPS[1], "checks": [{"title": "Every bulb lit"}]}]
+    assert not write(client, PROCESS, {"steps": steps}, message="Give each step its checks").faults
+    return loads(read(client, PROCESS, whole=True).content)
+
+
+@when("the client adds a check to the first step of the process, saying which role and why", target_fixture="added")
+def _add_a_check_to_the_first_step(client):
+    return _added(client, {"title": "Door stays open"}, collection="steps/unlock-the-door/checks", message="Prop the door")
+
+
+@then("the client is given the new check's name and the artifact's new version")
+def _given_the_checks_name_and_version(client, added):
+    assert (added["response"].id, added["response"].revision) == ("door-stays-open", 3)
+    entry = journal(client, PROCESS).entries[-1]
+    assert (entry.op, entry.path, entry.revision) == ("append", "steps/unlock-the-door/checks/door-stays-open", 3)
+
+
+@then("the rest of the process is unchanged")
+def _rest_unchanged(client, before):
+    after = loads(read(client, PROCESS, whole=True).content)
+    added = after["steps"][0]["checks"].pop()
+    assert added == {"title": "Door stays open", "id": "door-stays-open"}
+    assert after == before
