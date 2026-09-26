@@ -3,7 +3,7 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, append, create, define, everything_under, read, write
+from calls import CLIENT, DECISION_TYPE, append, create, define, everything_under, read, refs, write
 from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -327,3 +327,76 @@ def _rejected_for_a_repeated_name(attempt):
 @then("the change is rejected because a name is a plain name of lower-case letters, digits and single hyphens")
 def _rejected_for_a_name_not_plain(attempt):
     _misnamed(attempt, "a name is a plain name of lower-case letters, digits and single hyphens")
+
+
+NOTE_TYPE = {
+    "title": "Note",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "about": {
+                "type": "string",
+                "ref": {"targets": ["decision"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
+            },
+        },
+        "required": ["title"],
+    },
+}
+MONTHLY = {"title": "Go monthly", "body": "Review on the first Monday of the month."}
+
+
+@when("the client replaces one of the options, saying which role and why", target_fixture="changed")
+def _replace_one_option(client):
+    define(client, NOTE_TYPE)
+    create(client, "note", {"title": "Why monthly", "about": f"{DECISION}#options/go-monthly"})
+    before = read(client, DECISION, whole=True)
+    response = write(client, DECISION, MONTHLY, message="Say when monthly", path="options/go-monthly")
+    assert not response.faults, response.faults
+    return {"response": response, "before": before, "after": read(client, DECISION, whole=True)}
+
+
+@then("only that option changes")
+def _only_that_option_changes(changed):
+    before, after = loads(changed["before"].content), loads(changed["after"].content)
+    assert changed["response"].revision == changed["before"].revision + 1
+    assert after["options"][0] == before["options"][0]
+    assert {key: value for key, value in after.items() if key != "options"} == {
+        key: value for key, value in before.items() if key != "options"
+    }
+    assert {key: value for key, value in after["options"][1].items() if key != "id"} == MONTHLY
+
+
+@then("it keeps the name it was given when it was created")
+def _keeps_its_name(changed):
+    assert [option["id"] for option in loads(changed["after"].content)["options"]] == ["keep-weekly", "go-monthly"]
+
+
+@then("anything pointing at it still lands on it")
+def _still_lands(client):
+    assert list(client.Validate(kb_pb2.ValidateRequest()).violations) == []
+    inward = refs(client, DECISION, 1, inward=True)
+    assert [(reached.stub.id, reached.route[0].field) for reached in inward.reached] == [("note/why-monthly", "about")]
+
+
+@when(
+    "the client replaces the decision, sending both options back with the names they were given and a third option "
+    "with no name, saying which role and why",
+    target_fixture="changed",
+)
+def _send_both_back_and_a_third(client):
+    options = [{"id": "keep-weekly", **OPTIONS[0]}, {"id": "go-monthly", **OPTIONS[1]}, {"title": "Go fortnightly"}]
+    response = write(client, DECISION, {"sections": SECTIONS, "options": options}, message="Add a third option")
+    assert not response.faults, response.faults
+    return {"response": response, "after": loads(read(client, DECISION, whole=True).content)}
+
+
+@then("the two options are the same items as before, keeping their names")
+def _the_same_two(changed):
+    assert changed["after"]["options"][:2] == [{"id": "keep-weekly", **OPTIONS[0]}, {"id": "go-monthly", **OPTIONS[1]}]
+
+
+@then("the third option is new and is given a name of its own")
+def _the_third_named(changed):
+    assert changed["after"]["options"][2] == {"id": "go-fortnightly", "title": "Go fortnightly"}
