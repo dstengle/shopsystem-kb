@@ -3,17 +3,13 @@
 Storage takes only these values, never a string that came from a request, and `path` is the one place a file
 path is made from a name.
 """
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical, discovery
+from kb import canonical, discovery, names
 from kb.content import loads
 from kb.contract import kb_pb2
-
-PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-
 
 class Refused(ValueError):
     """A request value that does not convert. Carries every fault found."""
@@ -44,7 +40,7 @@ class Locator:
 
 
 def kind(text: str) -> Kind:
-    if not PLAIN.fullmatch(text):
+    if not names.plain(text):
         raise Refused([kb_pb2.Fault(
             rule="kind",
             message=f"a kind is a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not",
@@ -54,7 +50,7 @@ def kind(text: str) -> Kind:
 
 def artifact_id(text: str) -> ArtifactId:
     kind_name, _, slug = text.partition("/")
-    if not (PLAIN.fullmatch(kind_name) and PLAIN.fullmatch(slug)):
+    if not (names.plain(kind_name) and names.plain(slug)):
         raise Refused([_not_a_plain_name(text)])
     return ArtifactId(Kind(kind_name), slug)
 
@@ -67,7 +63,7 @@ def locator(request: kb_pb2.Locator) -> Locator:
     except Refused as refused:
         faults += refused.faults
     place = tuple(request.path.split("/")) if request.path else ()
-    if not all(PLAIN.fullmatch(part) for part in place):
+    if not all(names.plain(part) for part in place):
         faults.append(kb_pb2.Fault(
             artifact=request.id, path=request.path, rule="locator",
             message=f"a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it; {request.path!r} is not",
@@ -97,14 +93,14 @@ def since(text: str) -> datetime:
 
 def named(kind: Kind, title: str) -> ArtifactId:
     """The name kb gives an artifact of this kind from its title. A title is required and must leave a name."""
-    at = f"{kind.name}/{slug(title)}"
+    at = f"{kind.name}/{names.slug(title)}"
     if not title:
         raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
                                     message="an artifact cannot be created without a title")])
-    if not slug(title):
+    if not names.slug(title):
         raise Refused([kb_pb2.Fault(artifact=at, path="title", rule="title",
                                     message=f"a title must leave something to make a name from; {title!r} leaves nothing")])
-    return ArtifactId(kind, slug(title))
+    return ArtifactId(kind, names.slug(title))
 
 
 @dataclass(frozen=True)
@@ -204,10 +200,6 @@ def root(text: str) -> Path:
             rule="root", message=f"stores do not nest; {text!r} is inside the store at {str(above)!r}",
         )])
     return named
-
-
-def slug(title: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
 
 
 def path(store_dir: Path, artifact_id: ArtifactId) -> Path:

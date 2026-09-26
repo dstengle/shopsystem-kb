@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from kb import values
+from kb import names, values
 from kb.contract import kb_pb2
 from kb.values import Actor, ArtifactId, Content, Kind, Locator, Refused
 
@@ -120,7 +120,7 @@ def _create(creation: kb_pb2.Creation) -> Create:
         name, title_faults = values.named(kind, creation.title), ()
     except Refused as refused:
         name, title_faults = None, tuple(refused.faults)
-    at = f"{kind.name}/{values.slug(creation.title)}"
+    at = f"{kind.name}/{names.slug(creation.title)}"
     return Create(kind, creation.title, name, at, title_faults, values.content(creation.content))
 
 
@@ -171,7 +171,7 @@ def listing(request: kb_pb2.ListRequest) -> Listing:
     return Listing(values.kind(request.type), dict(request.fields), request.form == kb_pb2.ListRequest.IDS)
 
 
-def names(requested) -> list:
+def snapshotted(requested) -> list:
     """Each name a snapshot is given, converted or standing as its refusal."""
     converted = []
     for name in requested:

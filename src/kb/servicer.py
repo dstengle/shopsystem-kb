@@ -7,7 +7,7 @@ import copy
 from datetime import datetime
 from typing import NamedTuple
 
-from kb import canonical, journal, requests, search, validation, values
+from kb import canonical, journal, names, requests, search, validation, values
 from kb.content import dumps, text
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.metaschema import METASCHEMA
@@ -155,7 +155,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         faults = validation.validate(at, {"title": creation.title, **content}, schema["schema"], draft)
         if faults:
             raise values.Refused(faults)
-        _name_items(schema["schema"], content, keep_named=False)
+        names.items(schema["schema"], content, keep_named=False)
         artifact = {
             **content,
             "id": str(artifact_id), "type": kind.name,
@@ -416,7 +416,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         """One journal entry listing each artifact named with its version now and the fingerprint of its file, under
         the actor and the message given, in a commit of its own."""
         named, faults = [], []
-        for artifact_id in requests.names(request.artifacts):
+        for artifact_id in requests.snapshotted(request.artifacts):
             if isinstance(artifact_id, requests.Refusal):
                 faults += artifact_id.faults
                 continue
@@ -485,7 +485,7 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     faults = validation.validate(str(artifact_id), {"title": current["title"], **content}, schema["schema"], draft)
     if faults:
         raise values.Refused(faults)
-    _name_items(schema["schema"], content, keep_named=True)
+    names.items(schema["schema"], content, keep_named=True)
     artifact = {
         **content,
         "id": current["id"], "type": current["type"],
@@ -534,22 +534,7 @@ def _find_section(sections: list, title: str) -> dict | None:
 
 def _node_name(collection: str, item: dict) -> str:
     """How a place names an item: a section by its title's name, a part by its id."""
-    return values.slug(item["title"]) if collection == "sections" else item.get("id")
-
-
-def _name_items(schema: dict, content: dict, keep_named: bool) -> None:
-    """Every item of every part collection given its name: from its title when it carries one, otherwise from its
-    place in the collection, counted from 1, with a number added as an artifact's name has when an item beside it
-    already has that name. On a write an item already carrying a name is the item of that name, moved or changed
-    where it stands, and keeps it; a name is minted once and never worked out again."""
-    for collection in schema.get("parts", {}):
-        items = content.get(collection, [])
-        taken = {item["id"] for item in items if keep_named and "id" in item}
-        for place, item in enumerate(items, start=1):
-            if keep_named and "id" in item:
-                continue
-            item["id"] = _numbered(values.slug(item["title"]) if "title" in item else str(place), taken.__contains__)
-            taken.add(item["id"])
+    return names.slug(item["title"]) if collection == "sections" else item.get("id")
 
 
 def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
@@ -561,16 +546,7 @@ def _not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
 def _unclaimed(draft: Draft, named: ArtifactId) -> ArtifactId:
     """The name a title gives, or, when the store or an earlier change in the set already holds it, that name with
     -2, -3 and so on added: the first that nothing holds. What already holds a name keeps it."""
-    return ArtifactId(named.kind, _numbered(named.slug, lambda slug: draft.holds(ArtifactId(named.kind, slug))))
-
-
-def _numbered(name: str, taken) -> str:
-    """The name, or, when taken says it is taken, that name with -2, -3 and so on added: the first it does not."""
-    candidate, number = name, 1
-    while taken(candidate):
-        number += 1
-        candidate = f"{name}-{number}"
-    return candidate
+    return ArtifactId(named.kind, names.numbered(named.slug, lambda slug: draft.holds(ArtifactId(named.kind, slug))))
 
 
 def _summary_fields(artifact, schema):
