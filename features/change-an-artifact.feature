@@ -62,3 +62,44 @@ So that a client can keep an artifact true without rewriting the store, the clie
     When the client replaces an artifact named "../../elsewhere", saying which role and why
     Then the change is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens
     And nothing is written anywhere, inside the store or outside it
+
+  Scenario Outline: Every way the place a change is aimed at can be wrong is refused
+    Pins that the place inside an artifact is checked before anything is touched, so a change that names nothing real is a plain refusal and the artifact is left exactly as it was.
+    When the client <call>, saying which role and why
+    Then the change is rejected because <reason>
+    And reading the decision gives what it held before, at the version it held before
+
+    Examples:
+      | call                                                                       | reason                                                           |
+      | replaces a place inside the decision the decision holds nothing under      | the decision holds nothing at that place                         |
+      | replaces a place inside the decision that runs on past a piece of prose    | the decision holds nothing at that place                         |
+      | replaces a place inside the decision beginning at the decision's own version | a place inside an artifact never names what only the store settles |
+      | adds an item at a place inside the decision that is not a collection       | an item is added to a collection, and that place is not one      |
+
+  Scenario: The client changes one item of a collection
+    Pins that a change can be aimed at one item of a collection, and that the item keeps the name it was given, because a name is worked out once and never again.
+    Given the decision carries two options
+    When the client replaces one of the options, saying which role and why
+    Then only that option changes
+    And it keeps the name it was given when it was created
+    And anything pointing at it still lands on it
+
+  Scenario: Items sent back with their names are the same items, and one without a name is new
+    Pins what a client sends when it rewrites a whole collection: the names the store gave are what say which item is which, and an item arriving without one is new and is named by the store.
+    Given the decision carries two options
+    When the client replaces the decision, sending both options back with the names they were given and a third option with no name, saying which role and why
+    Then the two options are the same items as before, keeping their names
+    And the third option is new and is given a name of its own
+
+  Scenario Outline: Every way an item's name can be wrong on a change is refused
+    Pins that item names are the store's to give and the client's only to hand back: anything else is refused rather than stored as the client wrote it.
+    Given the decision carries two options
+    When the client replaces the decision with options <items>, saying which role and why
+    Then the change is rejected because <reason>
+    And reading the decision gives what it held before, at the version it held before
+
+    Examples:
+      | items                                                        | reason                                                                    |
+      | one of which carries a name no option of that decision has   | a name on an item names an item already in that collection                |
+      | both of which carry the same name                            | the items of a collection each have a name of their own                   |
+      | one of which carries a name that is not a plain name         | a name is a plain name of lower-case letters, digits and single hyphens   |

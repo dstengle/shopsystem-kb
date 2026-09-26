@@ -21,3 +21,15 @@ So that a client can show everything of one kind without knowing any names, the 
     Pins that a client can ask for just the names, for when it means to work through them one by one and does not want everything up front.
     When the client lists the decisions asking for names only
     Then the client is given three names and nothing else
+
+  Scenario Outline: Asking by a kind the store holds no type for is refused
+    Pins that an unknown kind is the same plain refusal wherever it is asked for, so a typo is never answered with an empty result that reads exactly like an empty store.
+    Given a store that holds no type called "invoice"
+    When the client <call>
+    Then the call is rejected because a kind must name a type the store holds, and the kind asked for is given back
+
+    Examples:
+      | call                                                              |
+      | lists the artifacts of the kind "invoice"                         |
+      | searches the prose for restocking among artifacts of that kind    |
+      | follows the links into a decision, only from artifacts of that kind |

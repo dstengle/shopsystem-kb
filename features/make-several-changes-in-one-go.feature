@@ -26,3 +26,23 @@ So that a set of changes that only makes sense together is never half-applied, t
     Then the set is rejected because a change in it does not fit its type
     And the store holds neither change
     And every fault in the set comes back, not only the first
+
+  Scenario Outline: A set stopped for any reason at all leaves the store exactly as it was
+    Pins all-or-nothing for every way a set can be stopped, not only a change that does not fit: the whole set is worked out and checked before anything is written, so nothing ever half-lands.
+    When the client asks, in one go, for a set in which <fault>, saying which role and why
+    Then the set is rejected because <reason>
+    And the store holds none of the changes in the set
+    And the store's history holds no entry for any of them
+
+    Examples:
+      | fault                                                                | reason                                                                  |
+      | the second change names an artifact the store holds nothing under    | the store holds nothing by that name, and the name asked for is given back |
+      | the second change removes an artifact something still points at      | something still points at it                                            |
+      | the second change touches an artifact whose stored file cannot be read | that file cannot be read, and the file is named                        |
+
+  Scenario: Two changes to one artifact in one set each leave their own entry
+    Pins that a set is still a set of changes: each one counts the artifact's version up and is recorded on its own, even though the set as a whole lands once.
+    When the client asks, in one go, for the work item to be changed twice, saying which role and why
+    Then the store's history holds an entry for each of the two changes
+    And each entry records the version that change left behind
+    And the work item's version has gone up by two

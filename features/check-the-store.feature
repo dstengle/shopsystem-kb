@@ -40,3 +40,11 @@ So that a client can tell whether everything the store holds still fits its type
     Then that file is reported as a violation, naming the file
     And everything else in the store is checked and reported alongside it
     And the check comes back with its answer rather than breaking off
+
+  Scenario: An artifact of a kind the store holds no type for is reported as a violation
+    Pins that a kind with no type behind it is a finding like any other, so a store that has lost a type is told about rather than crashing the very check that would have said so.
+    Given a store holding an artifact of a kind the store holds no type for
+    When the client checks the store
+    Then that artifact is reported as a violation, naming the artifact and the kind it claims
+    And everything else in the store is checked and reported alongside it
+    And the check comes back with its answer rather than breaking off

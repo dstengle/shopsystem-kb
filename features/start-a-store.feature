@@ -82,3 +82,23 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     When the client starts a store there, saying which role it is
     Then starting the store is rejected because a store is started in a directory, and what was named is not one
     And that file is left as it was
+
+  Scenario Outline: Starting a store where the store's own corner is already taken is refused
+    Pins that the store's corner of a directory is never written over or grown into, whatever is sitting in it and whether or not it is a store.
+    Given a directory holding <what>
+    When the client starts a store there, saying which role it is
+    Then starting the store is rejected because that directory already holds the place a store goes
+    And what was there is left as it was
+
+    Examples:
+      | what                                    |
+      | an empty folder where a store would go  |
+      | a file where a store would go           |
+
+  Scenario: A client readied where there was no store can still start one
+    Pins that starting a store is the one call needing no store to be found first, so the client that brings the first store into being does not have to exist after it.
+    Given the client was readied to call a store while working where there was none and nothing named one
+    And an empty directory elsewhere that sits inside no store
+    When the client starts a store in that empty directory, saying which role it is
+    Then the store is made in the directory the client named
+    And the client can read and write in it straight away

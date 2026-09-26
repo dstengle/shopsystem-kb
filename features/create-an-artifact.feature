@@ -192,3 +192,43 @@ So that a client can put content into the store and get a name it can come back 
     When the client creates a decision with that title, saying which role and why
     Then the title reads back as the text "12"
     And the name the client is given is made from that text
+
+  Scenario Outline: Content the store cannot make sense of is refused
+    Pins that every shape of content the store cannot take is a named refusal rather than a call that breaks off, so a client is never handed a crash in place of an answer.
+    When the client creates a decision from <content>, saying which role and why
+    Then the artifact is rejected because <reason>, and the place it went wrong is named
+    And the call comes back with its answer rather than breaking off
+    And nothing is written anywhere in the store
+
+    Examples:
+      | content                                                        | reason                              |
+      | content that cannot be read as written at all                  | content cannot be read as written   |
+      | content that is a list rather than a set of named entries      | content is a set of named entries   |
+      | content that is a single bare value                            | content is a set of named entries   |
+      | content with nothing in it at all                              | content is a set of named entries   |
+      | content whose sections are one line of text rather than sections | the content does not fit the type |
+      | content whose options are a single value rather than a collection | the content does not fit the type |
+      | content one of whose options is a bare value                   | the content does not fit the type   |
+
+  Scenario: Faults found by different rules all come back together
+    Pins that a refusal is one full account however the faults were found, so a client never fixes what the shape of the content says only to be told about a missing section next time.
+    When the client creates a decision whose options are of a shape the type does not allow and which is also missing its purpose, saying which role and why
+    Then the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken
+    And the store is unchanged
+
+  Scenario: A field written as a bare date is the text that was written
+    Pins the last of the reading traps: a date written without quotes is text like anything else, so a field the type declares as text is not refused for looking like a day.
+    When the client creates a decision carrying a field written "2026-09-24", saying which role and why
+    Then that field reads back as the text that was written, not as a date
+
+  Scenario: A section whose body is empty is kept as it is
+    Pins that an empty body is content and not an omission, so a client can write a heading before it has the prose and read it back the way it wrote it.
+    When the client creates a decision whose rationale carries a title and an empty body, saying which role and why
+    Then the client is given the name the artifact keeps for life and its first version
+    And the rationale reads back with an empty body
+
+  Scenario: Prose the store could not write back in its one form is refused
+    Pins that the store checks its own output as strictly as its input: prose it could not lay down the way it lays down all prose is refused, rather than written some other way.
+    When the client creates a decision one of whose lines of prose ends in a space, saying which role and why
+    Then the artifact is rejected because every piece of prose is written as a block, and this prose could not be written back as one
+    And nothing is written anywhere in the store

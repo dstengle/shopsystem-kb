@@ -140,3 +140,34 @@ So that a client can show what the store holds at whatever depth it needs, the c
     When the client reads the decision
     Then the read is rejected because that file cannot be read, and the file is named
     And the client is given that fault as it is given any other, the call never breaking off
+
+  Scenario Outline: A read that names a place the artifact does not hold is refused
+    Pins that naming a place that is not there is an ordinary answer naming what was asked for, so a client can tell "not here" from "went wrong" inside an artifact as well as between artifacts.
+    When the client reads <what>
+    Then the read is rejected because the decision holds nothing at that place, and what was asked for is given back
+    And no content comes back
+
+    Examples:
+      | what                                                                        |
+      | the section of the decision titled "Consequences", which it holds no section under |
+      | the place "sections/nowhere" inside the decision                            |
+      | the place "sections/purpose/body/first" inside the decision, which runs on past a piece of prose |
+
+  Scenario: A link filled in still says what it is
+    Pins that a target put in place of a link is recognisably an artifact: it comes with its name, its kind, its title and its version, so a client can tell what it has been handed.
+    When the client reads the whole decision following its links one step
+    Then the older decision comes with its name, its kind, its title and the version it is at, ahead of its content
+
+  Scenario Outline: A KB_ROOT that names no store is refused, naming KB_ROOT
+    Pins that naming the store outright is either right or refused: nothing about KB_ROOT is guessed at, and where the client happens to be working is never quietly fallen back on.
+    Given the client is working outside any store, with KB_ROOT <state>
+    When the client reads the decision
+    Then the read is rejected because KB_ROOT names no store, and KB_ROOT is named back
+    And where the client is working is not fallen back on
+    And no content comes back
+
+    Examples:
+      | state                                    |
+      | set to nothing at all                    |
+      | naming a directory that is not there     |
+      | naming a file rather than a directory    |

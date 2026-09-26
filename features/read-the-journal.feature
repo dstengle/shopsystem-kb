@@ -38,3 +38,20 @@ So that a client can show how the store came to hold what it holds, the client c
     Pins the "what has happened lately" question, so a client can catch up without walking the whole history.
     When the client reads the journal since 2026-09-22
     Then the client is given only the change made today
+
+  Scenario Outline: Every way the history can be asked for is checked and answered plainly
+    Pins that a filter is an input like any other: one that names nothing real gives nothing back and no fault, and one that cannot be read at all is refused rather than breaking off.
+    When the client reads the journal <filter>
+    Then <outcome>
+
+    Examples:
+      | filter                                                  | outcome                                                              |
+      | for a set of changes the history holds nothing under    | the client is given no entries and no fault                          |
+      | for a role nothing in the history was done under        | the client is given no entries and no fault                          |
+      | since something that cannot be read as a moment in time | the read is rejected because since names a moment in time            |
+
+  Scenario: A change aimed at one place records the place it changed
+    Pins that the history says where inside an artifact a change landed, so a reader can tell a change to one section from a change to the whole artifact.
+    Given a store where an agent replaced one section of a decision
+    When the client reads the journal for that decision
+    Then the entry for that change names the place inside the decision that was changed
