@@ -35,10 +35,10 @@ So that a client can show how the store's contents hang together, the client can
 
   @slice-89.2
   Scenario: The client follows the links out of one place inside an artifact
-    Pins that a traversal can start at a place inside an artifact rather than the whole of it, so a client can ask what one section or one step points at and get only that.
-    Given the decision's rationale points at a tag of its own
-    When the client follows the links out of the rationale of the decision
-    Then the client is given a stub of that tag and nothing else the decision points at
+    Pins that a traversal can start at a place inside an artifact rather than the whole of it, so a client can ask what one step points at and get only that.
+    Given a process one of whose steps points at a tag of its own, while another of its steps points at the decision
+    When the client follows the links out of that step of the process
+    Then the client is given a stub of that tag and nothing else the process points at
 
   @slice-72
   Scenario: A link into a part counts as a link into the artifact holding it
