@@ -8,15 +8,23 @@ a change that breaks one is refactored into place first, then made.
 | module | owns | never holds |
 |---|---|---|
 | `contract/` | `kb.proto` and generated code | hand-written logic |
-| `servicer.py` | the rpc adapter: request in, validated values, one call into the domain, response out | domain logic, file paths, git |
-| `values.py` | conversion of every request field into validated values: ids, locators, kinds, roots, content trees | anything that touches the store |
+| `servicer.py` | the rpc adapter: request in, one call into the domain, response out, inside the one fail-closed wrapper | domain logic, file paths, git |
+| `values.py` | conversion of single request fields into validated values: ids, locators, kinds, roots, content trees | anything that touches the store or the filesystem |
+| `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
 | `names.py` | minting, uniqueness, reuse and grammar of artifact and item ids | I/O |
 | `validation.py` | the composed effective schema and the checks JSON Schema cannot express | file access |
-| `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, then write and commit | rpc types |
+| `refusals.py` | the faults the domain makes of what a store holds, each with its rule and message | conversions, type checks |
+| `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, then write, journal and commit; starting a store, recording a snapshot | rpc types |
+| `edits.py` | what each operation of a set does to the draft, checked against the draft as the operations before it left it | rpc types, writes |
 | `read.py` | reads at every level, resolution and stubs | writes |
-| `query.py` | list, refs, search, journal, snapshot over the loaded corpus | writes |
-| `store.py` | files, canonical serialization, the git repository, discovery | validation, domain rules |
-| `journal.py` | journal entries and their files | anything else |
+| `query.py` | list, refs, search, journal, snapshot gathering over the loaded corpus | writes |
+| `search.py` | ranking prose and fields for the words searched | store access |
+| `store.py` | files, the git repository, discovery of a store from a root | validation, domain rules |
+| `canonical.py` | the one canonical YAML checker, dump and load; YAML 1.2 | domain rules |
+| `content.py` | artifact content crossing the contract as canonical text | anything else |
+| `journal.py` | journal entries, their files and fingerprints | anything else |
+| `metaschema.py` | the one type a new store holds | logic |
+| `client.py`, `cli.py` | the in-process transport; the operator's init and validate commands | domain logic |
 
 A new concern gets a new module. Nothing is added "beside" existing code in a
 module that does not own it.
