@@ -10,7 +10,7 @@ from kb.content import dumps, text
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.store import Store, Unreadable
 from kb.values import ArtifactId
-from kb.edits import not_found as _not_found
+from kb.refusals import not_found as _not_found
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
@@ -28,34 +28,49 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def Create(self, request, context):
         creation = kb_pb2.Creation(type=request.type, title=request.title, content=request.content)
-        landed = write.land(self._store, requests.operations([kb_pb2.Operation(create=creation)]), values.signed(request.actor, request.message))
-        if landed.faults:
-            return kb_pb2.CreateResponse(faults=landed.faults)
-        return kb_pb2.CreateResponse(id=landed.results[0].id, revision=landed.results[0].revision)
+        try:
+            landed = self._land([kb_pb2.Operation(create=creation)], request)
+        except values.Refused as refused:
+            return kb_pb2.CreateResponse(faults=refused.faults)
+        return kb_pb2.CreateResponse(id=str(landed.results[0].artifact_id), revision=landed.results[0].revision)
 
     def Write(self, request, context):
         replacement = kb_pb2.Replacement(locator=request.locator, content=request.content)
-        landed = write.land(self._store, requests.operations([kb_pb2.Operation(write=replacement)]), values.signed(request.actor, request.message))
-        if landed.faults:
-            return kb_pb2.WriteResponse(faults=landed.faults)
+        try:
+            landed = self._land([kb_pb2.Operation(write=replacement)], request)
+        except values.Refused as refused:
+            return kb_pb2.WriteResponse(faults=refused.faults)
         return kb_pb2.WriteResponse(revision=landed.results[0].revision)
 
     def Append(self, request, context):
         addition = kb_pb2.Addition(locator=request.locator, content=request.content)
-        landed = write.land(self._store, requests.operations([kb_pb2.Operation(append=addition)]), values.signed(request.actor, request.message))
-        if landed.faults:
-            return kb_pb2.AppendResponse(faults=landed.faults)
+        try:
+            landed = self._land([kb_pb2.Operation(append=addition)], request)
+        except values.Refused as refused:
+            return kb_pb2.AppendResponse(faults=refused.faults)
         return kb_pb2.AppendResponse(id=landed.results[0].item, revision=landed.results[0].revision)
 
     def Delete(self, request, context):
         removal = kb_pb2.Removal(locator=request.locator)
-        landed = write.land(self._store, requests.operations([kb_pb2.Operation(delete=removal)]), values.signed(request.actor, request.message))
-        if landed.faults:
-            return kb_pb2.DeleteResponse(faults=landed.faults)
+        try:
+            landed = self._land([kb_pb2.Operation(delete=removal)], request)
+        except values.Refused as refused:
+            return kb_pb2.DeleteResponse(faults=refused.faults)
         return kb_pb2.DeleteResponse(revision=landed.results[0].revision)
 
     def Apply(self, request, context):
-        return write.land(self._store, requests.operations(request.operations), values.signed(request.actor, request.message))
+        try:
+            landed = self._land(request.operations, request)
+        except values.Refused as refused:
+            return kb_pb2.ApplyResponse(faults=refused.faults)
+        return kb_pb2.ApplyResponse(batch=landed.batch, results=[
+            kb_pb2.Result(id=str(result.artifact_id), revision=result.revision, item=result.item)
+            for result in landed.results
+        ])
+
+    def _land(self, operations, request) -> write.Landed:
+        """A set of operations landed under the request's actor and message."""
+        return write.land(self._store, requests.operations(operations), values.signed(request.actor, request.message))
 
     def Read(self, request, context):
         try:
