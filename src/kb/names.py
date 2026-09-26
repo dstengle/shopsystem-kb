@@ -29,6 +29,17 @@ def linked(text: str) -> tuple[str, str]:
     return name, place
 
 
+def placed(steps) -> str:
+    """A place inside an artifact as it is written: its steps, each a collection, an item's or a section's name, or a
+    field, joined by slashes."""
+    return "/".join(steps)
+
+
+def steps(text: str) -> tuple[str, ...]:
+    """A written place read back as its steps, none for no place, none of them yet checked."""
+    return tuple(text.split("/")) if text else ()
+
+
 def referred(ref: str) -> tuple[str, str] | None:
     """What a `kb:` reference names: the written name of a type, and what follows it from `#` on, empty when the
     reference is to the whole type. None for a reference that is not kb's."""

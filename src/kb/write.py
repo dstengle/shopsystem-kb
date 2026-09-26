@@ -40,7 +40,9 @@ def start(root: Root, actor: Actor) -> None:
     vacant(root)
     store, signed = Store(root.path), Signed(actor, "initialise store")
     marker = store.start()
-    metaschema = settled.given(settled.content(METASCHEMA), str(METASCHEMA_ID), "schema", 1, 1, METASCHEMA["title"])
+    metaschema = settled.given(
+        settled.content(METASCHEMA), str(METASCHEMA_ID), METASCHEMA_ID.kind.name, 1, 1, METASCHEMA["title"],
+    )
     text = canonical.dump(settled.order(metaschema, METASCHEMA["schema"]))
     path = store.save(METASCHEMA_ID, text)
     entry = journal.write(

@@ -79,7 +79,7 @@ def _located(name: str, path: str) -> Locator:
         converted = artifact_id(name)
     except Refused as refused:
         faults += refused.faults
-    place = tuple(path.split("/")) if path else ()
+    place = names.steps(path)
     if not all(names.plain(part) for part in place):
         faults.append(kb_pb2.Fault(
             artifact=name, path=path, rule="locator",

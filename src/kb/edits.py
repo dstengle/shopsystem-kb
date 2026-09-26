@@ -91,7 +91,7 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
     item = addition.item.tree
     spot.holder.setdefault(spot.key, []).append(item)
     _revise(draft, locator.id, current, content)
-    return Change("append", locator.id, "/".join((*locator.place, item["id"])), item["id"])
+    return Change("append", locator.id, names.placed((*locator.place, item["id"])), item["id"])
 
 
 def _collections_at(draft: Draft, locator: values.Locator) -> dict:
