@@ -211,7 +211,7 @@ So that a client can put content into the store and get a name it can come back 
       | content whose options are a single value rather than a collection | the content does not fit the type |
       | content one of whose options is a bare value                   | the content does not fit the type   |
 
-  @slice-66
+  @slice-73
   Scenario: Faults found by different rules all come back together
     Pins that a refusal is one full account however the faults were found, so a client never fixes what the shape of the content says only to be told about a missing section next time.
     When the client creates a decision whose options are of a shape the type does not allow and which is also missing its purpose, saying which role and why

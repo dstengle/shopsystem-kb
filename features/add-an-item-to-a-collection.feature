@@ -88,7 +88,7 @@ So that a client can grow a collection an item at a time without rewriting the a
     Then the item is rejected because a link must land on a node of a kind the type allows
     And the process holds the steps it held before, at the version it held before
 
-  @slice-73
+  @slice-66
   Scenario: An item missing something its own type requires is refused
     Pins that an item is checked against its type the way an artifact is checked against its, so a collection cannot fill up with half-filled items nobody checked.
     When the client adds a step with no role named, where a step must name a role, saying which role and why
