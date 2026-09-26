@@ -4,7 +4,7 @@ entry per operation naming the set, and one commit. A fault anywhere refuses the
 and nothing is written. Starting a store and recording a snapshot write and commit here too."""
 from typing import NamedTuple
 
-from kb import canonical, edits, journal, query, refusals, requests, values
+from kb import canonical, edits, journal, query, refusals, requests, settled, values
 from kb.metaschema import METASCHEMA
 from kb.edits import Change
 from kb.store import Draft, Store, vacant
@@ -40,8 +40,8 @@ def start(root: Root, actor: Actor) -> None:
     vacant(root)
     store, signed = Store(root.path), Signed(actor, "initialise store")
     marker = store.start()
-    metaschema = {"id": str(METASCHEMA_ID), "type": "schema", "schema_version": 1, "revision": 1, **METASCHEMA}
-    text = canonical.dump(canonical.order(metaschema, METASCHEMA["schema"]))
+    metaschema = settled.given(settled.content(METASCHEMA), str(METASCHEMA_ID), "schema", 1, 1, METASCHEMA["title"])
+    text = canonical.dump(settled.order(metaschema, METASCHEMA["schema"]))
     path = store.save(METASCHEMA_ID, text)
     entry = journal.write(
         store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",

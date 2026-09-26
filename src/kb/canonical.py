@@ -9,9 +9,6 @@ from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.representer import SafeRepresenter
 
-IDENTITY = ("id", "type", "schema_version", "revision", "title")
-
-
 class Prose(str):
     """A prose body. Written as a literal block, however short."""
 
@@ -174,43 +171,3 @@ def _unreadable(error: YAMLError) -> str:
     mark = getattr(error, "problem_mark", None)
     where = f" at line {mark.line + 1}" if mark is not None else ""
     return f"it is not YAML that can be read: {getattr(error, 'problem', None) or error}{where}"
-
-
-def order(artifact: dict, schema: dict) -> dict:
-    """Identity keys first, then fields in schema order, then sections, then part collections in schema order."""
-    parts = schema.get("parts", {})
-    ordered = {key: artifact[key] for key in IDENTITY}
-    for name in schema.get("properties", {}):
-        if name in artifact and name not in ordered:
-            ordered[name] = artifact[name]
-    for name, value in artifact.items():
-        if name not in ordered and name != "sections" and name not in parts:
-            ordered[name] = value
-    if "sections" in artifact:
-        ordered["sections"] = [_section(section) for section in artifact["sections"]]
-    for name in parts:
-        if name in artifact:
-            ordered[name] = [_item(item, parts[name]["items"]) for item in artifact[name]]
-    return ordered
-
-
-def _section(section: dict) -> dict:
-    ordered = {"title": section["title"], "body": section["body"]}
-    if "sections" in section:
-        ordered["sections"] = [_section(child) for child in section["sections"]]
-    return ordered
-
-
-def _item(item: dict, item_schema: dict) -> dict:
-    """An item's id first, then its fields in the item schema's order; an item that is not a set of named entries as
-    it was written."""
-    if not isinstance(item, dict):
-        return item
-    ordered = {"id": item["id"]}
-    for name in item_schema.get("properties", {}):
-        if name in item and name not in ordered:
-            ordered[name] = item[name]
-    for name, value in item.items():
-        if name not in ordered:
-            ordered[name] = value
-    return ordered

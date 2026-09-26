@@ -1,6 +1,6 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too."""
-from kb import canonical, composition, links, refusals, values
+from kb import composition, links, refusals, settled, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
@@ -33,8 +33,7 @@ def stub(store: Store, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
 
 def _whole(store: Store, locator: Locator, depth: int) -> kb_pb2.ReadResponse:
     found = _resolved(store, locator.id, depth, {str(locator.id)})
-    content = {key: value for key, value in found.items() if key not in canonical.IDENTITY}
-    return _response(found, dumps(content))
+    return _response(found, dumps(settled.content(found)))
 
 
 def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:

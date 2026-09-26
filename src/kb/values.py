@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical, names
+from kb import canonical, names, settled
 from kb.content import entries, loads, title as title_of
 from kb.contract import kb_pb2
 
@@ -138,7 +138,7 @@ def content(text: str, at_root: bool = True) -> Content:
     if not at_root:
         return Content(tree)
     problems = []
-    for key in canonical.IDENTITY:
+    for key in settled.IDENTITY:
         if key not in tree:
             continue
         if key == "title":

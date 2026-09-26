@@ -4,7 +4,7 @@ word, whatever its case."""
 import re
 from typing import NamedTuple
 
-from kb.canonical import IDENTITY
+from kb.settled import IDENTITY
 
 WIDTH = 60
 

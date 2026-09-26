@@ -4,7 +4,7 @@ with every fault it finds."""
 import copy
 from typing import NamedTuple
 
-from kb import canonical, composition, definitions, links, names, places, refusals, requests, validation, values
+from kb import composition, definitions, links, names, places, refusals, requests, settled, validation, values
 from kb.store import Draft
 from kb.values import ArtifactId, Refused
 
@@ -56,12 +56,8 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
         raise Refused(faults)
     declared = composition.declared(schema["schema"], draft)
     names.items(declared["parts"], content, False, _item_parts(draft))
-    artifact = {
-        **content,
-        "id": str(artifact_id), "type": kind.name,
-        "schema_version": schema["version"], "revision": 1, "title": creation.title,
-    }
-    draft.put(artifact_id, canonical.order(artifact, declared))
+    artifact = settled.given(content, str(artifact_id), kind.name, schema["version"], 1, creation.title)
+    draft.put(artifact_id, settled.order(artifact, declared))
     return artifact_id
 
 
@@ -144,12 +140,10 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     if faults:
         raise Refused(faults)
     names.items(declared["parts"], content, True, _item_parts(draft))
-    artifact = {
-        **content,
-        "id": current["id"], "type": current["type"],
-        "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
-    }
-    draft.put(artifact_id, canonical.order(artifact, declared))
+    artifact = settled.given(
+        content, current["id"], current["type"], schema["version"], current["revision"] + 1, current["title"],
+    )
+    draft.put(artifact_id, settled.order(artifact, declared))
 
 
 def _item_parts(draft: Draft):
@@ -168,7 +162,7 @@ def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) ->
 
 def _content_of(artifact: dict) -> dict:
     """A copy of what an artifact holds but its identity keys, to be changed without changing it."""
-    return copy.deepcopy({key: value for key, value in artifact.items() if key not in canonical.IDENTITY})
+    return copy.deepcopy(settled.content(artifact))
 
 
 def _placed(artifact: dict, locator: values.Locator, node: dict) -> dict:

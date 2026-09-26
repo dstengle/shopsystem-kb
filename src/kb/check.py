@@ -1,7 +1,7 @@
 """The check of the whole store: every artifact against the current version of its type, the stale listed beside
 the violations, and a file that cannot be read, or an artifact of a kind with no type, reported as what it is, the
 check going on past it."""
-from kb import canonical, refusals, validation, values
+from kb import refusals, settled, validation, values
 from kb.contract import kb_pb2
 from kb.store import Damaged, Store
 
@@ -21,8 +21,7 @@ def everything(store: Store) -> kb_pb2.ValidateResponse:
             stale.append(kb_pb2.Stale(
                 artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
             ))
-        content = {key: value for key, value in artifact.items() if key not in canonical.IDENTITY[:4]}
-        violations += validation.validate(str(artifact_id), content, schema["schema"], store)
+        violations += validation.validate(str(artifact_id), settled.checked(artifact), schema["schema"], store)
     return kb_pb2.ValidateResponse(violations=violations, stale=stale)
 
 

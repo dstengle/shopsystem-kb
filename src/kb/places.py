@@ -3,7 +3,7 @@ and a part by its id, which may end in a field. A place is resolved here, once, 
 saying why nothing stands there."""
 from typing import NamedTuple
 
-from kb import canonical, names, refusals
+from kb import names, refusals, settled
 from kb.values import Locator, Refused
 
 
@@ -18,7 +18,7 @@ class Spot(NamedTuple):
 def resolve(content: dict, locator: Locator) -> Spot:
     """Where the locator's place, which is not empty, stands in an artifact's content. Raises Refused for a place that
     begins at what only the store settles, or that names nothing the content holds."""
-    if locator.place[0] in canonical.IDENTITY:
+    if locator.place[0] in settled.IDENTITY:
         raise Refused([refusals.settled_place(locator)])
     spot = _walk(content, locator.place)
     if spot is None:

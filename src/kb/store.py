@@ -4,9 +4,9 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, TypeVar
 
-from kb import canonical, refusals, values
+from kb import canonical, refusals, settled, values
 from kb.contract import CONTRACT_VERSION, kb_pb2
 from kb.values import ArtifactId, Kind, Refused, Root, Signed
 
@@ -19,7 +19,10 @@ class Damaged:
     fault: kb_pb2.Fault
 
 
-def readable(loaded):
+Loaded = TypeVar("Loaded")
+
+
+def readable(loaded: Loaded | Damaged) -> Loaded:
     """What was loaded, an artifact or the journal's entries; a file that cannot be read refuses the call with the
     fault naming it. The one place a damaged file becomes a refusal."""
     if isinstance(loaded, Damaged):
@@ -73,7 +76,7 @@ class Store:
         except canonical.NotCanonical as error:
             problem = str(error)
         else:
-            problem = _unsettled(loaded)
+            problem = settled.lacking(loaded)
         if problem:
             return Damaged(refusals.unreadable(str(artifact_id), path.relative_to(self.dir), problem))
         return loaded
@@ -106,21 +109,6 @@ class Store:
         """Every artifact in the store, schemas included, in path order. Raises Refused at a damaged file."""
         for artifact_id in self.ids():
             yield self.artifact(artifact_id)
-
-
-SETTLED = {"id": str, "type": str, "schema_version": int, "revision": int, "title": str}
-
-
-def _unsettled(loaded: dict) -> str:
-    """What a stored artifact lacks of what the store settles for every artifact, said as the problem with its file;
-    empty when it lacks nothing."""
-    lacking = [
-        key for key, kind in SETTLED.items()
-        if not isinstance(loaded.get(key), kind) or isinstance(loaded.get(key), bool)
-    ]
-    if not lacking:
-        return ""
-    return f"it does not carry what the store settles for every artifact: {', '.join(lacking)}"
 
 
 class Draft:
