@@ -65,21 +65,41 @@ def registry(corpus) -> Registry:
 
 
 def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_pb2.Fault]:
-    """Every violation, as artifact, path, rule, message. A kb:schema/<type> reference resolves against the corpus.
+    """Every violation, as artifact, path, rule, message, JSON Schema's and kb's own rules' together. A
+    kb:schema/<type> reference resolves against the corpus.
 
-    kb's own rules read content that fits the composed schema, so they run only when it does.
+    kb's own rules read a node only where JSON Schema found it in the shape they read it in.
     """
+    errors = list(Draft202012Validator(compose(schema, corpus), registry=registry(corpus)).iter_errors(content))
     faults = [
-        kb_pb2.Fault(
-            artifact=artifact_id,
-            path="/".join(str(step) for step in error.absolute_path),
-            rule=error.validator,
-            message=error.message,
-        )
-        for error in Draft202012Validator(compose(schema, corpus), registry=registry(corpus)).iter_errors(content)
+        kb_pb2.Fault(artifact=artifact_id, path=_place(error), rule=error.validator, message=error.message)
+        for error in errors
     ]
-    if faults:
-        return faults
+    if not _misread("sections", errors):
+        required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
+        faults += _sections(artifact_id, content.get("sections", []), required, "sections")
+    for link in links.carried(content, schema, corpus):
+        if not _misread(link.place, errors) and not _lands(link.target, link.ref, corpus):
+            faults.append(kb_pb2.Fault(
+                artifact=artifact_id, path=link.place, rule="ref",
+                message=f"a link must land on a node of a kind the type allows; {link.target!r} does not",
+            ))
+    return faults
+
+
+def _place(error) -> str:
+    return "/".join(str(step) for step in error.absolute_path)
+
+
+def _misread(place: str, errors: list) -> bool:
+    """Whether JSON Schema found fault with the node at a place, or with anything inside it, or found a node holding
+    it of the wrong type, so that kb's own rules cannot read it."""
+    steps = place.split("/")
+    for error in errors:
+        at = _place(error).split("/") if error.absolute_path else []
+        if at[:len(steps)] == steps or (error.validator == "type" and steps[:len(at)] == at):
+            return True
+    return False
     required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
     faults = _sections(artifact_id, content.get("sections", []), required, "sections")
     for link in links.carried(content, schema, corpus):

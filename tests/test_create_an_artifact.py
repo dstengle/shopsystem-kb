@@ -467,7 +467,10 @@ def _create_with_two_faults(client, tmp_path):
         "supersedes": "decision/prices-are-reviewed-monthly",
         "sections": [SECTIONS[1]],
     }, message="Record it")
-    return {"response": response, "before": before, "after": everything_under(tmp_path)}
+    return {
+        "response": response, "before": before, "after": everything_under(tmp_path),
+        "faults": [("sections", "sections"), ("supersedes", "ref")],
+    }
 
 
 @then("the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken")
@@ -475,8 +478,7 @@ def _rejected_with_both_faults(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
     assert sorted((fault.artifact, fault.path, fault.rule) for fault in refused.faults) == [
-        ("decision/price-reviews-happen-weekly", "sections", "sections"),
-        ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
+        ("decision/price-reviews-happen-weekly", path, rule) for path, rule in attempt["faults"]
     ]
 
 
@@ -584,3 +586,17 @@ def _rejected_for_the_link(refused):
         ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
     ]
     assert refused.faults[0].message.startswith("a link must land on a node of a kind the type allows")
+
+
+@when(
+    "the client creates a decision whose options are of a shape the type does not allow and which is also missing its "
+    "purpose, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_with_two_kinds_of_fault(root, client):
+    before = everything_under(root)
+    response = request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS[1:], "options": "Keep weekly"})
+    return {
+        "response": response, "before": before, "after": everything_under(root),
+        "faults": [("options", "type"), ("sections", "sections")],
+    }
