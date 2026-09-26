@@ -2,7 +2,7 @@
 and whether a link points at an artifact. The checks, removal, reads and walks all read links here."""
 from typing import NamedTuple
 
-from kb.composition import composition
+from kb.composition import declared
 
 
 class Link(NamedTuple):
@@ -16,18 +16,13 @@ class Link(NamedTuple):
 
 def references(schema: dict, corpus) -> dict[str, dict]:
     """Every field that links to other artifacts, from every schema in the composition, base first, with its `ref`."""
-    return {
-        name: field["ref"]
-        for part in composition(schema, corpus)
-        for name, field in part.get("properties", {}).items()
-        if "ref" in field
-    }
+    return {name: field["ref"] for name, field in declared(schema, corpus)["properties"].items() if "ref" in field}
 
 
 def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
     """Every link an artifact carries, wherever it sits: in its own fields, and in the fields of each item of each of
     its collections, at every depth."""
-    return _links_in(artifact, references(schema, corpus), schema.get("parts", {}), "", corpus)
+    return _links_in(artifact, references(schema, corpus), declared(schema, corpus)["parts"], "", corpus)
 
 
 def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -> list[Link]:
@@ -47,7 +42,7 @@ def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus) -
         item_refs = references(item_schema, corpus)
         for index, item in enumerate(items):
             if isinstance(item, dict):
-                found += _links_in(item, item_refs, item_schema.get("parts", {}), f"{at}{collection}/{index}/", corpus)
+                found += _links_in(item, item_refs, declared(item_schema, corpus)["parts"], f"{at}{collection}/{index}/", corpus)
     return found
 
 

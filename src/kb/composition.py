@@ -29,3 +29,15 @@ def type_schema(uri: str, corpus) -> dict:
     if schema_id is None or schema_id.kind != Kind("schema") or not corpus.holds(schema_id):
         raise NoSuchResource(ref=uri)
     return corpus.artifact(schema_id)["schema"]
+
+
+def declared(schema: dict, corpus) -> dict:
+    """kb's own keywords as a type declares them together with everything it is built on, base first: its fields
+    (`properties`), its collections (`parts`) and the fields shown at a glance (`summary`). A type naming a field or
+    a collection its base names too has its own."""
+    whole = {"properties": {}, "parts": {}, "summary": []}
+    for part in composition(schema, corpus):
+        whole["properties"].update(part.get("properties", {}))
+        whole["parts"].update(part.get("parts", {}))
+        whole["summary"] += [name for name in part.get("summary", []) if name not in whole["summary"]]
+    return whole

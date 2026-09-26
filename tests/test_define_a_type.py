@@ -4,6 +4,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import create, define, everything_under, read, request
 from kb import canonical
+from kb.content import loads
 
 scenarios("define-a-type.feature")
 
@@ -137,9 +138,10 @@ DECISION_ON_BASE_TYPE = {
     "schema": {
         "allOf": [{"$ref": "kb:schema/base"}],
         "type": "object",
-        "properties": {"title": {"type": "string"}},
+        "properties": {"title": {"type": "string"}, "outcome": {"type": "string"}},
         "required": ["title"],
         "sections": [{"title": "Rationale"}],
+        "summary": ["outcome"],
     },
 }
 
@@ -251,3 +253,54 @@ def _rejected_for_a_link_without_kinds(attempt):
 @then("nothing is written anywhere in the store")
 def _nothing_written(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+LINK = {"type": "string", "ref": {"targets": ["tag"], "cardinality": "one", "parts": False, "on_delete": "refuse"}}
+
+BASES = {
+    "a collection of notes every artifact may carry": {
+        "type": "object",
+        "parts": {"notes": {"items": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}}},
+    },
+    "which fields are shown at a glance": {
+        "type": "object", "properties": {"owner": {"type": "string"}}, "summary": ["owner"],
+    },
+    "a link field every artifact may carry": {"type": "object", "properties": {"about": LINK}},
+}
+
+RATIONALE = [{"title": "Rationale", "body": "Costs move weekly.\n"}]
+
+
+@given(parsers.re(f"a base type declaring (?P<declared>{'|'.join(map(re.escape, BASES))})"))
+def _a_base_type_declaring(client, declared):
+    define(client, {"title": "Base", "version": 1, "schema": BASES[declared]})
+
+
+@then("a decision of that type can be given notes, and each note is named by the store")
+def _given_notes_named_by_the_store(client):
+    created = create(client, "decision", {
+        "title": "Price reviews happen weekly", "sections": RATIONALE,
+        "notes": [{"title": "Check the costs"}, {"title": "Ask the supplier"}],
+    })
+    notes = loads(read(client, created.id, whole=True).content)["notes"]
+    assert [(note["id"], note["title"]) for note in notes] == [
+        ("check-the-costs", "Check the costs"), ("ask-the-supplier", "Ask the supplier"),
+    ]
+
+
+@then("reading a decision of that type at a glance shows the base's fields as well as the type's own")
+def _the_bases_fields_at_a_glance(client):
+    created = create(client, "decision", {
+        "title": "Price reviews happen weekly", "owner": "shopkeeper", "outcome": "Weekly", "sections": RATIONALE,
+    })
+    assert loads(read(client, created.id).content) == {"owner": "shopkeeper", "outcome": "Weekly"}
+
+
+@then("a decision of that type pointing through that field at a kind the base does not allow is rejected")
+def _a_link_through_the_base_refused(client):
+    other = create(client, "decision", {"title": "Prices are reviewed monthly", "sections": RATIONALE})
+    refused = request(client, "decision", "Price reviews happen weekly", {"about": other.id, "sections": RATIONALE})
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+        ("decision/price-reviews-happen-weekly", "about", "ref"),
+    ]

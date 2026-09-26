@@ -1,6 +1,6 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too."""
-from kb import canonical, links, refusals, values
+from kb import canonical, composition, links, refusals, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
@@ -27,7 +27,7 @@ def stub(store: Store, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     schema = store.schema(target_id.kind)["schema"]
     return kb_pb2.Stub(
         field=field, id=target["id"], type=target["type"], title=target["title"],
-        fields=dumps(_summary_fields(target, schema)),
+        fields=dumps(_summary_fields(target, composition.declared(schema, store))),
     )
 
 
@@ -49,10 +49,11 @@ def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:
 def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
     found = store.artifact(locator.id)
     schema = store.schema(locator.id.kind)["schema"]
-    response = _response(found, dumps(_summary_fields(found, schema)))
+    declared = composition.declared(schema, store)
+    response = _response(found, dumps(_summary_fields(found, declared)))
     for link in links.carried(found, schema, store):
         response.references.append(stub(store, link.field, values.artifact_id(link.target)))
-    for collection in schema.get("parts", {}):
+    for collection in declared["parts"]:
         for item in found.get(collection, []):
             response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
     for (type_name, field), count in _inbound(store, str(locator.id)).items():
@@ -109,5 +110,5 @@ def _find_section(sections: list, title: str) -> dict | None:
     return None
 
 
-def _summary_fields(found: dict, schema: dict) -> dict:
-    return {name: found[name] for name in schema.get("summary", []) if name in found}
+def _summary_fields(found: dict, declared: dict) -> dict:
+    return {name: found[name] for name in declared["summary"] if name in found}

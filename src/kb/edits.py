@@ -4,7 +4,7 @@ with every fault it finds."""
 import copy
 from typing import NamedTuple
 
-from kb import canonical, definitions, links, names, places, refusals, requests, validation, values
+from kb import canonical, composition, definitions, links, names, places, refusals, requests, validation, values
 from kb.store import Draft
 from kb.values import ArtifactId, Kind, Refused
 
@@ -55,13 +55,14 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     faults = _fits(draft, artifact_id, {"title": creation.title, **content}, schema)
     if faults:
         raise Refused(faults)
-    names.items(schema["schema"], content, keep_named=False)
+    declared = composition.declared(schema["schema"], draft)
+    names.items(declared, content, keep_named=False)
     artifact = {
         **content,
         "id": str(artifact_id), "type": kind.name,
         "schema_version": schema["version"], "revision": 1, "title": creation.title,
     }
-    draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
+    draft.put(artifact_id, canonical.order(artifact, declared))
     return artifact_id
 
 
@@ -90,7 +91,8 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
     current = draft.artifact(locator.id)
     content = _content_of(current)
     spot = places.resolve(content, locator)
-    if spot.holder is not content or spot.key not in draft.schema(locator.id.kind)["schema"].get("parts", {}):
+    collections = composition.declared(draft.schema(locator.id.kind)["schema"], draft)["parts"]
+    if spot.holder is not content or spot.key not in collections:
         raise Refused([refusals.not_a_collection(locator)])
     item = addition.item.tree
     content.setdefault(spot.key, []).append(item)
@@ -125,19 +127,19 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     held, the content checked against the current version of its type, its new items named, its version up by one,
     its title kept. Raises Refused with every fault."""
     schema = draft.schema(artifact_id.kind)
-    held = {collection: {item.get("id") for item in current.get(collection, [])}
-            for collection in schema["schema"].get("parts", {})}
-    faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(schema["schema"], content, held)]
+    declared = composition.declared(schema["schema"], draft)
+    held = {collection: {item.get("id") for item in current.get(collection, [])} for collection in declared["parts"]}
+    faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
     faults += _fits(draft, artifact_id, {"title": current["title"], **content}, schema)
     if faults:
         raise Refused(faults)
-    names.items(schema["schema"], content, keep_named=True)
+    names.items(declared, content, keep_named=True)
     artifact = {
         **content,
         "id": current["id"], "type": current["type"],
         "schema_version": schema["version"], "revision": current["revision"] + 1, "title": current["title"],
     }
-    draft.put(artifact_id, canonical.order(artifact, schema["schema"]))
+    draft.put(artifact_id, canonical.order(artifact, declared))
 
 
 def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) -> list:

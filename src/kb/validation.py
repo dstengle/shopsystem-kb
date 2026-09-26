@@ -7,7 +7,7 @@ from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
 from kb import canonical, links, values
-from kb.composition import composition, type_schema
+from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
 from kb.store import Damaged, Store
 from kb.values import Kind
@@ -26,33 +26,33 @@ SECTION = {
 STRUCTURE = {"properties": {"sections": {"type": "array", "items": {"$ref": "#/$defs/kb-section"}}}}
 
 
-def compose(schema: dict) -> dict:
-    """One effective schema: the type's, with kb's structural rules and the shape of each collection it declares
-    beside it under allOf.
+def compose(schema: dict, corpus) -> dict:
+    """One effective schema: the type's, with kb's structural rules and the shape of each collection it and its bases
+    declare beside it under allOf.
 
     The type stays the root, so its own `#` references still resolve; kb's shapes sit under `$defs/kb-*`.
     """
     return {
         **schema,
-        "allOf": [*schema.get("allOf", []), STRUCTURE, *_collections(schema)],
+        "allOf": [*schema.get("allOf", []), STRUCTURE, *_collections(schema, corpus)],
         "$defs": {**schema.get("$defs", {}), "kb-section": SECTION},
     }
 
 
-def _collections(schema: dict) -> list[dict]:
-    """The collections a schema declares, each a list whose items fit the item's type, and the collections that
-    type declares in turn."""
-    parts = schema.get("parts", {})
+def _collections(schema: dict, corpus) -> list[dict]:
+    """The collections a schema and its bases declare, each a list whose items fit the item's type, and the
+    collections that type declares in turn."""
+    parts = declared(schema, corpus)["parts"]
     if not parts:
         return []
     return [{"properties": {
-        name: {"type": "array", "items": _item(part.get("items", {}))} for name, part in parts.items()
+        name: {"type": "array", "items": _item(part.get("items", {}), corpus)} for name, part in parts.items()
     }}]
 
 
-def _item(item_schema: dict) -> dict:
+def _item(item_schema: dict, corpus) -> dict:
     """An item's schema with the shape of each collection it declares beside it; unchanged when it declares none."""
-    collections = _collections(item_schema)
+    collections = _collections(item_schema, corpus)
     if not collections:
         return item_schema
     return {**item_schema, "allOf": [*item_schema.get("allOf", []), *collections]}
@@ -77,7 +77,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
             rule=error.validator,
             message=error.message,
         )
-        for error in Draft202012Validator(compose(schema), registry=registry(corpus)).iter_errors(content)
+        for error in Draft202012Validator(compose(schema, corpus), registry=registry(corpus)).iter_errors(content)
     ]
     if faults:
         return faults
