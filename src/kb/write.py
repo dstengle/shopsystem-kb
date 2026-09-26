@@ -4,7 +4,7 @@ entry per operation naming the set, and one commit. A fault anywhere refuses the
 and nothing is written. Starting a store and recording a snapshot write and commit here too."""
 from typing import NamedTuple
 
-from kb import canonical, edits, journal, refusals, requests
+from kb import canonical, edits, journal, query, refusals, requests
 from kb.metaschema import METASCHEMA
 from kb.edits import Change
 from kb.store import Draft, Store, vacant
@@ -57,9 +57,10 @@ def land(store: Store, operations: list, signed: Signed) -> Landed:
     return _written(store, _serialised(draft, changes), signed)
 
 
-def record(store: Store, read: list[dict], signed: Signed) -> str:
-    """One journal entry listing what a piece of work read, in a commit of its own. Returns the entry's id."""
-    entry = journal.snapshot(store.dir, signed=signed, read=read)
+def record(store: Store, named: list, signed: Signed) -> str:
+    """One journal entry listing each artifact named as it stands now, in a commit of its own. Returns the entry's
+    id; raises Refused, having written nothing, when a name did not convert or the store lacks it."""
+    entry = journal.snapshot(store.dir, signed=signed, read=query.snapshotted(store, named))
     store.commit([entry], signed)
     return entry.stem
 
