@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, define, journal, read
+from calls import CLIENT, DECISION_TYPE, define, journal, moment, read
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
@@ -26,13 +26,11 @@ def client(root):
     return kb_client.connect(root)
 
 
-@then(parsers.parse("the store's one history entry says it happened at {day} at {time}"))
-def _one_entry_at(client, day, time):
+@then(parsers.parse("the store's one history entry says it happened at {reading}"))
+def _one_entry_at(client, reading):
     response = journal(client)
     assert not response.faults, response.faults
-    assert [datetime.fromisoformat(entry.at) for entry in response.entries] == [
-        datetime.fromisoformat(f"{day}T{time}:00+00:00"),
-    ]
+    assert [datetime.fromisoformat(entry.at) for entry in response.entries] == [moment(reading)]
 
 
 @when("the client starts a store there, saying which role it is", target_fixture="started")
@@ -341,14 +339,11 @@ def test_a_relative_root_that_is_simply_missing_is_still_refused_as_before(tmp_p
     ]
 
 
-def _at(day, time):
-    return datetime.fromisoformat(f"{day}T{time}:00+00:00")
-
-
-@given(parsers.parse("a store the client started, readied with a clock that reads {day} at {time}"),
+@given(parsers.parse("a store the client started, readied with a clock that reads {reading}"),
        target_fixture="client")
-def _started_with_a_clock(root, day, time):
-    client = kb_client.connect(root, clock=lambda: _at(day, time))
+def _started_with_a_clock(root, reading):
+    stood = moment(reading)
+    client = kb_client.connect(root, clock=lambda: stood)
     started = client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     assert not started.faults, started.faults
     return client
@@ -356,12 +351,13 @@ def _started_with_a_clock(root, day, time):
 
 @when("the client defines its own type")
 def _defines_its_own_type(client):
-    assert not define(client, DECISION_TYPE).faults
+    defined = define(client, DECISION_TYPE)
+    assert not defined.faults, defined.faults
 
 
-@then(parsers.parse("the store's history holds two entries, both saying they happened at {day} at {time}"))
-def _two_entries_at(client, day, time):
-    assert [datetime.fromisoformat(entry.at) for entry in journal(client).entries] == [_at(day, time)] * 2
+@then(parsers.parse("the store's history holds two entries, both saying they happened at {reading}"))
+def _two_entries_at(client, reading):
+    assert [datetime.fromisoformat(entry.at) for entry in journal(client).entries] == [moment(reading)] * 2
 
 
 @then("each names itself as its own set")

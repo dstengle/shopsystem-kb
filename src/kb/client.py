@@ -79,5 +79,6 @@ class InProcessClient:
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds.
     Each change it makes, Init's included, is stamped in the journal with the moment the clock gives, read at each
-    stamp; with no clock, with the machine's."""
+    stamp; with no clock, with the machine's. A clock returns a `datetime`, read as UTC when it has no zone; the
+    journal gives every moment in UTC."""
     return InProcessClient(Path(root) if root is not None else None, clock)

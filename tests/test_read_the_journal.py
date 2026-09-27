@@ -1,10 +1,12 @@
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, append, apply, create, creation, define, journal, remove, snapshot, write
+from calls import (
+    CLIENT, DECISION_TYPE, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
+)
 from kb import client as kb_client
 from kb import journal as kb_journal
 from kb.contract import kb_pb2
@@ -218,10 +220,6 @@ def _names_the_place(entries):
     )
 
 
-def _moment(day, time):
-    return datetime.fromisoformat(f"{day}T{time}:00+00:00")
-
-
 CHANGES = {
     "creates a second decision":
         lambda client: create(client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}),
@@ -246,11 +244,11 @@ def _the_client_changes(client, change):
     return before
 
 
-@then(parsers.parse("every entry that change left in the journal says it happened at {day} at {time}"))
-def _every_entry_left_at(client, before_the_change, day, time):
+@then(parsers.parse("every entry that change left in the journal says it happened at {reading}"))
+def _every_entry_left_at(client, before_the_change, reading):
     left = [entry for entry in journal(client).entries if entry.id not in before_the_change]
     assert left, "the change left no entry"
-    assert [datetime.fromisoformat(entry.at) for entry in left] == [_moment(day, time)] * len(left)
+    assert [datetime.fromisoformat(entry.at) for entry in left] == [moment(reading)] * len(left)
 
 
 def _changed_five_times(client):
@@ -283,7 +281,14 @@ def _snapshotted_twice(client):
     return [("snapshot", "")] * 2
 
 
+def _created_a_second(client):
+    made = CHANGES["creates a second decision"](client)
+    assert not made.faults, made.faults
+    return [("create", SECOND)]
+
+
 MADE = {
+    "created a second decision": _created_a_second,
     "changed the decision five times, one change after another": _changed_five_times,
     "created a second decision, changed the decision, added an item to one of the decision's collections, "
     "snapshotted what a piece of work read, and removed the second decision": _one_of_each,
@@ -302,11 +307,11 @@ def _left(entries, made):
     return [entry for entry in entries if entry.id not in made["before"]]
 
 
-@then(parsers.parse("there is one entry for each of those changes, each saying it happened at {day} at {time}"))
-def _one_entry_for_each_at(entries, made, day, time):
+@then(parsers.parse("there is one entry for each of those changes, each saying it happened at {reading}"))
+def _one_entry_for_each_at(entries, made, reading):
     left = _left(entries, made)
     assert [(entry.op, entry.artifact) for entry in left] == made["changes"]
-    assert [datetime.fromisoformat(entry.at) for entry in left] == [_moment(day, time)] * len(left)
+    assert [datetime.fromisoformat(entry.at) for entry in left] == [moment(reading)] * len(left)
 
 
 @then("each of those changes names itself as its own set, and no two of them name the same set")
@@ -362,3 +367,42 @@ def _alone_apart_from_both(entries):
 def _each_name_finds_its_go(client, goes):
     found = [[entry.artifact for entry in journal(client, batch=name).entries] for name in goes]
     assert found == [FIRST_GO, SECOND_GO]
+
+
+@when("the client reads the journal for the second decision", target_fixture="entries")
+def _read_the_journal_for_the_second(client):
+    response = journal(client, SECOND)
+    assert not response.faults, response.faults
+    return list(response.entries)
+
+
+def _its_creation(entries):
+    [created] = [entry for entry in entries if entry.op == "create"]
+    return datetime.fromisoformat(created.at)
+
+
+@then(parsers.parse("the entry for its creation says it happened at the same moment as {reading}"))
+def _at_the_same_moment_as(entries, reading):
+    assert _its_creation(entries) == moment(reading)
+
+
+@then(parsers.parse("the entry gives that moment in UTC, as {reading}"))
+def _given_in_utc_as(entries, reading):
+    at = _its_creation(entries)
+    assert (at, at.utcoffset()) == (moment(reading), timedelta(0))
+
+
+@then(parsers.parse("the entry for its creation says it happened at {reading}, given in UTC"))
+def _at_given_in_utc(entries, reading):
+    at = _its_creation(entries)
+    assert (at, at.utcoffset()) == (moment(reading).replace(tzinfo=timezone.utc), timedelta(0))
+
+
+@when(parsers.parse("the client reads the journal for the second decision since {reading}"), target_fixture="asked")
+def _for_the_second_since(client, reading):
+    return journal(client, SECOND, since=moment(reading).isoformat())
+
+
+@then("the client is given the creation of the second decision")
+def _given_its_creation(asked):
+    assert ([(entry.op, entry.artifact) for entry in asked.entries], list(asked.faults)) == ([("create", SECOND)], [])

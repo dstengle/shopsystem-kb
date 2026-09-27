@@ -1,10 +1,28 @@
-"""How the steps call the contract: one helper per rpc, plus the types the Backgrounds define."""
+"""How the steps call the contract: one helper per rpc, the types the Backgrounds define, and the one reading of a
+moment a step names."""
 import copy
+import re
+from datetime import datetime, timedelta, timezone
 
 from kb.content import dumps
 from kb.contract import kb_pb2
 
 CLIENT = kb_pb2.Actor(role="client")
+
+READING = re.compile(r"(?P<day>\d{4}-\d{2}-\d{2}) at (?P<time>\d{2}:\d{2})(?P<zone>.*)")
+ZONES = {
+    "": timezone.utc,
+    " UTC": timezone.utc,
+    ", five hours ahead of UTC": timezone(timedelta(hours=5)),
+    ", with no zone": None,
+}
+
+
+def moment(reading):
+    """The moment a step reads, as "2026-09-23 at 14:30" with the zone it names after, UTC when it names none, or
+    with none at all when it says "with no zone"."""
+    found = READING.fullmatch(reading)
+    return datetime.fromisoformat(f"{found['day']}T{found['time']}").replace(tzinfo=ZONES[found["zone"]])
 
 MANGLED = "title: [a bracket opened by hand and never closed\n"
 

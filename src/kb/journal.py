@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, NamedTuple
 
-from kb import canonical, refusals
+from kb import canonical, refusals, values
 from kb.signatures import Signed
 from kb.store import Damaged
 
@@ -29,16 +29,20 @@ def stamps(store_dir: Path, count: int, clock: Clock | None = None) -> list[Stam
     """The stamps of a set's `count` entries, in order, each read from the clock and given the next id free at its
     moment, after every id the journal holds there and every one settled before it in the set. Settled before the
     set's first write, so a clock that raises leaves nothing written."""
+    last: dict[str, int] = {}
     settled: list[Stamp] = []
     for _ in range(count):
         at = _stamp(clock)
-        settled.append(Stamp(at, _entry_id(at, _next_seq(store_dir, at, settled))))
+        moment = _moment(at)
+        last[moment] = (last[moment] if moment in last else _last_seq(store_dir, at)) + 1
+        settled.append(Stamp(at, _entry_id(at, last[moment])))
     return settled
 
 
 def _stamp(clock: Clock | None) -> datetime:
-    """The moment an entry is stamped with: the clock given, read now, or, with none, this module's `now`."""
-    return (clock or now)()
+    """The moment an entry is stamped with: the clock given, read now, or, with none, this module's `now`; in UTC,
+    a moment given with no zone read as UTC."""
+    return values.in_utc((now if clock is None else clock)())
 
 
 def _moment(at: datetime) -> str:
@@ -51,12 +55,22 @@ def _entry_id(at: datetime, seq: int) -> str:
     return f"{_moment(at)}-{seq}"
 
 
-def _next_seq(store_dir: Path, at: datetime, settled: list[Stamp]) -> int:
-    """One after every seq taken at this moment, by a file in the journal's day or an id settled earlier in the set,
-    so an entry stamped later at the same moment is ordered after them. Reads names, never what a file holds."""
-    taken = re.compile(re.escape(_moment(at)) + r"-(\d+)")
-    names = [path.stem for path in _day(store_dir, at).glob("*.yaml")] + [stamp.id for stamp in settled]
-    return 1 + max((int(found[1]) for found in map(taken.fullmatch, names) if found), default=0)
+_ID = re.compile(r"(?P<moment>.+)-(?P<seq>\d+)")
+
+
+def _parts(entry_id: str) -> tuple[str, int] | None:
+    """The one reading of an entry's id: its moment, and its seq among the entries stamped with that moment; None
+    for a name that is not an id."""
+    found = _ID.fullmatch(entry_id)
+    return (found["moment"], int(found["seq"])) if found else None
+
+
+def _last_seq(store_dir: Path, at: datetime) -> int:
+    """The highest seq a file in the journal's day takes at this moment, or 0 when none does. Reads names, never
+    what a file holds; read once per moment in a set, whose own ids are counted on from it."""
+    moment = _moment(at)
+    parts = [_parts(path.stem) for path in _day(store_dir, at).glob(f"{moment}-*.yaml")]
+    return max((found[1] for found in parts if found and found[0] == moment), default=0)
 
 
 def digest(path: Path) -> str:
@@ -119,9 +133,8 @@ def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
 
 def entries(store_dir: Path) -> list[dict] | Damaged:
     """Every entry in the journal, oldest first: by the time in its id, then by its seq, the order in which entries
-    stamped with that moment were written. When an entry's
-    file cannot be read, the fault naming the first such file in place of them all. Never raises for what a file
-    holds."""
+    stamped with that moment were written. When an entry's file cannot be read, the fault naming the first such file
+    in place of them all. Never raises for what a file holds."""
     found = []
     for path in sorted((store_dir / "journal").rglob("*.yaml")):
         try:
@@ -131,6 +144,5 @@ def entries(store_dir: Path) -> list[dict] | Damaged:
     return sorted(found, key=_order)
 
 
-def _order(entry: dict) -> tuple[str, int]:
-    stamp, _, seq = entry["id"].rpartition("-")
-    return stamp, int(seq)
+def _order(entry: dict) -> tuple[str, int] | None:
+    return _parts(entry["id"])

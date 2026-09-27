@@ -1,13 +1,12 @@
 """Suite wiring. Step definitions live beside the scenarios they serve; shared Givens are added here by slice 1."""
 import re
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing
+from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing, moment
 from kb import client as kb_client, store
 from kb.contract import kb_pb2
 
@@ -67,11 +66,11 @@ def _a_store(root):
     return client
 
 
-@given(parsers.parse("the client was readied with a clock that reads {day} at {time}"), target_fixture="client")
-def _readied_with_a_clock(root, day, time):
-    """A client over the store at root whose clock stands still at that moment, in UTC."""
-    moment = datetime.fromisoformat(f"{day}T{time}:00+00:00")
-    return kb_client.connect(root, clock=lambda: moment)
+@given(parsers.parse("the client was readied with a clock that reads {reading}"), target_fixture="client")
+def _readied_with_a_clock(root, reading):
+    """A client over the store at root whose clock stands still at that moment, given in the zone the step names."""
+    stood = moment(reading)
+    return kb_client.connect(root, clock=lambda: stood)
 
 
 @pytest.fixture

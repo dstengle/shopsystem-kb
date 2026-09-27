@@ -98,7 +98,12 @@ def since(text: str) -> datetime:
         raise Refused([kb_pb2.Fault(
             rule=rules.SINCE, message=f"a time is written in ISO 8601, as 2026-09-22 or 2026-09-22T09:00:00Z; {text!r} is not",
         )]) from None
-    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    return in_utc(moment)
+
+
+def in_utc(moment: datetime) -> datetime:
+    """The one reading of a moment: in UTC unless it says otherwise, and given in UTC."""
+    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
 
 
 def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
