@@ -41,6 +41,7 @@ So that a set of changes that only makes sense together is never half-applied, t
       | the second change removes an artifact something still points at      | something still points at it                                            |
       | the second change touches an artifact whose stored file cannot be read | that file cannot be read, and the file is named                        |
 
+  @slice-97
   Scenario: A set holding no changes at all is refused
     Pins that a set is a request to change something, so asking for nothing is a mistake the client is told about rather than a change the store records, and the store is left exactly as it was.
     When the client asks, in one go, for a set holding no changes at all, saying which role and why
