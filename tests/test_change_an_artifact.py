@@ -459,14 +459,3 @@ def _rejected_for_its_signature(attempt, reason):
     assert refused.faults[0].message.startswith(reason)
     if "revision" in refused.DESCRIPTOR.fields_by_name:
         assert refused.revision == 0
-
-
-@then("the store holds no artifact it did not hold before")
-def _no_new_artifact(root, client, attempt):
-    assert _names(client) == attempt["names"]
-    assert everything_under(root / "kb") == attempt["files"]
-
-
-@then("the store's history holds no entry for it")
-def _no_entry_in_history(client, attempt):
-    assert len(journal(client).entries) == attempt["entries"]

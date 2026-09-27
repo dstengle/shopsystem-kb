@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, then, when
 
-from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under
+from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -102,3 +102,14 @@ def _reported_as_unreadable(checked):
 def _answers(checked):
     assert isinstance(checked, kb_pb2.ValidateResponse)
     assert not checked.faults, checked.faults
+
+
+@then("the store holds no artifact it did not hold before")
+def _no_new_artifact(root, client, attempt):
+    assert [stub.id for stub in listing(client, "decision", ids_only=True).stubs] == attempt["names"]
+    assert everything_under(root / "kb") == attempt["files"]
+
+
+@then("the store's history holds no entry for it")
+def _no_entry_in_history(client, attempt):
+    assert len(journal(client).entries) == attempt["entries"]

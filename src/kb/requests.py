@@ -90,6 +90,15 @@ def starting(request: kb_pb2.InitRequest) -> tuple[Actor, Root]:
     return values.starter(request.actor), values.root(request.root)
 
 
+def change(requested, actor: kb_pb2.Actor, message: str) -> tuple[list, values.Signed]:
+    """A change request as the domain takes it: who makes it and why first, refused alone when it does not say; then
+    a set holding nothing is refused; then each operation, converted or standing as its refusal."""
+    signed = values.signed(actor, message)
+    if not requested:
+        raise Refused([kb_pb2.Fault(rule="operations", message="a set must hold at least one change")])
+    return operations(requested), signed
+
+
 def operations(requested) -> list:
     """Every operation of a set, each converted or standing as its refusal."""
     converted = []

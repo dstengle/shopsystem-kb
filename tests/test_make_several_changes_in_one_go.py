@@ -4,8 +4,8 @@ import subprocess
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, apply, create, creation, define, journal, read, removal,
-    replacement, write,
+    CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, apply, create, creation, define, everything_under, journal, listing, read,
+    removal, replacement, write,
 )
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
@@ -223,3 +223,18 @@ def _none_of_the_set_held(client, attempt):
 def _no_entry_for_the_set(root, attempt):
     assert _journal(root) == attempt["history"]
     assert not [entry for entry in attempt["history"] if entry.get("artifact") == MONTHLY]
+
+
+@when("the client asks, in one go, for a set holding no changes at all, saying which role and why", target_fixture="attempt")
+def _ask_for_an_empty_set(root, client):
+    before = {
+        "names": [stub.id for stub in listing(client, "decision", ids_only=True).stubs],
+        "files": everything_under(root / "kb"),
+        "entries": len(journal(client).entries),
+    }
+    return {**before, "response": apply(client, [], message="Change nothing")}
+
+
+@then("the set is rejected because a set must hold at least one change")
+def _rejected_for_being_empty(attempt):
+    assert _refused_with(attempt, [("", "", "operations")]).startswith("a set must hold at least one change")

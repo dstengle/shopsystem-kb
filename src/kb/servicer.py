@@ -69,7 +69,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def _land(self, operations, request) -> write.Landed:
         """A set of operations landed under the request's actor and message."""
-        return write.land(self._store, requests.operations(operations), values.signed(request.actor, request.message))
+        return write.land(self._store, *requests.change(operations, request.actor, request.message))
 
     @_boundary(kb_pb2.ReadResponse)
     def Read(self, request):
