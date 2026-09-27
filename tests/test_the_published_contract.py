@@ -8,6 +8,7 @@ import pytest
 
 from calls import define, request
 from kb import client as kb_client, rules
+from kb import content as kb_content
 from kb.content import NotCanonical, dumps, loads, text
 from kb.contract import kb_pb2
 
@@ -24,6 +25,11 @@ TYPED = {
         "required": ["title", "detail"],
     },
 }
+
+
+def test_kb_content_publishes_only_what_the_contract_names():
+    assert sorted(kb_content.__all__) == ["NotCanonical", "dumps", "loads", "text"]
+    assert not hasattr(kb_content, "entries")
 
 
 def test_content_round_trips_and_refuses_what_it_cannot_keep():

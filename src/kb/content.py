@@ -4,7 +4,7 @@ import datetime
 from kb import canonical
 from kb.canonical import NotCanonical
 
-__all__ = ["dumps", "loads", "entries", "text", "NotCanonical"]
+__all__ = ["dumps", "loads", "text", "NotCanonical"]
 
 
 def dumps(value: dict) -> str:
@@ -16,12 +16,6 @@ def dumps(value: dict) -> str:
 def loads(text: str) -> dict:
     """Read content plainly, by the same check every file kb writes passes. Raises NotCanonical."""
     return canonical.load(text) or {}
-
-
-def entries(text: str) -> dict:
-    """A whole artifact's content: a set of named entries, read plainly. Raises NotCanonical for text that
-    is anything else, nothing at all included."""
-    return canonical.entries(text)
 
 
 def text(value) -> str:
