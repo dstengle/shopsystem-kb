@@ -4,11 +4,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, next_version
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
+from repositories import hooked, made, standing
 
 scenarios("look-after-a-store.feature")
 
@@ -120,9 +122,33 @@ def _directory_with_no_store(root):
     return root
 
 
+@pytest.fixture
+def starter():
+    """The role the operator starts a store under."""
+    return OPERATOR
+
+
+@pytest.fixture
+def named_repository():
+    """The git repository the operator's environment names, how it stood, and what its directory held, when a Given
+    names one; otherwise an environment naming none, and a directory that held nothing."""
+    return {"environment": {}, "held": []}
+
+
+@given(
+    "a directory that is itself a git repository, and the operator's environment naming that repository as the git "
+    "repository to work in, the way git does for a program it runs from a hook",
+    target_fixture="named_repository",
+)
+def _git_repository_named_by_the_operators_environment(root):
+    made(root)
+    held = [path.name for path in root.iterdir()]
+    return {"path": root, "standing": standing(root), "environment": hooked(root), "held": held}
+
+
 @when("the operator runs kb init against that directory, saying which role they are", target_fixture="ran")
-def _kb_init_with_a_role(root, tmp_path):
-    return _kb("init", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+def _kb_init_with_a_role(root, tmp_path, named_repository):
+    return _kb("init", str(root), cwd=tmp_path, env={**named_repository["environment"], "KB_ACTOR": OPERATOR})
 
 
 @when("the operator runs kb init against that directory", target_fixture="ran")
@@ -131,10 +157,11 @@ def _kb_init_without_a_role(root, tmp_path):
 
 
 @then("there is a store inside that directory, in a place of its own")
-def _a_store_inside(ran, root):
+def _a_store_inside(ran, root, named_repository):
+    """The store is the one thing added to what the directory held."""
     assert (ran.returncode, ran.stderr) == (0, "")
     assert (root / "kb" / "store.yaml").is_file()
-    assert [path.name for path in root.iterdir()] == ["kb"]
+    assert sorted(path.name for path in root.iterdir()) == sorted([*named_repository["held"], "kb"])
 
 
 @then("a client can begin defining its own types in it straight away")

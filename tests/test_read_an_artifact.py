@@ -7,6 +7,7 @@ from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define
 from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
+from repositories import hooked, made
 
 scenarios("read-an-artifact.feature")
 
@@ -223,6 +224,33 @@ def _outside_with_kb_root_naming_this_one(root, tmp_path, monkeypatch):
 @then("the client is given the decision, from the store KB_ROOT names")
 def _from_the_store_kb_root_names(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+
+
+def _working_deep_inside(root, tmp_path, monkeypatch):
+    monkeypatch.chdir(_deep_inside(root))
+    monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+def _working_outside_naming_this_one(root, tmp_path, monkeypatch):
+    monkeypatch.chdir(_elsewhere(tmp_path))
+    monkeypatch.setenv("KB_ROOT", str(root))
+
+
+WORKING = {
+    "in a folder deep inside the directory the store sits in": _working_deep_inside,
+    "outside any store, with KB_ROOT naming this one": _working_outside_naming_this_one,
+}
+
+
+@given(parsers.re(
+    f"the client is working (?P<where>{'|'.join(map(re.escape, WORKING))}), with its environment naming a git "
+    f"repository other than this store, the way git does for a program it runs from a hook"
+))
+def _working_with_a_repository_named(root, tmp_path, monkeypatch, where):
+    """A git repository made under tmp_path, holding no store, named in this process's environment, restored after."""
+    WORKING[where](root, tmp_path, monkeypatch)
+    for name, value in hooked(made(tmp_path / "elsewhere-repository")).items():
+        monkeypatch.setenv(name, value)
 
 
 @given("the client is working outside any store and nothing names one", target_fixture="elsewhere")

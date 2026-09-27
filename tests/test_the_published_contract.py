@@ -1,6 +1,7 @@
 """Pins what kb publishes to a client through the contract alone (adrs/0018): `kb.content`'s `loads`, `dumps`,
-`text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`; `kb.contract.kb_pb2`'s being
-importable; and the set of kb's own rule names against the spec's list. It does not pin the wording of any fault."""
+`text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
+None; `kb.contract.kb_pb2`'s being importable; and the set of kb's own rule names against the spec's list. It does not
+pin the wording of any fault."""
 import inspect
 import re
 from pathlib import Path

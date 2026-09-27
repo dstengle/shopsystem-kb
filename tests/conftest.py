@@ -7,8 +7,9 @@ import pytest
 from pytest_bdd import given, parsers, then, when
 
 from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing, moment
-from kb import client as kb_client, store
+from kb import canonical, client as kb_client, store
 from kb.contract import kb_pb2
+from repositories import git, hooked, made, standing
 
 
 def pytest_configure(config):
@@ -152,3 +153,53 @@ def _no_new_artifact(root, client, attempt):
 @then("the store's history holds no entry for it")
 def _no_entry_in_history(client, attempt):
     assert len(journal(client).entries) == attempt["entries"]
+
+
+@pytest.fixture
+def starter():
+    """The role a scenario's store was started under."""
+    return CLIENT.role
+
+
+@then(
+    parsers.parse('the store\'s history holds one entry, under that role, with the message "{message}"'),
+    target_fixture="entry",
+)
+def _one_entry_under_the_role(root, starter, message):
+    """The one entry in the journal's files, and the one commit in the store's own git history, both under the role
+    the store was started under."""
+    entries = sorted((root / "kb" / "journal").rglob("*.yaml"))
+    assert len(entries) == 1, entries
+    entry = canonical.load(entries[0].read_text())
+    assert (entry["actor"]["role"], entry["message"]) == (starter, message)
+    assert git(root / "kb", "log", "--format=%an%x09%s").splitlines() == [f"{starter}\t{message}"]
+    return entry
+
+
+REPOSITORIES = {
+    "the git repository the directory the store sits in belongs to": lambda root, tmp_path: made(root),
+    "the git repository that directory is": lambda root, tmp_path: root,
+    "a git repository elsewhere, which holds no store": lambda root, tmp_path: made(tmp_path / "elsewhere-repository"),
+}
+
+
+@given(
+    parsers.re(
+        f"the client runs with its environment naming (?P<repository>{'|'.join(REPOSITORIES)}) as the git repository "
+        f"to work in, the way git does for a program it runs from a hook"
+    ),
+    target_fixture="named_repository",
+)
+def _environment_naming_a_repository(root, tmp_path, monkeypatch, repository):
+    """The repository named, under tmp_path, set in this process's environment, restored after, and how it stood."""
+    path = REPOSITORIES[repository](root, tmp_path)
+    for name, value in hooked(path).items():
+        monkeypatch.setenv(name, value)
+    return {"path": path, "standing": standing(path)}
+
+
+@then(
+    "that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit"
+)
+def _repository_left_as_it_was(named_repository):
+    assert standing(named_repository["path"]) == named_repository["standing"]

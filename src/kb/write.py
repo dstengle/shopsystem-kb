@@ -109,7 +109,7 @@ def _written(store: Store, landings: list[Landing], signed: Signed, stamps: list
     """Each file saved or removed, its journal entry written under its stamp naming the set, the first entry's id,
     and all of it in one commit. Reads nothing: everything written was settled before."""
     written, results, batch = [], [], stamps[0].id
-    for (change, text, last), stamp in zip(landings, stamps):
+    for (change, text, last), stamp in zip(landings, stamps, strict=True):
         if last:
             written.append(_file(store, change.artifact_id, text))
         written.append(journal.write(

@@ -221,34 +221,62 @@ def _names_the_place(entries):
 
 
 CHANGES = {
-    "creates a second decision":
-        lambda client: create(client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}),
-    "changes the decision": lambda client: write(client, DECISION, {"sections": SECTIONS}),
-    "adds an item to one of the decision's collections":
-        lambda client: append(client, DECISION, "options", {"title": "Every week"}),
-    "removes the decision": lambda client: remove(client, DECISION),
-    "makes several changes in one go": lambda client: apply(client, [
+    "creates a second decision": lambda client, message: create(
+        client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}, message=message, actor=SHOPKEEPER,
+    ),
+    "changes the decision": lambda client, message: write(
+        client, DECISION, {"sections": SECTIONS}, message=message, actor=SHOPKEEPER,
+    ),
+    "adds an item to one of the decision's collections": lambda client, message: append(
+        client, DECISION, "options", {"title": "Every week"}, message=message, actor=SHOPKEEPER,
+    ),
+    "removes the decision": lambda client, message: remove(client, DECISION, message=message, actor=SHOPKEEPER),
+    "makes several changes in one go": lambda client, message: apply(client, [
         creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
         creation("decision", "Count the till nightly", {"sections": SECTIONS}),
-    ]),
-    "snapshots what a piece of work read": lambda client: snapshot(client, "restock-run-12", [DECISION]),
+    ], message=message, actor=SHOPKEEPER),
+    "snapshots what a piece of work read": lambda client, message: snapshot(
+        client, "restock-run-12", [DECISION], message=message, role=SHOPKEEPER.role,
+    ),
 }
 
 
-@when(parsers.re(f"the client (?P<change>{'|'.join(CHANGES)})"), target_fixture="before_the_change")
+def _signed(change):
+    """The role and message the client gives when it makes that change."""
+    return SHOPKEEPER.role, f"The client {change}"
+
+
+def _make(client, change):
+    """That change, made by the shopkeeper under its own message."""
+    return CHANGES[change](client, _signed(change)[1])
+
+
+@when(parsers.re(f"the client (?P<change>{'|'.join(CHANGES)})"), target_fixture="the_change")
 def _the_client_changes(client, change):
-    """The ids of the entries the journal held before the change, so the Then can tell the entries it left."""
+    """The change made, and the ids of the entries the journal held before it, so a Then can tell the entries it
+    left."""
     before = {entry.id for entry in journal(client).entries}
-    changed = CHANGES[change](client)
+    changed = _make(client, change)
     assert not changed.faults, changed.faults
-    return before
+    return {"change": change, "before": before}
+
+
+def _left_by(client, the_change):
+    left = [entry for entry in journal(client).entries if entry.id not in the_change["before"]]
+    assert left, "the change left no entry"
+    return left
 
 
 @then(parsers.parse("every entry that change left in the journal says it happened at {reading}"))
-def _every_entry_left_at(client, before_the_change, reading):
-    left = [entry for entry in journal(client).entries if entry.id not in before_the_change]
-    assert left, "the change left no entry"
+def _every_entry_left_at(client, the_change, reading):
+    left = _left_by(client, the_change)
     assert [datetime.fromisoformat(entry.at) for entry in left] == [moment(reading)] * len(left)
+
+
+@then("every entry that change left is in the store's history, under the role and with the message the client gave")
+def _every_entry_left_in_the_history(client, the_change):
+    left = _left_by(client, the_change)
+    assert [(entry.actor.role, entry.message) for entry in left] == [_signed(the_change["change"])] * len(left)
 
 
 def _changed_five_times(client):
@@ -267,7 +295,7 @@ SECOND = "decision/restock-on-thursdays"
 def _one_of_each(client):
     for change in ("creates a second decision", "changes the decision",
                    "adds an item to one of the decision's collections", "snapshots what a piece of work read"):
-        made = CHANGES[change](client)
+        made = _make(client, change)
         assert not made.faults, made.faults
     removed = remove(client, SECOND)
     assert not removed.faults, removed.faults
@@ -276,13 +304,13 @@ def _one_of_each(client):
 
 def _snapshotted_twice(client):
     for _ in range(2):
-        made = CHANGES["snapshots what a piece of work read"](client)
+        made = _make(client, "snapshots what a piece of work read")
         assert not made.faults, made.faults
     return [("snapshot", "")] * 2
 
 
 def _created_a_second(client):
-    made = CHANGES["creates a second decision"](client)
+    made = _make(client, "creates a second decision")
     assert not made.faults, made.faults
     return [("create", SECOND)]
 

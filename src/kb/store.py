@@ -1,6 +1,7 @@
 """The store on disk: <root>/kb/, one canonical YAML file per artifact, itself a git repository; and finding it, the
 way git finds a repository: upward from the working directory, or named by KB_ROOT. CONTRACT_VERSION is the store
 marker's value alone, written to store.yaml at Init; the store's own, not part of the published contract (adrs/0018)."""
+import functools
 import os
 import subprocess
 from dataclasses import dataclass
@@ -233,5 +234,16 @@ QUIET = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")
 
 
 def _git(*args, env=None):
-    """git, with its automatic maintenance off, so nothing runs on in the store after a call returns."""
-    subprocess.run(["git", *QUIET, *args], check=True, capture_output=True, text=True, env=env)
+    """git, its automatic maintenance off so nothing runs on after a call returns, and with no variable git reads as
+    locating a repository, so it works in the store named whatever the caller's environment names; `env` counts."""
+    locating = _locating()
+    passed = {name: value for name, value in (os.environ if env is None else env).items() if name not in locating}
+    subprocess.run(["git", *QUIET, *args], check=True, capture_output=True, text=True, env=passed)
+
+
+@functools.cache
+def _locating() -> frozenset[str]:
+    """Git's own list of the variables that locate a repository, read from git once a process. When it cannot be read
+    this raises, and no git runs with the environment it was to clear."""
+    listed = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True, text=True)
+    return frozenset(listed.stdout.split())

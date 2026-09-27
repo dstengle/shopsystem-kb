@@ -15,7 +15,7 @@ Clock = Callable[[], datetime]
 
 def now() -> datetime:
     """The machine's clock, which stamps an entry when no clock is given. Looked up as each entry is stamped, so a
-    replacement made from outside still takes effect, until shop-knowledge's slice 50.23 moves to the given clock."""
+    replacement made from outside still takes effect."""
     return datetime.now(timezone.utc)
 
 
@@ -134,8 +134,7 @@ def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
 def entries(store_dir: Path) -> list[dict] | Damaged:
     """Every entry in the journal, oldest first: by the time in its id, then by its seq, the order in which entries
     stamped with that moment were written. When an entry's file cannot be read, the fault naming the first such file
-    in place of them all. An entry whose id kb cannot read makes the read raise: a known gap, logged for the ninth
-    review."""
+    in place of them all. An entry whose id kb cannot read makes the read raise."""
     found = []
     for path in sorted((store_dir / "journal").rglob("*.yaml")):
         try:

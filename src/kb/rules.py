@@ -23,4 +23,4 @@ TITLE = "title"
 ROOT = "root"
 STORE = "store"
 
-ALL = tuple(value for name, value in sorted(vars().items()) if name.isupper() and name != "ALL")
+ALL = tuple(value for name, value in sorted(globals().items()) if name.isupper() and name != "ALL")
