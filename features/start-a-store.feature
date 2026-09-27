@@ -26,6 +26,7 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     When the client starts a store there, saying which role it is
     Then the store's one history entry says it happened at 2026-09-20 at 08:00
 
+  @slice-102.3
   Scenario: Starting a store and the first change after it keep separate entries at the same moment
     Pins that the first entry in a history is never lost to the change that follows it, however close together the client's clock puts them.
     Given a store the client started, readied with a clock that reads 2026-09-20 at 08:00

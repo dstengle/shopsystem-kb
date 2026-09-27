@@ -55,6 +55,7 @@ So that a client can show how the store came to hold what it holds, the client c
       | makes several changes in one go                   |
       | snapshots what a piece of work read               |
 
+  @slice-102.3
   Scenario Outline: Changes stamped with the same moment each leave an entry of their own
     Pins that a clock standing still loses nothing: every change is still recorded, at the moment the clock gave, and changes made apart never share a set just because they share a moment.
     Given the client was readied with a clock that reads 2026-09-23 at 14:30
@@ -69,6 +70,7 @@ So that a client can show how the store came to hold what it holds, the client c
       | created a second decision, changed the decision, added an item to one of the decision's collections, snapshotted what a piece of work read, and removed the second decision |
       | snapshotted what a piece of work read twice                                                                                                                                  |
 
+  @slice-102.3
   Scenario: Sets of changes made at the same moment are told apart
     Pins that the name the store gives a set belongs to that set alone, even when several sets land at the same moment, so what landed together is never confused with what merely landed at the same time.
     Given the client was readied with a clock that reads 2026-09-23 at 14:30
@@ -78,6 +80,7 @@ So that a client can show how the store came to hold what it holds, the client c
     And the change made on its own names itself as its own set, apart from both
     And the name the client was given for each go finds exactly that go's two changes in the history
 
+  @slice-102.4
   Scenario: A moment the clock gives in another zone is kept as the same moment
     Pins that a client's clock may tell the time in any zone without the history mistaking when a change happened, and that the history tells every time in one zone.
     Given the client was readied with a clock that reads 2026-09-24 at 01:30, five hours ahead of UTC
@@ -86,6 +89,7 @@ So that a client can show how the store came to hold what it holds, the client c
     Then the entry for its creation says it happened at the same moment as 2026-09-23 at 20:30 UTC
     And the entry gives that moment in UTC, as 2026-09-23 at 20:30
 
+  @slice-102.4
   Scenario: A moment the clock gives with no zone is recorded as that moment in UTC
     Pins that a clock which does not say its zone is read the way every time a client gives is read, as UTC, so the history never holds a time that cannot be placed.
     Given the client was readied with a clock that reads 2026-09-23 at 20:30, with no zone
@@ -93,6 +97,7 @@ So that a client can show how the store came to hold what it holds, the client c
     When the client reads the journal for the second decision
     Then the entry for its creation says it happened at 2026-09-23 at 20:30, given in UTC
 
+  @slice-102.4
   Scenario Outline: The history read since a time answers plainly whatever zone the clock gave
     Pins that a history holding moments given in another zone, or in none, is still read plainly: asking what has happened since a time answers by the moment itself, not the way the clock wrote it, and never breaks off.
     Given the client was readied with a clock that reads <reading>
