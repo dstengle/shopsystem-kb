@@ -18,6 +18,7 @@ a change that breaks one is refactored into place first, then made.
 | `links.py` | the one reading of links: every link an artifact carries, wherever it sits, and whether a link points at an artifact | checks, file access |
 | `definitions.py` | a type checked as it is written: what it refers to is held, it is not built on itself, its link fields say what they may point at | file access, checking artifacts against a type |
 | `refusals.py` | the faults the domain makes of what a store holds, each with its rule and message | conversions, type checks |
+| `rules.py` | the name of every rule a fault of kb's own carries, which kb publishes (adrs/0018) | faults, messages |
 | `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, then write, journal and commit; starting a store, recording a snapshot | rpc types |
 | `edits.py` | what each operation of a set does to the draft, checked against the draft as the operations before it left it | rpc types, writes |
 | `places.py` | resolving a place inside an artifact to where its node stands, or the refusal saying why nothing does; whether a link's place names a part | I/O, what an operation does there |

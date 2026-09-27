@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, TypeVar
 
-from kb import canonical, refusals, settled
+from kb import canonical, refusals, rules, settled
 from kb.contract import CONTRACT_VERSION, kb_pb2
 from kb.values import ArtifactId, Kind, Refused, Root, Signed
 
@@ -147,25 +147,25 @@ def vacant(root: Root) -> None:
     anything else in the place a store goes, or is inside a store."""
     if not root.path.exists():
         raise Refused([kb_pb2.Fault(
-            rule="root", message=f"a store is started in a directory that exists; {root.named!r} does not",
+            rule=rules.ROOT, message=f"a store is started in a directory that exists; {root.named!r} does not",
         )])
     if not root.path.is_dir():
         raise Refused([kb_pb2.Fault(
-            rule="root", message=f"a store is started in a directory, and {root.named!r} is not one",
+            rule=rules.ROOT, message=f"a store is started in a directory, and {root.named!r} is not one",
         )])
     if (root.path / MARKER).is_file():
         raise Refused([kb_pb2.Fault(
-            rule="root", message=f"a store is never started over another; {root.named!r} already has a store inside it",
+            rule=rules.ROOT, message=f"a store is never started over another; {root.named!r} already has a store inside it",
         )])
     if (root.path / MARKER.parent).exists() or (root.path / MARKER.parent).is_symlink():
         raise Refused([kb_pb2.Fault(
-            rule="root",
+            rule=rules.ROOT,
             message=f"a store goes in a place of its own, and {root.named!r} already holds something in that place",
         )])
     above = find_above(root.path.resolve().parent)
     if above is not None:
         raise Refused([kb_pb2.Fault(
-            rule="root", message=f"stores do not nest; {root.named!r} is inside the store at {str(above)!r}",
+            rule=rules.ROOT, message=f"stores do not nest; {root.named!r} is inside the store at {str(above)!r}",
         )])
 
 
@@ -198,11 +198,11 @@ def locate(env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
     named = Path(value)
     if not value or not (named / MARKER).is_file():
         return None, kb_pb2.Fault(
-            rule="store", message=f"KB_ROOT names a directory that holds no store: {value}",
+            rule=rules.STORE, message=f"KB_ROOT names a directory that holds no store: {value}",
         )
     if above is not None and above.resolve() != named.resolve():
         return None, kb_pb2.Fault(
-            rule="store",
+            rule=rules.STORE,
             message=f"KB_ROOT names a store other than the one {cwd} is working in: KB_ROOT is {named}, "
                     f"the working directory is inside {above}; neither is guessed at",
         )
@@ -214,9 +214,9 @@ def _nothing_found(cwd: Path | None) -> kb_pb2.Fault:
     when that is gone, said to be gone."""
     if cwd is None:
         return kb_pb2.Fault(
-            rule="store", message="no store was found: the working directory is gone, and nothing named one outright",
+            rule=rules.STORE, message="no store was found: the working directory is gone, and nothing named one outright",
         )
-    return kb_pb2.Fault(rule="store", message=f"no store was found, neither above {cwd} nor named outright")
+    return kb_pb2.Fault(rule=rules.STORE, message=f"no store was found, neither above {cwd} nor named outright")
 
 
 QUIET = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")

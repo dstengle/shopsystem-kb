@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical, names, settled
+from kb import canonical, names, rules, settled
 from kb.content import entries, loads
 from kb.contract import kb_pb2
 
@@ -49,7 +49,7 @@ class Locator:
 def kind(text: str) -> Kind:
     if not names.plain(text):
         raise Refused([kb_pb2.Fault(
-            rule="kind",
+            rule=rules.KIND,
             message=f"a kind is a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not",
         )])
     return Kind(text)
@@ -82,7 +82,7 @@ def _located(name: str, path: str) -> Locator:
     place = names.steps(path)
     if not all(names.plain(part) for part in place):
         faults.append(kb_pb2.Fault(
-            artifact=name, path=path, rule="locator",
+            artifact=name, path=path, rule=rules.LOCATOR,
             message=f"a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it; {path!r} is not",
         ))
     if faults:
@@ -96,7 +96,7 @@ def since(text: str) -> datetime:
         moment = datetime.fromisoformat(text)
     except ValueError:
         raise Refused([kb_pb2.Fault(
-            rule="since", message=f"a time is written in ISO 8601, as 2026-09-22 or 2026-09-22T09:00:00Z; {text!r} is not",
+            rule=rules.SINCE, message=f"a time is written in ISO 8601, as 2026-09-22 or 2026-09-22T09:00:00Z; {text!r} is not",
         )]) from None
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
@@ -112,7 +112,7 @@ def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
         message = _leaves_nothing(title)
     else:
         return ArtifactId(kind, slug), at, ()
-    return None, at, (kb_pb2.Fault(artifact=at, path="title", rule="title", message=message),)
+    return None, at, (kb_pb2.Fault(artifact=at, path="title", rule=rules.TITLE, message=message),)
 
 
 def _leaves_nothing(title: str) -> str:
@@ -137,7 +137,7 @@ def content(text: str, at_root: bool = True) -> Content:
     try:
         tree = entries(text) if at_root else loads(text)
     except canonical.NotCanonical as fault:
-        return Content(None, ((fault.path, "content", str(fault)),))
+        return Content(None, ((fault.path, rules.CONTENT, str(fault)),))
     if not at_root:
         return Content(tree)
     problems = []
@@ -148,7 +148,7 @@ def content(text: str, at_root: bool = True) -> Content:
             message = f"a title is given alongside the content, never inside it; the content carried the title {tree[key]!r}"
         else:
             message = f"content holds only what the type declares; {key} is settled by the store, and the content carried {key}: {tree[key]!r}"
-        problems.append((key, "identity", message))
+        problems.append((key, rules.IDENTITY, message))
     return Content(tree, tuple(problems))
 
 
@@ -160,7 +160,7 @@ def item(text: str) -> Content:
     if read.problems or not isinstance(read.tree, dict):
         return read
     if "id" in read.tree:
-        return Content(read.tree, (("id", "identity",
+        return Content(read.tree, (("id", rules.IDENTITY,
             f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {read.tree['id']!r}"),))
     return _titled(read.tree)
 
@@ -172,7 +172,7 @@ def _titled(tree: dict) -> Content:
     if title is None:
         return Content(tree)
     if not names.slug(title):
-        return Content(tree, (("title", "title", _leaves_nothing(title)),))
+        return Content(tree, (("title", rules.TITLE, _leaves_nothing(title)),))
     return Content({**tree, "title": title})
 
 
@@ -195,7 +195,8 @@ def actor(request: kb_pb2.Actor) -> Actor:
 
 def _unsigned(request: kb_pb2.Actor, message: str) -> list[kb_pb2.Fault]:
     return [kb_pb2.Fault(rule=rule, message=f"every entry in the history {reason}") for rule, reason, missing in (
-        ("actor", "names the role that made it", not request.role.strip()), ("message", "says why it was made", not message.strip()),
+        (rules.ACTOR, "names the role that made it", not request.role.strip()),
+        (rules.MESSAGE, "says why it was made", not message.strip()),
     ) if missing]
 
 
@@ -211,7 +212,7 @@ def reader(request: kb_pb2.Actor, message: str) -> Signed:
     """Who records what a piece of work read, who must sign and name the piece of work; every fault found."""
     faults = _unsigned(request, message)
     if not request.execution:
-        faults.append(kb_pb2.Fault(rule="actor", message="a snapshot records what a named piece of work read"))
+        faults.append(kb_pb2.Fault(rule=rules.ACTOR, message="a snapshot records what a named piece of work read"))
     if faults:
         raise Refused(faults)
     return Signed(actor(request), message)
@@ -220,7 +221,7 @@ def reader(request: kb_pb2.Actor, message: str) -> Signed:
 def starter(request: kb_pb2.Actor) -> Actor:
     """The actor who starts a store, who must name a role."""
     if not request.role:
-        raise Refused([kb_pb2.Fault(rule="actor", message="a store can only be started under a role")])
+        raise Refused([kb_pb2.Fault(rule=rules.ACTOR, message="a store can only be started under a role")])
     return actor(request)
 
 
@@ -236,7 +237,7 @@ def root(text: str) -> Root:
     there is the store's to check."""
     if not text:
         raise Refused([kb_pb2.Fault(
-            rule="root",
+            rule=rules.ROOT,
             message="a store is started in a directory that was named and that exists; no directory was named",
         )])
     return Root(Path(text), text)
@@ -244,6 +245,6 @@ def root(text: str) -> Root:
 
 def _not_a_plain_name(text: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=text, rule="locator",
+        artifact=text, rule=rules.LOCATOR,
         message=f"a name is a kind and a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not",
     )

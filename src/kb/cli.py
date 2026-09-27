@@ -9,6 +9,7 @@ import os
 import sys
 
 from kb import client as kb_client
+from kb import rules
 from kb.contract import kb_pb2
 
 REFUSED, VIOLATED = 2, 1
@@ -31,7 +32,7 @@ def _init(root: str) -> int:
     role = os.environ.get("KB_ACTOR", "")
     if not role:
         return _refused("init", [kb_pb2.Fault(
-            rule="actor", message="a store can only be started under a role, named through KB_ACTOR",
+            rule=rules.ACTOR, message="a store can only be started under a role, named through KB_ACTOR",
         )])
     started = kb_client.connect().Init(kb_pb2.InitRequest(root=root, actor=kb_pb2.Actor(role=role)))
     if started.faults:

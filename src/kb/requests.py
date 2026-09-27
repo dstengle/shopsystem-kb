@@ -4,7 +4,7 @@ entry that does not convert stands in its place as a Refusal, so the faults come
 from dataclasses import dataclass
 from datetime import datetime
 
-from kb import values
+from kb import rules, values
 from kb.contract import kb_pb2
 from kb.values import Actor, ArtifactId, Content, Kind, Locator, Refused, Root
 
@@ -95,7 +95,7 @@ def change(requested, actor: kb_pb2.Actor, message: str) -> tuple[list, values.S
     a set holding nothing is refused; then each operation, converted or standing as its refusal."""
     signed = values.signed(actor, message)
     if not requested:
-        raise Refused([kb_pb2.Fault(rule="operations", message="a set must hold at least one change")])
+        raise Refused([kb_pb2.Fault(rule=rules.OPERATIONS, message="a set must hold at least one change")])
     return operations(requested), signed
 
 
