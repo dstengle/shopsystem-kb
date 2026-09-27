@@ -1,5 +1,6 @@
 """The store on disk: <root>/kb/, one canonical YAML file per artifact, itself a git repository; and finding it, the
-way git finds a repository: upward from the working directory, or named by KB_ROOT."""
+way git finds a repository: upward from the working directory, or named by KB_ROOT. CONTRACT_VERSION is the store
+marker's value alone, written to store.yaml at Init; the store's own, not part of the published contract (adrs/0018)."""
 import os
 import subprocess
 from dataclasses import dataclass
@@ -7,11 +8,12 @@ from pathlib import Path
 from typing import Mapping, TypeVar
 
 from kb import canonical, refusals, rules, settled
-from kb.contract import CONTRACT_VERSION, kb_pb2
+from kb.contract import kb_pb2
 from kb.signatures import Signed
 from kb.values import ArtifactId, Kind, Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
+CONTRACT_VERSION = "0.1"
 
 
 @dataclass(frozen=True)
