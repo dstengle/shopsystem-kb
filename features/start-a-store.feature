@@ -26,6 +26,13 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     When the client starts a store there, saying which role it is
     Then the store's one history entry says it happened at 2026-09-20 at 08:00
 
+  Scenario: Starting a store and the first change after it keep separate entries at the same moment
+    Pins that the first entry in a history is never lost to the change that follows it, however close together the client's clock puts them.
+    Given a store the client started, readied with a clock that reads 2026-09-20 at 08:00
+    When the client defines its own type
+    Then the store's history holds two entries, both saying they happened at 2026-09-20 at 08:00
+    And each names itself as its own set
+
   @slice-1.10
   Scenario: Starting a store without saying which role is refused
     Pins that there is no unattributed change anywhere, so a store cannot come into being without someone answering for it.
