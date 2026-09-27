@@ -17,13 +17,6 @@ ZONES = {
     ", with no zone": None,
 }
 
-
-def moment(reading):
-    """The moment a step reads, as "2026-09-23 at 14:30" with the zone it names after, UTC when it names none, or
-    with none at all when it says "with no zone"."""
-    found = READING.fullmatch(reading)
-    return datetime.fromisoformat(f"{found['day']}T{found['time']}").replace(tzinfo=ZONES[found["zone"]])
-
 MANGLED = "title: [a bracket opened by hand and never closed\n"
 
 DECISION_TYPE = {
@@ -77,6 +70,14 @@ TAG_TYPE = {
     "version": 1,
     "schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]},
 }
+
+
+def moment(reading):
+    """The moment a step reads, as "2026-09-23 at 14:30" with the zone it names after, UTC when it names none, or
+    with none at all when it says "with no zone"."""
+    found = READING.fullmatch(reading)
+    assert found, reading
+    return datetime.fromisoformat(f"{found['day']}T{found['time']}").replace(tzinfo=ZONES[found["zone"]])
 
 
 def tagged_decision_type():

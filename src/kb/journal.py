@@ -20,7 +20,7 @@ def now() -> datetime:
 
 
 class Stamp(NamedTuple):
-    """An entry's moment, the clock's unchanged, and its id, free in the journal and in the set it belongs to."""
+    """An entry's moment, the clock's, in UTC, and its id, free in the journal and in the set it belongs to."""
     at: datetime
     id: str
 
@@ -134,7 +134,8 @@ def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
 def entries(store_dir: Path) -> list[dict] | Damaged:
     """Every entry in the journal, oldest first: by the time in its id, then by its seq, the order in which entries
     stamped with that moment were written. When an entry's file cannot be read, the fault naming the first such file
-    in place of them all. Never raises for what a file holds."""
+    in place of them all. An entry whose id kb cannot read makes the read raise: a known gap, logged for the ninth
+    review."""
     found = []
     for path in sorted((store_dir / "journal").rglob("*.yaml")):
         try:
