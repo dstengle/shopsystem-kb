@@ -25,7 +25,7 @@ a change that breaks one is refactored into place first, then made.
 | `read.py` | reads at every level, resolution and stubs | writes |
 | `query.py` | list, refs, search, journal, snapshot gathering over the loaded corpus | writes |
 | `search.py` | ranking prose and fields for the words searched | store access |
-| `store.py` | files, the git repository, discovery of a store from a root | validation, domain rules |
+| `store.py` | files, the git repository, discovery of a store from the process's working directory and `KB_ROOT` | validation, domain rules |
 | `canonical.py` | the one canonical YAML checker, dump and load; YAML 1.2 | domain rules |
 | `settled.py` | what the store settles for every artifact whatever its type: the keys naming it and what each must be, its content without them, an artifact given them, and the order its entries are written in as its type declares | I/O, checks against a type |
 | `content.py` | artifact content crossing the contract as canonical text, and `NotCanonical`, the refusal of text kb cannot keep: what kb publishes about content (adrs/0018) | anything else |

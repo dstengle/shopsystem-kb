@@ -302,3 +302,30 @@ def _reads_and_writes_there(readied, root, monkeypatch):
     defined = define(readied, DECISION_TYPE)
     assert not defined.faults, defined.faults
     assert read(readied, "schema/decision").revision == 1
+
+
+def test_a_relative_root_from_a_removed_working_directory_is_refused_not_raised(tmp_path, monkeypatch):
+    """slice 100.5: `store.vacant`'s `root.path.resolve()` used to let a `FileNotFoundError` escape once the
+    working directory a relative root reads against was itself removed."""
+    working_in = tmp_path / "gone"
+    working_in.mkdir()
+    monkeypatch.chdir(working_in)
+    working_in.rmdir()
+
+    started = kb_client.connect().Init(kb_pb2.InitRequest(root=".", actor=CLIENT))
+
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", "a store is started in a directory that exists; whether '.' does depends on the working "
+                 "directory, and it is gone"),
+    ]
+
+
+def test_a_relative_root_that_is_simply_missing_is_still_refused_as_before(tmp_path, monkeypatch):
+    """The fix above must not change the ordinary refusal for a relative root that just is not there."""
+    monkeypatch.chdir(tmp_path)
+
+    started = kb_client.connect().Init(kb_pb2.InitRequest(root="sub", actor=CLIENT))
+
+    assert [(fault.rule, fault.message) for fault in started.faults] == [
+        ("root", "a store is started in a directory that exists; 'sub' does not"),
+    ]

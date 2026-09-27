@@ -144,7 +144,14 @@ class Draft:
 
 def vacant(root: Root) -> None:
     """Refuse a root a store cannot be started in: one that is not there, is not a directory, has a store inside it or
-    anything else in the place a store goes, or is inside a store."""
+    anything else in the place a store goes, or is inside a store. A relative root cannot be resolved once the
+    working directory it is read against is itself gone; that is refused too, never raised."""
+    if not root.path.is_absolute() and working_directory() is None:
+        raise Refused([kb_pb2.Fault(
+            rule=rules.ROOT,
+            message=f"a store is started in a directory that exists; whether {root.named!r} does depends on the "
+                    f"working directory, and it is gone",
+        )])
     if not root.path.exists():
         raise Refused([kb_pb2.Fault(
             rule=rules.ROOT, message=f"a store is started in a directory that exists; {root.named!r} does not",
