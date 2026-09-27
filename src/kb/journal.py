@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Callable
 
 from kb import canonical, refusals
+from kb.signatures import Signed
 from kb.store import Damaged
-from kb.values import Signed
 
 
 Clock = Callable[[], datetime]

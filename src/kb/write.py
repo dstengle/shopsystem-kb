@@ -7,8 +7,9 @@ from typing import NamedTuple
 from kb import canonical, edits, journal, query, refusals, requests, settled, values
 from kb.metaschema import METASCHEMA
 from kb.edits import Change
+from kb.signatures import Actor, Signed
 from kb.store import Draft, Store, vacant
-from kb.values import Actor, ArtifactId, Refused, Root, Signed
+from kb.values import ArtifactId, Refused, Root
 
 METASCHEMA_ID = values.type_of(values.TYPE_KIND)
 

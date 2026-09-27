@@ -10,6 +10,7 @@ a change that breaks one is refactored into place first, then made.
 | `contract/` | `kb.proto` and generated code | hand-written logic |
 | `servicer.py` | the rpc adapter: request in, one call into the domain, response out, inside the one fail-closed wrapper | domain logic, file paths, git |
 | `values.py` | conversion of single request fields into validated values: ids, locators, kinds, roots, content trees | anything that touches the store or the filesystem |
+| `signatures.py` | who makes a change and why: the actor, the signature, and the conversions of a writer's, a reader's and a starter's; refuses one that does not sign | I/O, other request values |
 | `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
 | `names.py` | the grammar of artifact and item names; how an artifact's name, a link's place inside one and a type's `kb:` reference are written and read; minting, uniqueness and reuse of item names | I/O |
 | `validation.py` | the composed effective schema and the checks JSON Schema cannot express | file access |

@@ -8,7 +8,8 @@ from typing import Mapping, TypeVar
 
 from kb import canonical, refusals, rules, settled
 from kb.contract import CONTRACT_VERSION, kb_pb2
-from kb.values import ArtifactId, Kind, Refused, Root, Signed
+from kb.signatures import Signed
+from kb.values import ArtifactId, Kind, Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
 

@@ -4,9 +4,10 @@ entry that does not convert stands in its place as a Refusal, so the faults come
 from dataclasses import dataclass
 from datetime import datetime
 
-from kb import rules, values
+from kb import rules, signatures, values
 from kb.contract import kb_pb2
-from kb.values import Actor, ArtifactId, Content, Kind, Locator, Refused, Root
+from kb.signatures import Actor, Signed
+from kb.values import ArtifactId, Content, Kind, Locator, Refused, Root
 
 
 @dataclass(frozen=True)
@@ -87,13 +88,13 @@ class Listing:
 
 def starting(request: kb_pb2.InitRequest) -> tuple[Actor, Root]:
     """Who starts a store, then where; the first refusal only."""
-    return values.starter(request.actor), values.root(request.root)
+    return signatures.starter(request.actor), values.root(request.root)
 
 
-def change(requested, actor: kb_pb2.Actor, message: str) -> tuple[list, values.Signed]:
+def change(requested, actor: kb_pb2.Actor, message: str) -> tuple[list, Signed]:
     """A change request as the domain takes it: who makes it and why first, refused alone when it does not say; then
     a set holding nothing is refused; then each operation, converted or standing as its refusal."""
-    signed = values.signed(actor, message)
+    signed = signatures.signed(actor, message)
     if not requested:
         raise Refused([kb_pb2.Fault(rule=rules.OPERATIONS, message="a set must hold at least one change")])
     return operations(requested), signed

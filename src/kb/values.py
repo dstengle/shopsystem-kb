@@ -177,55 +177,6 @@ def _titled(tree: dict) -> Content:
 
 
 @dataclass(frozen=True)
-class Actor:
-    role: str
-    execution: str
-
-
-@dataclass(frozen=True)
-class Signed:
-    """Who made a change, and the message they gave for it."""
-    actor: Actor
-    message: str
-
-
-def actor(request: kb_pb2.Actor) -> Actor:
-    return Actor(request.role, request.execution)
-
-
-def _unsigned(request: kb_pb2.Actor, message: str) -> list[kb_pb2.Fault]:
-    return [kb_pb2.Fault(rule=rule, message=f"every entry in the history {reason}") for rule, reason, missing in (
-        (rules.ACTOR, "names the role that made it", not request.role.strip()),
-        (rules.MESSAGE, "says why it was made", not message.strip()),
-    ) if missing]
-
-
-def signed(request: kb_pb2.Actor, message: str) -> Signed:
-    """Who makes a change and why, who must name a role and a message; both faults when both fail."""
-    faults = _unsigned(request, message)
-    if faults:
-        raise Refused(faults)
-    return Signed(actor(request), message)
-
-
-def reader(request: kb_pb2.Actor, message: str) -> Signed:
-    """Who records what a piece of work read, who must sign and name the piece of work; every fault found."""
-    faults = _unsigned(request, message)
-    if not request.execution:
-        faults.append(kb_pb2.Fault(rule=rules.ACTOR, message="a snapshot records what a named piece of work read"))
-    if faults:
-        raise Refused(faults)
-    return Signed(actor(request), message)
-
-
-def starter(request: kb_pb2.Actor) -> Actor:
-    """The actor who starts a store, who must name a role."""
-    if not request.role:
-        raise Refused([kb_pb2.Fault(rule=rules.ACTOR, message="a store can only be started under a role")])
-    return actor(request)
-
-
-@dataclass(frozen=True)
 class Root:
     """The directory a store is started in, and the name the request gave it, which a refusal quotes."""
     path: Path
