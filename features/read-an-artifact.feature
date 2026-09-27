@@ -124,6 +124,7 @@ So that a client can show what the store holds at whatever depth it needs, the c
     Then the read is rejected because KB_ROOT names a store other than the one it is working in, and neither of the two is guessed at
     And no content comes back, from either store
 
+  @slice-99
   Scenario Outline: The client names the store from a working directory that has since been removed
     Pins that losing the working directory takes away only the looking upward: KB_ROOT still reaches its store, and a directory that is gone is inside no store, so it cannot disagree with the one KB_ROOT names.
     Given the client is working in <where>, which has since been removed, with KB_ROOT naming this store
@@ -135,6 +136,7 @@ So that a client can show what the store holds at whatever depth it needs, the c
       | a directory outside any store                                |
       | a folder deep inside the directory a different store sits in |
 
+  @slice-99
   Scenario Outline: A call from a working directory that has since been removed, with nothing naming a store, is refused
     Pins that a working directory that is gone is inside no store, so the store that once sat above it is not looked for or fallen back on, and the refusal says why rather than just that no store was found.
     Given the client is working in <where>, which has since been removed, and nothing names a store
@@ -147,6 +149,7 @@ So that a client can show what the store holds at whatever depth it needs, the c
       | a directory outside any store                        |
       | a folder deep inside the directory the store sits in |
 
+  @slice-99
   Scenario: A working directory that has gone is a fault the client is given, never an exception
     Pins that losing the place the client was working in ends the way every other failure to find a store does: an answer the client can handle, the call never breaking off.
     Given the client is working in a directory that has since been removed, and nothing names a store
