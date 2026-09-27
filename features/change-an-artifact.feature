@@ -108,6 +108,7 @@ So that a client can keep an artifact true without rewriting the store, the clie
       | both of which carry the same name                            | the items of a collection each have a name of their own                   |
       | one of which carries a name that is not a plain name         | a name is a plain name of lower-case letters, digits and single hyphens   |
 
+  @slice-96
   Scenario Outline: A change that does not say which role made it, or why, is refused
     Pins that every change is attributable before anything is written: whichever call makes it, a change missing its role or its reason leaves nothing on disk to be read and nothing in the history.
     Given the decision carries two options
