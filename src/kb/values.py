@@ -195,7 +195,7 @@ def actor(request: kb_pb2.Actor) -> Actor:
 
 def _unsigned(request: kb_pb2.Actor, message: str) -> list[kb_pb2.Fault]:
     return [kb_pb2.Fault(rule=rule, message=f"every entry in the history {reason}") for rule, reason, missing in (
-        ("actor", "names the role that made it", not request.role), ("message", "says why it was made", not message),
+        ("actor", "names the role that made it", not request.role.strip()), ("message", "says why it was made", not message.strip()),
     ) if missing]
 
 

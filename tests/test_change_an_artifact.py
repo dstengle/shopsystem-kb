@@ -422,6 +422,8 @@ UNSIGNED = {
 SAYING = {
     "saying why but not which role it is": (kb_pb2.Actor(role=""), "Say why"),
     "saying which role it is but not why": (CLIENT, ""),
+    "saying why but giving a role that is only blank space": (kb_pb2.Actor(role="   "), "Say why"),
+    "saying which role it is but giving as its reason only blank space": (CLIENT, "   "),
 }
 
 

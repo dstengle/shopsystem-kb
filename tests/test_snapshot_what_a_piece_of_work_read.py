@@ -63,6 +63,8 @@ WRONGLY = {
         EXECUTION, [DECISION, "decision/never-made"], "agent", SAID),
     "the decision and the process without saying which role it is": (EXECUTION, [DECISION, PROCESS], "", SAID),
     "the decision and the process without saying why": (EXECUTION, [DECISION, PROCESS], "agent", ""),
+    "the decision and the process giving a role that is only blank space": (EXECUTION, [DECISION, PROCESS], "   ", SAID),
+    "the decision and the process giving as its reason only blank space": (EXECUTION, [DECISION, PROCESS], "agent", "   "),
 }
 
 
