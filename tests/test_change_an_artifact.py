@@ -3,7 +3,10 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, append, create, define, everything_under, read, refs, write
+from calls import (
+    CLIENT, DECISION_TYPE, append, apply, creation, define, create, everything_under, journal, listing, read, refs,
+    remove, replacement, request, write,
+)
 from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -400,3 +403,70 @@ def _the_same_two(changed):
 @then("the third option is new and is given a name of its own")
 def _the_third_named(changed):
     assert changed["after"]["options"][2] == {"id": "go-fortnightly", "title": "Go fortnightly"}
+
+
+ANOTHER = ("decision", "Another", {"sections": SECTIONS})
+
+UNSIGNED = {
+    "creates another decision": lambda client, actor, message: request(client, *ANOTHER, message=message, actor=actor),
+    "replaces the decision": lambda client, actor, message: write(
+        client, DECISION, {"sections": SECTIONS}, message=message, actor=actor),
+    "adds an option to the decision": lambda client, actor, message: append(
+        client, DECISION, "options", {"title": "Go fortnightly"}, message=message, actor=actor),
+    "removes the decision": lambda client, actor, message: remove(client, DECISION, message=message, actor=actor),
+    "asks, in one go, for another decision to be created and the decision to be replaced":
+        lambda client, actor, message: apply(
+            client, [creation(*ANOTHER), replacement(DECISION, {"sections": SECTIONS})], message=message, actor=actor),
+}
+
+SAYING = {
+    "saying why but not which role it is": (kb_pb2.Actor(role=""), "Say why"),
+    "saying which role it is but not why": (CLIENT, ""),
+}
+
+
+def _names(client):
+    return [stub.id for stub in listing(client, "decision", ids_only=True).stubs]
+
+
+@when(
+    parsers.re(
+        f"the client (?P<call>{'|'.join(map(re.escape, UNSIGNED))}), (?P<saying>{'|'.join(map(re.escape, SAYING))})"
+    ),
+    target_fixture="attempt",
+)
+def _change_unsigned(root, client, call, saying):
+    before = {
+        "before": (root / "kb" / f"{DECISION}.yaml").read_bytes(),
+        "names": _names(client),
+        "files": everything_under(root / "kb"),
+        "entries": len(journal(client).entries),
+    }
+    actor, message = SAYING[saying]
+    return {**before, "response": UNSIGNED[call](client, actor, message)}
+
+
+UNSIGNED_REASONS = {
+    "every entry in the history names the role that made it": "actor",
+    "every entry in the history says why it was made": "message",
+}
+
+
+@then(parsers.re("the change is rejected because (?P<reason>" + "|".join(map(re.escape, UNSIGNED_REASONS)) + ")"))
+def _rejected_for_its_signature(attempt, reason):
+    refused = attempt["response"]
+    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [("", "", UNSIGNED_REASONS[reason])]
+    assert refused.faults[0].message.startswith(reason)
+    if "revision" in refused.DESCRIPTOR.fields_by_name:
+        assert refused.revision == 0
+
+
+@then("the store holds no artifact it did not hold before")
+def _no_new_artifact(root, client, attempt):
+    assert _names(client) == attempt["names"]
+    assert everything_under(root / "kb") == attempt["files"]
+
+
+@then("the store's history holds no entry for it")
+def _no_entry_in_history(client, attempt):
+    assert len(journal(client).entries) == attempt["entries"]

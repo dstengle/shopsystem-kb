@@ -106,9 +106,10 @@ def read(client, artifact_id, whole=False, depth=0, section=""):
     ))
 
 
-def apply(client, operations, message="Make several changes"):
-    """An Apply of the operations in order, under the client's role. Returns the response, faults and all."""
-    return client.Apply(kb_pb2.ApplyRequest(operations=operations, actor=CLIENT, message=message))
+def apply(client, operations, message="Make several changes", actor=CLIENT):
+    """An Apply of the operations in order, under the client's role unless another actor is given. Returns the
+    response, faults and all."""
+    return client.Apply(kb_pb2.ApplyRequest(operations=operations, actor=actor, message=message))
 
 
 def creation(type_name, title, content):

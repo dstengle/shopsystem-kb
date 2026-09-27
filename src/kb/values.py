@@ -193,20 +193,28 @@ def actor(request: kb_pb2.Actor) -> Actor:
     return Actor(request.role, request.execution)
 
 
+def _unsigned(request: kb_pb2.Actor, message: str) -> list[kb_pb2.Fault]:
+    return [kb_pb2.Fault(rule=rule, message=f"every entry in the history {reason}") for rule, reason, missing in (
+        ("actor", "names the role that made it", not request.role), ("message", "says why it was made", not message),
+    ) if missing]
+
+
 def signed(request: kb_pb2.Actor, message: str) -> Signed:
+    """Who makes a change and why, who must name a role and a message; both faults when both fail."""
+    faults = _unsigned(request, message)
+    if faults:
+        raise Refused(faults)
     return Signed(actor(request), message)
 
 
 def reader(request: kb_pb2.Actor, message: str) -> Signed:
-    """Who records what a piece of work read, who must name a role and the piece of work; both faults when both fail."""
-    faults = []
-    if not request.role:
-        faults.append(kb_pb2.Fault(rule="actor", message="every entry in the history names the role that made it"))
+    """Who records what a piece of work read, who must sign and name the piece of work; every fault found."""
+    faults = _unsigned(request, message)
     if not request.execution:
         faults.append(kb_pb2.Fault(rule="actor", message="a snapshot records what a named piece of work read"))
     if faults:
         raise Refused(faults)
-    return signed(request, message)
+    return Signed(actor(request), message)
 
 
 def starter(request: kb_pb2.Actor) -> Actor:

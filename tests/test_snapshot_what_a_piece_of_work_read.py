@@ -55,17 +55,21 @@ def _given_the_entry(client, snapshotted):
     assert snapshotted.entry == entry.id
 
 
+SAID = "Read before restocking"
+
 WRONGLY = {
-    "the decision and the process without naming the piece of work": ("", [DECISION, PROCESS], "agent"),
-    "the decision and an artifact the store holds nothing under": (EXECUTION, [DECISION, "decision/never-made"], "agent"),
-    "the decision and the process without saying which role it is": (EXECUTION, [DECISION, PROCESS], ""),
+    "the decision and the process without naming the piece of work": ("", [DECISION, PROCESS], "agent", SAID),
+    "the decision and an artifact the store holds nothing under": (
+        EXECUTION, [DECISION, "decision/never-made"], "agent", SAID),
+    "the decision and the process without saying which role it is": (EXECUTION, [DECISION, PROCESS], "", SAID),
+    "the decision and the process without saying why": (EXECUTION, [DECISION, PROCESS], "agent", ""),
 }
 
 
 @when(parsers.re(f"the client snapshots (?P<request>{'|'.join(map(re.escape, WRONGLY))})"), target_fixture="refused")
 def _snapshot_wrongly(client, request):
-    execution, artifacts, role = WRONGLY[request]
-    return snapshot(client, execution, artifacts, message="Read before restocking", role=role)
+    execution, artifacts, role, message = WRONGLY[request]
+    return snapshot(client, execution, artifacts, message=message, role=role)
 
 
 REASONS = {
@@ -74,6 +78,7 @@ REASONS = {
         ("decision/never-made", "", "not-found"),
     ],
     "every entry in the history names the role that made it": [("", "", "actor")],
+    "every entry in the history says why it was made": [("", "", "message")],
 }
 
 
@@ -81,7 +86,7 @@ REASONS = {
 def _snapshot_rejected(refused, reason):
     assert refused.entry == ""
     assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == REASONS[reason]
-    if REASONS[reason][0][2] == "actor":
+    if REASONS[reason][0][2] in ("actor", "message"):
         assert refused.faults[0].message.startswith(reason)
 
 
