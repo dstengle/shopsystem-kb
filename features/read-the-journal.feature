@@ -39,6 +39,22 @@ So that a client can show how the store came to hold what it holds, the client c
     When the client reads the journal since 2026-09-22
     Then the client is given only the change made today
 
+  @slice-102
+  Scenario Outline: A client given a clock stamps each change it makes with the moment the clock gives
+    Pins that a client can say when its own changes happen, so its own tests can lay down a history across several days without waiting for them or touching the store's files.
+    Given the client was readied with a clock that reads 2026-09-23 at 14:30
+    When the client <change>
+    Then every entry that change left in the journal says it happened at 2026-09-23 at 14:30
+
+    Examples:
+      | change                                            |
+      | creates a second decision                         |
+      | changes the decision                              |
+      | adds an item to one of the decision's collections |
+      | removes the decision                              |
+      | makes several changes in one go                   |
+      | snapshots what a piece of work read               |
+
   @slice-91
   Scenario Outline: Every way the history can be asked for is checked and answered plainly
     Pins that a filter is an input like any other: one that names nothing real gives nothing back and no fault, and one that cannot be read at all is refused rather than breaking off.

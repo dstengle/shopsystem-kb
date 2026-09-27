@@ -18,6 +18,14 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
+  @slice-102
+  Scenario: Starting a store is stamped with the moment the client's clock gives
+    Pins that the first entry in a history is timed like every entry after it, so a client laying down a history across several days can begin it on the day it chooses.
+    Given an empty directory
+    And the client was readied with a clock that reads 2026-09-20 at 08:00
+    When the client starts a store there, saying which role it is
+    Then the store's one history entry says it happened at 2026-09-20 at 08:00
+
   @slice-1.10
   Scenario: Starting a store without saying which role is refused
     Pins that there is no unattributed change anywhere, so a store cannot come into being without someone answering for it.
