@@ -1,0 +1,3 @@
+# 0019 A store's git takes nothing of the caller's git
+
+2026-09-27. A store (`<root>/kb/`) is the git repository kb owns (spec, Serialization). Every git call kb makes runs with the variables git lists as locating a repository (`git rev-parse --local-env-vars`) cleared, so a caller's `GIT_DIR` and its kin, as git sets them for a hook, never redirect the store's history. `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT` are cleared with them: git's own code for another repository keeps them for a submodule, which belongs to the user's command, but a store does not, so a caller's `git -c` settings (a hooks path among them) never change how kb commits its own history. kb's own `-c` settings stay in force. Slice 102.6.1.
