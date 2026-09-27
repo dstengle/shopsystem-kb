@@ -119,14 +119,24 @@ So that a client can keep an artifact true without rewriting the store, the clie
     And the store's history holds no entry for it
 
     Examples:
-      | call                                                                                | saying                              | reason                                                 |
-      | creates another decision                                                            | saying why but not which role it is | every entry in the history names the role that made it |
-      | creates another decision                                                            | saying which role it is but not why | every entry in the history says why it was made        |
-      | replaces the decision                                                               | saying why but not which role it is | every entry in the history names the role that made it |
-      | replaces the decision                                                               | saying which role it is but not why | every entry in the history says why it was made        |
-      | adds an option to the decision                                                      | saying why but not which role it is | every entry in the history names the role that made it |
-      | adds an option to the decision                                                      | saying which role it is but not why | every entry in the history says why it was made        |
-      | removes the decision                                                                | saying why but not which role it is | every entry in the history names the role that made it |
-      | removes the decision                                                                | saying which role it is but not why | every entry in the history says why it was made        |
-      | asks, in one go, for another decision to be created and the decision to be replaced | saying why but not which role it is | every entry in the history names the role that made it |
-      | asks, in one go, for another decision to be created and the decision to be replaced | saying which role it is but not why | every entry in the history says why it was made        |
+      | call                                                                                | saying                                                            | reason                                                 |
+      | creates another decision                                                            | saying why but not which role it is                               | every entry in the history names the role that made it |
+      | creates another decision                                                            | saying which role it is but not why                               | every entry in the history says why it was made        |
+      | replaces the decision                                                               | saying why but not which role it is                               | every entry in the history names the role that made it |
+      | replaces the decision                                                               | saying which role it is but not why                               | every entry in the history says why it was made        |
+      | adds an option to the decision                                                      | saying why but not which role it is                               | every entry in the history names the role that made it |
+      | adds an option to the decision                                                      | saying which role it is but not why                               | every entry in the history says why it was made        |
+      | removes the decision                                                                | saying why but not which role it is                               | every entry in the history names the role that made it |
+      | removes the decision                                                                | saying which role it is but not why                               | every entry in the history says why it was made        |
+      | asks, in one go, for another decision to be created and the decision to be replaced | saying why but not which role it is                               | every entry in the history names the role that made it |
+      | asks, in one go, for another decision to be created and the decision to be replaced | saying which role it is but not why                               | every entry in the history says why it was made        |
+      | creates another decision                                                            | saying why but giving a role that is only blank space             | every entry in the history names the role that made it |
+      | creates another decision                                                            | saying which role it is but giving as its reason only blank space | every entry in the history says why it was made        |
+      | replaces the decision                                                               | saying why but giving a role that is only blank space             | every entry in the history names the role that made it |
+      | replaces the decision                                                               | saying which role it is but giving as its reason only blank space | every entry in the history says why it was made        |
+      | adds an option to the decision                                                      | saying why but giving a role that is only blank space             | every entry in the history names the role that made it |
+      | adds an option to the decision                                                      | saying which role it is but giving as its reason only blank space | every entry in the history says why it was made        |
+      | removes the decision                                                                | saying why but giving a role that is only blank space             | every entry in the history names the role that made it |
+      | removes the decision                                                                | saying which role it is but giving as its reason only blank space | every entry in the history says why it was made        |
+      | asks, in one go, for another decision to be created and the decision to be replaced | saying why but giving a role that is only blank space             | every entry in the history names the role that made it |
+      | asks, in one go, for another decision to be created and the decision to be replaced | saying which role it is but giving as its reason only blank space | every entry in the history says why it was made        |

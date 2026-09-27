@@ -19,8 +19,10 @@ So that a piece of work can say which versions it was built on while the store k
     And the journal holds no entry for it
 
     Examples:
-      | request                                                          | reason                                                                     |
-      | the decision and the process without naming the piece of work    | a snapshot records what a named piece of work read                         |
-      | the decision and an artifact the store holds nothing under       | the store holds nothing by that name, and the name asked for is given back |
-      | the decision and the process without saying which role it is     | every entry in the history names the role that made it                     |
-      | the decision and the process without saying why                  | every entry in the history says why it was made                            |
+      | request                                                             | reason                                                                     |
+      | the decision and the process without naming the piece of work       | a snapshot records what a named piece of work read                         |
+      | the decision and an artifact the store holds nothing under          | the store holds nothing by that name, and the name asked for is given back |
+      | the decision and the process without saying which role it is        | every entry in the history names the role that made it                     |
+      | the decision and the process without saying why                     | every entry in the history says why it was made                            |
+      | the decision and the process giving a role that is only blank space | every entry in the history names the role that made it                     |
+      | the decision and the process giving as its reason only blank space  | every entry in the history says why it was made                            |
