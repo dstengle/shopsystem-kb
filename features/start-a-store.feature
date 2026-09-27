@@ -18,6 +18,7 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
+  @slice-102.6.1
   Scenario Outline: Starting a store while the client's environment names another git repository begins the store's own history
     Pins that the first entry of a history belongs to the store it starts, whatever repository the environment the client runs in names, and that the repository named is not touched.
     Given a directory that is itself a git repository, holding files that have nothing to do with a store

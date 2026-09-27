@@ -12,6 +12,7 @@ So that a client can show how the store came to hold what it holds, the client c
     Then there is one entry for each change
     And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, the message given, and which set of changes it landed with
 
+  @slice-102.6.1
   Scenario Outline: A change made while the client's environment names another git repository is recorded in the store's own history
     Pins that where a change is recorded is settled by the store the client found and by nothing else in the environment it runs in, so a change reported as made is in this store's history and never in a repository the client happens to be running beside.
     Given the client runs with its environment naming <repository> as the git repository to work in, the way git does for a program it runs from a hook

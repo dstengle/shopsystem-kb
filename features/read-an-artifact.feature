@@ -124,6 +124,7 @@ So that a client can show what the store holds at whatever depth it needs, the c
     Then the read is rejected because KB_ROOT names a store other than the one it is working in, and neither of the two is guessed at
     And no content comes back, from either store
 
+  @slice-102.6.1
   Scenario Outline: A git repository named by the environment is no way of saying which store is meant
     Pins that only where the client is working and KB_ROOT say which store is meant: a git repository named by the environment the client runs in is neither a third answer nor a disagreement to refuse, so a read comes from the store found and from nowhere else.
     Given the client is working <where>, with its environment naming a git repository other than this store, the way git does for a program it runs from a hook

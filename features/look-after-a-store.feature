@@ -9,6 +9,7 @@ So that a store exists and can be checked from a shell without any client, the o
     Then there is a store inside that directory, in a place of its own
     And a client can begin defining its own types in it straight away
 
+  @slice-102.6.1
   Scenario: The operator sets up a store from a shell whose environment names another git repository
     Pins that setting a store up from a hook, or any shell that names a git repository to work in, still begins the store's own history and leaves the repository named untouched.
     Given a directory that is itself a git repository, and the operator's environment naming that repository as the git repository to work in, the way git does for a program it runs from a hook
