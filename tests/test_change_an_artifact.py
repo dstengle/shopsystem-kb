@@ -407,6 +407,8 @@ def _the_third_named(changed):
 
 ANOTHER = ("decision", "Another", {"sections": SECTIONS})
 
+BLANK = " \t "
+
 UNSIGNED = {
     "creates another decision": lambda client, actor, message: request(client, *ANOTHER, message=message, actor=actor),
     "replaces the decision": lambda client, actor, message: write(
@@ -422,8 +424,8 @@ UNSIGNED = {
 SAYING = {
     "saying why but not which role it is": (kb_pb2.Actor(role=""), "Say why"),
     "saying which role it is but not why": (CLIENT, ""),
-    "saying why but giving a role that is only blank space": (kb_pb2.Actor(role="   "), "Say why"),
-    "saying which role it is but giving as its reason only blank space": (CLIENT, "   "),
+    "saying why but giving a role that is only blank space": (kb_pb2.Actor(role=BLANK), "Say why"),
+    "saying which role it is but giving as its reason only blank space": (CLIENT, BLANK),
 }
 
 

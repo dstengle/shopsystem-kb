@@ -56,6 +56,7 @@ def _given_the_entry(client, snapshotted):
 
 
 SAID = "Read before restocking"
+BLANK = " \t "
 
 WRONGLY = {
     "the decision and the process without naming the piece of work": ("", [DECISION, PROCESS], "agent", SAID),
@@ -63,8 +64,8 @@ WRONGLY = {
         EXECUTION, [DECISION, "decision/never-made"], "agent", SAID),
     "the decision and the process without saying which role it is": (EXECUTION, [DECISION, PROCESS], "", SAID),
     "the decision and the process without saying why": (EXECUTION, [DECISION, PROCESS], "agent", ""),
-    "the decision and the process giving a role that is only blank space": (EXECUTION, [DECISION, PROCESS], "   ", SAID),
-    "the decision and the process giving as its reason only blank space": (EXECUTION, [DECISION, PROCESS], "agent", "   "),
+    "the decision and the process giving a role that is only blank space": (EXECUTION, [DECISION, PROCESS], BLANK, SAID),
+    "the decision and the process giving as its reason only blank space": (EXECUTION, [DECISION, PROCESS], "agent", BLANK),
 }
 
 
