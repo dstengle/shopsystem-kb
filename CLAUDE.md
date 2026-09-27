@@ -30,7 +30,7 @@ a change that breaks one is refactored into place first, then made.
 | `canonical.py` | the one canonical YAML checker, dump and load; YAML 1.2 | domain rules |
 | `settled.py` | what the store settles for every artifact whatever its type: the keys naming it and what each must be, its content without them, an artifact given them, and the order its entries are written in as its type declares | I/O, checks against a type |
 | `content.py` | artifact content crossing the contract as canonical text, and `NotCanonical`, the refusal of text kb cannot keep: what kb publishes about content (adrs/0018) | anything else |
-| `journal.py` | journal entries, their files and fingerprints | anything else |
+| `journal.py` | journal entries, their ids, files and fingerprints | anything else |
 | `metaschema.py` | the one type a new store holds | logic |
 | `client.py`, `cli.py` | the in-process transport; the operator's init and validate commands | domain logic |
 
@@ -55,7 +55,8 @@ module that does not own it.
 5. **One canonical checker**, applied to content after parsing and to bytes
    before writing. All YAML is 1.2.
 6. **Names live in one place.** No module other than `names.py` decides what
-   an id looks like or whether it is free.
+   an artifact's or an item's name looks like or whether it is free;
+   `journal.py` alone decides a journal entry's id.
 
 ## Size and shape
 
