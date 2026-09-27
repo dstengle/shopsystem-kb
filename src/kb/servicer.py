@@ -25,14 +25,16 @@ def _boundary(response):
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
-    def __init__(self, root=None):
-        """Over the store at root; with none, a servicer that can only start a store, taking its root from the request."""
+    def __init__(self, root=None, clock=None):
+        """Over the store at root; with none, a servicer that can only start a store, taking its root from the request.
+        Each change it makes is stamped by the clock, or the machine's with none."""
         self._store = Store(root) if root is not None else None
+        self._clock = clock
 
     @_boundary(kb_pb2.InitResponse)
     def Init(self, request):
         actor, root = requests.starting(request)
-        write.start(root, actor)
+        write.start(root, actor, self._clock)
         return kb_pb2.InitResponse()
 
     @_boundary(kb_pb2.CreateResponse)
@@ -69,7 +71,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     def _land(self, operations, request) -> write.Landed:
         """A set of operations landed under the request's actor and message."""
-        return write.land(self._store, *requests.change(operations, request.actor, request.message))
+        return write.land(self._store, *requests.change(operations, request.actor, request.message), self._clock)
 
     @_boundary(kb_pb2.ReadResponse)
     def Read(self, request):
@@ -98,4 +100,4 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     @_boundary(kb_pb2.SnapshotResponse)
     def Snapshot(self, request):
         named, signed = requests.snapshotted(request.artifacts), values.reader(request.actor, request.message)
-        return kb_pb2.SnapshotResponse(entry=write.record(self._store, named, signed))
+        return kb_pb2.SnapshotResponse(entry=write.record(self._store, named, signed, self._clock))

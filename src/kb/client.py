@@ -1,6 +1,8 @@
 """Transports. In-process: an object with the stub's method names that calls the servicer directly."""
 import os
+from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 from kb import store
 from kb.contract import kb_pb2
@@ -15,19 +17,20 @@ class InProcessClient:
     touches nothing. Init takes its root from the request and finds nothing.
     """
 
-    def __init__(self, root: Path | None = None):
+    def __init__(self, root: Path | None = None, clock: Callable[[], datetime] | None = None):
         self._root = root
+        self._clock = clock
 
     def _servicer(self) -> tuple[KbServicer | None, kb_pb2.Fault | None]:
         if self._root is not None:
-            return KbServicer(self._root), None
+            return KbServicer(self._root, self._clock), None
         root, refusal = store.locate(os.environ)
         if refusal is not None:
             return None, refusal
-        return KbServicer(root), None
+        return KbServicer(root, self._clock), None
 
     def Init(self, request, timeout=None):
-        return KbServicer().Init(request, None)
+        return KbServicer(clock=self._clock).Init(request, None)
 
     def _call(self, rpc: str, request, response):
         """The rpc on the store this call finds, or the response carrying the fault that says none was found."""
@@ -73,6 +76,8 @@ class InProcessClient:
         return self._call("Delete", request, kb_pb2.DeleteResponse)
 
 
-def connect(root=None) -> InProcessClient:
-    """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds."""
-    return InProcessClient(Path(root) if root is not None else None)
+def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:
+    """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds.
+    Each change it makes, Init's included, is stamped in the journal with the moment the clock gives, read at each
+    stamp; with no clock, with the machine's."""
+    return InProcessClient(Path(root) if root is not None else None, clock)

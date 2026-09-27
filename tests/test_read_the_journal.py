@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, apply, create, creation, define, journal, write
+from calls import CLIENT, DECISION_TYPE, append, apply, create, creation, define, journal, remove, snapshot, write
 from kb import client as kb_client
 from kb import journal as kb_journal
 from kb.contract import kb_pb2
@@ -216,3 +216,44 @@ def _names_the_place(entries):
     assert [(entry.op, entry.path, entry.message) for entry in entries][-1] == (
         "write", "sections/rationale", "Say it plainer",
     )
+
+
+def _moment(day, time):
+    return datetime.fromisoformat(f"{day}T{time}:00+00:00")
+
+
+@given(parsers.parse("the client was readied with a clock that reads {day} at {time}"), target_fixture="client")
+def _readied_with_a_clock(root, day, time):
+    moment = _moment(day, time)
+    return kb_client.connect(root, clock=lambda: moment)
+
+
+CHANGES = {
+    "creates a second decision":
+        lambda client: create(client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}),
+    "changes the decision": lambda client: write(client, DECISION, {"sections": SECTIONS}),
+    "adds an item to one of the decision's collections":
+        lambda client: append(client, DECISION, "options", {"title": "Every week"}),
+    "removes the decision": lambda client: remove(client, DECISION),
+    "makes several changes in one go": lambda client: apply(client, [
+        creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
+        creation("decision", "Count the till nightly", {"sections": SECTIONS}),
+    ]),
+    "snapshots what a piece of work read": lambda client: snapshot(client, "restock-run-12", [DECISION]),
+}
+
+
+@when(parsers.re(f"the client (?P<change>{'|'.join(CHANGES)})"), target_fixture="before_the_change")
+def _the_client_changes(client, change):
+    """The ids of the entries the journal held before the change, so the Then can tell the entries it left."""
+    before = {entry.id for entry in journal(client).entries}
+    changed = CHANGES[change](client)
+    assert not changed.faults, changed.faults
+    return before
+
+
+@then(parsers.parse("every entry that change left in the journal says it happened at {day} at {time}"))
+def _every_entry_left_at(client, before_the_change, day, time):
+    left = [entry for entry in journal(client).entries if entry.id not in before_the_change]
+    assert left, "the change left no entry"
+    assert [datetime.fromisoformat(entry.at) for entry in left] == [_moment(day, time)] * len(left)

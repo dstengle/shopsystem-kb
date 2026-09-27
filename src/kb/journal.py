@@ -2,15 +2,25 @@
 import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from kb import canonical, refusals
 from kb.store import Damaged
 from kb.values import Signed
 
 
+Clock = Callable[[], datetime]
+
+
 def now() -> datetime:
-    """The clock entries are stamped with. A module function so a later slice can set it from outside."""
+    """The machine's clock, which stamps an entry when no clock is given. Looked up as each entry is stamped, so a
+    replacement made from outside still takes effect, until shop-knowledge's slice 50.23 moves to the given clock."""
     return datetime.now(timezone.utc)
+
+
+def _stamp(clock: Clock | None) -> datetime:
+    """The moment an entry is stamped with: the clock given, read now, or, with none, this module's `now`."""
+    return (clock or now)()
 
 
 def digest(path: Path) -> str:
@@ -24,10 +34,11 @@ def fingerprint(text: str) -> str:
 
 
 def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str, revision: int,
-          schema_version: int, text: str | None, seq: int = 1, batch: str = "") -> Path:
+          schema_version: int, text: str | None, seq: int = 1, batch: str = "", clock: Clock | None = None) -> Path:
     """Write one entry and return its file; its stem is the entry's id. A change made alone names itself as its batch.
-    The fingerprint is of the text the change writes; a removal writes none, so its entry's fingerprint is empty."""
-    at = now()
+    The fingerprint is of the text the change writes; a removal writes none, so its entry's fingerprint is empty.
+    Stamped with the moment the clock gives, or the machine's with none."""
+    at = _stamp(clock)
     entry_id = f"{at.strftime('%Y%m%dT%H%M%S%fZ')}-{seq}"
     entry = {
         "id": entry_id,
@@ -45,10 +56,10 @@ def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str,
     return _save(store_dir, at, entry)
 
 
-def snapshot(store_dir: Path, *, signed: Signed, read: list[dict]) -> Path:
+def snapshot(store_dir: Path, *, signed: Signed, read: list[dict], clock: Clock | None = None) -> Path:
     """Write the entry recording what a piece of work read, each artifact as { artifact, revision, digest }, and
-    return its file. It names no artifact of its own and is a set of its own."""
-    at = now()
+    return its file. It names no artifact of its own and is a set of its own. Stamped as `write` stamps."""
+    at = _stamp(clock)
     entry_id = f"{at.strftime('%Y%m%dT%H%M%S%fZ')}-1"
     entry = {
         "id": entry_id,

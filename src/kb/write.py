@@ -34,9 +34,9 @@ class Landing(NamedTuple):
     last: bool
 
 
-def start(root: Root, actor: Actor) -> None:
-    """A new store at root, holding the type of types, its start in the journal and in one commit. Raises Refused
-    where no store can be started."""
+def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
+    """A new store at root, holding the type of types, its start in the journal, stamped by the clock, and in one
+    commit. Raises Refused where no store can be started."""
     vacant(root)
     store, signed = Store(root.path), Signed(actor, "initialise store")
     marker = store.start()
@@ -47,22 +47,23 @@ def start(root: Root, actor: Actor) -> None:
     path = store.save(METASCHEMA_ID, text)
     entry = journal.write(
         store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",
-        revision=1, schema_version=1, text=text,
+        revision=1, schema_version=1, text=text, clock=clock,
     )
     store.commit([marker, path, entry], signed)
 
 
-def land(store: Store, operations: list, signed: Signed) -> Landed:
-    """The set drafted, serialised, then written and committed. Raises Refused with every fault, having written
-    nothing."""
+def land(store: Store, operations: list, signed: Signed, clock: journal.Clock | None = None) -> Landed:
+    """The set drafted, serialised, then written, each entry stamped by the clock, and committed. Raises Refused with
+    every fault, having written nothing."""
     changes = _drafted(store, operations)
-    return _written(store, _serialised(changes), signed)
+    return _written(store, _serialised(changes), signed, clock)
 
 
-def record(store: Store, named: list, signed: Signed) -> str:
-    """One journal entry listing each artifact named as it stands now, in a commit of its own. Returns the entry's
-    id; raises Refused, having written nothing, when a name did not convert or the store lacks it."""
-    entry = journal.snapshot(store.dir, signed=signed, read=query.snapshotted(store, named))
+def record(store: Store, named: list, signed: Signed, clock: journal.Clock | None = None) -> str:
+    """One journal entry listing each artifact named as it stands now, stamped by the clock, in a commit of its own.
+    Returns the entry's id; raises Refused, having written nothing, when a name did not convert or the store lacks
+    it."""
+    entry = journal.snapshot(store.dir, signed=signed, read=query.snapshotted(store, named), clock=clock)
     store.commit([entry], signed)
     return entry.stem
 
@@ -100,7 +101,7 @@ def _serialised(changes: list[Change]) -> list[Landing]:
     return landings
 
 
-def _written(store: Store, landings: list[Landing], signed: Signed) -> Landed:
+def _written(store: Store, landings: list[Landing], signed: Signed, clock: journal.Clock | None) -> Landed:
     """Each file saved or removed, its journal entry written naming the set, and all of it in one commit. Reads
     nothing: everything written was settled before."""
     written, results, batch = [], [], ""
@@ -110,6 +111,7 @@ def _written(store: Store, landings: list[Landing], signed: Signed) -> Landed:
         entry = journal.write(
             store.dir, signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path,
             revision=change.revision, schema_version=change.schema_version, text=text, seq=seq, batch=batch,
+            clock=clock,
         )
         batch = batch or entry.stem
         written.append(entry)

@@ -1,11 +1,12 @@
 import hashlib
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, define, read
+from calls import CLIENT, DECISION_TYPE, define, journal, read
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
@@ -23,6 +24,21 @@ def _empty_directory(tmp_path):
 def client(root):
     """A client over the store at root, for the steps that go on to use the store a scenario started."""
     return kb_client.connect(root)
+
+
+@given(parsers.parse("the client was readied with a clock that reads {day} at {time}"), target_fixture="client")
+def _readied_with_a_clock(root, day, time):
+    moment = datetime.fromisoformat(f"{day}T{time}:00+00:00")
+    return kb_client.connect(root, clock=lambda: moment)
+
+
+@then(parsers.parse("the store's one history entry says it happened at {day} at {time}"))
+def _one_entry_at(client, day, time):
+    response = journal(client)
+    assert not response.faults, response.faults
+    assert [datetime.fromisoformat(entry.at) for entry in response.entries] == [
+        datetime.fromisoformat(f"{day}T{time}:00+00:00"),
+    ]
 
 
 @when("the client starts a store there, saying which role it is", target_fixture="started")
