@@ -177,14 +177,22 @@ def find_above(start: Path) -> Path | None:
     return None
 
 
-def locate(cwd: Path, env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
-    """The store a call goes to, or the fault that refuses it. Nothing is guessed at."""
-    above = find_above(cwd)
+def working_directory() -> Path | None:
+    """The directory this process is working in, or None when it has since been removed."""
+    try:
+        return Path.cwd()
+    except FileNotFoundError:
+        return None
+
+
+def locate(env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
+    """The store a call goes to from the working directory, or the fault that refuses it. Nothing is guessed at. A
+    working directory that is gone is inside no store."""
+    cwd = working_directory()
+    above = None if cwd is None else find_above(cwd)
     if "KB_ROOT" not in env:
         if above is None:
-            return None, kb_pb2.Fault(
-                rule="store", message=f"no store was found, neither above {cwd} nor named outright",
-            )
+            return None, _nothing_found(cwd)
         return above, None
     value = env["KB_ROOT"]
     named = Path(value)
@@ -199,6 +207,16 @@ def locate(cwd: Path, env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault
                     f"the working directory is inside {above}; neither is guessed at",
         )
     return named, None
+
+
+def _nothing_found(cwd: Path | None) -> kb_pb2.Fault:
+    """The fault for a call that finds no store above where it works and none named: where it works is named, or,
+    when that is gone, said to be gone."""
+    if cwd is None:
+        return kb_pb2.Fault(
+            rule="store", message="no store was found: the working directory is gone, and nothing named one outright",
+        )
+    return kb_pb2.Fault(rule="store", message=f"no store was found, neither above {cwd} nor named outright")
 
 
 QUIET = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")

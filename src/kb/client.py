@@ -21,7 +21,7 @@ class InProcessClient:
     def _servicer(self) -> tuple[KbServicer | None, kb_pb2.Fault | None]:
         if self._root is not None:
             return KbServicer(self._root), None
-        root, refusal = store.locate(Path.cwd(), os.environ)
+        root, refusal = store.locate(os.environ)
         if refusal is not None:
             return None, refusal
         return KbServicer(root), None

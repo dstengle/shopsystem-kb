@@ -83,10 +83,30 @@ def _inbound_counts(summary):
 
 @given("the client is working in a folder deep inside the directory the store sits in")
 def _working_deep_inside_the_store(root, monkeypatch):
-    deep = root / "shelves" / "pricing" / "notes"
-    deep.mkdir(parents=True)
-    monkeypatch.chdir(deep)
+    monkeypatch.chdir(_deep_inside(root))
     monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+def _deep_inside(directory):
+    """A folder a few levels down inside `directory`, made."""
+    deep = directory / "shelves" / "pricing" / "notes"
+    deep.mkdir(parents=True)
+    return deep
+
+
+def _elsewhere(tmp_path):
+    """A directory inside no store, made."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    return elsewhere
+
+
+def _another_store(tmp_path):
+    """A second store, started beside the one the scenario reads from."""
+    other = tmp_path / "other"
+    other.mkdir()
+    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
+    return other
 
 
 @pytest.fixture
@@ -196,9 +216,7 @@ def _rejected_as_not_a_plain_place(shown):
 
 @given("the client is working outside any store, with KB_ROOT naming this one")
 def _outside_with_kb_root_naming_this_one(root, tmp_path, monkeypatch):
-    elsewhere = tmp_path / "elsewhere"
-    elsewhere.mkdir()
-    monkeypatch.chdir(elsewhere)
+    monkeypatch.chdir(_elsewhere(tmp_path))
     monkeypatch.setenv("KB_ROOT", str(root))
 
 
@@ -209,8 +227,7 @@ def _from_the_store_kb_root_names(shown):
 
 @given("the client is working outside any store and nothing names one", target_fixture="elsewhere")
 def _outside_with_nothing_naming_one(tmp_path, monkeypatch):
-    elsewhere = tmp_path / "elsewhere"
-    elsewhere.mkdir()
+    elsewhere = _elsewhere(tmp_path)
     monkeypatch.chdir(elsewhere)
     monkeypatch.delenv("KB_ROOT", raising=False)
     return elsewhere
@@ -225,11 +242,9 @@ def _rejected_with_no_store_found(shown, elsewhere):
 
 @given("the client is working outside any store, with KB_ROOT naming a directory that holds no store", target_fixture="empty")
 def _outside_with_kb_root_naming_nothing(tmp_path, monkeypatch):
-    elsewhere = tmp_path / "elsewhere"
-    elsewhere.mkdir()
     empty = tmp_path / "empty"
     empty.mkdir()
-    monkeypatch.chdir(elsewhere)
+    monkeypatch.chdir(_elsewhere(tmp_path))
     monkeypatch.setenv("KB_ROOT", str(empty))
     return empty
 
@@ -248,12 +263,8 @@ def _no_content(shown):
 
 @given("the client is working inside a store, with KB_ROOT naming a different store", target_fixture="other")
 def _inside_one_store_with_kb_root_naming_another(root, tmp_path, monkeypatch):
-    other = tmp_path / "other"
-    other.mkdir()
-    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
-    deep = root / "shelves"
-    deep.mkdir()
-    monkeypatch.chdir(deep)
+    other = _another_store(tmp_path)
+    monkeypatch.chdir(_deep_inside(root))
     monkeypatch.setenv("KB_ROOT", str(other))
     return other
 
@@ -272,6 +283,49 @@ def _rejected_as_two_stores(shown, root, other):
 def _no_content_from_either(shown):
     assert (shown.id, shown.title, shown.content) == ("", "", "")
     assert not shown.references and not shown.parts and not shown.inbound
+
+
+REMOVED_FROM = {
+    "a directory outside any store": lambda root, tmp_path: _elsewhere(tmp_path),
+    "a folder deep inside the directory the store sits in": lambda root, tmp_path: _deep_inside(root),
+    "a folder deep inside the directory a different store sits in":
+        lambda root, tmp_path: _deep_inside(_another_store(tmp_path)),
+}
+
+
+def _work_in_then_remove(directory, monkeypatch):
+    """Move the process into `directory`, then take the directory away from under it."""
+    monkeypatch.chdir(directory)
+    directory.rmdir()
+
+
+@given(parsers.parse("the client is working in {where}, which has since been removed, and nothing names a store"))
+def _removed_with_nothing_naming_one(where, root, tmp_path, monkeypatch):
+    _work_in_then_remove(REMOVED_FROM[where](root, tmp_path), monkeypatch)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+@given(parsers.parse("the client is working in {where}, which has since been removed, with KB_ROOT naming this store"))
+def _removed_with_kb_root_naming_this_one(where, root, tmp_path, monkeypatch):
+    _work_in_then_remove(REMOVED_FROM[where](root, tmp_path), monkeypatch)
+    monkeypatch.setenv("KB_ROOT", str(root))
+
+
+@given("the client is working in a directory that has since been removed, and nothing names a store")
+def _removed_outside_with_nothing_naming_one(root, tmp_path, monkeypatch):
+    _removed_with_nothing_naming_one("a directory outside any store", root, tmp_path, monkeypatch)
+
+
+@then("the client is given that refusal as it is given any other fault, the call never breaking off")
+def _given_the_refusal_as_an_answer(shown):
+    assert isinstance(shown, kb_pb2.ReadResponse)
+    assert [fault.rule for fault in shown.faults] == ["store"]
+
+
+@then("the read is rejected because the directory it is working in is gone")
+def _rejected_as_working_directory_gone(shown):
+    assert [fault.rule for fault in shown.faults] == ["store"]
+    assert "the working directory is gone" in shown.faults[0].message
 
 
 @given(
