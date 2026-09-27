@@ -36,10 +36,11 @@ class Landing(NamedTuple):
 
 
 def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
-    """A new store at root, holding the type of types, its start in the journal, stamped by the clock, and in one
-    commit. Raises Refused where no store can be started."""
+    """A new store at root, holding the type of types, its start in the journal, stamped by the clock before
+    anything is written, and in one commit. Raises Refused where no store can be started."""
     vacant(root)
     store, signed = Store(root.path), Signed(actor, "initialise store")
+    [stamp] = journal.stamps(store.dir, 1, clock)
     marker = store.start()
     metaschema = settled.given(
         settled.content(METASCHEMA), str(METASCHEMA_ID), METASCHEMA_ID.kind.name, 1, 1, METASCHEMA["title"],
@@ -48,23 +49,25 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
     path = store.save(METASCHEMA_ID, text)
     entry = journal.write(
         store.dir, signed=signed, op="create", artifact=str(METASCHEMA_ID), path="",
-        revision=1, schema_version=1, text=text, clock=clock,
+        revision=1, schema_version=1, text=text, stamp=stamp,
     )
     store.commit([marker, path, entry], signed)
 
 
 def land(store: Store, operations: list, signed: Signed, clock: journal.Clock | None = None) -> Landed:
-    """The set drafted, serialised, then written, each entry stamped by the clock, and committed. Raises Refused with
-    every fault, having written nothing."""
-    changes = _drafted(store, operations)
-    return _written(store, _serialised(changes), signed, clock)
+    """The set drafted, serialised, each entry's stamp settled by the clock, then written and committed. Raises Refused
+    with every fault, having written nothing."""
+    landings = _serialised(_drafted(store, operations))
+    return _written(store, landings, signed, journal.stamps(store.dir, len(landings), clock))
 
 
 def record(store: Store, named: list, signed: Signed, clock: journal.Clock | None = None) -> str:
     """One journal entry listing each artifact named as it stands now, stamped by the clock, in a commit of its own.
     Returns the entry's id; raises Refused, having written nothing, when a name did not convert or the store lacks
     it."""
-    entry = journal.snapshot(store.dir, signed=signed, read=query.snapshotted(store, named), clock=clock)
+    read = query.snapshotted(store, named)
+    [stamp] = journal.stamps(store.dir, 1, clock)
+    entry = journal.snapshot(store.dir, signed=signed, read=read, stamp=stamp)
     store.commit([entry], signed)
     return entry.stem
 
@@ -102,20 +105,17 @@ def _serialised(changes: list[Change]) -> list[Landing]:
     return landings
 
 
-def _written(store: Store, landings: list[Landing], signed: Signed, clock: journal.Clock | None) -> Landed:
-    """Each file saved or removed, its journal entry written naming the set, and all of it in one commit. Reads
-    nothing: everything written was settled before."""
-    written, results, batch = [], [], ""
-    for seq, (change, text, last) in enumerate(landings, start=1):
+def _written(store: Store, landings: list[Landing], signed: Signed, stamps: list[journal.Stamp]) -> Landed:
+    """Each file saved or removed, its journal entry written under its stamp naming the set, the first entry's id,
+    and all of it in one commit. Reads nothing: everything written was settled before."""
+    written, results, batch = [], [], stamps[0].id
+    for (change, text, last), stamp in zip(landings, stamps):
         if last:
             written.append(_file(store, change.artifact_id, text))
-        entry = journal.write(
+        written.append(journal.write(
             store.dir, signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path,
-            revision=change.revision, schema_version=change.schema_version, text=text, seq=seq, batch=batch,
-            clock=clock,
-        )
-        batch = batch or entry.stem
-        written.append(entry)
+            revision=change.revision, schema_version=change.schema_version, text=text, stamp=stamp, batch=batch,
+        ))
         results.append(Result(change.artifact_id, change.revision, change.item))
     store.commit(written, signed)
     return Landed(batch, results)

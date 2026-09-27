@@ -222,12 +222,6 @@ def _moment(day, time):
     return datetime.fromisoformat(f"{day}T{time}:00+00:00")
 
 
-@given(parsers.parse("the client was readied with a clock that reads {day} at {time}"), target_fixture="client")
-def _readied_with_a_clock(root, day, time):
-    moment = _moment(day, time)
-    return kb_client.connect(root, clock=lambda: moment)
-
-
 CHANGES = {
     "creates a second decision":
         lambda client: create(client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}),
@@ -257,3 +251,114 @@ def _every_entry_left_at(client, before_the_change, day, time):
     left = [entry for entry in journal(client).entries if entry.id not in before_the_change]
     assert left, "the change left no entry"
     assert [datetime.fromisoformat(entry.at) for entry in left] == [_moment(day, time)] * len(left)
+
+
+def _changed_five_times(client):
+    for turn in range(1, 6):
+        changed = write(client, DECISION, {"sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+            {"title": "Rationale", "body": f"Costs move weekly; said {turn} times.\n"},
+        ]})
+        assert not changed.faults, changed.faults
+    return [("write", DECISION)] * 5
+
+
+SECOND = "decision/restock-on-thursdays"
+
+
+def _one_of_each(client):
+    for change in ("creates a second decision", "changes the decision",
+                   "adds an item to one of the decision's collections", "snapshots what a piece of work read"):
+        made = CHANGES[change](client)
+        assert not made.faults, made.faults
+    removed = remove(client, SECOND)
+    assert not removed.faults, removed.faults
+    return [("create", SECOND), ("write", DECISION), ("append", DECISION), ("snapshot", ""), ("delete", SECOND)]
+
+
+def _snapshotted_twice(client):
+    for _ in range(2):
+        made = CHANGES["snapshots what a piece of work read"](client)
+        assert not made.faults, made.faults
+    return [("snapshot", "")] * 2
+
+
+MADE = {
+    "changed the decision five times, one change after another": _changed_five_times,
+    "created a second decision, changed the decision, added an item to one of the decision's collections, "
+    "snapshotted what a piece of work read, and removed the second decision": _one_of_each,
+    "snapshotted what a piece of work read twice": _snapshotted_twice,
+}
+
+
+@given(parsers.re(f"the client has (?P<changes>{'|'.join(MADE)})$"), target_fixture="made")
+def _the_client_has_made(client, changes):
+    """The ids the journal held before, and each change made as the (op, artifact) its entry should carry."""
+    before = {entry.id for entry in journal(client).entries}
+    return {"before": before, "changes": MADE[changes](client)}
+
+
+def _left(entries, made):
+    return [entry for entry in entries if entry.id not in made["before"]]
+
+
+@then(parsers.parse("there is one entry for each of those changes, each saying it happened at {day} at {time}"))
+def _one_entry_for_each_at(entries, made, day, time):
+    left = _left(entries, made)
+    assert [(entry.op, entry.artifact) for entry in left] == made["changes"]
+    assert [datetime.fromisoformat(entry.at) for entry in left] == [_moment(day, time)] * len(left)
+
+
+@then("each of those changes names itself as its own set, and no two of them name the same set")
+def _each_its_own_set(entries, made):
+    left = _left(entries, made)
+    assert [entry.batch for entry in left] == [entry.id for entry in left]
+    assert len({entry.batch for entry in left}) == len(left)
+
+
+FIRST_GO = ["decision/restock-on-thursdays", "decision/count-the-till-nightly"]
+SECOND_GO = ["decision/close-early-on-sundays", "decision/order-flour-monthly"]
+
+
+def _in_one_go(client, artifacts):
+    applied = apply(client, [
+        creation("decision", artifact.split("/")[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
+        for artifact in artifacts
+    ])
+    assert not applied.faults, applied.faults
+    return applied.batch
+
+
+@given("the client has made two changes in one go, then one change on its own, then two more changes in another go",
+       target_fixture="goes")
+def _two_goes_and_one_alone(client):
+    """The name the client was given for each go, first and second."""
+    first = _in_one_go(client, FIRST_GO)
+    alone = write(client, DECISION, {"sections": SECTIONS})
+    assert not alone.faults, alone.faults
+    return [first, _in_one_go(client, SECOND_GO)]
+
+
+def _sets_of(entries, artifacts):
+    return [entry.batch for entry in entries if entry.artifact in artifacts]
+
+
+@then("the two entries from the first go name one set, and the two entries from the second go name another")
+def _each_go_one_set(entries):
+    first, second = _sets_of(entries, FIRST_GO), _sets_of(entries, SECOND_GO)
+    assert (len(first), len(set(first)), len(second), len(set(second))) == (2, 1, 2, 1)
+    assert first[0] != second[0]
+
+
+@then("the change made on its own names itself as its own set, apart from both")
+def _alone_apart_from_both(entries):
+    """The change on its own is the decision's latest entry, after the Background's two."""
+    alone = [entry for entry in entries if entry.artifact == DECISION][-1]
+    assert alone.batch == alone.id
+    assert alone.batch not in _sets_of(entries, FIRST_GO + SECOND_GO)
+
+
+@then("the name the client was given for each go finds exactly that go's two changes in the history")
+def _each_name_finds_its_go(client, goes):
+    found = [[entry.artifact for entry in journal(client, batch=name).entries] for name in goes]
+    assert found == [FIRST_GO, SECOND_GO]

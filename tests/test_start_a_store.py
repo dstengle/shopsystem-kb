@@ -26,12 +26,6 @@ def client(root):
     return kb_client.connect(root)
 
 
-@given(parsers.parse("the client was readied with a clock that reads {day} at {time}"), target_fixture="client")
-def _readied_with_a_clock(root, day, time):
-    moment = datetime.fromisoformat(f"{day}T{time}:00+00:00")
-    return kb_client.connect(root, clock=lambda: moment)
-
-
 @then(parsers.parse("the store's one history entry says it happened at {day} at {time}"))
 def _one_entry_at(client, day, time):
     response = journal(client)
@@ -345,3 +339,33 @@ def test_a_relative_root_that_is_simply_missing_is_still_refused_as_before(tmp_p
     assert [(fault.rule, fault.message) for fault in started.faults] == [
         ("root", "a store is started in a directory that exists; 'sub' does not"),
     ]
+
+
+def _at(day, time):
+    return datetime.fromisoformat(f"{day}T{time}:00+00:00")
+
+
+@given(parsers.parse("a store the client started, readied with a clock that reads {day} at {time}"),
+       target_fixture="client")
+def _started_with_a_clock(root, day, time):
+    client = kb_client.connect(root, clock=lambda: _at(day, time))
+    started = client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    assert not started.faults, started.faults
+    return client
+
+
+@when("the client defines its own type")
+def _defines_its_own_type(client):
+    assert not define(client, DECISION_TYPE).faults
+
+
+@then(parsers.parse("the store's history holds two entries, both saying they happened at {day} at {time}"))
+def _two_entries_at(client, day, time):
+    assert [datetime.fromisoformat(entry.at) for entry in journal(client).entries] == [_at(day, time)] * 2
+
+
+@then("each names itself as its own set")
+def _each_its_own_set(client):
+    entries = journal(client).entries
+    assert [entry.batch for entry in entries] == [entry.id for entry in entries]
+    assert len({entry.batch for entry in entries}) == len(entries)
