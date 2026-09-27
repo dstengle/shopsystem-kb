@@ -1,4 +1,4 @@
-// kb contract, version 0.1. Regenerate with `make contract`.
+// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (adrs/0018).
 //
 // Artifact content crosses as canonical YAML text beside the fixed
 // identity fields, since content shape is schema-defined at runtime.
