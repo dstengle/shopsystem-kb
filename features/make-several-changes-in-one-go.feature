@@ -41,6 +41,13 @@ So that a set of changes that only makes sense together is never half-applied, t
       | the second change removes an artifact something still points at      | something still points at it                                            |
       | the second change touches an artifact whose stored file cannot be read | that file cannot be read, and the file is named                        |
 
+  Scenario: A set holding no changes at all is refused
+    Pins that a set is a request to change something, so asking for nothing is a mistake the client is told about rather than a change the store records, and the store is left exactly as it was.
+    When the client asks, in one go, for a set holding no changes at all, saying which role and why
+    Then the set is rejected because a set must hold at least one change
+    And the store holds no artifact it did not hold before
+    And the store's history holds no entry for it
+
   @slice-70
   Scenario: Two changes to one artifact in one set each leave their own entry
     Pins that a set is still a set of changes: each one counts the artifact's version up and is recorded on its own, even though the set as a whole lands once.
