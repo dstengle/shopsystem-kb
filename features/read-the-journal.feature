@@ -12,6 +12,23 @@ So that a client can show how the store came to hold what it holds, the client c
     Then there is one entry for each change
     And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, the message given, and which set of changes it landed with
 
+  Scenario Outline: A change made while the client's environment names another git repository is recorded in the store's own history
+    Pins that where a change is recorded is settled by the store the client found and by nothing else in the environment it runs in, so a change reported as made is in this store's history and never in a repository the client happens to be running beside.
+    Given the client runs with its environment naming <repository> as the git repository to work in, the way git does for a program it runs from a hook
+    When the client <change>
+    Then every entry that change left is in the store's history, under the role and with the message the client gave
+    And that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit
+
+    Examples:
+      | repository                                                    | change                                            |
+      | the git repository the directory the store sits in belongs to | creates a second decision                         |
+      | the git repository the directory the store sits in belongs to | changes the decision                              |
+      | the git repository the directory the store sits in belongs to | adds an item to one of the decision's collections |
+      | the git repository the directory the store sits in belongs to | removes the decision                              |
+      | the git repository the directory the store sits in belongs to | makes several changes in one go                   |
+      | the git repository the directory the store sits in belongs to | snapshots what a piece of work read               |
+      | a git repository elsewhere, which holds no store              | creates a second decision                         |
+
   @slice-35
   Scenario: The journal alone shows what landed together
     Pins that the journal is self-sufficient about grouping: what landed together is visible in the entries themselves, with a lone change its own set, so nothing outside has to be consulted.

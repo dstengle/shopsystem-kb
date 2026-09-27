@@ -18,6 +18,19 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
+  Scenario Outline: Starting a store while the client's environment names another git repository begins the store's own history
+    Pins that the first entry of a history belongs to the store it starts, whatever repository the environment the client runs in names, and that the repository named is not touched.
+    Given a directory that is itself a git repository, holding files that have nothing to do with a store
+    And the client runs with its environment naming <repository> as the git repository to work in, the way git does for a program it runs from a hook
+    When the client starts a store there, saying which role it is
+    Then the store's history holds one entry, under that role, with the message "initialise store"
+    And that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit
+
+    Examples:
+      | repository                                       |
+      | the git repository that directory is             |
+      | a git repository elsewhere, which holds no store |
+
   @slice-102
   Scenario: Starting a store is stamped with the moment the client's clock gives
     Pins that the first entry in a history is timed like every entry after it, so a client laying down a history across several days can begin it on the day it chooses.

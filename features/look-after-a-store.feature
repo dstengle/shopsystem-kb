@@ -9,6 +9,14 @@ So that a store exists and can be checked from a shell without any client, the o
     Then there is a store inside that directory, in a place of its own
     And a client can begin defining its own types in it straight away
 
+  Scenario: The operator sets up a store from a shell whose environment names another git repository
+    Pins that setting a store up from a hook, or any shell that names a git repository to work in, still begins the store's own history and leaves the repository named untouched.
+    Given a directory that is itself a git repository, and the operator's environment naming that repository as the git repository to work in, the way git does for a program it runs from a hook
+    When the operator runs kb init against that directory, saying which role they are
+    Then there is a store inside that directory, in a place of its own
+    And the store's history holds one entry, under that role, with the message "initialise store"
+    And that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit
+
   @slice-46
   Scenario: Setting up a store without naming which role is refused
     Pins that every change is attributable from the very first one, so a store cannot be created by nobody.
