@@ -107,3 +107,25 @@ So that a client can keep an artifact true without rewriting the store, the clie
       | one of which carries a name no option of that decision has   | a name on an item names an item already in that collection                |
       | both of which carry the same name                            | the items of a collection each have a name of their own                   |
       | one of which carries a name that is not a plain name         | a name is a plain name of lower-case letters, digits and single hyphens   |
+
+  Scenario Outline: A change that does not say which role made it, or why, is refused
+    Pins that every change is attributable before anything is written: whichever call makes it, a change missing its role or its reason leaves nothing on disk to be read and nothing in the history.
+    Given the decision carries two options
+    When the client <call>, <saying>
+    Then the change is rejected because <reason>
+    And reading the decision gives what it held before, at the version it held before
+    And the store holds no artifact it did not hold before
+    And the store's history holds no entry for it
+
+    Examples:
+      | call                                                                                | saying                              | reason                                                 |
+      | creates another decision                                                            | saying why but not which role it is | every entry in the history names the role that made it |
+      | creates another decision                                                            | saying which role it is but not why | every entry in the history says why it was made        |
+      | replaces the decision                                                               | saying why but not which role it is | every entry in the history names the role that made it |
+      | replaces the decision                                                               | saying which role it is but not why | every entry in the history says why it was made        |
+      | adds an option to the decision                                                      | saying why but not which role it is | every entry in the history names the role that made it |
+      | adds an option to the decision                                                      | saying which role it is but not why | every entry in the history says why it was made        |
+      | removes the decision                                                                | saying why but not which role it is | every entry in the history names the role that made it |
+      | removes the decision                                                                | saying which role it is but not why | every entry in the history says why it was made        |
+      | asks, in one go, for another decision to be created and the decision to be replaced | saying why but not which role it is | every entry in the history names the role that made it |
+      | asks, in one go, for another decision to be created and the decision to be replaced | saying which role it is but not why | every entry in the history says why it was made        |
