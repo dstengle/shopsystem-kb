@@ -1,12 +1,13 @@
 """Suite wiring. Step definitions live beside the scenarios they serve; shared Givens are added here by slice 1."""
 import re
+import tempfile
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, then, when
 
 from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing
-from kb import client as kb_client
+from kb import client as kb_client, store
 from kb.contract import kb_pb2
 
 
@@ -17,6 +18,37 @@ def pytest_configure(config):
         tags.update(re.findall(r"@(slice-\d+(?:\.\d+)?)", feature.read_text()))
     for tag in sorted(tags):
         config.addinivalue_line("markers", f"{tag}: scenario of that slice in the plan")
+
+
+def _guard_starts(config):
+    """Where the guard looks for a store, upward from each: the checkout, the system's temporary directory, and
+    pytest's own base temp root, wherever `--basetemp` or `TMPDIR` puts it. A seam a demonstration can point
+    elsewhere without touching where the real ones sit."""
+    return (config.rootpath, Path(tempfile.gettempdir()), config._tmp_path_factory.getbasetemp())
+
+
+def pytest_sessionstart(session):
+    """Refuse to run rather than reach a store outside the suite's own temporary directories: one is never found by
+    looking upward, discovery's own way, from any of `_guard_starts`."""
+    for start in _guard_starts(session.config):
+        found = store.find_above(start)
+        if found is not None:
+            pytest.exit(
+                f"refusing to run: a store was found at {found!s}, above {start!s}; "
+                f"no test may reach a store outside its own temporary directory",
+                returncode=1,
+            )
+
+
+@pytest.fixture(autouse=True)
+def _works_under_its_own_tmp_path(tmp_path, monkeypatch):
+    """Every test starts working in a directory under its own tmp_path, restored after, with KB_ROOT cleared unless
+    the test sets it, so discovery from the working directory never reaches outside it. A Given that finds or names
+    a store of its own chdirs, or sets KB_ROOT, afterward and keeps working."""
+    working = tmp_path / "working"
+    working.mkdir()
+    monkeypatch.chdir(working)
+    monkeypatch.delenv("KB_ROOT", raising=False)
 
 
 @pytest.fixture
