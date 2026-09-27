@@ -1,6 +1,7 @@
 """Pins what kb publishes to a client through the contract alone (adrs/0018): `kb.content`'s `loads`, `dumps`,
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`; `kb.contract.kb_pb2`'s being
 importable; and the set of kb's own rule names against the spec's list. It does not pin the wording of any fault."""
+import inspect
 import re
 from pathlib import Path
 
@@ -53,6 +54,12 @@ def test_the_in_process_client_and_contract_are_reachable(tmp_path):
     response = client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     assert isinstance(response, kb_pb2.InitResponse)
     assert not response.faults
+
+
+def test_connects_clock_is_a_keyword_defaulting_to_none():
+    clock = inspect.signature(kb_client.connect).parameters["clock"]
+    assert clock.kind is inspect.Parameter.KEYWORD_ONLY
+    assert clock.default is None
 
 
 def test_the_rule_names_kb_gives_are_exactly_the_spec_lists():

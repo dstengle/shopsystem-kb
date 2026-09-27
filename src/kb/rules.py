@@ -23,7 +23,4 @@ TITLE = "title"
 ROOT = "root"
 STORE = "store"
 
-ALL = (
-    NOT_FOUND, KIND, LOCATOR, COLLECTION, IDENTITY, ON_DELETE, UNREADABLE, ITEM_NAME, SHAPE, BUILT_ON, TARGETS,
-    VERSION, CONTENT, SECTIONS, REF, ACTOR, MESSAGE, OPERATIONS, SINCE, TITLE, ROOT, STORE,
-)
+ALL = tuple(value for name, value in sorted(vars().items()) if name.isupper() and name != "ALL")
