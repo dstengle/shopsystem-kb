@@ -18,7 +18,7 @@ kb knows nothing about any domain. It ships no type beyond the one that describe
 - What a client may depend on is published and versioned together by kb's release tag, which clients pin: `kb.proto` and its messages, the in-process client's `connect` with its clock, `kb.content` (content as canonical text, and `NotCanonical`), the connection file's form (`kb/server.yaml` and its `address`), and each fault's `rule` name. A fault's message wording, the store's files and layout, and every other module may change behind the contract.
 - A fault's `rule` is one of kb's own rule names, or, for content that breaks a type's JSON Schema, the JSON Schema keyword it breaks. kb's own rule names: `not-found`, `kind`, `locator`, `collection`, `identity`, `on_delete`, `unreadable`, `item-name`, `shape`, `built-on`, `targets`, `version`, `content`, `sections`, `ref`, `actor`, `message`, `operations`, `since`, `title`, `root`, `store`.
 - Errors are a typed list of `{ artifact, path, rule, message }`.
-- Bounds: at most one repository root per store; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); a change takes the store's lock with a timeout (its length is not stated).
+- Bounds: at most one repository root per store, promoted to more when one store's history outgrows one repository; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); several callers share a store only through a server, which takes changes one at a time, and there is no lock.
 
 ## Composition
 

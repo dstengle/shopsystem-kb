@@ -35,4 +35,4 @@ The client decides what its artifacts are made of by defining types, which are o
 ## Not yet
 
 - Migrating artifacts between type versions. Promoted when a stale artifact causes wrong behaviour (decision/stale-is-safe).
-- A type hierarchy derived from references, and listing by a base type. No trigger stated yet; an open question in the plan's log.
+- A type hierarchy and listing by a base type. Promoted when a client asks to list by a base type.

@@ -27,6 +27,7 @@ Every call names what it means: a kind, an artifact's name, a place inside an ar
 - If a change is aimed at a place the artifact holds nothing under, a place that runs on past a piece of prose, a place beginning at what only the store settles, or adds an item at a place that is not a collection, the change is refused naming which, and the artifact reads as before, at the revision it held.
 - If the client creates an artifact of a kind the store holds no type for, the artifact is refused because a kind must name a type the store holds, the kind asked for is given back, that fault stands on its own apart from anything wrong with the content, and nothing is written.
 - If the client lists, searches or follows links restricted to a kind the store holds no type for, the call is refused because a kind must name a type the store holds, and the kind asked for is given back.
+- If the client reads an artifact by a name whose kind the store holds no type for, the read is refused because the store holds nothing by that name, and the name asked for is given back.
 
 ## Implementation, may change
 

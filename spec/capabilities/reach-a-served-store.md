@@ -2,7 +2,7 @@
 id: capability/reach-a-served-store
 title: Reach a served store
 narrator: the client
-rests_on: [decision/0020-a-server-found-where-the-store-is, decision/0018-the-published-contract, decision/runtime-shape, decision/scale]
+rests_on: [decision/0020-a-server-found-where-the-store-is, decision/0018-the-published-contract, decision/runtime-shape, decision/scale-without-a-lock]
 formulated_as: features/reach-a-served-store.feature
 ---
 
@@ -24,6 +24,7 @@ Several clients share one store through a server that hosts the same contract ov
 - While a client reaches a server, each change it makes is stamped in the history with the server's clock.
 - If a client readied with a clock finds a server and asks for a change, the change is refused because the clock belongs to a client that reaches its store in process.
 - The store never writes the connection to a server.
+- While a client readied with a clock finds a server, its reads are answered.
 
 ## Implementation, may change
 
@@ -33,4 +34,4 @@ Several clients share one store through a server that hosts the same contract ov
 
 ## Not yet
 
-- Authentication and encryption between a client and a server. No trigger stated yet; an open question in the plan's log.
+- Authentication and encryption. Promoted when a caller outside the operator's own network needs to reach a server.

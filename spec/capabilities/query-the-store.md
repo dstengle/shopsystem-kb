@@ -26,13 +26,14 @@ The client finds artifacts without knowing their names. It can list a kind, opti
 - When the client searches the prose, each result comes with the title of the section it matched and a snippet of it, and the one whose section mentions the words most often comes first.
 - When the client searches within one kind, it is given only artifacts of that kind.
 - When the client searches the fields as well as the prose, it is also given artifacts whose fields, such as a title, match.
+- If the client follows links out of a section, it is given nothing.
 
 ## Implementation, may change
 
 - `List` takes a type, field filters and an output form (`stubs` or `ids`), and returns matches.
 - `Refs` takes a locator, a direction, an optional via-field, an optional type and a depth, and returns stubs with the path taken.
 - `Search` takes text, an optional type and a scope (`sections`, `fields`, `all`), and returns stubs with the matching section title and snippet, ranked by term frequency in the section.
-- The reference index is rebuilt in both directions from `ref` fields on load; the search index is rebuilt on load.
+- The reference index is rebuilt in both directions from `ref` fields on load; the search index is rebuilt on load. A section carries no links.
 
 ## Not yet
 

@@ -225,3 +225,16 @@ A read takes a resolve depth whose default is 0, so links come back as names unl
 date: 2026-09-30
 supersedes: decision/0009-resolve-depth-and-cycles
 source: this migration's gate (the approved scenario read-an-artifact / "Without being asked to follow them, links come back as names")
+
+## decision/init-refuses-inside-or-above
+Starting a store is refused only where a store sits directly inside the named directory or above it; a store deeper below the named directory does not refuse it. This supersedes 0003's "above or below" only; 0003's discovery rule stands.
+date: 2026-09-30
+supersedes: decision/0003-init-refuses-inside-a-store
+source: the migration gate
+
+## decision/scale-without-a-lock
+One repository, an incremental load cache, batch operations, and, when callers are several, a server that takes changes one at a time; there is no lock and no daemon.
+date: 2026-09-30
+revisit_when: changes wait at the server in growing numbers
+supersedes: decision/scale
+source: the migration gate; adrs/0020-a-server-found-where-the-store-is.md

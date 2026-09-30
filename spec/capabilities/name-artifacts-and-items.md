@@ -10,7 +10,7 @@ formulated_as: features/name-artifacts-and-items.feature
 
 ## Purpose
 
-The store gives every artifact and every item of a collection its name. The name comes from the title, or from the item's position when its kind has no title. It is made once and kept for life, and a clash is settled with a number. The client never chooses a name; it only hands back names the store gave. This capability does not rename anything; an artifact's name is fixed until migration exists.
+The store gives every artifact and every item of a collection its name. The name comes from the title, or from the item's position when its kind has no title. It is made once and kept for life, and a clash is settled with a number. The client never chooses a name; it only hands back names the store gave. This capability does not rename anything: an artifact's name is fixed until migration exists, and its title is fixed once it is created.
 
 ## Behaviour
 
@@ -37,8 +37,9 @@ The store gives every artifact and every item of a collection its name. The name
 
 - An artifact's id is `<type>/<slug>`. The slug is the title lowercased, runs of anything outside `[a-z0-9]` replaced by one hyphen, hyphens trimmed. On collision kb appends `-2`, `-3` and so on. The file path derives from the id.
 - An item's `id` is unique within its collection and first in its key order; it is minted from the item's `title` when the item schema has one, otherwise from its position, with the same suffix. `Append` and `Create`'s response return what was minted.
-- Titles are coerced to text after YAML 1.2 parsing.
+- Titles are coerced to text after YAML 1.2 parsing. Only `Create` carries a title.
 
 ## Not yet
 
 - Changing an artifact's name. Promoted when migration between type versions exists.
+- Changing an artifact's title. Promoted when a client needs to retitle an artifact.

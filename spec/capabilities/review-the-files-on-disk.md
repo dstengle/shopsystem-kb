@@ -19,7 +19,7 @@ The store's files are meant to be read and reviewed by people. Prose sits in blo
 
 ## Implementation, may change
 
-- Layout inside the store: `<type>/<slug>.yaml`, one file per artifact; types at `schema/<type>.yaml`; the journal under `journal/`; a lock file `.kb.lock`.
+- Layout inside the store: `<type>/<slug>.yaml`, one file per artifact; types at `schema/<type>.yaml`; the journal under `journal/`.
 - Canonical form: identity keys first, in the order `id`, `type`, `schema_version`, `revision`, `title`, then fields in schema order, then `sections`, then part collections in schema order. Every prose body is a literal block scalar. Two-space indent, sequences indented under their key, no line folding at any width, no flow style, no comments, no anchors, no tags.
 - Loading uses a standard YAML 1.2 parser; no YAML 1.1 loader or emitter appears anywhere in kb.
 

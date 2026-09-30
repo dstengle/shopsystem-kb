@@ -29,6 +29,7 @@ Every call except starting a store finds its store on each call, the way git fin
 - If the directory the search stops at holds both a store and the connection to a server, the call is refused, naming that directory.
 - When the client's working directory has moved into a different store, its next call is answered from the store it now sits in.
 - Where the client was readied with a root, the store is looked for from that root the way it is looked for from the working directory.
+- Where the client was readied with a root, `KB_ROOT` is not consulted.
 
 ## Implementation, may change
 

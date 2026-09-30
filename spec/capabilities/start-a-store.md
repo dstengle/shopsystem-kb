@@ -2,7 +2,7 @@
 id: capability/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/0001-yaml-1-2-git-canonical, decision/0003-init-refuses-inside-a-store, decision/0019-kb-git-owns-its-store, decision/types-are-data]
+rests_on: [decision/0001-yaml-1-2-git-canonical, decision/init-refuses-inside-or-above, decision/0019-kb-git-owns-its-store, decision/types-are-data]
 formulated_as: features/start-a-store.feature
 ---
 
