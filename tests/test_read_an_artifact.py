@@ -1,7 +1,7 @@
 import re
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, write
 from kb import canonical, client as kb_client
@@ -9,7 +9,39 @@ from kb.content import loads
 from kb.contract import kb_pb2
 from repositories import hooked, made
 
+scenarios("find-the-store.feature")
 scenarios("read-an-artifact.feature")
+
+
+@scenario("answer-a-damaged-file.feature", "Reading an artifact whose stored file cannot be read is refused")
+def test_reading_an_artifact_whose_stored_file_cannot_be_read_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A name that is not a plain name is refused")
+def test_a_name_that_is_not_a_plain_name_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A name that begins at the root of the disk is refused")
+def test_a_name_that_begins_at_the_root_of_the_disk_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A place inside an artifact that is not a plain place is refused")
+def test_a_place_inside_an_artifact_that_is_not_a_plain_place_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "Reading something the store does not hold is refused")
+def test_reading_something_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A read that names a place the artifact does not hold is refused")
+def test_a_read_that_names_a_place_the_artifact_does_not_hold_is_refused():
+    pass
+
 
 OLDER = "decision/prices-are-reviewed-monthly"
 DECISION = "decision/price-reviews-happen-weekly"

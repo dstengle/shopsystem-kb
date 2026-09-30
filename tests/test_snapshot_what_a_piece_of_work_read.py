@@ -7,7 +7,7 @@ from calls import CLIENT, DECISION_TYPE, PROCESS_TYPE, create, define, journal, 
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("snapshot-what-a-piece-of-work-read.feature")
+scenarios("snapshot-what-work-read.feature")
 
 DECISION = "decision/price-reviews-happen-weekly"
 PROCESS = "process/open-the-shop"

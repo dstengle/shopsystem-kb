@@ -1,5 +1,6 @@
+# formulated from spec/capabilities/define-a-type.md
 Feature: Define a type
-So that a client decides for itself what its artifacts are made of, the client can define a type.
+  Narrator: the client
 
   Background:
     Given a store

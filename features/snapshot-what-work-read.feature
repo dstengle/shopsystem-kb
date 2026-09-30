@@ -1,5 +1,6 @@
-Feature: Snapshot what a piece of work read
-So that a piece of work can say which versions it was built on while the store keeps moving, the client can snapshot what a piece of work read.
+# formulated from spec/capabilities/snapshot-what-work-read.md
+Feature: Snapshot what work read
+  Narrator: the client
 
   Background:
     Given a store holding a decision at its third version and a process at its first

@@ -1,10 +1,24 @@
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, search
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("search-the-store.feature")
+
+@scenario("query-the-store.feature", "The client searches the prose")
+def test_the_client_searches_the_prose():
+    pass
+
+
+@scenario("query-the-store.feature", "The client searches within one kind")
+def test_the_client_searches_within_one_kind():
+    pass
+
+
+@scenario("query-the-store.feature", "The client searches the fields as well as the prose")
+def test_the_client_searches_the_fields_as_well_as_the_prose():
+    pass
+
 
 PROCESS_TYPE = {
     "title": "Process",

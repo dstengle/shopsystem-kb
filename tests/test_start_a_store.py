@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, define, journal, moment, read
 from kb import client as kb_client
@@ -12,6 +12,11 @@ from repositories import made
 from kb.contract import kb_pb2
 
 scenarios("start-a-store.feature")
+
+
+@scenario("keep-the-history.feature", "Starting a store and the first change after it keep separate entries at the same moment")
+def test_starting_a_store_and_the_first_change_after_it_keep_separate_entries_at_the_same_moment():
+    pass
 
 
 @given("an empty directory", target_fixture="root")

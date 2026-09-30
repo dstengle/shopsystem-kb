@@ -1,6 +1,6 @@
 import subprocess
 
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from calls import (
     CLIENT, TAG_TYPE, create, define, everything_under, journal, listing, read, remove, request, tagged_decision_type,
@@ -8,7 +8,31 @@ from calls import (
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("remove-an-artifact.feature")
+
+@scenario("change-the-store.feature", "The client removes an artifact nothing points at")
+def test_the_client_removes_an_artifact_nothing_points_at():
+    pass
+
+
+@scenario("change-the-store.feature", "A removal something points at is refused")
+def test_a_removal_something_points_at_is_refused():
+    pass
+
+
+@scenario("change-the-store.feature", "A link from inside a part blocks a removal like any other")
+def test_a_link_from_inside_a_part_blocks_a_removal_like_any_other():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A name is free again once what held it has been removed")
+def test_a_name_is_free_again_once_what_held_it_has_been_removed():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "Removing something the store does not hold is refused")
+def test_removing_something_the_store_does_not_hold_is_refused():
+    pass
+
 
 LOOSE = "tag/clearance"
 HELD = "tag/pricing"

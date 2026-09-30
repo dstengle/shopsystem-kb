@@ -1,6 +1,6 @@
 import re
 
-from pytest_bdd import given, parsers, then, when, scenarios
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     CLIENT, DECISION_TYPE, MANGLED, PROCESS_TYPE, TAG_TYPE, append, create, define, everything_under, journal,
@@ -9,7 +9,26 @@ from calls import (
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("a-file-the-store-cannot-read.feature")
+
+@scenario("answer-a-damaged-file.feature", "Every call refuses a file it cannot read, naming the file")
+def test_every_call_refuses_a_file_it_cannot_read_naming_the_file():
+    pass
+
+
+@scenario("answer-a-damaged-file.feature", "Creating an artifact of a kind whose type cannot be read is refused")
+def test_creating_an_artifact_of_a_kind_whose_type_cannot_be_read_is_refused():
+    pass
+
+
+@scenario("answer-a-damaged-file.feature", "An entry of the history that cannot be read is refused in the same way")
+def test_an_entry_of_the_history_that_cannot_be_read_is_refused_in_the_same_way():
+    pass
+
+
+@scenario("check-the-store.feature", "Every shape of damage to a stored file is the one named finding")
+def test_every_shape_of_damage_to_a_stored_file_is_the_one_named_finding():
+    pass
+
 
 DECISION = "decision/price-reviews-happen-weekly"
 SECTIONS = [

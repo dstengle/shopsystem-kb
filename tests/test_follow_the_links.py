@@ -1,6 +1,6 @@
 import copy
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, refs, remove, tagged_decision_type, write,
@@ -8,7 +8,36 @@ from calls import (
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("follow-the-links.feature")
+
+@scenario("query-the-store.feature", "The client follows the links out of an artifact")
+def test_the_client_follows_the_links_out_of_an_artifact():
+    pass
+
+
+@scenario("query-the-store.feature", "The client follows the links into an artifact")
+def test_the_client_follows_the_links_into_an_artifact():
+    pass
+
+
+@scenario("query-the-store.feature", "The client narrows the links to one link and one kind")
+def test_the_client_narrows_the_links_to_one_link_and_one_kind():
+    pass
+
+
+@scenario("query-the-store.feature", "The client follows the links two steps out")
+def test_the_client_follows_the_links_two_steps_out():
+    pass
+
+
+@scenario("query-the-store.feature", "The client follows the links out of one place inside an artifact")
+def test_the_client_follows_the_links_out_of_one_place_inside_an_artifact():
+    pass
+
+
+@scenario("query-the-store.feature", "A link into a part counts as a link into the artifact holding it")
+def test_a_link_into_a_part_counts_as_a_link_into_the_artifact_holding_it():
+    pass
+
 
 OLDER = "decision/prices-are-reviewed-monthly"
 DECISION = "decision/price-reviews-happen-weekly"

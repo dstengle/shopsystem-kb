@@ -1,7 +1,7 @@
 import copy
 import re
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
     CLIENT, DECISION_TYPE, append, apply, creation, define, create, everything_under, journal, listing, read, refs,
@@ -11,7 +11,68 @@ from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
 
-scenarios("change-an-artifact.feature")
+scenarios("sign-a-change.feature")
+
+
+@scenario("change-the-store.feature", "The client changes an artifact")
+def test_the_client_changes_an_artifact():
+    pass
+
+
+@scenario("change-the-store.feature", "The client changes one node inside an artifact")
+def test_the_client_changes_one_node_inside_an_artifact():
+    pass
+
+
+@scenario("change-the-store.feature", "The client changes one item of a collection")
+def test_the_client_changes_one_item_of_a_collection():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type brings it up to date")
+def test_changing_an_artifact_that_is_behind_its_type_brings_it_up_to_date():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type with content the current version will not have is refused")
+def test_changing_an_artifact_that_is_behind_its_type_with_content_the_current_version_will_not_have_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A change that would break the type leaves the artifact as it was")
+def test_a_change_that_would_break_the_type_leaves_the_artifact_as_it_was():
+    pass
+
+
+@scenario("hand-over-content.feature", "A change whose content settles what only the store settles is refused")
+def test_a_change_whose_content_settles_what_only_the_store_settles_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Items sent back with their names are the same items, and one without a name is new")
+def test_items_sent_back_with_their_names_are_the_same_items_and_one_without_a_name_is_new():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Every way an item's name can be wrong on a change is refused")
+def test_every_way_an_item_s_name_can_be_wrong_on_a_change_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A change aimed at a name that is not a plain name writes nothing")
+def test_a_change_aimed_at_a_name_that_is_not_a_plain_name_writes_nothing():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "Changing something the store does not hold is refused")
+def test_changing_something_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "Every way the place a change is aimed at can be wrong is refused")
+def test_every_way_the_place_a_change_is_aimed_at_can_be_wrong_is_refused():
+    pass
+
 
 DECISION = "decision/price-reviews-happen-weekly"
 SECTIONS = [

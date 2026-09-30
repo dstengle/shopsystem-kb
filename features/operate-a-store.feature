@@ -1,5 +1,6 @@
-Feature: Look after a store
-So that a store exists and can be checked from a shell without any client, the operator can look after a store.
+# formulated from spec/capabilities/operate-a-store.md
+Feature: Operate a store
+  Narrator: the operator
 
   @slice-46
   Scenario: The operator sets up a store
@@ -57,23 +58,6 @@ So that a store exists and can be checked from a shell without any client, the o
     When the operator asks what the command line offers
     Then it offers setting a store up and checking one
     And nothing that changes what the store holds
-
-  @slice-1.1
-  Scenario: The operator reads an artifact's file on disk
-    Pins that the files are meant to be read and reviewed by people: prose in blocks, lists under their names, no rewrapping, and nothing in them that instructs a reader how to build a value.
-    Given a store holding a decision whose purpose is one short line and which carries a list of options
-    When the operator opens the decision's file
-    Then every piece of prose stands as a block of its own, however short it is
-    And each list is written beneath the name it belongs to, indented under it
-    And no line of prose has been broken to fit a width
-    And nothing in the file tells a reader how to build a value
-
-  @slice-1.9
-  Scenario: The same content always lands on disk as the same bytes
-    Pins that writing is deterministic, which is what makes a difference between two versions mean a real change rather than a reshuffle.
-    Given two stores each given the same decision by the same client
-    When the operator compares the two decision files
-    Then the two files are the same, byte for byte
 
   @slice-46
   Scenario: The operator checks the store from a folder inside it

@@ -1,14 +1,33 @@
 import copy
 import re
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, listing, read, refs, search
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
 
-scenarios("list-artifacts-of-a-kind.feature")
+
+@scenario("name-what-is-asked-for.feature", "Asking by a kind the store holds no type for is refused")
+def test_asking_by_a_kind_the_store_holds_no_type_for_is_refused():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists every artifact of a kind")
+def test_the_client_lists_every_artifact_of_a_kind():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists the artifacts matching a field")
+def test_the_client_lists_the_artifacts_matching_a_field():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists names only")
+def test_the_client_lists_names_only():
+    pass
+
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep the shop running.\n"},

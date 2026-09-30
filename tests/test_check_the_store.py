@@ -1,10 +1,39 @@
-from pytest_bdd import given, scenarios, then
+from pytest_bdd import given, scenario, then
 
 from calls import CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, create, define, next_version
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("check-the-store.feature")
+
+@scenario("check-the-store.feature", "A store with nothing wrong reports nothing")
+def test_a_store_with_nothing_wrong_reports_nothing():
+    pass
+
+
+@scenario("check-the-store.feature", "Every violation is reported")
+def test_every_violation_is_reported():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact behind its type is reported as stale")
+def test_an_artifact_behind_its_type_is_reported_as_stale():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact behind its type that no longer fits it is reported both ways")
+def test_an_artifact_behind_its_type_that_no_longer_fits_it_is_reported_both_ways():
+    pass
+
+
+@scenario("check-the-store.feature", "A stored file that cannot be read is reported as a violation")
+def test_a_stored_file_that_cannot_be_read_is_reported_as_a_violation():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact of a kind the store holds no type for is reported as a violation")
+def test_an_artifact_of_a_kind_the_store_holds_no_type_for_is_reported_as_a_violation():
+    pass
+
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},

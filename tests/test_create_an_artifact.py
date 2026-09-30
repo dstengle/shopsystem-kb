@@ -1,12 +1,176 @@
 import re
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, everything_under, read, request
 from kb import canonical, content, client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("create-an-artifact.feature")
+
+@scenario("change-the-store.feature", "The client creates an artifact")
+def test_the_client_creates_an_artifact():
+    pass
+
+
+@scenario("change-the-store.feature", "An artifact created without a title is refused")
+def test_an_artifact_created_without_a_title_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact missing a required section is refused")
+def test_an_artifact_missing_a_required_section_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing at something that is not there is refused")
+def test_an_artifact_pointing_at_something_that_is_not_there_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact with several faults reports them all")
+def test_an_artifact_with_several_faults_reports_them_all():
+    pass
+
+
+@scenario("check-a-change.feature", "Faults found by different rules all come back together")
+def test_faults_found_by_different_rules_all_come_back_together():
+    pass
+
+
+@scenario("check-a-change.feature", "A section carrying anything besides its title, its body and its own sections is refused")
+def test_a_section_carrying_anything_besides_its_title_its_body_and_its_own_sections_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A section with no title is refused")
+def test_a_section_with_no_title_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A section with no body is refused")
+def test_a_section_with_no_body_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A section whose body is empty is kept as it is")
+def test_a_section_whose_body_is_empty_is_kept_as_it_is():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content that settles what only the store settles is refused")
+def test_content_that_settles_what_only_the_store_settles_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content carrying a title of its own is refused")
+def test_content_carrying_a_title_of_its_own_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content telling the store how to build a value is refused")
+def test_content_telling_the_store_how_to_build_a_value_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content holding more than one document is refused")
+def test_content_holding_more_than_one_document_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "A value that reads as a switch or as a clock time is still the text that was written")
+def test_a_value_that_reads_as_a_switch_or_as_a_clock_time_is_still_the_text_that_was_written():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content that writes a value once and points back at it elsewhere is refused")
+def test_content_that_writes_a_value_once_and_points_back_at_it_elsewhere_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content that opens by declaring the format it is written in is refused")
+def test_content_that_opens_by_declaring_the_format_it_is_written_in_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content naming the same entry twice is refused")
+def test_content_naming_the_same_entry_twice_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Values written as a yes-or-no, as nothing and as a number keep those meanings")
+def test_values_written_as_a_yes_or_no_as_nothing_and_as_a_number_keep_those_meanings():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content the store cannot make sense of is refused")
+def test_content_the_store_cannot_make_sense_of_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "A field written as a bare date is the text that was written")
+def test_a_field_written_as_a_bare_date_is_the_text_that_was_written():
+    pass
+
+
+@scenario("hand-over-content.feature", "Prose the store could not write back in its one form is refused")
+def test_prose_the_store_could_not_write_back_in_its_one_form_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "The name of a new artifact is made from its title, not asked for")
+def test_the_name_of_a_new_artifact_is_made_from_its_title_not_asked_for():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A second artifact with a title already used gets a name of its own")
+def test_a_second_artifact_with_a_title_already_used_gets_a_name_of_its_own():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Two parts with the same title are given names of their own")
+def test_two_parts_with_the_same_title_are_given_names_of_their_own():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title with capitals and punctuation gives a plain name")
+def test_a_title_with_capitals_and_punctuation_gives_a_plain_name():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title that leaves nothing to make a name from is refused")
+def test_a_title_that_leaves_nothing_to_make_a_name_from_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title that reads as a date is still a title")
+def test_a_title_that_reads_as_a_date_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title that reads as yes is still a title")
+def test_a_title_that_reads_as_yes_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title given as a yes-or-no is still a title")
+def test_a_title_given_as_a_yes_or_no_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title given as a number is still a title")
+def test_a_title_given_as_a_number_is_still_a_title():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A kind that is not a plain name is refused")
+def test_a_kind_that_is_not_a_plain_name_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A kind the store holds no type for is refused")
+def test_a_kind_the_store_holds_no_type_for_is_refused():
+    pass
+
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},

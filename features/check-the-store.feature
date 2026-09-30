@@ -1,5 +1,6 @@
+# formulated from spec/capabilities/check-the-store.md
 Feature: Check the store
-So that a client can tell whether everything the store holds still fits its type, the client can check the store.
+  Narrator: the client
 
   @slice-43
   Scenario: A store with nothing wrong reports nothing
@@ -49,3 +50,23 @@ So that a client can tell whether everything the store holds still fits its type
     Then that artifact is reported as a violation, naming the artifact and the kind it claims
     And everything else in the store is checked and reported alongside it
     And the check comes back with its answer rather than breaking off
+
+  @slice-74
+  Scenario Outline: Every shape of damage to a stored file is the one named finding
+    Pins that "cannot be read" means every way a file can stop making sense, not only a mangled bracket, so no shape of damage reaches a client as a crash.
+    Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
+    Given someone edited the decision's file by hand and left it <damage>
+    When the client checks the store
+    Then that file is reported as a violation, naming the file
+    And everything else in the store is checked and reported alongside it
+    And the check comes back with its answer rather than breaking off
+
+    Examples:
+      | damage                                                |
+      | in a shape that cannot be read at all                 |
+      | empty, with nothing in it                             |
+      | holding a list rather than a set of named entries     |
+      | holding a second document after the first             |
+      | telling a reader how to build one of its values       |
+      | pointing back at a value written elsewhere in it      |
+      | naming the same entry twice                           |

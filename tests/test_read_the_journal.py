@@ -2,7 +2,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     CLIENT, DECISION_TYPE, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
@@ -11,7 +11,76 @@ from kb import client as kb_client
 from kb import journal as kb_journal
 from kb.contract import kb_pb2
 
-scenarios("read-the-journal.feature")
+
+@scenario("keep-the-history.feature", "Every change leaves an entry")
+def test_every_change_leaves_an_entry():
+    pass
+
+
+@scenario("keep-the-history.feature", "A change made while the client's environment names another git repository is recorded in the store's own history")
+def test_a_change_made_while_the_client_s_environment_names_another_git_repository_is_recorded_in_the_store_s_own_history():
+    pass
+
+
+@scenario("keep-the-history.feature", "The journal alone shows what landed together")
+def test_the_journal_alone_shows_what_landed_together():
+    pass
+
+
+@scenario("keep-the-history.feature", "The client reads the journal for one role")
+def test_the_client_reads_the_journal_for_one_role():
+    pass
+
+
+@scenario("keep-the-history.feature", "The client reads the journal for one piece of work")
+def test_the_client_reads_the_journal_for_one_piece_of_work():
+    pass
+
+
+@scenario("keep-the-history.feature", "The client reads the journal since a time")
+def test_the_client_reads_the_journal_since_a_time():
+    pass
+
+
+@scenario("keep-the-history.feature", "A client given a clock stamps each change it makes with the moment the clock gives")
+def test_a_client_given_a_clock_stamps_each_change_it_makes_with_the_moment_the_clock_gives():
+    pass
+
+
+@scenario("keep-the-history.feature", "Changes stamped with the same moment each leave an entry of their own")
+def test_changes_stamped_with_the_same_moment_each_leave_an_entry_of_their_own():
+    pass
+
+
+@scenario("keep-the-history.feature", "Sets of changes made at the same moment are told apart")
+def test_sets_of_changes_made_at_the_same_moment_are_told_apart():
+    pass
+
+
+@scenario("keep-the-history.feature", "A moment the clock gives in another zone is kept as the same moment")
+def test_a_moment_the_clock_gives_in_another_zone_is_kept_as_the_same_moment():
+    pass
+
+
+@scenario("keep-the-history.feature", "A moment the clock gives with no zone is recorded as that moment in UTC")
+def test_a_moment_the_clock_gives_with_no_zone_is_recorded_as_that_moment_in_utc():
+    pass
+
+
+@scenario("keep-the-history.feature", "The history read since a time answers plainly whatever zone the clock gave")
+def test_the_history_read_since_a_time_answers_plainly_whatever_zone_the_clock_gave():
+    pass
+
+
+@scenario("keep-the-history.feature", "Every way the history can be asked for is checked and answered plainly")
+def test_every_way_the_history_can_be_asked_for_is_checked_and_answered_plainly():
+    pass
+
+
+@scenario("keep-the-history.feature", "A change aimed at one place records the place it changed")
+def test_a_change_aimed_at_one_place_records_the_place_it_changed():
+    pass
+
 
 DECISION = "decision/price-reviews-happen-weekly"
 SHOPKEEPER = kb_pb2.Actor(role="shopkeeper")

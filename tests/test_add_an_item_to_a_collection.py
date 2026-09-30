@@ -1,14 +1,78 @@
 import copy
 import re
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import CLIENT, PROCESS_TYPE, append, create, define, everything_under, journal, read, write
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
 
-scenarios("add-an-item-to-a-collection.feature")
+
+@scenario("change-the-store.feature", "The client adds an item to a collection")
+def test_the_client_adds_an_item_to_a_collection():
+    pass
+
+
+@scenario("change-the-store.feature", "An item that uses another artifact keeps its settings on itself")
+def test_an_item_that_uses_another_artifact_keeps_its_settings_on_itself():
+    pass
+
+
+@scenario("change-the-store.feature", "The client adds an item to a collection inside an item")
+def test_the_client_adds_an_item_to_a_collection_inside_an_item():
+    pass
+
+
+@scenario("check-a-change.feature", "An item pointing at something that is not there is refused")
+def test_an_item_pointing_at_something_that_is_not_there_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An item missing something its own type requires is refused")
+def test_an_item_missing_something_its_own_type_requires_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "An item whose content settles what only the store settles is refused")
+def test_an_item_whose_content_settles_what_only_the_store_settles_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "The name of a new item comes from its title")
+def test_the_name_of_a_new_item_comes_from_its_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An item of a kind that carries no title is named by its place")
+def test_an_item_of_a_kind_that_carries_no_title_is_named_by_its_place():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A second item with a title already used in the collection gets a name of its own")
+def test_a_second_item_with_a_title_already_used_in_the_collection_gets_a_name_of_its_own():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Taking an item out does not rename the items left")
+def test_taking_an_item_out_does_not_rename_the_items_left():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Putting items in a different order does not rename them")
+def test_putting_items_in_a_different_order_does_not_rename_them():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An item's title becomes its name by the same rules as an artifact's title")
+def test_an_item_s_title_becomes_its_name_by_the_same_rules_as_an_artifact_s_title():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "Adding an item to something the store does not hold is refused")
+def test_adding_an_item_to_something_the_store_does_not_hold_is_refused():
+    pass
+
 
 STEP_TYPE = {
     "title": "Step",

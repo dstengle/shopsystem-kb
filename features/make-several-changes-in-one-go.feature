@@ -1,5 +1,6 @@
+# formulated from spec/capabilities/make-several-changes-in-one-go.md
 Feature: Make several changes in one go
-So that a set of changes that only makes sense together is never half-applied, the client can make several changes in one go.
+  Narrator: the client
 
   Background:
     Given a store holding a decision type and a work item
