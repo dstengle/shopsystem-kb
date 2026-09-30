@@ -1,0 +1,26 @@
+---
+id: capability/snapshot-what-work-read
+title: Snapshot what work read
+narrator: the client
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/one-current-corpus, decision/0014-signature-refused-before-operations]
+formulated_as: features/snapshot-what-work-read.feature
+---
+
+# Snapshot what work read
+
+## Purpose
+
+A named piece of work records which revisions of which artifacts it read, in one history entry, while the store keeps moving. It is how one floating store is reconciled with reproducible work. A snapshot changes no content.
+
+## Behaviour
+
+- When the client snapshots artifacts for a piece of work, the history holds one entry listing each of them with the revision read and a fingerprint of it, and the client is given the name of that entry.
+- If a snapshot names no piece of work, names an artifact the store holds nothing under, does not say which role it is or why, or gives either as blank space only, the snapshot is refused naming the reason, and the history holds no entry for it.
+
+## Implementation, may change
+
+- `Snapshot` takes an execution id and artifact ids, and returns the journal entry id. A snapshot entry carries `op: snapshot` and a list of `{ artifact, revision, digest }`.
+
+## Not yet
+
+- None.
