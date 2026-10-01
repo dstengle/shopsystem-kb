@@ -25,5 +25,6 @@ STORE = "store"
 CLOCK = "clock"
 BUSY = "busy"
 REVISION = "revision"
+PLACEMENT = "placement"
 
 ALL = tuple(value for name, value in sorted(globals().items()) if name.isupper() and name != "ALL")

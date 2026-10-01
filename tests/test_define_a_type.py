@@ -358,3 +358,119 @@ def _rejected_naming_each(client, attempt):
     assert all("'schema/vote'" in fault.message for fault in faults)
     assert attempt["after"] == attempt["before"]
     assert list(listing(client, "vote", ids_only=True).ids) == sorted(TWO_DECISIONS)
+
+
+MISPLACED = {
+    "declares a link field inside a field's own nested schema": (
+        {"type": "object", "properties": {"title": {"type": "string"}, "about": {
+            "type": "object", "properties": {"label": {"type": "string"}, "link": LINK},
+        }}},
+        "schema/properties/about/properties/link/ref",
+    ),
+    "declares a collection inside a field's own nested schema": (
+        {"type": "object", "properties": {"title": {"type": "string"}, "about": {
+            "type": "object", "properties": {"label": {"type": "string"}},
+            "parts": {"notes": {"items": {"type": "object", "properties": {"title": {"type": "string"}}}}},
+        }}},
+        "schema/properties/about/parts",
+    ),
+    "declares required sections inside a collection's items": (
+        {"type": "object", "properties": {"title": {"type": "string"}}, "parts": {"notes": {"items": {
+            "type": "object", "properties": {"title": {"type": "string"}}, "sections": [{"title": "Context"}],
+        }}}},
+        "schema/parts/notes/items/sections",
+    ),
+    "declares the fields shown at a glance inside a field's own nested schema": (
+        {"type": "object", "properties": {"title": {"type": "string"}, "about": {
+            "type": "object", "properties": {"label": {"type": "string"}}, "summary": ["label"],
+        }}},
+        "schema/properties/about/summary",
+    ),
+}
+
+
+@when(parsers.re(f"the client defines a type that (?P<misplaced>{'|'.join(map(re.escape, MISPLACED))})"), target_fixture="attempt")
+def _define_a_type_misplacing(root, client, misplaced):
+    before = held.holds(root)
+    schema, place = MISPLACED[misplaced]
+    response = request(client, "schema", "Note", {"version": 1, "schema": schema}, message="Define Note")
+    return {"response": response, "before": before, "after": held.holds(root), "place": place}
+
+
+@then("the type is rejected because kb does not read a link field there")
+def _rejected_for_a_misplaced_link(attempt):
+    _type_rejected(attempt, "ref", attempt["place"], "kb does not read a link field there")
+
+
+@then("the type is rejected because kb does not read them there")
+def _rejected_for_a_misplaced_keyword(attempt):
+    _type_rejected(attempt, "placement", attempt["place"], "kb does not read")
+
+
+@then("the refusal names the place")
+def _the_refusal_names_the_place(attempt):
+    assert [fault.place for fault in attempt["response"].faults] == [attempt["place"]]
+
+
+def _ref_without(key):
+    return {name: value for name, value in LINK["ref"].items() if name != key}
+
+
+FLAWED_LINKS = {
+    "that does not say whether it points at one artifact or several": _ref_without("cardinality"),
+    "that does not say whether it may point into a part": _ref_without("parts"),
+    "that does not say what a removal does": _ref_without("on_delete"),
+    "whose removal rule is cascade": {**LINK["ref"], "on_delete": "cascade"},
+    "that says it points at two artifacts": {**LINK["ref"], "cardinality": "two"},
+}
+
+
+@when(parsers.re(f"the client defines a type with a link field (?P<flaw>{'|'.join(map(re.escape, FLAWED_LINKS))})"), target_fixture="attempt")
+def _define_a_type_with_a_flawed_link(root, client, flaw):
+    before = held.holds(root)
+    schema = {"type": "object", "properties": {
+        "title": {"type": "string"}, "relates_to": {"type": "string", "ref": FLAWED_LINKS[flaw]},
+    }}
+    response = request(client, "schema", "Note", {"version": 1, "schema": schema}, message="Define Note")
+    return {"response": response, "before": before, "after": held.holds(root), "place": "schema/properties/relates_to"}
+
+
+@then(
+    "the type is rejected because a link field says which kinds it may point at, whether it points at one artifact "
+    "or several, whether it may point into a part and what a removal does"
+)
+def _rejected_for_a_link_left_incomplete(attempt):
+    _type_rejected(attempt, "ref", attempt["place"], (
+        "a link field says which kinds it may point at, whether it points at one artifact or several, whether it may "
+        "point into a part and what a removal does"
+    ))
+
+
+@then("the type is rejected because refuse is the one removal rule kb knows")
+def _rejected_for_a_removal_rule(attempt):
+    _type_rejected(attempt, "ref", attempt["place"], "refuse is the one removal rule kb knows")
+
+
+@then("the type is rejected because a link field points at one artifact or several")
+def _rejected_for_a_reach(attempt):
+    _type_rejected(attempt, "ref", attempt["place"], "a link field points at one artifact or several")
+
+
+KEYWORDS = {
+    "enum": {"kind": {"type": "string", "enum": ["ref", "parts", "sections", "summary"]}},
+    "pattern": {"code": {"type": "string", "pattern": "^[a-z]+$"}},
+    "format": {"due": {"type": "string", "format": "date"}},
+}
+
+
+@when(parsers.parse("the client defines a type that uses {keyword} inside a field's own nested schema"), target_fixture="defined")
+def _define_a_type_using(client, keyword):
+    extra = {"type": "object", "properties": KEYWORDS[keyword]}
+    schema = {**NOTE_TYPE["schema"], "properties": {**NOTE_TYPE["schema"]["properties"], "extra": extra}}
+    return request(client, "schema", "Note", {"version": 1, "schema": schema}, message="Define Note")
+
+
+@then("the type is accepted")
+def _the_type_is_accepted(defined):
+    assert not defined.faults, defined.faults
+    assert (defined.id, defined.revision) == ("schema/note", 1)
