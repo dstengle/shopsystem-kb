@@ -12,7 +12,7 @@ a change that breaks one is refactored into place first, then made.
 | `values.py` | conversion of single request fields into validated values: ids, locators, kinds, roots, content trees; the one reading of a moment in UTC, "UTC unless it says otherwise", which `in_utc` provides for both `since` and the clock | anything that touches the store or the filesystem |
 | `signatures.py` | who makes a change and why: the actor, the signature, and the conversions of a writer's, a reader's and a starter's; refuses one that does not sign | I/O, other request values |
 | `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
-| `names.py` | the grammar of artifact and item names; how an artifact's name, a link's place inside one and a type's `kb:` reference are written and read; minting, uniqueness and reuse of item names | I/O |
+| `names.py` | the grammar of artifact and item names; how an artifact's name, a link's place inside one and a type's `kb:` reference are written and read; the one order names are given in (`order`); minting, uniqueness and reuse of item names | I/O |
 | `validation.py` | the composed effective schema and the checks JSON Schema cannot express | file access |
 | `check.py` | the check of the whole store: every artifact against the current version of its type, the stale listed beside the violations, a file that cannot be read or an artifact of a kind with no type reported and passed over | checks of its own, writes |
 | `composition.py` | a type read through what it is built on: its composition, base first, and the type a `kb:` reference names | checks, file access |
@@ -26,6 +26,9 @@ a change that breaks one is refactored into place first, then made.
 | `read.py` | reads at every level, resolution and stubs | writes |
 | `query.py` | list, refs, search, journal, snapshot gathering over the loaded corpus | writes |
 | `search.py` | ranking prose and fields for the words searched | store access |
+| `port.py` | the storage port, kb-internal and unpublished: the interface every adapter answers, the change, link, entry and read values it takes and gives, and its refusals (`Conflict`, `Linked`, `Unlanded`, `Unreadable`) | an adapter, kb's rules |
+| `sqlite_store.py` | the SQLite adapter: making and opening the database, its schema, and landing a set in one `BEGIN IMMEDIATE` transaction with its revision, landing and linked checks | kinds, types, kb's rules |
+| `sqlite_reads.py` | the SQLite adapter's reads over one connection, and content as the database keeps it (JSON text that reads back every value kb accepts) | writes, kinds, kb's rules |
 | `store.py` | files, the git repository, discovery of a store from the process's working directory and `KB_ROOT` | validation, domain rules |
 | `canonical.py` | the one canonical YAML checker, dump and load; YAML 1.2 | domain rules |
 | `settled.py` | what the store settles for every artifact whatever its type: the keys naming it and what each must be, its content without them, an artifact given them, and the order its entries are written in as its type declares | I/O, checks against a type |

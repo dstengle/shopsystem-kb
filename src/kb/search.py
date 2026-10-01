@@ -20,7 +20,7 @@ class Hit(NamedTuple):
 def rank(artifacts, text: str, sections: bool = True, fields: bool = False) -> list[Hit]:
     """Every section whose body, and every field whose value, holds a word of the text, as asked, most occurrences
     first; ties in the order the store and the artifact hold them, an artifact's sections before its fields."""
-    words = re.findall(r"\w+", text.lower())
+    words = _words(text)
     if not words:
         return []
     pattern = re.compile(r"\b(?:" + "|".join(re.escape(word) for word in words) + r")\b", re.IGNORECASE)
@@ -37,6 +37,28 @@ def rank(artifacts, text: str, sections: bool = True, fields: bool = False) -> l
                 if found:
                     hits.append(Hit(artifact["id"], "", name, _snippet(value, found[0]), len(found)))
     return sorted(hits, key=lambda hit: -hit.count)
+
+
+def terms(text: str) -> list[str]:
+    """The words searched for, each folded as `tokens` folds the words a text holds, so a store that keeps the
+    folded words of every section and field can find each text `rank` would match a word in."""
+    return [_folded(word) for word in _words(text)]
+
+
+def tokens(text: str) -> list[str]:
+    """The words a text holds, folded: every whole word `rank` could match a word searched for against."""
+    return [_folded(word) for word in re.findall(r"\w+", text)]
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"\w+", text.lower())
+
+
+def _folded(word: str) -> str:
+    """A word with its case folded so that every two words a match ignoring case finds alike fold alike: lowered,
+    raised and lowered again, which brings together ß and ẞ, ſ and s, ı and i, µ and μ; and İ, which lowers to two
+    characters, taken as the i a match takes it as."""
+    return word.replace("\u0130", "i").lower().upper().lower()
 
 
 def _fields(artifact: dict):

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, TypeVar
 
-from kb import canonical, refusals, rules, settled
+from kb import canonical, names, refusals, rules, settled
 from kb.contract import kb_pb2
 from kb.signatures import Signed
 from kb.values import ArtifactId, Kind, Refused, Root
@@ -113,7 +113,8 @@ class Store:
 
     def ids(self) -> list[ArtifactId]:
         """The name of every artifact in the store, schemas included, in path order."""
-        return [ArtifactId(Kind(path.parent.name), path.stem) for path in sorted(self.dir.glob("*/*.yaml"))]
+        found = [ArtifactId(Kind(path.parent.name), path.stem) for path in self.dir.glob("*/*.yaml")]
+        return sorted(found, key=names.order)
 
     def artifacts(self):
         """Every artifact in the store, schemas included, in path order. Raises Refused at a damaged file."""
@@ -145,7 +146,7 @@ class Draft:
     def ids(self) -> list[ArtifactId]:
         """The name of every artifact the draft holds, in the order their paths would sort."""
         held = (set(self._store.ids()) | set(self._pending)) - self._removed
-        return sorted(held, key=lambda artifact_id: f"{artifact_id}.yaml")
+        return sorted(held, key=names.order)
 
     def load(self, artifact_id: ArtifactId) -> dict | Damaged:
         if artifact_id in self._pending:

@@ -21,6 +21,14 @@ def parted(text: str) -> tuple[str, str]:
     return kind, slug
 
 
+def order(artifact_id) -> tuple[str, str]:
+    """The one order artifacts' names are given in: by kind, then by `<slug>.yaml`, compared as the paths of the
+    files a store once kept them in compared, so `work/...` comes before `work-item/...`, and `price-2` before
+    `price`."""
+    kind, slug = parted(str(artifact_id))
+    return kind, f"{slug}.yaml"
+
+
 def linked(text: str) -> tuple[str, str]:
     """A link as a field holds it read as the name it points at and, after `#`, the place inside that artifact."""
     name, _, place = text.partition("#")
