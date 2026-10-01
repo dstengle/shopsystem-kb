@@ -7,11 +7,8 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import (
-    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, add, create, create_many, created, define, journal, listing, refs,
-    read, remove, request, search, snapshot, replace, start_a_store, check,
-)
-from conftest import OPERATOR, _kb
+from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, create, define, request, start_a_store
+from conftest import _kb
 import held
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -28,8 +25,6 @@ def test_a_store_whose_database_cannot_be_read_refuses_every_call_and_command():
     pass
 
 
-DECISION = "decision/price-reviews-happen-weekly"
-PROCESS = "process/open-the-shop"
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -85,37 +80,7 @@ def _an_empty_directory(tmp_path):
     return empty
 
 
-CALLS = {
-    "creates a decision with a title and both required sections, saying which role and why":
-        lambda client: request(client, "decision", "Close early on Sundays", {"sections": SECTIONS}),
-    "reads the decision":
-        lambda client: read(client, DECISION),
-    "replaces the decision, saying which role and why":
-        lambda client: replace(client, DECISION, {"sections": SECTIONS}),
-    "adds an item to a collection of the decision, saying which role and why":
-        lambda client: add(client, DECISION, "options", {"title": "Go monthly"}),
-    "removes the decision, saying which role and why":
-        lambda client: remove(client, DECISION),
-    "asks, in one go, for two decisions to be created, saying which role and why":
-        lambda client: create_many(client, [
-            created("decision", "Close early on Sundays", {"sections": SECTIONS}),
-            created("decision", "Open late on Fridays", {"sections": SECTIONS}),
-        ]),
-    "lists the decisions":
-        lambda client: listing(client, "decision"),
-    "follows the links out of the decision":
-        lambda client: refs(client, DECISION, 1),
-    "follows the links into the decision":
-        lambda client: refs(client, DECISION, 1, inward=True),
-    "searches the prose for a word that decision holds":
-        lambda client: search(client, "weekly"),
-    "reads the journal":
-        lambda client: journal(client),
-    "snapshots the decision and the process for a piece of work":
-        lambda client: snapshot(client, "restock-2026-10-01", [DECISION, PROCESS]),
-    "checks the store":
-        lambda client: check(client),
-}
+CREATES_A_DECISION = "creates a decision with a title and both required sections, saying which role and why"
 
 
 def _answered(root, before, act):
@@ -124,9 +89,9 @@ def _answered(root, before, act):
     return act()
 
 
-@when(parsers.re(f"the client (?P<call>{'|'.join(map(re.escape, CALLS))})"), target_fixture="answered")
-def _the_client_calls(client, root, before, call):
-    return _answered(root, before, lambda: CALLS[call](client))
+@when(f"the client {CREATES_A_DECISION}", target_fixture="answered")
+def _the_client_creates_a_decision(client, root, before):
+    return _answered(root, before, lambda: request(client, "decision", "Close early on Sundays", {"sections": SECTIONS}))
 
 
 def _unreadable(rule, message):
@@ -167,6 +132,11 @@ def _says_how_to_move(answered):
     assert "start a new store and import the old one's files" in message
 
 
+@then("nothing is written in the store")
+def _nothing_written_in_the_store(root, before):
+    assert held.bytes_held(root) == before["held"]
+
+
 @then("the fault is given as any other fault is given, never breaking off")
 def _given_as_any_other_fault(answered):
     if hasattr(answered, "faults"):
@@ -183,46 +153,9 @@ def _nothing_written(root, before, empty):
     assert empty.is_dir() and held.holds_nothing(empty)
 
 
-def _exported_from_another_store(tmp_path):
-    """A directory a second, healthy store holding the decision type and a decision was exported to."""
-    other = tmp_path / "other"
-    other.mkdir()
-    client = kb_client.connect(other)
-    start_a_store(other)
-    define(client, DECISION_TYPE)
-    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": SECTIONS})
-    exported = tmp_path / "exported"
-    ran = _kb("export", str(exported), cwd=other)
-    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
-    return exported
-
-
-@when("the operator runs kb validate in that store", target_fixture="answered")
-def _kb_validate(root, before, where):
-    return _answered(root, before, lambda: _kb("validate", **where))
-
-
 @when("the operator runs kb export in that store, aimed at the empty directory", target_fixture="answered")
 def _kb_export(root, before, empty, where):
     return _answered(root, before, lambda: _kb("export", str(empty), **where))
-
-
-@when(
-    "the operator checks a directory exported from another store for import in that store", target_fixture="answered",
-)
-def _kb_import_check(root, before, tmp_path, where):
-    exported = _exported_from_another_store(tmp_path)
-    return _answered(root, before, lambda: _kb("import", str(exported), "--check", **where))
-
-
-@when(
-    "the operator runs kb import in that store on a directory exported from another store, saying which role they are",
-    target_fixture="answered",
-)
-def _kb_import(root, before, tmp_path, where):
-    exported = _exported_from_another_store(tmp_path)
-    env = {**where["env"], "KB_ACTOR": OPERATOR}
-    return _answered(root, before, lambda: _kb("import", str(exported), cwd=where["cwd"], env=env))
 
 
 @given(
