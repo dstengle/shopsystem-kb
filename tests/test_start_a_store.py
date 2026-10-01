@@ -88,8 +88,8 @@ def _rejected_without_a_role(refused):
 
 @then("that directory holds no store")
 def _no_store_there(root):
-    assert not held.holds_anything_in_the_place(root)
-    assert held.apart_from_the_store(root) == {}
+    """Nothing at all is made in the directory, which was empty."""
+    assert held.holds_nothing(root)
 
 
 @given("the client is working inside a store", target_fixture="working_in")

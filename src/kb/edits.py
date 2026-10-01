@@ -4,8 +4,8 @@ with every fault it finds."""
 import copy
 from typing import NamedTuple
 
-from kb import composition, definitions, links, names, places, refusals, requests, settled, validation, values
-from kb.store import Draft
+from kb import composition, definitions, names, places, refusals, requests, settled, validation, values
+from kb.draft import Draft
 from kb.values import ArtifactId, Refused
 
 
@@ -113,14 +113,10 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
         raise Refused([refusals.not_found(locator.id)])
     if locator.place:
         raise Refused([refusals.whole_only(locator)])
-    blocking = []
-    for other_id in draft.ids():
-        if other_id == locator.id:
-            continue
-        schema = composition.kind_schema(other_id.kind, draft)["schema"]
-        for link in links.carried(draft.artifact(other_id), schema, draft):
-            if links.points_at(link.target, locator.id):
-                blocking.append(refusals.still_linked(locator.id, other_id, link.place))
+    blocking = [
+        refusals.still_linked(locator.id, each.source, each.place)
+        for each in draft.links_in(locator.id) if each.source != locator.id
+    ]
     if blocking:
         raise Refused(blocking)
     removed = draft.artifact(locator.id)

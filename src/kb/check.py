@@ -3,10 +3,10 @@ the violations, and a file that cannot be read, or an artifact of a kind with no
 check going on past it."""
 from kb import composition, settled, validation
 from kb.contract import kb_pb2
-from kb.store import Damaged, Store
+from kb.port import Port
 
 
-def everything(store: Store) -> kb_pb2.ValidateResponse:
+def everything(store: Port) -> kb_pb2.ValidateResponse:
     """Every artifact checked against the current version of its type, and listed as stale when it was last
     checked against an older one; a file that cannot be read, or an artifact of a kind with no type, is reported and
     the check goes on."""
@@ -25,14 +25,10 @@ def everything(store: Store) -> kb_pb2.ValidateResponse:
     return kb_pb2.ValidateResponse(violations=violations, stale=stale)
 
 
-def _with_type(store: Store, artifact_id) -> tuple[dict, dict] | kb_pb2.Fault:
-    """The artifact and its type as stored, or the one finding that stands in for checking it: the damage of the
-    first of them whose file cannot be read, or that the store holds no type for its kind."""
-    artifact = store.load(artifact_id)
-    if isinstance(artifact, Damaged):
-        return artifact.fault
+def _with_type(store: Port, artifact_id) -> tuple[dict, dict] | kb_pb2.Fault:
+    """The artifact and its type as the store holds them, or the finding that stands in for checking it: that the
+    store holds no type for its kind."""
     type_id = composition.named_type(artifact_id.kind, store, artifact=str(artifact_id))
     if isinstance(type_id, kb_pb2.Fault):
         return type_id
-    schema = store.load(type_id)
-    return schema.fault if isinstance(schema, Damaged) else (artifact, schema)
+    return store.artifact(artifact_id), store.artifact(type_id)

@@ -2,7 +2,7 @@
 and whether a link points at an artifact. The checks, removal, reads and walks all read links here."""
 from typing import NamedTuple
 
-from kb import names
+from kb import composition, names, port, values
 from kb.composition import declared
 
 
@@ -26,6 +26,17 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
     """Every link an artifact carries, wherever it sits: in its own fields, and in the fields of each item of each of
     its collections, at every depth."""
     return inside(artifact, schema, corpus, artifact)
+
+
+def handed(artifact_id: values.ArtifactId, artifact: dict, corpus) -> list[port.Link]:
+    """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
+    the kinds its field allows, read through the artifact's type as the corpus holds it."""
+    schema = composition.kind_schema(artifact_id.kind, corpus)["schema"]
+    found = []
+    for link in carried(artifact, schema, corpus):
+        target, part = names.linked(link.target)
+        found.append(port.Link(link.field, link.place, values.artifact_id(target), part, tuple(link.ref["targets"])))
+    return found
 
 
 def inside(artifact: dict, schema: dict, corpus, node) -> list[Link]:

@@ -22,6 +22,7 @@ a change that breaks one is refactored into place first, then made.
 | `rules.py` | the name of every rule a fault of kb's own carries, which kb publishes (adrs/0018) | faults, messages |
 | `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, then write, journal and commit; starting a store, recording a snapshot | rpc types |
 | `edits.py` | what each operation of a set does to the draft, checked against the draft as the operations before it left it | rpc types, writes |
+| `draft.py` | the store as a set's changes would leave it, read like the store: what it holds, each artifact, and the links into one, over the port | writes, checks |
 | `places.py` | resolving a place inside an artifact to where its node stands, or the refusal saying why nothing does; whether a link's place names a part | I/O, what an operation does there |
 | `read.py` | reads at every level, resolution and stubs | writes |
 | `query.py` | list, refs, search, journal, snapshot gathering over the loaded corpus | writes |

@@ -1,36 +1,41 @@
-"""The journal: one file per entry under <store>/journal/<YYYY>/<MM>/<DD>/, written inside the commit that made the change."""
+"""The history's entries: each stamped by the clock and given its id here, and fingerprinted from the canonical text of
+what was written. Nothing here writes: an entry rides with the set handed to the port, and lands with it."""
 import hashlib
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Callable, NamedTuple
 
-from kb import canonical, refusals, values
+from kb import canonical, values
+from kb.port import Entry, Port
 from kb.signatures import Signed
-from kb.store import Damaged
-
 
 Clock = Callable[[], datetime]
 
 
 class Stamp(NamedTuple):
-    """An entry's moment, the clock's, in UTC, and its id, free in the journal and in the set it belongs to."""
+    """An entry's moment, the clock's, in UTC, and its id, free in the history and in the set it belongs to."""
     at: datetime
     id: str
 
 
-def stamps(store_dir: Path, count: int, clock: Clock | None = None) -> list[Stamp]:
+def stamps(store: Port, count: int, clock: Clock | None = None) -> list[Stamp]:
     """The stamps of a set's `count` entries, in order, each read from the clock and given the next id free at its
-    moment, after every id the journal holds there and every one settled before it in the set. Settled before the
-    set's first write, so a clock that raises leaves nothing written."""
+    moment, after every id the history holds there and every one settled before it in the set. Settled before the
+    set lands, so a clock that raises leaves nothing written."""
     last: dict[str, int] = {}
     settled: list[Stamp] = []
     for _ in range(count):
         at = _stamp(clock)
         moment = _moment(at)
-        last[moment] = (last[moment] if moment in last else _last_seq(store_dir, at)) + 1
+        last[moment] = (last[moment] if moment in last else _last_seq(store, at)) + 1
         settled.append(Stamp(at, _entry_id(at, last[moment])))
     return settled
+
+
+def first(clock: Clock | None = None) -> Stamp:
+    """The stamp of a new store's first entry, which nothing in its history comes before."""
+    at = _stamp(clock)
+    return Stamp(at, _entry_id(at, 1))
 
 
 def _stamp(clock: Clock | None) -> datetime:
@@ -40,7 +45,7 @@ def _stamp(clock: Clock | None) -> datetime:
 
 
 def _moment(at: datetime) -> str:
-    """The moment as an id and its file name begin with it."""
+    """The moment as an id begins with it."""
     return at.strftime("%Y%m%dT%H%M%S%fZ")
 
 
@@ -59,30 +64,29 @@ def _parts(entry_id: str) -> tuple[str, int] | None:
     return (found["moment"], int(found["seq"])) if found else None
 
 
-def _last_seq(store_dir: Path, at: datetime) -> int:
-    """The highest seq a file in the journal's day takes at this moment, or 0 when none does. Reads names, never
-    what a file holds; read once per moment in a set, whose own ids are counted on from it."""
+def _last_seq(store: Port, at: datetime) -> int:
+    """The highest seq an entry the history holds at this moment takes, or 0 when none does; asked once per moment
+    in a set, whose own ids are counted on from it."""
     moment = _moment(at)
-    parts = [_parts(path.stem) for path in _day(store_dir, at).glob(f"{moment}-*.yaml")]
+    parts = [_parts(entry_id) for entry_id in store.entry_ids(at)]
     return max((found[1] for found in parts if found and found[0] == moment), default=0)
 
 
-def digest(path: Path) -> str:
-    """The fingerprint of a stored file: sha256 of its bytes."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def digest(artifact: dict) -> str:
+    """The fingerprint of an artifact as the store holds it: of its canonical text, as its entry's was."""
+    return fingerprint(canonical.dump(artifact))
 
 
 def fingerprint(text: str) -> str:
-    """The fingerprint of text about to be written: sha256 of the bytes it is written as."""
+    """The fingerprint of canonical text: sha256 of the bytes it is written as."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str, revision: int,
-          schema_version: int, text: str | None, stamp: Stamp, batch: str = "") -> Path:
-    """Write one entry under its settled stamp and return its file; its stem is the entry's id. A change made alone
-    names itself as its batch. The fingerprint is of the text the change writes; a removal writes none, so its
-    entry's fingerprint is empty."""
-    entry = {
+def change(*, signed: Signed, op: str, artifact: str, path: str, revision: int, schema_version: int,
+           text: str | None, stamp: Stamp, batch: str = "") -> Entry:
+    """The entry of one change, under its settled stamp. A change made alone names itself as its batch. The
+    fingerprint is of the text the change leaves; a removal leaves none, so its entry's fingerprint is empty."""
+    record = {
         "id": stamp.id,
         "at": stamp.at.isoformat(),
         "actor": {"role": signed.actor.role, "execution": signed.actor.execution},
@@ -95,13 +99,13 @@ def write(store_dir: Path, *, signed: Signed, op: str, artifact: str, path: str,
         "message": signed.message,
         "batch": batch or stamp.id,
     }
-    return _save(store_dir, stamp.at, entry)
+    return _entry(record, stamp, signed, artifact)
 
 
-def snapshot(store_dir: Path, *, signed: Signed, read: list[dict], stamp: Stamp) -> Path:
-    """Write the entry recording what a piece of work read, each artifact as { artifact, revision, digest }, under
-    its settled stamp, and return its file. It names no artifact of its own and is a set of its own."""
-    entry = {
+def snapshot(*, signed: Signed, read: list[dict], stamp: Stamp) -> Entry:
+    """The entry recording what a piece of work read, each artifact as { artifact, revision, digest }, under its
+    settled stamp. It names no artifact of its own and is a set of its own."""
+    record = {
         "id": stamp.id,
         "at": stamp.at.isoformat(),
         "actor": {"role": signed.actor.role, "execution": signed.actor.execution},
@@ -110,33 +114,11 @@ def snapshot(store_dir: Path, *, signed: Signed, read: list[dict], stamp: Stamp)
         "message": signed.message,
         "batch": stamp.id,
     }
-    return _save(store_dir, stamp.at, entry)
+    return _entry(record, stamp, signed, "")
 
 
-def _day(store_dir: Path, at: datetime) -> Path:
-    """The directory holding the entries stamped on the day of that moment."""
-    return store_dir / "journal" / at.strftime("%Y") / at.strftime("%m") / at.strftime("%d")
-
-
-def _save(store_dir: Path, at: datetime, entry: dict) -> Path:
-    target = _day(store_dir, at) / f"{entry['id']}.yaml"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(canonical.dump(entry), encoding="utf-8")
-    return target
-
-
-def entries(store_dir: Path) -> list[dict] | Damaged:
-    """Every entry in the journal, oldest first: by the time in its id, then by its seq, the order in which entries
-    stamped with that moment were written. When an entry's file cannot be read, the fault naming the first such file
-    in place of them all. An entry whose id kb cannot read makes the read raise."""
-    found = []
-    for path in sorted((store_dir / "journal").rglob("*.yaml")):
-        try:
-            found.append(canonical.entries(canonical.decoded(path.read_bytes())))
-        except canonical.NotCanonical as error:
-            return Damaged(refusals.unreadable("", path.relative_to(store_dir), str(error)))
-    return sorted(found, key=_order)
-
-
-def _order(entry: dict) -> tuple[str, int] | None:
-    return _parts(entry["id"])
+def _entry(record: dict, stamp: Stamp, signed: Signed, artifact: str) -> Entry:
+    return Entry(
+        stamp.id, stamp.at, _parts(stamp.id)[1], record, artifact, signed.actor.role, signed.actor.execution,
+        record["batch"],
+    )

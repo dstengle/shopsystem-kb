@@ -1,49 +1,52 @@
-"""The one test module that knows how a store is kept. Today it is kept as files under a `kb/` directory below the
-directory it was started in; the steps ask for what they mean here and never look at a path. What the store holds
-comes back as an opaque value that a step only compares with another taken at another time."""
+"""The one test module that knows how a store is kept: a `kb/` directory below the directory it was started in,
+holding a marker and one SQLite database beside it. The steps ask for what they mean here and never look at a path.
+What the store holds comes back through the port's public reads, or as an opaque value that a step only compares
+with another taken at another time."""
 import hashlib
+import sqlite3
 from pathlib import Path
 
-from kb import canonical
+from kb import canonical, store
 from kb.contract import kb_pb2
+from kb.sqlite_reads import encoded
+from kb.values import artifact_id
 
 _PLACE = "kb"
 _MARKER = "store.yaml"
+_DATABASE = "store.sqlite3"
 
 
-def _store(root):
+def _place(root):
     return Path(root) / _PLACE
-
-
-def _file(root, name):
-    return _store(root) / f"{name}.yaml"
 
 
 def artifact(root, name):
     """The artifact the store holds under a name, as a mapping."""
-    return canonical.load(text(root, name))
+    with store.opened(root) as opened:
+        return opened.artifact(artifact_id(name))
 
 
 def text(root, name):
     """The canonical text the store holds under a name."""
-    return _file(root, name).read_text()
+    return canonical.dump(artifact(root, name))
 
 
 def fingerprint(root, name):
-    """The fingerprint of the text the store holds under a name."""
-    return hashlib.sha256(text(root, name).encode()).hexdigest()
+    """The fingerprint of the canonical text the store holds under a name, its UTF-8 bytes hashed, as the history's
+    fingerprints are."""
+    return hashlib.sha256(text(root, name).encode("utf-8")).hexdigest()
 
 
 def holds_artifact(root, name):
     """Whether the store holds anything under a name."""
-    return _file(root, name).exists()
+    with store.opened(root) as opened:
+        return opened.holds(artifact_id(name))
 
 
 def names(root):
     """The name of every artifact the store holds, sorted."""
-    store = _store(root)
-    found = [path.relative_to(store).with_suffix("").as_posix() for path in store.rglob("*.yaml")]
-    return sorted(name for name in found if name != "store" and not name.startswith("journal/"))
+    with store.opened(root) as opened:
+        return sorted(str(each) for each in opened.ids())
 
 
 def history(client):
@@ -53,22 +56,27 @@ def history(client):
 
 def holds(root):
     """Everything the store started in `root` holds, as one value to compare with another taken later."""
-    return _everything_under(_store(root))
+    return _kept(_place(root))
 
 
 def holds_a_store(directory):
     """Whether a store has been started in `directory`."""
-    return (_store(directory) / _MARKER).is_file()
+    return (_place(directory) / _MARKER).is_file()
 
 
 def holds_anything_in_the_place(directory):
     """Whether `directory` holds anything, a store or not, in the place a store goes."""
-    return _store(directory).exists()
+    return _place(directory).exists()
+
+
+def holds_nothing(directory):
+    """Whether `directory` holds nothing at all."""
+    return not any(Path(directory).iterdir())
 
 
 def occupy_the_place(directory, how):
     """Put an empty folder, or a file, in the place a store goes in `directory`."""
-    place = _store(directory)
+    place = _place(directory)
     if how == "folder":
         place.mkdir()
     else:
@@ -85,17 +93,42 @@ def everything_in(directory):
     stores = _stores_under(Path(directory))
     return {
         "apart": _apart(Path(directory), stores),
-        "stores": {store.relative_to(directory): _everything_under(store) for store in stores},
+        "stores": {place.relative_to(directory): _kept(place) for place in stores},
     }
 
 
 def plant(root, name, content):
-    """Write an artifact under a name behind the store's back, as a mapping, so it can break what the store allows."""
-    _file(root, name).write_text(canonical.dump(content))
+    """Put content under a name behind the store's back, as a mapping, so it can break what the store allows. The
+    store refuses to land such content, so its row is written here; nothing else of the store is touched."""
+    with _connected(_place(root)) as db, db:
+        changed = db.execute("UPDATE artifacts SET content = ? WHERE id = ?", (encoded(content), name)).rowcount
+    assert changed == 1, name
 
 
-def _everything_under(directory):
-    return {path: path.read_bytes() if path.is_file() else None for path in sorted(directory.rglob("*"))}
+class _connected:
+    """The store's database, open read-write for a block, and closed after it."""
+
+    def __init__(self, place):
+        self._uri = f"{(place / _DATABASE).resolve().as_uri()}?mode=rw"
+
+    def __enter__(self):
+        self._db = sqlite3.connect(self._uri, uri=True)
+        return self._db
+
+    def __exit__(self, *raised):
+        self._db.close()
+
+
+def _kept(place):
+    """What a store holds: its marker's bytes, the names beside it, and every row of every table of its database,
+    compared as rows, never as the database's bytes, which can differ with nothing changed."""
+    with _connected(place) as db:
+        tables = [name for (name,) in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        )]
+        rows = {table: sorted(db.execute(f'SELECT * FROM "{table}"').fetchall(), key=repr) for table in tables}
+    beside = sorted(path.name for path in place.iterdir() if not path.name.endswith(("-wal", "-shm")))
+    return {"marker": (place / _MARKER).read_bytes(), "beside": beside, "rows": rows}
 
 
 def _stores_under(directory):

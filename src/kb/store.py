@@ -1,160 +1,42 @@
-"""The store on disk: <root>/kb/, one canonical YAML file per artifact, itself a git repository; and finding it, the
-way git finds a repository: upward from the working directory, or named by KB_ROOT. CONTRACT_VERSION is the store
-marker's value alone, written to store.yaml at Init; the store's own, not part of the published contract (adrs/0018)."""
-import functools
-import os
-import subprocess
-from dataclasses import dataclass
+"""Where a store is and what marks it: <root>/kb/, holding the marker store.yaml and beside it the database the
+adapter keeps the store in; and finding it, the way git finds a repository: upward from the working directory, or
+named by KB_ROOT. CONTRACT_VERSION is the store marker's value alone, written to store.yaml when the store is
+started; the store's own, not part of the published contract (adrs/0018)."""
+import contextlib
+import shutil
+import sqlite3
 from pathlib import Path
-from typing import Mapping, TypeVar
+from typing import Callable, Mapping
 
-from kb import canonical, names, refusals, rules, settled
+from kb import canonical, rules, sqlite_store
 from kb.contract import kb_pb2
-from kb.signatures import Signed
-from kb.values import ArtifactId, Kind, Refused, Root
+from kb.port import Port
+from kb.values import Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
+DATABASE = MARKER.parent / "store.sqlite3"
 CONTRACT_VERSION = "0.1"
 
 
-@dataclass(frozen=True)
-class Damaged:
-    """What loading a stored file that cannot be read gives in place of the artifact: the fault that names the file."""
-    fault: kb_pb2.Fault
+def opened(root) -> contextlib.AbstractContextManager[Port]:
+    """The store at root, open until the block ends: the database beside its marker, handed to the adapter."""
+    return sqlite_store.opened(Path(root) / DATABASE)
 
 
-Loaded = TypeVar("Loaded")
-
-
-def readable(loaded: Loaded | Damaged) -> Loaded:
-    """What was loaded, an artifact or the journal's entries; a file that cannot be read refuses the call with the
-    fault naming it. The one place a damaged file becomes a refusal."""
-    if isinstance(loaded, Damaged):
-        raise Refused([loaded.fault])
-    return loaded
-
-
-class Store:
-    def __init__(self, root):
-        self.root = Path(root)
-        self.dir = self.root / "kb"
-
-    def path(self, artifact_id: ArtifactId) -> Path:
-        """The one place a file path is made from a name: <store>/<kind>/<name>.yaml."""
-        if not isinstance(artifact_id, ArtifactId):
-            raise TypeError(f"a path is made only from a checked name, not {artifact_id!r}")
-        return self.dir / artifact_id.kind.name / f"{artifact_id.slug}.yaml"
-
-    def start(self) -> Path:
-        """Make the store directory, its git repository, and its marker file; where the marker is."""
-        self.dir.mkdir(parents=True)
-        _git("init", "-q", "-b", "main", str(self.dir))
-        marker = self.root / MARKER
-        marker.write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
-        return marker
-
-    def save(self, artifact_id: ArtifactId, text: str) -> Path:
-        """Write canonical text to a temp file and rename it into place."""
-        path = self.path(artifact_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_name(path.name + ".tmp")
-        temp.write_text(text, encoding="utf-8")
-        temp.replace(path)
-        return path
-
-    def remove(self, artifact_id: ArtifactId) -> Path:
-        """Take an artifact's file out, and return where it was."""
-        path = self.path(artifact_id)
-        path.unlink()
-        return path
-
-    def holds(self, artifact_id: ArtifactId) -> bool:
-        return self.path(artifact_id).is_file()
-
-    def load(self, artifact_id: ArtifactId) -> dict | Damaged:
-        """The artifact as stored, or, when its file cannot be read as one, the fault naming the file. Never raises
-        for what a file holds."""
-        path = self.path(artifact_id)
-        try:
-            loaded = canonical.entries(canonical.decoded(path.read_bytes()))
-        except canonical.NotCanonical as error:
-            problem = str(error)
-        else:
-            problem = settled.lacking(loaded)
-        if problem:
-            return Damaged(refusals.unreadable(str(artifact_id), path.relative_to(self.dir), problem))
-        return loaded
-
-    def artifact(self, artifact_id: ArtifactId) -> dict:
-        """The artifact as stored, for a reader that cannot go on without it. Raises Refused for a damaged file."""
-        return readable(self.load(artifact_id))
-
-    def history(self) -> list[dict]:
-        """Every journal entry, oldest first. Raises Refused for an entry that cannot be read."""
-        from kb import journal  # journal reads Damaged from here, so it is imported where it is used
-        return readable(journal.entries(self.dir))
-
-    def digest(self, artifact_id: ArtifactId) -> str:
-        """The fingerprint of an artifact as stored."""
-        from kb import journal
-        return journal.digest(self.path(artifact_id))
-
-    def commit(self, paths: list, signed: Signed) -> None:
-        """One commit of the given files, under the message and the actor's role."""
-        role = signed.actor.role
-        relative = [str(Path(path).relative_to(self.dir)) for path in paths]
-        _git("-C", str(self.dir), "add", "--", *relative)
-        env = {
-            **os.environ,
-            "GIT_AUTHOR_NAME": role, "GIT_AUTHOR_EMAIL": f"{role}@kb",
-            "GIT_COMMITTER_NAME": role, "GIT_COMMITTER_EMAIL": f"{role}@kb",
-        }
-        _git("-C", str(self.dir), "-c", "commit.gpgsign=false", "commit", "-q", "-m", signed.message, "--", *relative, env=env)
-
-    def ids(self) -> list[ArtifactId]:
-        """The name of every artifact in the store, schemas included, in path order."""
-        found = [ArtifactId(Kind(path.parent.name), path.stem) for path in self.dir.glob("*/*.yaml")]
-        return sorted(found, key=names.order)
-
-    def artifacts(self):
-        """Every artifact in the store, schemas included, in path order. Raises Refused at a damaged file."""
-        for artifact_id in self.ids():
-            yield self.artifact(artifact_id)
-
-
-class Draft:
-    """The store as a set of changes would leave it: artifacts put here stand over the stored ones, artifacts removed
-    here are no longer held, and nothing is written. Read like the store: holds, load, artifact, ids."""
-
-    def __init__(self, store: Store):
-        self._store = store
-        self._pending: dict[ArtifactId, dict] = {}
-        self._removed: set[ArtifactId] = set()
-
-    def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
-        self._removed.discard(artifact_id)
-        self._pending[artifact_id] = artifact
-
-    def remove(self, artifact_id: ArtifactId) -> None:
-        self._removed.add(artifact_id)
-
-    def holds(self, artifact_id: ArtifactId) -> bool:
-        if artifact_id in self._removed:
-            return False
-        return artifact_id in self._pending or self._store.holds(artifact_id)
-
-    def ids(self) -> list[ArtifactId]:
-        """The name of every artifact the draft holds, in the order their paths would sort."""
-        held = (set(self._store.ids()) | set(self._pending)) - self._removed
-        return sorted(held, key=names.order)
-
-    def load(self, artifact_id: ArtifactId) -> dict | Damaged:
-        if artifact_id in self._pending:
-            return self._pending[artifact_id]
-        return self._store.load(artifact_id)
-
-    def artifact(self, artifact_id: ArtifactId) -> dict:
-        return readable(self.load(artifact_id))
+def start(root: Root, fill: Callable[[Port], None]) -> None:
+    """The store's place made, then its database, filled by `fill`, then its marker, last, so a store is marked only
+    once it is whole. When making the database or the marker raises, the place is removed and the error raised: a
+    failed start leaves nothing."""
+    place = root.path / MARKER.parent
+    place.mkdir()
+    try:
+        sqlite_store.make(root.path / DATABASE)
+        with opened(root.path) as made:
+            fill(made)
+        (root.path / MARKER).write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
+    except (sqlite3.Error, OSError):
+        shutil.rmtree(place)
+        raise
 
 
 def vacant(root: Root) -> None:
@@ -229,22 +111,3 @@ def _nothing_found(cwd: Path | None) -> kb_pb2.Fault:
             rule=rules.STORE, message="no store was found: the working directory is gone, and nothing named one outright",
         )
     return kb_pb2.Fault(rule=rules.STORE, message=f"no store was found, neither above {cwd} nor named outright")
-
-
-QUIET = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")
-
-
-def _git(*args, env=None):
-    """git, its automatic maintenance off so nothing runs on after a call returns, and with no variable git reads as
-    locating a repository, so it works in the store named whatever the caller's environment names; `env` counts."""
-    locating = _locating()
-    passed = {name: value for name, value in (os.environ if env is None else env).items() if name not in locating}
-    subprocess.run(["git", *QUIET, *args], check=True, capture_output=True, text=True, env=passed)
-
-
-@functools.cache
-def _locating() -> frozenset[str]:
-    """Git's own list of the variables that locate a repository, read from git once a process. When it cannot be read
-    this raises, and no git runs with the environment it was to clear."""
-    listed = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True, text=True)
-    return frozenset(listed.stdout.split())
