@@ -215,3 +215,21 @@ Feature: Export and import a store
     And a directory for import holding a copy of the type that describes types that differs from the store's
     When the operator checks the directory for import
     Then the file holding that copy is reported as an error, naming the file
+
+  Scenario: An import that waits longer than the store waits for another change is refused as busy
+    Pins that an import, which writes, is held to the same wait as any change: refused as busy, nothing written, free to be run again.
+    Given a freshly started store
+    And a directory for import that checks clean
+    And another change is being written and holds the store longer than the store waits
+    When the operator imports the directory, saying which role they are
+    Then the import is rejected because the store was busy with another change
+    And nothing is written
+    And the same import may be run again
+
+  Scenario: The operator exports the store while another change is being written
+    Pins that an export is a read: it is written however long another change holds the store.
+    Given a store holding a decision
+    And another change is being written and holds the store longer than the store waits
+    When the operator exports the store to an empty directory
+    Then the export is written
+    And the export is not refused because the store was busy with another change

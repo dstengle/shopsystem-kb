@@ -158,3 +158,20 @@ Feature: Change the store
     Then each replacement left a version of its own, and the decision's version has gone up by two
     And both replacements are in the history
     And the decision holds the different rationale
+
+  Scenario: A change that waits longer than the store waits for another change is refused as busy
+    Pins that a change never waits for ever behind another: it is refused as busy, leaves nothing behind, and can simply be made again.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And another change is being written and holds the store longer than the store waits
+    When the client replaces the decision, saying which role and why
+    Then the change is rejected because the store was busy with another change
+    And nothing is written
+    And the same change may be made again
+
+  Scenario: A read while another change is being written is not refused as busy
+    Pins that reading never meets the wait for another change: a client can always read, however long a change holds the store.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And another change is being written and holds the store longer than the store waits
+    When the client reads the decision
+    Then the client is given the decision
+    And the read is not refused because the store was busy with another change

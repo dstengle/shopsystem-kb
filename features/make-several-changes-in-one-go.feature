@@ -77,3 +77,11 @@ Feature: Make several changes in one go
     When the client asks, in one go, for two decisions to be created, each pointing at the other, saying which role and why
     Then the set lands
     And the store holds both decisions, each pointing at the other
+
+  Scenario: A set that waits longer than the store waits for another change is refused as busy
+    Pins that a set is held to the same wait as a single change: refused as busy, none of it written, and free to be asked for again.
+    Given another change is being written and holds the store longer than the store waits
+    When the client asks, in one go, for a decision to be created and the work item to point at it, in that order, saying which role and why
+    Then the set is rejected because the store was busy with another change
+    And nothing is written
+    And the same set may be asked for again

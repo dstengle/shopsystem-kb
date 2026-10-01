@@ -27,3 +27,11 @@ Feature: Snapshot what work read
       | the decision and the process without saying why                     | every entry in the history says why it was made                            |
       | the decision and the process giving a role that is only blank space | every entry in the history names the role that made it                     |
       | the decision and the process giving as its reason only blank space  | every entry in the history says why it was made                            |
+
+  Scenario: A snapshot that waits longer than the store waits for another change is refused as busy
+    Pins that a snapshot, which writes a history entry, can be refused as busy like a change, and leaves no entry behind.
+    Given another change is being written and holds the store longer than the store waits
+    When the client snapshots the decision and the process for a piece of work
+    Then the snapshot is rejected because the store was busy with another change
+    And the journal holds no entry for it
+    And the same snapshot may be asked for again

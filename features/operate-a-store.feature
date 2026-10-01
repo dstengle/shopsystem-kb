@@ -84,3 +84,11 @@ Feature: Operate a store
     Given the operator is working inside a store, with KB_ROOT naming a different store
     When the operator runs kb validate there
     Then the check is rejected because KB_ROOT names a store other than the one they are standing in, and neither of the two is guessed at
+
+  Scenario: The operator checks the store while another change is being written
+    Pins that checking is a read: it goes ahead however long another change holds the store.
+    Given a store whose content the operator did not write
+    And another change is being written and holds the store longer than the store waits
+    When the operator runs kb validate in that store
+    Then the store is checked
+    And kb validate is not refused because the store was busy with another change
