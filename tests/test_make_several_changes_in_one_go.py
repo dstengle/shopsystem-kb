@@ -8,6 +8,7 @@ from calls import (
 )
 import held
 from kb import client as kb_client
+from kb.content import loads
 from kb.contract import kb_pb2
 
 scenarios("make-several-changes-in-one-go.feature")
@@ -209,3 +210,94 @@ def _ask_for_an_empty_set(root, client):
 @then("the set is rejected because a set must hold at least one change")
 def _rejected_for_being_empty(attempt):
     assert _refused_with(attempt, [("", "", "operations")]).startswith("a set must hold at least one change")
+
+
+REPLACED = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs now move daily.\n"},
+]
+
+
+@when(
+    "the client asks, in one go, for the work item to point at a decision and that decision to be created, in that "
+    "order, saying which role and why",
+    target_fixture="applied",
+)
+def _point_at_it_and_create(client):
+    return apply(client, [
+        replacement(WORK_ITEM, {"decisions": [DECISION]}),
+        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+    ], message="Move price reviews to weekly")
+
+
+@when(
+    "the client asks, in one go, for a decision to be created and that decision to be replaced, in that order, "
+    "saying which role and why",
+    target_fixture="applied",
+)
+def _create_and_replace(client):
+    return apply(client, [
+        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+        replacement(DECISION, {"sections": REPLACED}),
+    ], message="Record a decision and revise it")
+
+
+@when(
+    "the client asks, in one go, for a decision to be replaced and that decision to be created, in that order, "
+    "saying which role and why",
+    target_fixture="attempt",
+)
+def _replace_and_create(root, client):
+    before, history = held.holds(root), held.history(client)
+    response = apply(client, [
+        replacement(DECISION, {"sections": REPLACED}),
+        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+    ], message="Revise a decision and record it")
+    return {"response": response, "before": before, "after": held.holds(root), "history": history}
+
+
+@then("the set lands, and the work item points at the new decision")
+def _lands_pointing_at_the_new_decision(client, applied):
+    assert not applied.faults, applied.faults
+    assert applied.batch
+    assert loads(read(client, WORK_ITEM, whole=True).content)["decisions"] == [DECISION]
+    assert not read(client, DECISION).faults
+
+
+@then("the set lands, and the decision holds the replacement")
+def _lands_holding_the_replacement(client, applied):
+    assert not applied.faults, applied.faults
+    assert applied.batch
+    assert loads(read(client, DECISION, whole=True).content)["sections"] == REPLACED
+
+
+WEEKLY, DAILY = DECISION, "decision/price-reviews-happen-daily"
+
+
+@given("the decision type lets a decision point at another decision")
+def _decisions_may_point_at_decisions():
+    assert DECISION_TYPE["schema"]["properties"]["supersedes"]["ref"]["targets"] == ["decision"]
+
+
+@when(
+    "the client asks, in one go, for two decisions to be created, each pointing at the other, "
+    "saying which role and why",
+    target_fixture="applied",
+)
+def _create_two_pointing_at_each_other(client):
+    return apply(client, [
+        creation("decision", "Price reviews happen weekly", {"supersedes": DAILY, "sections": SECTIONS}),
+        creation("decision", "Price reviews happen daily", {"supersedes": WEEKLY, "sections": SECTIONS}),
+    ], message="Record two decisions that point at each other")
+
+
+@then("the set lands")
+def _the_set_lands(applied):
+    assert not applied.faults, applied.faults
+    assert [(result.id, result.revision) for result in applied.results] == [(WEEKLY, 1), (DAILY, 1)]
+
+
+@then("the store holds both decisions, each pointing at the other")
+def _both_held_pointing_at_each_other(client):
+    assert loads(read(client, WEEKLY, whole=True).content)["supersedes"] == DAILY
+    assert loads(read(client, DAILY, whole=True).content)["supersedes"] == WEEKLY

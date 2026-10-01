@@ -1,4 +1,4 @@
-"""A type checked as it is written, against the types the draft holds: every shape it refers to belongs to a type the
+"""A type checked as it is written, as the whole set leaves the types: every shape it refers to belongs to a type the
 store holds, it is not built on itself, every link field says which kinds it may point at, and a change to it moves
 its version on. What a type could never check an artifact against is refused here, once, rather than by every create
 that uses it."""
@@ -26,11 +26,11 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
 
 
 def _version_kept(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
-    """The fault of a type whose schema changed while its version did not go up from the version the draft holds;
-    nothing for a type the draft does not hold yet."""
-    if not draft.holds(type_id):
+    """The fault of a type whose schema the set changed while its version did not go up from the version the store
+    held before the set; nothing for a type the store did not hold."""
+    held = draft.before(type_id)
+    if held is None:
         return []
-    held = draft.artifact(type_id)
     if content["schema"] == held["schema"] or content["version"] > held["version"]:
         return []
     return [refusals.version_kept(type_id, held["version"])]

@@ -91,9 +91,12 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
     number, true or false, as an artifact's is, otherwise from its place in the collection, counted from 1, with a
     number added as an artifact's name has when an item beside it already has that name. On a write an item already
     carrying a name is the item of that name, moved or changed where it stands, and keeps it; a name is minted once
-    and never worked out again. An item that is not a set of named entries carries no name, and is passed over."""
+    and never worked out again. An item that is not a set of named entries carries no name, and is passed over, as is
+    a collection that is not a list."""
     for collection, part in parts.items():
         found = node.get(collection, [])
+        if not isinstance(found, list):
+            continue
         taken = {item["id"] for item in found if isinstance(item, dict) and keep_named and "id" in item}
         for place, item in enumerate(found, start=1):
             if not isinstance(item, dict):

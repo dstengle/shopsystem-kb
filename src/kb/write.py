@@ -1,11 +1,15 @@
-"""The write path: a set of operations applied in order to a draft of the store and checked there, against the store
-as the operations before it left it; only when every one passes is each entry's stamp settled by the clock and the
-set handed to the port, which lands every change and one entry per operation naming the set in one transaction. A
-fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store and recording
-a snapshot land through the port too."""
+"""The write path: a set of operations applied in order to a draft of the store, each acting on it as the operations
+before it left it, then every artifact the set touched checked once, its content, its links and a type as a type,
+against the store as the whole set leaves it; only when every one passes is each entry's stamp settled by the clock
+and the set handed to the port, which lands every change and one entry per operation naming the set in one
+transaction. A fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store
+and recording a snapshot land through the port too."""
 from typing import NamedTuple
 
-from kb import canonical, edits, journal, links, places, port, query, refusals, requests, settled, store, values
+from kb import (
+    canonical, composition, definitions, edits, journal, links, places, port, query, refusals, requests, settled, store,
+    validation, values,
+)
 from kb.draft import Draft
 from kb.edits import Change
 from kb.metaschema import METASCHEMA
@@ -99,19 +103,75 @@ def record(held: port.Port, named: list, signed: Signed, clock: journal.Clock | 
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:
-    """Every operation applied in order to a draft; refused with the faults of every operation that fails."""
-    changes, faults = [], []
-    for operation in operations:
-        if isinstance(operation, requests.Refusal):
-            faults += operation.faults
-            continue
-        try:
-            changes.append(edits.apply(draft, operation))
-        except Refused as refused:
-            faults += refused.faults
+    """Every operation applied in order to a draft, then what the set leaves checked once; refused with every fault,
+    in the order of the operations they belong to."""
+    outcomes = [_acted(draft, operation) for operation in operations]
+    changes = [each for each in outcomes if isinstance(each, Change)]
+    last = {change.artifact_id: change for change in changes}
+    faults = [fault for outcome in outcomes for fault in _faults(draft, outcome, last)]
     if faults:
         raise Refused(faults)
-    return changes
+    return [_versioned(draft, change, last[change.artifact_id] is change) for change in changes]
+
+
+def _acted(draft: Draft, operation) -> Change | list:
+    """What one operation did to the draft, or the faults it was refused with as it acted."""
+    if isinstance(operation, requests.Refusal):
+        return list(operation.faults)
+    try:
+        return edits.apply(draft, operation)
+    except Refused as refused:
+        return list(refused.faults)
+
+
+def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
+    """An operation's faults: those it was refused with as it acted; for a removal, every link the set leaves pointing
+    at what it removed; for a change, the names it handed back that the artifact did not hold, and, for the last the
+    set makes to an artifact, the artifact as the set leaves it against its type as the set leaves it."""
+    if not isinstance(outcome, Change):
+        return outcome
+    return [*outcome.faults, *_left(draft, outcome, last)]
+
+
+def _left(draft: Draft, outcome: Change, last: dict) -> list:
+    """What a change leaves refused for, judged against the state the whole set leaves."""
+    if outcome.left is None:
+        return [
+            refusals.still_linked(str(outcome.artifact_id), each.source, each.place)
+            for each in draft.links_in(outcome.artifact_id) if each.source != outcome.artifact_id
+        ]
+    if last[outcome.artifact_id] is not outcome:
+        return []
+    try:
+        return _fits(draft, outcome.artifact_id)
+    except Refused as refused:
+        return list(refused.faults)
+
+
+def _fits(draft: Draft, artifact_id: ArtifactId) -> list:
+    """Every fault of an artifact against its type, both as the set leaves them; a type, once it fits the type of
+    types, checked as a type too."""
+    checked = settled.checked(draft.artifact(artifact_id))
+    faults = validation.validate(
+        str(artifact_id), checked, composition.kind_schema(artifact_id.kind, draft)["schema"], draft,
+    )
+    if not faults and artifact_id.kind == values.TYPE_KIND:
+        faults = definitions.faults(artifact_id, checked, draft)
+    return faults
+
+
+def _versioned(draft: Draft, change: Change, last: bool) -> Change:
+    """The last change the set makes to an artifact, recording the version of its type as the set leaves it, the one
+    it was checked against, its entries in the order that type declares, and put in the draft so; any other change as
+    it acted."""
+    if change.left is None or not last:
+        return change
+    schema = composition.kind_schema(change.artifact_id.kind, draft)
+    left = settled.order(
+        {**change.left, "schema_version": schema["version"]}, composition.declared(schema["schema"], draft),
+    )
+    draft.put(change.artifact_id, left)
+    return change._replace(schema_version=schema["version"], left=left)
 
 
 def _serialised(changes: list[Change]) -> list[str | None]:
