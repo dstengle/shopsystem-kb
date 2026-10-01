@@ -2,7 +2,7 @@
 id: capability/sign-a-change
 title: Sign a change
 narrator: the client
-rests_on: [decision/0012-writes-need-role-and-message, decision/0014-signature-refused-before-operations, decision/0015-missing-message-rule, decision/0017-blank-role-or-message, decision/every-change-is-attributable]
+rests_on: [decision/0012-writes-need-role-and-message, decision/0014-signature-refused-before-operations, decision/0015-missing-message-rule, decision/0017-blank-role-or-message, decision/every-change-is-attributable, decision/one-signature]
 formulated_as: features/sign-a-change.feature
 ---
 
@@ -20,8 +20,8 @@ Every change says which role made it and why, so that every entry in the history
 
 ## Implementation, may change
 
-- The actor is `{ role, execution }`; the message is the request's `message`. Both travel to the storage port as the set's signature.
-- A missing role is the fault with rule `actor`, no artifact and no path; a missing message is rule `message`, no artifact and no path.
+- Every request that changes the store, and `Snapshot`, carries one `Signature`: the role, the piece of work and the message. It travels to the storage port as the set's signature.
+- A missing role is the fault with rule `actor`, no artifact and no place; a missing message is rule `message`, no artifact and no place.
 - Blank space is every character Python's `str.isspace` counts; a role or message counts as none when nothing is left once blank space is taken from either end.
 
 ## Not yet

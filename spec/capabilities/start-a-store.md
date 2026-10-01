@@ -2,7 +2,7 @@
 id: capability/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart]
+rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/starting-leaves-the-wire]
 formulated_as: features/start-a-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/start-a-store.feature
 
 ## Purpose
 
-The client starts a store in a directory it names. The store takes a place of its own inside that directory, holds only the type that describes types, and its history begins with that write. Starting a store is the one call that does not look for a store first. A store made by an earlier kb counts as a store here. This capability is not the operator's `kb init` (operate-a-store), and it never teaches the store any domain.
+The client starts a store in a directory it names, in its own process and never through a server. The store takes a place of its own inside that directory, holds only the type that describes types, and its history begins with that write. Starting a store is the one act that does not look for a store first. A store made by an earlier kb counts as a store here. This capability is not the operator's `kb init` (operate-a-store), and it never teaches the store any domain.
 
 ## Behaviour
 
@@ -33,7 +33,7 @@ The client starts a store in a directory it names. The store takes a place of it
 
 - The store is `<root>/kb/`, marked by `<root>/kb/store.yaml`, whose value says which form of store it marks (answer-a-damaged-file); its data lives in `<root>/kb/store.sqlite3`, in WAL mode. Nothing else in `<root>` is the store's concern.
 - Starting a store makes the directory, the marker and the database, and writes the type that describes types and the first history entry. No git repository is made.
-- `Init` takes the root path and the actor, and returns nothing. The root is an absolute or relative path.
+- A client starts a store by calling `kb.init(root, role)`, a function of the published package, which starts a store at the root under the role and takes the same optional clock `connect` takes; it raises `kb.NotStarted`, carrying the faults, when it refuses. There is no `Init` rpc. The root is an absolute or relative path.
 - The type that describes types (the metaschema) is shipped in kb's code and written as artifact `schema/schema`; its entry is the write of `schema/schema` at revision 1 with its digest.
 
 ## Not yet

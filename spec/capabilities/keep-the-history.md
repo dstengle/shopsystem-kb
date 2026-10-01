@@ -2,7 +2,7 @@
 id: capability/keep-the-history
 title: Keep the history
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/kb-runs-no-git, decision/every-change-is-attributable, decision/past-states-kept-not-yet-read, decision/history-ordered-per-artifact]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/kb-runs-no-git, decision/every-change-is-attributable, decision/past-states-kept-not-yet-read, decision/history-ordered-per-artifact, decision/one-method-per-action]
 formulated_as: features/keep-the-history.feature
 ---
 
@@ -37,11 +37,11 @@ Every change leaves an entry in the store's own history. The entry says when, by
 
 ## Implementation, may change
 
-- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `path`, `revision`, `schema_version`, `digest` (sha256 of the canonical bytes after the write), `message` and `batch`: the id of the `Apply` that wrote it, or the entry's own id for a single operation. Snapshot entries keep their shape.
+- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `place`, `revision`, `schema_version`, `digest` (sha256 of the canonical bytes after the write), `message` and `batch`: the name of the set (`CreateMany`, `ReplaceMany`, `AddMany` or `RemoveMany`) that wrote it, or the entry's own id for a single change. Snapshot entries keep their shape.
 - History entries are rows in the store's database, replacing the journal files. They ride with the set handed to the storage port, named by `journal.py` and fingerprinted from the canonical text.
 - The adapter keeps each artifact's content at every revision; today's contract does not read it.
-- `Journal` takes filters: artifact, actor, execution, batch, since.
-- A clock returns a `datetime`, read as UTC when it has no zone; the journal holds every moment in UTC. The clock is the in-process client's (`connect`) and is part of the published contract.
+- `History` (until v1 `Journal`) takes filters: artifact, actor, execution, batch, since.
+- A clock returns a `datetime`, read as UTC when it has no zone; the journal holds every moment in UTC. The clock is the in-process client's (`connect`) and `kb.init`'s, and is part of the published contract.
 - An unreadable `since` is the fault with rule `since`.
 
 ## Not yet

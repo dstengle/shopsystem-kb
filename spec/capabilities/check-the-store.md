@@ -2,7 +2,7 @@
 id: capability/check-the-store
 title: Check the store
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/stale-is-safe]
+rests_on: [decision/0006-validation-from-composed-schema, decision/stale-is-safe, decision/result-or-refusal]
 formulated_as: features/check-the-store.feature
 ---
 
@@ -21,7 +21,7 @@ The client checks every artifact the store holds against the current version of 
 
 ## Implementation, may change
 
-- `Validate` takes nothing and returns every violation as artifact, path and message, with stale artifacts listed.
+- `Check` (until v1 `Validate`) takes nothing. Its result is every violation as artifact, place, rule and message, and the stale artifacts listed apart; the violations are what the store holds, not a refusal.
 - An artifact is stale when its `schema_version` is behind its type's `version`.
 
 ## Not yet

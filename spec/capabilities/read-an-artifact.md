@@ -2,7 +2,7 @@
 id: capability/read-an-artifact
 title: Read an artifact
 narrator: the client
-rests_on: [decision/resolve-depth-defaults-to-zero, decision/summary-is-enough-to-navigate, decision/section-reads-are-the-common-read]
+rests_on: [decision/resolve-depth-defaults-to-zero, decision/summary-is-enough-to-navigate, decision/section-reads-are-the-common-read, decision/read-asks-for-one-level]
 formulated_as: features/read-an-artifact.feature
 ---
 
@@ -26,7 +26,7 @@ The client reads an artifact at a glance, one section by its title, or whole. It
 
 ## Implementation, may change
 
-- `Read` takes a locator, a level (`summary`, `section` with a title, `whole`) and a resolve depth, and returns node content.
+- `Read` takes a locator and asks for one level: a summary, the whole artifact with its links followed to a resolve depth, or one section by its title. The request carries only what that level takes, and the response returns node content.
 - A resolve depth of 0, the default, returns references as ids; depth 1 inlines each direct target; depth n follows references n hops. A target already inlined on the current resolution path is returned as a reference.
 - Branches inside a process point at steps of the same process by id and are not references.
 

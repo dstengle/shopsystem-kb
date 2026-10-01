@@ -2,7 +2,7 @@
 id: capability/name-what-is-asked-for
 title: Name what is asked for
 narrator: the client
-rests_on: [decision/0007-input-safety-at-the-boundary]
+rests_on: [decision/0007-input-safety-at-the-boundary, decision/one-method-per-action]
 formulated_as: features/name-what-is-asked-for.feature
 ---
 
@@ -31,8 +31,8 @@ Every call names what it means: a kind, an artifact's name, a place inside an ar
 
 ## Implementation, may change
 
-- A locator is `{ id, path }`, with `path` empty for the artifact root. Every node is addressable by a path from the root, such as `steps/draft/branches/0` or `sections/purpose/sections/rationale`.
-- An id matches `<type>/<slug>`, where `type` is a type the store holds and `slug` is `[a-z0-9]+(-[a-z0-9]+)*`. A part path is a sequence of node names of the same alphabet, or a collection name followed by an item id. `.`, `..`, `/` in a segment and absolute paths are faults; no file is resolved from them.
+- A locator is `{ id, place }`, with `place` empty for the artifact root; a request or response names a place inside an artifact as a place, never a path, and a kind as a kind, never a type. Every node is addressable by a place from the root, such as `steps/draft/branches/0` or `sections/purpose/sections/rationale`.
+- An id matches `<kind>/<slug>`, where `kind` is a kind the store holds a type for and `slug` is `[a-z0-9]+(-[a-z0-9]+)*`. A place is a sequence of node names of the same alphabet, or a collection name followed by an item id. `.`, `..`, `/` in a segment and absolute paths are faults; no file is resolved from them.
 - Every request is converted at the boundary into validated values (an id, a locator, a content tree) by one function per kind of value. Storage accepts only those values; one function derives a file's path from a validated id, and export writes a file only at that path, inside the directory it was given.
 
 ## Not yet

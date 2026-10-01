@@ -356,3 +356,60 @@ source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md
 A snapshot writes to the store, so it is a call that changes the store and is refused as `busy` like a change; kb export and kb validate are reads and are never refused as busy; where entries for different artifacts carry the same moment they are given in the order they landed, and a read of one artifact's history keeps landing order even where its moments run the other way.
 date: 2026-10-01
 source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md; the person's answers of 2026-10-01 to the integration's questions 5 to 8
+
+## decision/contract-v1
+kb's contract is published again as one breaking release in which every rpc is renamed or reshaped, what a call does unchanged except where note 2 changes it, and its package is `kb.v1`, so a client of one version calling a server of another is refused by the transport rather than answered wrongly.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/starting-leaves-the-wire
+A store is started by the operator's `kb init` or by a client in its own process calling `kb.init(root, role)`, which takes the same optional clock `connect` takes and raises `kb.NotStarted` carrying the faults when it refuses; there is no `Init` rpc, a served store cannot be started through its server, and starting keeps every behaviour it had, only the way it is asked for changing.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md; the controller's answer to the integration's question 5, under the person's delegation of 2026-10-01
+
+## decision/one-method-per-action
+Every rpc is one action named in the spec's words (`Create`, `Replace`, `Add`, `Remove`, `Read`, `List`, `Follow`, `Search`, `History`, `Snapshot`, `Check`) with a request and a response message of its own, no message shared between two requests except the small values every call names things with (a locator, a signature, a fault, a stub); a kind is called a kind and a place a place, never a type or a path, wherever a request or a response names one.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/sets-one-kind-at-a-time
+`Apply` and its four operation messages go; a set is one kind of change at a time, `CreateMany`, `ReplaceMany`, `AddMany` or `RemoveMany`, and never mixes kinds, so a create and a replacement are two calls; a set still lands whole or not at all, is checked against the state the whole set leaves, names itself and gives each change's own result.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/references-inside-a-set
+A create in `CreateMany` may carry a key of the client's choosing, unique in the set, and a link written `@<key>` anywhere in the set names the artifact that create makes, kb putting the minted name in its place before anything is checked; a reference names a whole artifact, never a part; a key no create carries, a key two creates carry, and a key with a place are refused with rule `ref`.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md; the controller's answers to the integration's questions 1, 2 and 8, under the person's delegation of 2026-10-01
+
+## decision/expected-revision
+`Replace`, `Add` and `Remove`, alone or in a set, may say the revision the client read the artifact at, and are then refused, with nothing of the set written, when the artifact stands at another revision as the change lands, a later change in a set to an artifact an earlier one changed being compared with the revision that earlier one left; the refusal names the revision it stands at and carries a rule of its own, `revision`, which joins kb's published rule names; a change that says none acts on the artifact as it stands.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md; the controller's answers to the integration's questions 3 and 4, under the person's delegation of 2026-10-01
+
+## decision/write-lock-and-expected-revision
+On one machine the database's write lock serialises writers across threads and processes, each change's revision compared inside the transaction; on a mismatch a change that says no expected revision is re-drafted against the new state and landed, so its client sees no conflict, and one that says an expected revision is refused with rule `revision`; readers never wait; across containers callers share a store through a server (0020), because SQLite over a network filesystem is not safe; there is no daemon.
+date: 2026-10-01
+supersedes: decision/write-lock-on-one-machine
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/one-signature
+Every request that changes the store, and `Snapshot`, carries one `Signature` holding the role, the piece of work and the message, a snapshot's piece of work being its signature's; the rules of signing do not change, only the shape they arrive in.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/result-or-refusal
+Every response is either the call's result or a refusal holding every fault, never both: a refusal carries no half-filled result and a result carries no faults; `Check`'s result is the violations and the stale, the violations being what the store holds, not a refusal.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/read-asks-for-one-level
+A `Read` asks for one level, a summary, the whole artifact with its links followed to a depth, or one section by its title, and its request carries only what that level takes.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/published-contract-v1
+What a client may depend on is still versioned together by the release tag: `kb.proto` in package `kb.v1`, `kb.init` and `kb.NotStarted`, `kb.client.connect` with its clock, `kb.content`, the connection file's form, and every fault's `rule` name; everything else may change without notice.
+date: 2026-10-01
+supersedes: decision/0018-the-published-contract
+source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md

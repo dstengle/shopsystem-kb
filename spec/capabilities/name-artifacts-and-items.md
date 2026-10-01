@@ -36,7 +36,7 @@ The store gives every artifact and every item of a collection its name. The name
 ## Implementation, may change
 
 - An artifact's id is `<type>/<slug>`. The slug is the title lowercased, runs of anything outside `[a-z0-9]` replaced by one hyphen, hyphens trimmed. On collision kb appends `-2`, `-3` and so on. The file path derives from the id.
-- An item's `id` is unique within its collection and first in its key order; it is minted from the item's `title` when the item schema has one, otherwise from its position, with the same suffix. `Append` and `Create`'s response return what was minted.
+- An item's `id` is unique within its collection and first in its key order; it is minted from the item's `title` when the item schema has one, otherwise from its position, with the same suffix. `Add`'s and `Create`'s results, and each create's result in `CreateMany`, return what was minted.
 - Titles are coerced to text after YAML 1.2 parsing. Only `Create` carries a title.
 
 ## Not yet

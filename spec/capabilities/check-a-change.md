@@ -2,7 +2,7 @@
 id: capability/check-a-change
 title: Check a change
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-on-one-machine]
+rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision]
 formulated_as: features/check-a-change.feature
 ---
 
@@ -35,10 +35,10 @@ Every create, change and added item is checked against the current version of it
 - kb's own structural rules (the section tree, items carrying an `id`, the identity keys) are JSON Schema fragments composed with the type's schema into one effective schema per artifact, checked by the standard validator in one pass. Code checks only what the schema language cannot express: a reference resolving to a node of a permitted type, required sections in their declared order, and id uniqueness in a collection.
 - The write path: kb applies each operation to an in-memory draft and checks the draft's content against JSON Schema and kb's keywords, collecting every error and stopping if any; it then hands the set to the storage port in one call, `land(changes, signature)`. Each change carries the operation, the artifact's id, its whole content after the change (none for a removal), its links as kb derives them from the type (field, place in the artifact, target artifact and part, and the kinds the field allows, already expanded to derived kinds), the parts it holds by place, and the revision it was read at. The journal entries ride with the set.
 - Inside one write transaction the adapter takes the write lock, compares each revision and refuses `conflict` on a mismatch, checks every link lands on an artifact or part of an allowed kind, refuses `linked` when anything outside the set links into an artifact or part the set removes, and only then writes the artifacts, the link index, the search rows and the history. It re-checks integrity inside the transaction, so a concurrent change cannot slip between the check and the write.
-- `conflict` and `linked` are the port's internal names and are never published. On `conflict`, kb re-drafts the change against the new state and lands it, so the client never sees it; `linked` reaches the client as a fault with rule `on_delete`, naming each link.
+- `conflict` and `linked` are the port's internal names and are never published. On `conflict`, kb re-drafts a change that carries no expected revision against the new state and lands it, so its client never sees it, and refuses one that carries an expected revision with rule `revision` (change-the-store); `linked` reaches the client as a fault with rule `on_delete`, naming each link.
 - Every artifact carries one implicit link to its type artifact (`schema/<kind>`), so removing a type still in use is refused by the same rule; the adapter knows nothing of kinds.
 - The port is a kb-internal Python interface, not published. Above it, unchanged: names, content checks, sections and items, signatures, faults, the contract. `store.py` keeps discovery and the marker; `port.py` holds the interface and `sqlite_store.py` the SQLite adapter; `journal.py` keeps entry naming and fingerprints but writes no files; the git code is gone.
-- Faults are `{ artifact, path, rule, message }`; a fault for content that breaks a type's JSON Schema carries the keyword it breaks as its rule.
+- Faults are `{ artifact, place, rule, message }`; a fault for content that breaks a type's JSON Schema carries the keyword it breaks as its rule.
 
 ## Not yet
 
