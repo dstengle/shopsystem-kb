@@ -36,6 +36,13 @@ Feature: Make several changes in one go
     And the store holds neither change
     And every fault in the set comes back, not only the first
 
+  Scenario: Faults of several refused changes in a set come in the order of the set
+    Pins that a set's refusal reads in the order the client wrote the set, so a client can match each fault to its change without searching.
+    Given a set whose first and second changes are each missing a section its type requires
+    When the client asks for the set, saying which role and why
+    Then the set is rejected because a change in it does not fit its type
+    And the first change's fault comes back before the second change's fault
+
   @slice-85
   Scenario Outline: A set stopped for any reason at all leaves the store exactly as it was
     Pins all-or-nothing for every way a set can be stopped, not only a change that does not fit: the whole set is worked out and checked before anything is written, so nothing ever half-lands.
