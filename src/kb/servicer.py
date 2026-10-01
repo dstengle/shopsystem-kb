@@ -41,7 +41,7 @@ def _escaped(error: Exception) -> kb_pb2.Fault:
     if isinstance(error, port.Busy):
         return refusals.busy()
     if isinstance(error, (port.Unreadable, sqlite3.Error)):
-        return refusals.unreadable(str(error))
+        return refusals.unreadable(error)
     return refusals.escaped(f"{type(error).__name__}: {error}")
 
 

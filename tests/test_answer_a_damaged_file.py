@@ -1,7 +1,10 @@
 """A store whose database cannot be read, damaged behind its back or missing beside its marker, refuses every call and
 the operator's commands with one fault, writing nothing anywhere."""
+import os
 import re
+from pathlib import Path
 
+import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
@@ -55,6 +58,15 @@ DAMAGES = {
 @given(parsers.re(f"the store's database (?P<damage>{'|'.join(map(re.escape, DAMAGES))})"))
 def _database_damaged(root, damage):
     DAMAGES[damage](root)
+
+
+@pytest.fixture
+def where(root):
+    """Where the operator works and what it is told: inside the store with nothing set, or, when a Given has set KB_ROOT
+    to name the store, where the process works, told so."""
+    if "KB_ROOT" in os.environ:
+        return {"cwd": Path.cwd(), "env": {"KB_ROOT": os.environ["KB_ROOT"]}}
+    return {"cwd": root, "env": {}}
 
 
 @given("an empty directory outside the store", target_fixture="empty")
@@ -124,6 +136,28 @@ def _rejected_as_unreadable(answered):
         _unreadable(*line.split(": ", 3)[2:4])
 
 
+def _earlier(rule, message):
+    assert rule == "unreadable"
+    assert "made by an earlier version of kb" in message
+
+
+@then("what was asked is rejected because the store was made by an earlier version of kb")
+def _rejected_as_earlier(answered):
+    if hasattr(answered, "faults"):
+        [fault] = answered.faults
+        assert (fault.artifact, fault.path) == ("", "")
+        _earlier(fault.rule, fault.message)
+    else:
+        [line] = answered.stderr.splitlines()
+        _earlier(*line.split(": ", 3)[2:4])
+
+
+@then("the fault says to start a new store and import the old one's files")
+def _says_how_to_move(answered):
+    message = answered.faults[0].message if hasattr(answered, "faults") else answered.stderr
+    assert "start a new store and import the old one's files" in message
+
+
 @then("the fault is given as any other fault is given, never breaking off")
 def _given_as_any_other_fault(answered):
     if hasattr(answered, "faults"):
@@ -155,30 +189,55 @@ def _exported_from_another_store(tmp_path):
 
 
 @when("the operator runs kb validate in that store", target_fixture="answered")
-def _kb_validate(root, before):
-    return _answered(root, before, lambda: _kb("validate", cwd=root))
+def _kb_validate(root, before, where):
+    return _answered(root, before, lambda: _kb("validate", **where))
 
 
 @when("the operator runs kb export in that store, aimed at the empty directory", target_fixture="answered")
-def _kb_export(root, before, empty):
-    return _answered(root, before, lambda: _kb("export", str(empty), cwd=root))
+def _kb_export(root, before, empty, where):
+    return _answered(root, before, lambda: _kb("export", str(empty), **where))
 
 
 @when(
     "the operator checks a directory exported from another store for import in that store", target_fixture="answered",
 )
-def _kb_import_check(root, before, tmp_path):
+def _kb_import_check(root, before, tmp_path, where):
     exported = _exported_from_another_store(tmp_path)
-    return _answered(root, before, lambda: _kb("import", str(exported), "--check", cwd=root))
+    return _answered(root, before, lambda: _kb("import", str(exported), "--check", **where))
 
 
 @when(
     "the operator runs kb import in that store on a directory exported from another store, saying which role they are",
     target_fixture="answered",
 )
-def _kb_import(root, before, tmp_path):
+def _kb_import(root, before, tmp_path, where):
     exported = _exported_from_another_store(tmp_path)
-    return _answered(root, before, lambda: _kb("import", str(exported), cwd=root, env={"KB_ACTOR": OPERATOR}))
+    env = {**where["env"], "KB_ACTOR": OPERATOR}
+    return _answered(root, before, lambda: _kb("import", str(exported), cwd=where["cwd"], env=env))
+
+
+@given(
+    "a store holding a decision, a process and a tag, made by an earlier kb in a form this kb cannot read",
+    target_fixture="client",
+)
+def _store_made_by_an_earlier_kb(root):
+    client = _store_with_a_decision_a_process_and_a_tag(root)
+    held.made_by_an_earlier_kb(root)
+    return client
+
+
+@given(parsers.re("the store is found (?P<how>upward from the working directory|through KB_ROOT naming it)"),
+       target_fixture="client")
+def _store_found(root, tmp_path, monkeypatch, how):
+    """The client readied with no root, so it finds the store as a call is made; the operator told the same way."""
+    if how.startswith("upward"):
+        monkeypatch.chdir(root)
+    else:
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        monkeypatch.chdir(outside)
+        monkeypatch.setenv("KB_ROOT", str(root))
+    return kb_client.connect()
 
 
 @scenario(

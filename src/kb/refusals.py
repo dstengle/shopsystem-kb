@@ -1,8 +1,11 @@
 """The refusals the domain makes of what a store holds, each with its rule and its message. Conversions refuse in
 kb.values and type checks in kb.validation; what neither owns is made here, so no domain module names a contract type."""
+import sqlite3
+
 from kb import names, rules
 from kb.contract import kb_pb2
 from kb.names import Misnamed
+from kb.port import EarlierKb, Unreadable
 from kb.values import ArtifactId, Locator
 
 
@@ -182,8 +185,14 @@ def clock_failed(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.CLOCK, message=f"the clock failed when it was asked the time: {problem}")
 
 
-def unreadable(problem: str) -> kb_pb2.Fault:
-    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {problem}")
+def unreadable(error: Unreadable | sqlite3.Error) -> kb_pb2.Fault:
+    """The fault for a store that cannot be read: the database named, or, for one an earlier kb made, how to move it."""
+    if isinstance(error, EarlierKb):
+        return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
+            f"the store at {error} was made by an earlier version of kb, in a form this kb cannot read; "
+            f"start a new store and import the old one's files"
+        ))
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {error}")
 
 
 def busy() -> kb_pb2.Fault:

@@ -234,6 +234,18 @@ def _rejected_as_already_a_store(started, root):
     ]
 
 
+@given("a directory that already has a store inside it, made by an earlier kb", target_fixture="root")
+def _directory_with_an_earlier_kbs_store(root, before):
+    held.made_by_an_earlier_kb(root)
+    before.update(held=held.bytes_held(root))
+    return root
+
+
+@then("the store that is there is left as it was")
+def _earlier_store_left_as_it_was(root, before):
+    assert held.bytes_held(root) == before["held"]
+
+
 @then("starting the store is rejected because that directory is inside a store")
 def _rejected_as_inside_a_store(started, root, before):
     assert [(fault.rule, fault.message) for fault in started.faults] == [

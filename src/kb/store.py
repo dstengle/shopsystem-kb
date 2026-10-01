@@ -1,7 +1,8 @@
 """Where a store is and what marks it: <root>/kb/, holding the marker store.yaml and beside it the database the
 adapter keeps the store in; and finding it, the way git finds a repository: upward from the working directory, or
-named by KB_ROOT. CONTRACT_VERSION is the store marker's value alone, written to store.yaml when the store is
-started; the store's own, not part of the published contract (adrs/0018)."""
+named by KB_ROOT. STORE_FORM is the store marker's value alone, written to store.yaml when the store is
+started; the store's own, not part of the published contract (adrs/0018). An earlier kb's marker held `contract`,
+and a store it made is told apart by that."""
 import contextlib
 import shutil
 import sqlite3
@@ -10,17 +11,29 @@ from typing import Callable, Mapping
 
 from kb import canonical, rules, sqlite_store
 from kb.contract import kb_pb2
-from kb.port import Port, Unreadable
+from kb.port import EarlierKb, Port, Unreadable
 from kb.values import Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
-CONTRACT_VERSION = "0.1"
+STORE_FORM = 1
 
 
 def opened(root) -> contextlib.AbstractContextManager[Port]:
-    """The store at root, open until the block ends: the database beside its marker, handed to the adapter."""
+    """The store at root, open until the block ends: the database beside its marker, handed to the adapter. Raises
+    EarlierKb, opening nothing, when the marker is the one an earlier kb wrote."""
+    _told_apart(Path(root))
     return sqlite_store.opened(Path(root) / DATABASE)
+
+
+def _told_apart(root: Path) -> None:
+    """Refuse a store whose marker holds `contract`, the one an earlier kb wrote."""
+    try:
+        marker = canonical.load((root / MARKER).read_text(encoding="utf-8"))
+    except (canonical.NotCanonical, OSError):
+        return
+    if isinstance(marker, dict) and "contract" in marker:
+        raise EarlierKb(str(root))
 
 
 def start(root: Root, fill: Callable[[Port], None]) -> None:
@@ -34,7 +47,7 @@ def start(root: Root, fill: Callable[[Port], None]) -> None:
         sqlite_store.make(root.path / DATABASE)
         with opened(root.path) as made:
             fill(made)
-        (root.path / MARKER).write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
+        (root.path / MARKER).write_text(canonical.dump({"store": STORE_FORM}), encoding="utf-8")
     except (sqlite3.Error, OSError, Unreadable):
         shutil.rmtree(place)
         raise
