@@ -164,3 +164,14 @@ def _rejected_as_two_stores(ran, where):
         f"kb validate: refused: store: KB_ROOT names a store other than the one {where['cwd']} is working in: "
         f"KB_ROOT is {where['env']['KB_ROOT']}, the working directory is inside {where['cwd']}; neither is guessed at\n"
     )
+
+
+@then("the store is checked")
+def _the_store_is_checked(ran):
+    assert ran.returncode == 1, ran.stderr
+    assert _unworded(ran.stdout) == _unworded(REPORT)
+
+
+@then("kb validate is not refused because the store was busy with another change")
+def _validate_not_busy(ran):
+    assert (ran.returncode, ran.stderr) == (1, "")
