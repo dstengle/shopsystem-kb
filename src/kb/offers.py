@@ -4,8 +4,7 @@ top, are passed over, unread: an old store's `.git/`, `journal/` and marker, and
 database. A name that names no directory is refused. Nothing here checks an artifact against a type."""
 from dataclasses import dataclass, field
 
-from kb import canonical, names, refusals, rules, settled, store, values
-from kb.contract import kb_pb2
+from kb import canonical, names, refusals, settled, store, values
 from kb.values import ArtifactId, Directory, Refused
 
 HISTORY = (".git", "journal")
@@ -27,9 +26,7 @@ def offered(directory: Directory) -> list[Offered]:
     """Every file below the directory, read, in the order of the places the layout gives them. Raises Refused when
     the name names no directory."""
     if not directory.path.is_dir():
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"an import is read from a directory; {directory.named!r} is not one",
-        )])
+        raise Refused([refusals.not_an_import_directory(directory.named)])
     return [_offered(directory, steps) for steps in _files(directory)]
 
 

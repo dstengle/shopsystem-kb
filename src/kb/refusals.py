@@ -122,6 +122,23 @@ def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
     )
 
 
+def not_an_import_directory(named: str) -> kb_pb2.Fault:
+    """A name offered for import that is not a directory."""
+    return kb_pb2.Fault(rule=rules.ROOT, message=f"an import is read from a directory; {named!r} is not one")
+
+
+def not_an_export_directory(named: str) -> kb_pb2.Fault:
+    """A name an export is to be written into that is not a directory."""
+    return kb_pb2.Fault(
+        rule=rules.ROOT, message=f"an export is written into a directory; {named!r} is not a directory",
+    )
+
+
+def export_would_overwrite(named: str) -> kb_pb2.Fault:
+    """A directory an export is to be written into that already holds something."""
+    return kb_pb2.Fault(rule=rules.ROOT, message=f"an export never overwrites; {named!r} already holds something")
+
+
 def unreadable_file(file: str, problem: str) -> kb_pb2.Fault:
     """A file offered for import that cannot be read as YAML 1.2."""
     return kb_pb2.Fault(artifact=file, rule=rules.UNREADABLE, message=f"it cannot be read as YAML 1.2: {problem}")

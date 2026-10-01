@@ -4,8 +4,7 @@ Each artifact's entries are written in the order the current version of its type
 its content, revision and type version are written as the store holds them."""
 from dataclasses import dataclass, field
 
-from kb import canonical, composition, rules, settled, values
-from kb.contract import kb_pb2
+from kb import canonical, composition, refusals, settled, values
 from kb.port import Port
 from kb.values import Directory, Refused
 
@@ -44,10 +43,6 @@ def _empty(into: Directory) -> None:
     """Refuse what is not a directory, and a directory that holds anything: an export never writes over what is
     there."""
     if into.path.exists() and not into.path.is_dir():
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"an export is written into a directory; {into.named!r} is not a directory",
-        )])
+        raise Refused([refusals.not_an_export_directory(into.named)])
     if into.path.is_dir() and any(into.path.iterdir()):
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"an export never overwrites; {into.named!r} already holds something",
-        )])
+        raise Refused([refusals.export_would_overwrite(into.named)])
