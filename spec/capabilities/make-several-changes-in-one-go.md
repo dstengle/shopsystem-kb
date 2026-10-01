@@ -2,7 +2,7 @@
 id: capability/make-several-changes-in-one-go
 title: Make several changes in one go
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/scale-without-a-lock]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine]
 formulated_as: features/make-several-changes-in-one-go.feature
 ---
 
@@ -10,23 +10,24 @@ formulated_as: features/make-several-changes-in-one-go.feature
 
 ## Purpose
 
-The client asks for an ordered set of creates, replacements, additions and removals as one act. The store names the set, and each change still reports its own result and leaves its own history entry. Each change is checked against the store as the earlier changes in the set left it, and the set lands whole or not at all. This capability is not the individual changes themselves (change-the-store).
+The client asks for an ordered set of creates, replacements, additions and removals as one act. The store names the set, and each change still reports its own result and leaves its own history entry. The set is checked once as a whole against the store it leaves, so its changes may point at each other and rely on one another, and it lands whole or not at all. This capability is not the individual changes themselves (change-the-store).
 
 ## Behaviour
 
 - When the client asks for several changes in one go, saying which role and why, it is given one name for the set, which it never asked for, and each change's own result, and the store's history shows the set as one change.
 - When the client reads the history under the name it was given for a set, it finds exactly that set's changes.
 - If a change in a set does not fit its type, the set is refused because a change in it does not fit its type, the store holds none of its changes, and every fault in the set comes back, not only the first.
-- If a set is stopped for any reason (a change names an artifact the store holds nothing under, removes an artifact something still points at, or touches an artifact whose stored file cannot be read), the set is refused naming that reason, the store holds none of its changes, and the history holds no entry for any of them.
+- If a set is stopped for any reason (a change names an artifact the store holds nothing under, or removes an artifact something still points at), the set is refused naming that reason, the store holds none of its changes, and the history holds no entry for any of them.
 - If a set holds no changes at all, it is refused because a set must hold at least one change, the store holds no artifact it did not hold before, and the history holds no entry for it.
 - When a set changes one artifact twice, the history holds an entry for each change with the revision it left, and the artifact's revision goes up by two.
 - If a set holds no changes, the client is given no name for the set and no results.
 - If a set holding no changes also lacks a role or a message, only the faults of the role and the message come back.
-- When a change in a set refers to what an earlier change in it made, it is checked against the store as the earlier changes left it.
+- When a change in a set relies on what another change in it makes, earlier or later, it is checked against the store as the whole set leaves it.
+- When two new artifacts in one set point at each other, the set lands.
 
 ## Implementation, may change
 
-- `Apply` takes an ordered list of Create/Write/Append/Delete, actor and message, and returns the batch id minted by kb, per-operation results, and one commit.
+- `Apply` takes an ordered list of Create/Write/Append/Delete, actor and message, and returns the batch id minted by kb and per-operation results; the set lands in one database transaction.
 - The batch id is carried by every entry the set writes.
 - An empty set is the fault with rule `operations`, no artifact and no path.
 

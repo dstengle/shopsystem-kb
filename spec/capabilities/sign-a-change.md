@@ -20,7 +20,7 @@ Every change says which role made it and why, so that every entry in the history
 
 ## Implementation, may change
 
-- The actor is `{ role, execution }`; the message is the request's `message`. The commit's author is the actor and its message the request's.
+- The actor is `{ role, execution }`; the message is the request's `message`. Both travel to the storage port as the set's signature.
 - A missing role is the fault with rule `actor`, no artifact and no path; a missing message is rule `message`, no artifact and no path.
 - Blank space is every character Python's `str.isspace` counts; a role or message counts as none when nothing is left once blank space is taken from either end.
 

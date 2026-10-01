@@ -2,7 +2,7 @@
 id: capability/change-the-store
 title: Change the store
 narrator: the client
-rests_on: [decision/graph-as-documents, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/a-refused-write-changes-nothing, decision/restore-on-commit-failure, decision/0007-input-safety-at-the-boundary]
+rests_on: [decision/graph-as-records, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/integrity-checked-both-ways, decision/a-refused-write-changes-nothing, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine, decision/0007-input-safety-at-the-boundary]
 formulated_as: features/change-the-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/change-the-store.feature
 
 ## Purpose
 
-The client creates an artifact, replaces an artifact or one node inside it, adds an item to a collection, or removes an artifact. Each change comes back with what it produced: the name the store gave and the new revision. Only a whole artifact is removed, and a removal is refused while anything points at it, the refusal handing back every link in the way. A change that fails partway leaves the store as it was. This capability does not cover checking (check-a-change), naming (name-artifacts-and-items) or sets of changes (make-several-changes-in-one-go).
+The client creates an artifact, replaces an artifact or one node inside it, adds an item to a collection, or removes an artifact. Each change comes back with what it produced: the name the store gave and the new revision. Only a whole artifact is removed. A removal, or a replacement that drops an item, is refused while anything points at what would go, the refusal handing back every link in the way. Clients changing one store at once on one machine each have their change checked against the store as the one before left it. A change that fails partway leaves the store as it was. This capability does not cover checking (check-a-change), naming (name-artifacts-and-items) or sets of changes (make-several-changes-in-one-go).
 
 ## Behaviour
 
@@ -26,17 +26,22 @@ The client creates an artifact, replaces an artifact or one node inside it, adds
 - If something points at the artifact being removed, the removal is refused because something still points at it, and the client is given every link that blocks it.
 - If an item inside another artifact points at the artifact being removed, the removal is refused because something still points at it, and that link is among the links given.
 - If recording a change in the store's history fails, the client is given a fault and the store holds what it held before.
-- If the clock or git fails during a change, the client is given a fault and the store holds what it held before.
+- If the clock fails during a change, the client is given a fault and the store holds what it held before.
 - If the client removes a place inside an artifact, the removal is refused because only a whole artifact is removed.
+- If the client replaces an artifact, or a node in it, so that an item something links into is no longer there, the change is refused because something still points at that item, and the client is given each such link.
+- While several clients on one machine change one store in process, each change is checked against the store as every earlier change left it.
+- When one client removes an artifact while another adds a link to it, the removal and the new link never both land: whichever lands second is refused, the removal because something still points at it, or the link because a link must land on a node of a kind the type allows.
+- When two clients replace one artifact at the same time, each replacement leaves a revision of its own, both are in the history, and the artifact holds the content of the later one.
 
 ## Implementation, may change
 
 - `Create` takes type, title, content, actor and message, and returns id and revision. `Write` takes a locator, content, actor and message, and returns revision. `Append` takes the locator of a collection, item content, actor and message, and returns item id and revision. `Delete` takes a locator, actor and message, and returns revision, or the list of inbound references that block it; its locator names a whole artifact.
 - `revision` is an integer kb increments on every write; `schema_version` is set to the type's current version on every write.
-- A delete is refused while there are inbound references to the artifact or anything beneath it; the only delete rule is `on_delete: refuse`. A part is taken out by rewriting its collection.
-- On a git failure, kb restores the written files from HEAD and reports the failure. Per-file writes are atomic through rename. Every rpc runs inside one fail-closed wrapper, so an exception a clock or git raises becomes a fault.
+- A delete is refused while there are inbound references to the artifact or anything beneath it; the only delete rule is `on_delete: refuse`. A part is taken out by rewriting its collection. Every refusal because something still points at what would go (a whole artifact, a dropped item, a type in use) carries the rule `on_delete` and names each link; the port's own name for it, `linked`, is not published.
+- Every change, single or in a set, lands in one database transaction. SQLite's write lock serialises writers across threads and processes on one machine, and readers never wait. When the adapter finds a change's revision moved since kb read it (`conflict`, internal to the port), kb re-drafts the change against the new state and lands it; the client never sees that fault. Every rpc runs inside one fail-closed wrapper, so an exception a clock or the database raises becomes a fault.
 
 ## Not yet
 
 - Delete rules other than refuse (cascade, detach). Promoted when operators need cascade or detach (decision/refuse-is-enough-for-deletes).
-- A daemon. Promoted when changes wait at the server in growing numbers (decision/scale-without-a-lock).
+- A daemon. Promoted when changes wait at the server in growing numbers (decision/write-lock-on-one-machine).
+- Refusing a change to an artifact that moved since the caller read it. Promoted when the contract's next version (note 2) carries an expected revision on a change.

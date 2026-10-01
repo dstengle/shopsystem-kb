@@ -2,7 +2,7 @@
 id: capability/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/0001-yaml-1-2-git-canonical, decision/init-refuses-inside-or-above, decision/0019-kb-git-owns-its-store, decision/types-are-data]
+rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data]
 formulated_as: features/start-a-store.feature
 ---
 
@@ -16,7 +16,6 @@ The client starts a store in a directory it names. The store takes a place of it
 
 - When the client starts a store in a directory, saying which role it is, the store holds the one type that describes what a type is, no other type and no content, and the client can define its own types in it straight away.
 - When the client starts a store, the store's history holds one entry, under the client's role, with the message "initialise store", which is the writing of the type that describes types at its first revision, with a fingerprint of what was written.
-- While the client's environment names a git repository to work in, the directory's own or one elsewhere that holds no store, when the client starts a store, the store's history holds its one entry and that repository gains nothing in its history and nothing made ready for its next commit.
 - Where the client was readied with a clock, when it starts a store, the store's one history entry says it happened at the moment the clock gives.
 - If the client starts a store without saying which role it is, starting is refused because a store can only be started under a role, and the directory holds no store.
 - When the client starts a store in a directory holding other files, the store is made inside that directory in a place of its own, and the files already there are left as they were.
@@ -31,10 +30,10 @@ The client starts a store in a directory it names. The store takes a place of it
 
 ## Implementation, may change
 
-- The store is `<root>/kb/`, marked by `<root>/kb/store.yaml`, which records the contract version; `<root>/kb/` is itself the git repository kb owns. Nothing else in `<root>` is the store's concern.
+- The store is `<root>/kb/`, marked by `<root>/kb/store.yaml`, which records the contract version; its data lives in `<root>/kb/store.sqlite3`, in WAL mode. Nothing else in `<root>` is the store's concern.
+- Starting a store makes the directory, the marker and the database, and writes the type that describes types and the first history entry. No git repository is made.
 - `Init` takes the root path and the actor, and returns nothing. The root is an absolute or relative path.
-- The type that describes types (the metaschema) is shipped in kb's code and written to `schema/schema.yaml`; its entry is the write of artifact `schema/schema` at revision 1 with its digest.
-- Every git call kb makes runs with the variables `git rev-parse --local-env-vars` lists cleared, together with `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT`; kb's own `-c` settings stay in force.
+- The type that describes types (the metaschema) is shipped in kb's code and written as artifact `schema/schema`; its entry is the write of `schema/schema` at revision 1 with its digest.
 
 ## Not yet
 

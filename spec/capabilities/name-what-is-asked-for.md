@@ -33,7 +33,7 @@ Every call names what it means: a kind, an artifact's name, a place inside an ar
 
 - A locator is `{ id, path }`, with `path` empty for the artifact root. Every node is addressable by a path from the root, such as `steps/draft/branches/0` or `sections/purpose/sections/rationale`.
 - An id matches `<type>/<slug>`, where `type` is a type the store holds and `slug` is `[a-z0-9]+(-[a-z0-9]+)*`. A part path is a sequence of node names of the same alphabet, or a collection name followed by an item id. `.`, `..`, `/` in a segment and absolute paths are faults; no file is resolved from them.
-- Every request is converted at the boundary into validated values (an id, a locator, a content tree) by one function per kind of value. Storage accepts only those values, one function derives a file path from a validated id, and a file is written only at that path, inside `<root>/kb/`.
+- Every request is converted at the boundary into validated values (an id, a locator, a content tree) by one function per kind of value. Storage accepts only those values; one function derives a file's path from a validated id, and export writes a file only at that path, inside the directory it was given.
 
 ## Not yet
 

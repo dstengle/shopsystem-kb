@@ -2,7 +2,7 @@
 id: capability/hand-over-content
 title: Hand over content
 narrator: the client
-rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/0001-yaml-1-2-git-canonical, decision/serialization-yaml]
+rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire]
 formulated_as: features/hand-over-content.feature
 ---
 
@@ -33,7 +33,7 @@ When the client creates, changes or adds, it hands the store content as text. Th
 
 - `content` is canonical YAML 1.2 text holding only fields, sections and parts; the identity keys `id`, `type`, `schema_version`, `revision` and `title` are typed fields of the messages that carry an artifact. Clients parse content with any YAML parser.
 - Content is parsed with a safe YAML 1.2 loader using the core schema: only `true`, `false`, `null`, integers and floats are typed. Tags, anchors, aliases, `%YAML` and `%TAG` directives, documents beyond the first, and duplicate keys are each a fault naming the place.
-- One canonical checker runs on content after parsing and on the bytes about to be written.
+- One canonical checker runs on content after parsing and on the canonical text about to be stored or exported.
 - `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`, the refusal of text kb cannot keep.
 
 ## Not yet

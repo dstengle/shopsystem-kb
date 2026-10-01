@@ -238,3 +238,85 @@ date: 2026-09-30
 revisit_when: changes wait at the server in growing numbers
 supersedes: decision/scale
 source: the migration gate; adrs/0020-a-server-found-where-the-store-is.md
+
+## decision/sqlite-canonical
+The store is one SQLite database, `kb/store.sqlite3` in WAL mode beside its marker `kb/store.yaml`, and canonical YAML 1.2, read and written by kb alone, is its export and wire form rather than its storage; chosen after a spike in which SQLite met every criterion fixed beforehand at 30,000 documents (reads and three-step traversals in about 0.02 ms, search in 4 ms, every race closed by its write lock and a revision compare-and-set), while TerminusDB 12.0.7 met two outright and the rest only with adapter code working around it.
+date: 2026-10-01
+supersedes: decision/0001-yaml-1-2-git-canonical
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/kb-runs-no-git
+Git is no longer kb's store and kb runs no git at all: starting a store makes no repository, the history is rows in the store's database, and committing exported files to git is the operator's choice.
+date: 2026-10-01
+supersedes: decision/0019-kb-git-owns-its-store
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/files-are-an-export
+Reviewable files are the operator's output, written on demand by `kb export` as canonical YAML; files on disk enter a store only through `kb import`, which checks them first and lands only in a freshly started store, one holding no artifact besides the type that describes types.
+date: 2026-10-01
+revisit_when: someone needs to combine stores
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/storage-behind-a-port
+kb's own rules (names, content checks, sections and items, signatures, faults, the contract) stay above a kb-internal, unpublished port and an adapter keeps the graph below it; SQLite is the first adapter, any other is gated by the same conformance tests, and the public contract, its rule names included, does not change with it.
+date: 2026-10-01
+revisit_when: a workload needs queries the port cannot answer within its bounds, such as transitive or pattern queries over transcripts and work state
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/integrity-checked-both-ways
+A change is checked for the links into what it changes as well as the links it carries: dropping an item, or removing an artifact or a type, that anything outside the set links into is refused with the published rule `on_delete` (`linked` is only the port's internal name), every artifact carrying one implicit link to its type, and the adapter re-checks this inside its write transaction so a concurrent change cannot slip between the check and the write.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/write-lock-on-one-machine
+On one machine the database's write lock serialises writers across threads and processes, each change's revision compared inside the transaction and, on a mismatch, the change re-drafted against the new state and landed, so no client sees a conflict; readers never wait; across containers callers share a store through a server (0020), because SQLite over a network filesystem is not safe; there is no daemon.
+date: 2026-10-01
+supersedes: decision/scale-without-a-lock
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/a-set-lands-in-one-transaction
+A set lands in one database transaction, so a failure part-way leaves nothing written and nothing to restore.
+date: 2026-10-01
+supersedes: decision/restore-on-commit-failure
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/a-set-is-checked-whole
+A set is checked once as a whole against the state it leaves, so its changes may point at each other and rely on any other in the set; each separate change is checked against the state the one before it left.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/performance-bounds
+At 30,000 artifacts a summary read and a three-step traversal take under 100 ms each, a single change under 50 ms and a set of 100 changes under 1 s, checked by a benchmark kept in the repository rather than by scenarios; a release that misses one does not ship.
+date: 2026-10-01
+revisit_when: the scale targets are set
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/damaged-database-one-fault
+A database that cannot be opened or read refuses every call and every command with one fault, rule `unreadable`, naming the database, and writes nothing; damage to files is found by the import check, not by the store.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/past-states-kept-not-yet-read
+The contract has no historical read; the store keeps each artifact's content at every revision, which the contract's next version will read.
+date: 2026-10-01
+revisit_when: a client needs a past state through the contract
+supersedes: decision/git-serves-time-travel
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/graph-as-records
+The primary model is a graph held as one record per artifact, parts inline with ids, references a schema primitive.
+date: 2026-10-01
+supersedes: decision/graph-as-documents
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/yaml-is-export-and-wire
+Canonical YAML is the export and wire form, read with a standard parser and emitted canonically by kb alone.
+date: 2026-10-01
+supersedes: decision/serialization-yaml
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/storage-may-change
+The API is the stable boundary; storage may change behind it, and changed to SQLite in note 1.
+date: 2026-10-01
+supersedes: decision/contract-stability
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md

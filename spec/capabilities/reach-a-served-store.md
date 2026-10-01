@@ -2,7 +2,7 @@
 id: capability/reach-a-served-store
 title: Reach a served store
 narrator: the client
-rests_on: [decision/0020-a-server-found-where-the-store-is, decision/0018-the-published-contract, decision/runtime-shape, decision/scale-without-a-lock]
+rests_on: [decision/0020-a-server-found-where-the-store-is, decision/0018-the-published-contract, decision/runtime-shape, decision/write-lock-on-one-machine]
 formulated_as: features/reach-a-served-store.feature
 ---
 
@@ -31,6 +31,7 @@ Several clients share one store through a server that hosts the same contract ov
 - The connection is `kb/server.yaml`, written by whoever arranges the callers and read as YAML 1.2, the way kb reads content. It holds one entry, `address`, the server's `host:port` as a caller can reach it (in a set of containers, the server's name on their shared network). The file's form is part of the published contract.
 - The network transport is `grpc.server` hosting the same servicer, called over a gRPC channel with the same method names, requests and responses; `connect` chooses the transport on each call.
 - Reads run alongside a change being written.
+- Across containers a server is the only way to share a store, since SQLite over a network filesystem is not safe.
 
 ## Not yet
 

@@ -2,7 +2,7 @@
 id: capability/keep-the-history
 title: Keep the history
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/0019-kb-git-owns-its-store, decision/every-change-is-attributable, decision/git-serves-time-travel]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/kb-runs-no-git, decision/every-change-is-attributable, decision/past-states-kept-not-yet-read]
 formulated_as: features/keep-the-history.feature
 ---
 
@@ -15,7 +15,6 @@ Every change leaves an entry in the store's own history. The entry says when, by
 ## Behaviour
 
 - When the client reads the history of an artifact, there is one entry for each change, and each says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the revision it left, a fingerprint of what was written, the message given, and which set of changes it landed with.
-- While the client's environment names a git repository to work in, the one the store's directory belongs to or one elsewhere that holds no store, when the client makes any change, every entry the change left is in the store's history under the role and message given, and that repository gains nothing in its history and nothing made ready for its next commit.
 - When the client reads the history, the entries of changes made in one go name the same set, and a change made on its own names itself as its own set.
 - When the client reads the history for one role, it is given only that role's entries.
 - When the client reads the history for one piece of work, it is given only the entries made for it.
@@ -34,12 +33,13 @@ Every change leaves an entry in the store's own history. The entry says when, by
 
 ## Implementation, may change
 
-- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `path`, `revision`, `schema_version`, `digest` (sha256 of the canonical bytes after the write), `message` and `batch`: the id of the `Apply` that wrote it, or the entry's own id for a single operation.
-- The journal is `journal/<YYYY>/<MM>/<DD>/<timestamp>-<seq>.yaml`, one file per entry, inside the store; the commit hash is not stored, since the entry is inside the commit and `git log` joins them.
+- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `path`, `revision`, `schema_version`, `digest` (sha256 of the canonical bytes after the write), `message` and `batch`: the id of the `Apply` that wrote it, or the entry's own id for a single operation. Snapshot entries keep their shape.
+- History entries are rows in the store's database, replacing the journal files. They ride with the set handed to the storage port, named by `journal.py` and fingerprinted from the canonical text.
+- The adapter keeps each artifact's content at every revision; today's contract does not read it.
 - `Journal` takes filters: artifact, actor, execution, batch, since.
 - A clock returns a `datetime`, read as UTC when it has no zone; the journal holds every moment in UTC. The clock is the in-process client's (`connect`) and is part of the published contract.
 - An unreadable `since` is the fault with rule `since`.
 
 ## Not yet
 
-- Reading a past state through the contract. Promoted when a client needs a past state through the contract (decision/git-serves-time-travel).
+- Reading a past state through the contract. Promoted when a client needs a past state through the contract (decision/past-states-kept-not-yet-read).

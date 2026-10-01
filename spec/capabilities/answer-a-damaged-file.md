@@ -2,7 +2,7 @@
 id: capability/answer-a-damaged-file
 title: Answer a damaged file
 narrator: the client
-rests_on: [decision/0007-input-safety-at-the-boundary]
+rests_on: [decision/damaged-database-one-fault, decision/0007-input-safety-at-the-boundary]
 formulated_as: features/answer-a-damaged-file.feature
 ---
 
@@ -10,19 +10,15 @@ formulated_as: features/answer-a-damaged-file.feature
 
 ## Purpose
 
-A file damaged behind the store's back never reaches a client as a crash. Every call that meets it answers with the same named fault, naming the file, and writes nothing. That holds for an artifact, a type or a history entry. Reporting damage across the whole store is check-the-store.
+The store's one file, its database, damaged behind the store's back, never reaches a client or the operator as a crash. Every call and every command of the command line that meets a database it cannot open or read answers with the same named fault, naming the database, and writes nothing. Damaged files on disk are found by the import check (export-and-import-a-store), not here.
 
 ## Behaviour
 
-- If the client reads an artifact whose stored file cannot be read, the read is refused because that file cannot be read, naming the file, and the client is given that fault as any other, the call never breaking off.
-- If the client replaces, adds an item to, removes, lists, searches, or follows the links into or out of an artifact whose stored file cannot be read, the call is refused because that file cannot be read, naming the file, the client is given that fault as any other, and nothing is written.
-- If the client creates an artifact of a kind whose type's stored file cannot be read, the create is refused because that file cannot be read, naming the file, and nothing is written.
-- If an entry of the store's history cannot be read, reading the history is refused because that file cannot be read, naming the file, and the client is given that fault as any other, the call never breaking off.
+- If the store's database cannot be opened or read, every call and every command of the command line is refused because the database cannot be read, naming the database, the refusal is given as any other fault, never breaking off, and nothing is written.
 
 ## Implementation, may change
 
-- Loading returns either the artifact or a fault naming the file, and never raises. Every rpc runs inside one fail-closed wrapper that turns any escaping exception into a fault with nothing written.
-- The fault's rule is `unreadable`.
+- The fault's rule is `unreadable`. Every rpc runs inside one fail-closed wrapper that turns any escaping exception into a fault with nothing written; the command line reports the same fault.
 
 ## Not yet
 

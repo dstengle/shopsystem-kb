@@ -32,4 +32,4 @@ The client reads an artifact at a glance, one section by its title, or whole. It
 
 ## Not yet
 
-- Reading a past state through the contract. Promoted when a client needs a past state through the contract (decision/git-serves-time-travel).
+- Reading a past state through the contract. Promoted when a client needs a past state through the contract (decision/past-states-kept-not-yet-read).
