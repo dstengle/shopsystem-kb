@@ -1,6 +1,7 @@
 """The store as a set's changes would leave it, read like the store: artifacts put here stand over the ones the store
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
-artifact) and the links into an artifact, over the port."""
+artifact) and the links into an artifact, over the port. A type it reads from the store is kept as first read, so
+every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names
 from kb.port import Linking, Port
 from kb.values import TYPE_KIND, ArtifactId
@@ -11,6 +12,7 @@ class Draft:
         self._store = store
         self._pending: dict[ArtifactId, dict] = {}
         self._removed: set[ArtifactId] = set()
+        self._types: dict[ArtifactId, dict] = {}
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
         self._removed.discard(artifact_id)
@@ -27,7 +29,18 @@ class Draft:
     def artifact(self, artifact_id: ArtifactId) -> dict:
         if artifact_id in self._pending:
             return self._pending[artifact_id]
-        return self._store.artifact(artifact_id)
+        if artifact_id.kind != TYPE_KIND:
+            return self._store.artifact(artifact_id)
+        if artifact_id not in self._types:
+            self._types[artifact_id] = self._store.artifact(artifact_id)
+        return self._types[artifact_id]
+
+    def as_read(self, type_ids: list[ArtifactId]) -> tuple[tuple[ArtifactId, int], ...]:
+        """Each type given that the draft read from the store and leaves as it is, with the revision it was read at."""
+        return tuple(
+            (each, self._types[each]["revision"]) for each in type_ids
+            if each in self._types and each not in self._pending and each not in self._removed
+        )
 
     def links_in(self, target: ArtifactId) -> list[Linking]:
         """Every link into an artifact or a part inside it from an artifact the draft holds, in the order of their

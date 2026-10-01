@@ -1058,3 +1058,31 @@ def _the_type_of_types_kept(root, before):
     assert held.text(root, "schema/schema") == before["type of types"]
     entries = journal(kb_client.connect(root), artifact="schema/schema").entries
     assert [(entry.op, entry.message) for entry in entries] == [("create", "initialise store")]
+
+
+def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the_order_its_type_now_declares(
+    tmp_path, monkeypatch,
+):
+    def typed(order, version):
+        fields = {name: {"type": "string"} for name in ["title", *order]}
+        return {"version": version, "schema": {"type": "object", "properties": fields, "required": ["title"]}}
+
+    source, target, exported = (tmp_path / each for each in ("source", "target", "exported"))
+    for root in (source, target):
+        root.mkdir()
+        kb_client.connect(root).Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    client = kb_client.connect(source)
+    define(client, {"title": "Note", **typed(["a", "b"], 1)})
+    create(client, "note", {"title": "X", "b": "second", "a": "first"})
+    write(client, "schema/note", typed(["b", "a"], 2))
+    assert list(client.Validate(kb_pb2.ValidateRequest()).violations) == []
+    monkeypatch.setenv("KB_ROOT", str(source))
+    assert kb_client.export(str(exported)).faults == []
+    text = (exported / "note" / "x.yaml").read_text(encoding="utf-8")
+    assert list(_loaded(text)) == [*IDENTITY, "b", "a"]
+    assert (_loaded(text)["schema_version"], _loaded(text)["revision"]) == (1, 1)
+    monkeypatch.setenv("KB_ROOT", str(target))
+    checked = kb_client.import_check(str(exported))
+    assert (checked.faults, list(checked.errors), list(checked.skipped)) == ([], [], [])
+    assert kb_client.import_(str(exported), OPERATOR).faults == []
+    assert held.artifact(target, "note/x")["b"] == "second"

@@ -41,14 +41,16 @@ class Linking:
 @dataclass(frozen=True)
 class Change:
     """One change of a set: the artifact, its whole content after the change (None for a removal), its links and the
-    places of the parts it holds, the revision the change read it at (0 when it was not held) and the revision it
-    leaves it at."""
+    places of the parts it holds, the revision the change read it at (0 when it was not held), the revision it
+    leaves it at, and the types it was checked and its links read through that the set does not change, each with
+    the revision it was read at. The adapter lands none of the set when any of those has since moved."""
     artifact: ArtifactId
     content: dict | None
     links: tuple[Link, ...] = ()
     parts: tuple[str, ...] = ()
     read: int = 0
     revision: int = 0
+    through: tuple[tuple[ArtifactId, int], ...] = ()
 
     @property
     def op(self) -> str:
@@ -102,7 +104,8 @@ class Refusal(Exception):
 
 
 class Conflict(Refusal):
-    """A change read its artifact at a revision that has since moved, or an entry's id is already held."""
+    """A change read its artifact, or a type it was read through, at a revision that has since moved, or an entry's
+    id is already held."""
 
 
 class Linked(Refusal):

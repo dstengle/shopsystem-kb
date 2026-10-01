@@ -79,6 +79,21 @@ def kind_schema(kind: values.Kind, corpus) -> dict:
     return corpus.artifact(kind_type(kind, corpus))
 
 
+def read_through(kind: values.Kind, corpus) -> list[values.ArtifactId]:
+    """The types an artifact of a kind is checked and its links read through: its kind's type and every type a kb:
+    reference names, in that type's schema or in one it names, each once; those the corpus holds."""
+    found = []
+
+    def visit(type_id: values.ArtifactId) -> None:
+        if type_id in found or not corpus.holds(type_id):
+            return
+        found.append(type_id)
+        for each in referred(corpus.artifact(type_id).get("schema")):
+            visit(each)
+    visit(values.type_of(kind))
+    return found
+
+
 def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], corpus) -> list[values.Kind]:
     """The kinds whose type, of those given, reads a changed type: is one, or refers by a kb: reference anywhere in
     its schema to a type that reads one. What an artifact's links are read through can change only for these."""

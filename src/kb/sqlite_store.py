@@ -2,9 +2,9 @@
 the landing of a set in one BEGIN IMMEDIATE transaction, which takes the write lock before reading anything, so a
 second writer waits, then finds the first's result.
 
-Inside the transaction each change's revision is compared with the one it was read at, every link the set hands
-must land, and nothing outside the set may link into what the set removes or drops. Any refusal rolls the whole set
-back. Opening checks the SQLite this process runs has FTS5 and is at least FLOOR.
+Inside the transaction each change's revision, and that of every type it was read through, is compared with the
+one it was read at, every link the set hands must land, and nothing outside the set may link into what the set
+removes or drops. Any refusal rolls the whole set back. Opening checks the SQLite this process runs has FTS5 and is at least FLOOR.
 """
 import contextlib
 import functools
@@ -114,24 +114,30 @@ class SqliteStore(Reads):
             landed = self._db.execute(
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
             ).lastrowid
+            self._unmoved(changes)
             before = {}
             for step, change in enumerate(changes):
-                held = self._compared(change)
+                held = self._compared(change.artifact, change.read)
                 before.setdefault(change.artifact, (held, set(self._parts(change.artifact))))
                 self._written(change, landed, step)
             for relink in relinks:
-                self._compared(relink)
+                self._compared(relink.artifact, relink.read)
                 self._linked(relink.artifact, relink.links)
             self._integral(changes, before)
             self._recorded(entries)
 
-    def _compared(self, change: Change | Relink) -> int:
-        """The revision the artifact stands at; Conflict when the change read it at another."""
-        rows = self._rows("SELECT revision FROM artifacts WHERE id = ?", str(change.artifact))
+    def _compared(self, artifact, read: int) -> int:
+        """The revision the artifact stands at; Conflict when it was read at another."""
+        rows = self._rows("SELECT revision FROM artifacts WHERE id = ?", str(artifact))
         held = rows[0][0] if rows else 0
-        if held != change.read:
-            raise Conflict(f"{change.artifact} was read at revision {change.read} and stands at revision {held}")
+        if held != read:
+            raise Conflict(f"{artifact} was read at revision {read} and stands at revision {held}")
         return held
+
+    def _unmoved(self, changes: list[Change]) -> None:
+        """Conflict when a type a change was read through stands at another revision than the one it was read at."""
+        for type_id, read in {each for change in changes for each in change.through}:
+            self._compared(type_id, read)
 
     def _parts(self, artifact) -> list[str]:
         return [place for (place,) in self._rows("SELECT place FROM parts WHERE artifact = ?", str(artifact))]

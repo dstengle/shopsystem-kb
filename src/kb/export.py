@@ -1,8 +1,10 @@
 """The store written out as canonical files at one moment, never over anything: each artifact at
-`<dir>/<kind>/<slug>.yaml`, so a type, of kind `schema`, at `<dir>/schema/<kind>.yaml` (export-and-import-a-store)."""
+`<dir>/<kind>/<slug>.yaml`, so a type, of kind `schema`, at `<dir>/schema/<kind>.yaml` (export-and-import-a-store).
+Each artifact's entries are written in the order the current version of its type declares, as an import checks them;
+its content, revision and type version are written as the store holds them."""
 from dataclasses import dataclass, field
 
-from kb import canonical, rules
+from kb import canonical, composition, rules, settled, values
 from kb.contract import kb_pb2
 from kb.port import Port
 from kb.values import Directory, Refused
@@ -19,7 +21,7 @@ def written(store: Port, into: Directory) -> None:
     which is made, with any directory above it, when it does not exist. Raises Refused, writing nothing, when it is not a
     directory or holds anything."""
     with store.at_one_moment():
-        artifacts = {name: store.artifact(name) for name in store.ids()}
+        artifacts = {name: _ordered(store, name, store.artifact(name)) for name in store.ids()}
     _empty(into)
     into.path.mkdir(parents=True, exist_ok=True)
     for name, artifact in artifacts.items():
@@ -27,6 +29,15 @@ def written(store: Port, into: Directory) -> None:
         folder.mkdir(exist_ok=True)
         with (folder / f"{name.slug}.yaml").open("x", encoding="utf-8") as file:
             file.write(canonical.dump(artifact))
+
+
+def _ordered(store: Port, name, artifact: dict) -> dict:
+    """The artifact, its entries in the order the current version of its type declares; as held when its kind has
+    no type."""
+    type_id = values.type_of(name.kind)
+    if not store.holds(type_id):
+        return artifact
+    return settled.order(artifact, composition.declared(store.artifact(type_id)["schema"], store))
 
 
 def _empty(into: Directory) -> None:

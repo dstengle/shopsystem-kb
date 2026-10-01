@@ -80,6 +80,13 @@ def working_directory() -> Path | None:
         return None
 
 
+def given(root: Path) -> kb_pb2.Fault | None:
+    """The fault for a root given outright that holds no store, its marker not inside it; None when it holds one."""
+    if (root / MARKER).is_file():
+        return None
+    return kb_pb2.Fault(rule=rules.STORE, message=f"the root given holds no store: {root}")
+
+
 def locate(env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
     """The store a call goes to from the working directory, or the fault that refuses it. Nothing is guessed at. A
     working directory that is gone is inside no store."""
