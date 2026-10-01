@@ -301,3 +301,18 @@ def _the_set_lands(applied):
 def _both_held_pointing_at_each_other(client):
     assert loads(read(client, WEEKLY, whole=True).content)["supersedes"] == DAILY
     assert loads(read(client, DAILY, whole=True).content)["supersedes"] == WEEKLY
+
+
+@then("the set is rejected because the store was busy with another change")
+def _set_rejected_as_busy(applied):
+    assert (applied.batch, list(applied.results)) == ("", [])
+    assert [(fault.artifact, fault.path, fault.rule) for fault in applied.faults] == [("", "", "busy")]
+    assert applied.faults[0].message.startswith("the store was busy with another change")
+
+
+@then("the same set may be asked for again")
+def _asked_for_again(client, holding):
+    holding.let_go()
+    again = _create_and_point_at_it(client)
+    assert not again.faults, again.faults
+    assert [(result.id, result.revision) for result in again.results] == [(DECISION, 1), (WORK_ITEM, 2)]
