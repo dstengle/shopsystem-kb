@@ -105,6 +105,26 @@ def _kb_help(root):
     return _kb("--help", cwd=root)
 
 
+@then("it offers setting a store up, checking and exporting one, and importing into a freshly started store")
+def _offers_four_commands(ran):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
+    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import}"
+    lines = " ".join(listed.split())
+    assert "init set up a store in a directory" in lines
+    assert "validate check the store" in lines
+    assert "export write the store" in lines
+    assert "import bring a directory of files into a freshly started store" in lines
+
+
+@then("nothing else that changes what the store holds")
+def _nothing_else(root):
+    for command in ("serve", "create"):
+        refused = _kb(command, cwd=root)
+        assert refused.returncode == 2
+        assert f"invalid choice: '{command}'" in refused.stderr
+
+
 @then("the store found above where they are working is the one checked")
 @then("the store KB_ROOT names is the one checked")
 def _that_store_checked(ran):

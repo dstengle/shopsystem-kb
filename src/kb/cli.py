@@ -23,7 +23,7 @@ def main(argv=None) -> int:
     commands.add_parser("validate", help="check the store found here, or the one KB_ROOT names")
     exporting = commands.add_parser("export", help="write the store found here, or the one KB_ROOT names, out as files")
     exporting.add_argument("directory", help="an empty directory, or one that does not exist, for the files")
-    importing = commands.add_parser("import", help="bring a directory of files into the store found here")
+    importing = commands.add_parser("import", help="bring a directory of files into a freshly started store")
     importing.add_argument("directory", help="the directory of files, laid out as an export lays them out")
     how = importing.add_mutually_exclusive_group()
     how.add_argument("--check", action="store_true", help="only check the directory, writing nothing")
