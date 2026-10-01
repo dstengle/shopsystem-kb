@@ -117,15 +117,14 @@ class SqliteStore(Checks):
         """The write lock taken by BEGIN IMMEDIATE for the block, committed when it ends, rolled back when it raises."""
         self._db.execute("BEGIN IMMEDIATE")
         self._locked = True
+        committed = False
         try:
             yield
-        except BaseException:
-            if self._db.in_transaction:
-                self._db.execute("ROLLBACK")
-            raise
-        else:
             self._db.execute("COMMIT")
+            committed = True
         finally:
+            if not committed and self._db.in_transaction:
+                self._db.execute("ROLLBACK")
             self._locked = False
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
@@ -152,13 +151,15 @@ class SqliteStore(Checks):
     def _saved(self):
         """A savepoint around one set: a refusal takes back the set alone, and a lock held for a block stays held."""
         self._db.execute("SAVEPOINT landing")
+        released = False
         try:
             yield
-        except BaseException:
-            self._db.execute("ROLLBACK TO landing")
             self._db.execute("RELEASE landing")
-            raise
-        self._db.execute("RELEASE landing")
+            released = True
+        finally:
+            if not released:
+                self._db.execute("ROLLBACK TO landing")
+                self._db.execute("RELEASE landing")
 
     def _written(self, change: Change, landed: int, step: int) -> None:
         name = str(change.artifact)
