@@ -101,6 +101,14 @@ Feature: Define a type
     And the refusal names the place
     And nothing is written anywhere in the store
 
+  Scenario: A type refused with several faults has them given in the order its places stand when it reads back
+    Pins that a refused type's faults follow the order the type would read back in, which is the order the type that describes types declares, not the order the client wrote the type in, and that faults at one place are told apart by a fixed order of their rules.
+    When the client defines a type written with its collection of parts first, then its required sections, then its fields, where one field breaks two of kb's rules for a link field, a field's nested schema declares required sections, and a collection's items declare required sections
+    Then the type is rejected with every fault, each naming the place
+    And the faults come in the order the places stand in the type as it would read back
+    And the two faults at the link field come in the alphabetical order of the names of the rules they break
+    And nothing is written anywhere in the store
+
   Scenario Outline: A type may use any keyword that is not kb's own, anywhere in its schema
     Pins that kb restricts only its own keywords, so a client has the whole of JSON Schema 2020-12 beside them.
     When the client defines a type that uses <keyword> inside a field's own nested schema

@@ -36,6 +36,15 @@ Feature: Make several changes in one go
     And the store holds neither change
     And every fault in the set comes back, not only the first
 
+  Scenario: A change in a set refused with several faults has them given in the order its places stand when its artifact reads back
+    Pins that inside a set one change's faults follow the order its artifact would read back, not the order the client wrote it in, and that faults at one place are told apart by a fixed order of their rules.
+    Given the decision type declares its fields first, then its required sections, then its collection of options
+    And a set whose second change is a decision written with its options first, then its sections, then its fields, where a field breaks two rules of the type, the second option is of a shape the type does not allow, and the rationale is missing
+    When the client asks for the set, saying which role and why
+    Then the set is rejected because a change in it does not fit its type
+    And that change's faults come in the order the places stand in its artifact as it would read back: the field first, then the sections, then the options
+    And the two faults at the field come in the alphabetical order of the names of the rules they break
+
   Scenario: Faults of several refused changes in a set come in the order of the set
     Pins that a set's refusal reads in the order the client wrote the set, so a client can match each fault to its change without searching.
     Given a set whose first and second changes are each missing a section its type requires

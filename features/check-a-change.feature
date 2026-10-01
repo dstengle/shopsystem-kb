@@ -32,6 +32,16 @@ Feature: Check a change
     Then the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken
     And the store is unchanged
 
+  Scenario: An artifact refused with several faults has them given in the order its places stand when it reads back
+    Pins that a refusal reads in the order the artifact would read back, not the order the client wrote it in, and that faults at one place are told apart by a fixed order of their rules, so a client can compare refusals from one attempt to the next.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    And the decision type declares its fields first, then its required sections, then its collection of options
+    When the client creates a decision written with its options first, then its sections, then its fields, where a field breaks two rules of the type, the second option is of a shape the type does not allow, and the rationale is missing, saying which role and why
+    Then the artifact is rejected with every fault, each naming the artifact, the place in it and the rule broken
+    And the faults come in the order the places stand in the decision as it would read back: the field first, then the sections, then the options
+    And the two faults at the field come in the alphabetical order of the names of the rules they break
+    And the store is unchanged
+
   @slice-1.6
   Scenario: A section carrying anything besides its title, its body and its own sections is refused
     Pins the shape of a section exactly, so prose stays prose and nobody starts keeping domain data in the margins of it.

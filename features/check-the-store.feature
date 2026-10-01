@@ -16,6 +16,15 @@ Feature: Check the store
     When the client checks the store
     Then both are reported, each naming the artifact, the place in it and the rule broken
 
+  Scenario: An artifact's violations are given in the order its places stand when it reads back
+    Pins that a check reports one artifact's violations in the order the artifact reads back, whatever order they were stored in, and tells apart violations at one place by a fixed order of their rules.
+    Given a store holding a decision type that declares its fields first, then its required sections, then its collection of options
+    And the store holds a decision stored with its options first, then its sections, then its fields, where a field breaks two rules of the type, the second option is of a shape the type does not allow, and the rationale is missing
+    When the client checks the store
+    Then the decision's violations are reported, each naming the artifact, the place in it and the rule broken
+    And they come in the order the places stand in the decision as it reads back: the field first, then the sections, then the options
+    And the two violations at the field come in the alphabetical order of the names of the rules they break
+
   @slice-43
   Scenario: An artifact behind its type is reported as stale
     Pins that falling behind a type is news, not damage: it is listed on its own so nobody has to fix it before the store can be trusted.
