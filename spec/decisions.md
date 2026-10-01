@@ -473,3 +473,9 @@ A type reads back exactly as it was written, so a type refused with several faul
 date: 2026-10-01
 supersedes: decision/faults-ordered-by-reading-order-then-rule-name (its clause on a type's places)
 source: the batch 26 planning question, decided by the controller under the person's delegation of 2026-10-01
+
+## decision/summary-read-only-at-the-top
+The fields shown at a glance (`summary`) are read only at the top of a type's schema; one at the top of a collection's items is refused like any misplaced keyword, rule `placement`, because a part's stub carries only its collection, name and title and kb reads `summary` nowhere else; showing item fields in part stubs would change the published contract and no client asks for it.
+date: 2026-10-01
+supersedes: decision/kb-keywords-read-where-written (its clause on `summary` at the top of a collection's items)
+source: the batch 26 review's question, decided by the controller under the person's delegation of 2026-10-01

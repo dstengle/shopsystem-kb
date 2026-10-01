@@ -72,7 +72,7 @@ Feature: Define a type
 
   @slice-125
   Scenario: Fields shown at a glance declared where kb does not read them are refused
-    Pins that the fields shown at a glance only count at the top of a schema or of a collection's items, so a choice that would never show is refused when the type is written.
+    Pins that the fields shown at a glance only count at the top of a schema, so a choice that would never show is refused when the type is written.
     When the client defines a type that declares the fields shown at a glance inside a field's own nested schema
     Then the type is rejected because kb does not read them there
     And the refusal names the place
