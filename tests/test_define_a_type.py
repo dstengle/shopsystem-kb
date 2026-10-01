@@ -2,8 +2,8 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, create, define, everything_under, next_version, read, request, write
-from kb import canonical
+from calls import DECISION_TYPE, create, define, next_version, read, request, write
+import held
 from kb.content import loads
 
 scenarios("define-a-type.feature")
@@ -177,7 +177,7 @@ def _purpose_before_rationale(root, client):
         "owner": "shopkeeper", "status": "accepted", "sections": BASE_SECTIONS,
     })
     assert not created.faults, created.faults
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert [section["title"] for section in on_disk["sections"]] == ["Purpose", "Rationale"]
 
 
@@ -221,10 +221,10 @@ NEVER_CHECKABLE = {
 
 @when(parsers.re(f"the client defines a type that (?P<fault>{'|'.join(map(re.escape, NEVER_CHECKABLE))})"), target_fixture="attempt")
 def _define_a_type_never_checkable(root, client, fault):
-    before = everything_under(root)
+    before = held.holds(root)
     title, schema = NEVER_CHECKABLE[fault]
     response = request(client, "schema", title, {"version": 1, "schema": schema}, message=f"Define {title}")
-    return {"response": response, "before": before, "after": everything_under(root)}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 def _type_rejected(attempt, rule, path, message):

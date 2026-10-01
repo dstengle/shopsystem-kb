@@ -4,9 +4,10 @@ import re
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, append, apply, creation, define, create, everything_under, journal, listing, read, refs,
+    CLIENT, DECISION_TYPE, append, apply, creation, define, create, journal, listing, read, refs,
     remove, replacement, request, write,
 )
+import held
 from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -92,7 +93,7 @@ def _store_with_a_decision(root):
 
 @when("the client replaces the decision with content that has no purpose, saying which role and why", target_fixture="attempt")
 def _replace_without_a_purpose(root, client):
-    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    before = held.text(root, DECISION)
     response = write(client, DECISION, {"sections": SECTIONS[1:]}, message="Drop the purpose")
     return {"response": response, "before": before}
 
@@ -107,8 +108,8 @@ def _rejected_for_the_sections(attempt):
 
 @then("reading the decision gives what it held before, at the version it held before")
 def _as_it_was(root, client, attempt):
-    assert read(client, DECISION).revision == canonical.load(attempt["before"].decode())["revision"]
-    assert (root / "kb" / f"{DECISION}.yaml").read_bytes() == attempt["before"]
+    assert read(client, DECISION).revision == canonical.load(attempt["before"])["revision"]
+    assert held.text(root, DECISION) == attempt["before"]
 
 
 @when("the client replaces the rationale of the decision, saying which role and why", target_fixture="changed")
@@ -159,7 +160,7 @@ def _version_up_by_one(client, changed):
 
 @then("the artifact records the current version of its type")
 def _records_the_current_version(root, client):
-    current = canonical.load((root / "kb" / "schema" / "decision.yaml").read_text())["version"]
+    current = held.artifact(root, "schema/decision")["version"]
     assert read(client, DECISION).schema_version == current
 
 
@@ -215,7 +216,7 @@ def _no_longer_stale(client):
     target_fixture="attempt",
 )
 def _replace_with_content_that_does_not_fit(root, client):
-    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    before = held.text(root, DECISION)
     return {"response": write(client, DECISION, {"sections": SECTIONS}, message="No owner"), "before": before}
 
 
@@ -240,7 +241,7 @@ def _still_stale(client):
     target_fixture="attempt",
 )
 def _replace_with_a_version_of_its_own(root, client):
-    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    before = held.text(root, DECISION)
     response = write(client, DECISION, {"revision": 7, "sections": SECTIONS}, message="Set the version")
     return {"response": response, "before": before}
 
@@ -261,9 +262,9 @@ def _rejected_for_a_version_inside(attempt):
     target_fixture="attempt",
 )
 def _replace_a_name_the_store_lacks(root, client):
-    before = everything_under(root / "kb")
+    before = held.holds(root)
     response = write(client, "decision/nothing-of-the-sort", {"sections": SECTIONS}, message="Change it")
-    return {"response": response, "before": before, "after": everything_under(root / "kb")}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the change is rejected because the store holds nothing by that name, and the name asked for is given back")
@@ -281,9 +282,9 @@ def _nothing_written_in_the_store(attempt):
 
 @when(parsers.parse('the client replaces an artifact named "{name}", saying which role and why'), target_fixture="attempt")
 def _replace_by_a_name(client, tmp_path, name):
-    before = everything_under(tmp_path)
+    before = held.everything_in(tmp_path)
     response = write(client, name, {"sections": SECTIONS}, message="Change it")
-    return {"response": response, "before": before, "after": everything_under(tmp_path)}
+    return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
 
 
 @then("the change is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
@@ -317,7 +318,7 @@ MISPLACED = {
     target_fixture="attempt",
 )
 def _aim_at_a_wrong_place(root, client, call):
-    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    before = held.text(root, DECISION)
     return {"response": MISPLACED[call](client), "before": before}
 
 
@@ -366,7 +367,7 @@ HANDED_BACK = {
     target_fixture="attempt",
 )
 def _replace_with_misnamed_options(root, client, items):
-    before = (root / "kb" / f"{DECISION}.yaml").read_bytes()
+    before = held.text(root, DECISION)
     options = [{"id": name, **option} for name, option in zip(HANDED_BACK[items], OPTIONS)]
     response = write(client, DECISION, {"sections": SECTIONS, "options": options}, message="Rename the options")
     return {"response": response, "before": before}
@@ -502,9 +503,9 @@ def _names(client):
 )
 def _change_unsigned(root, client, call, saying):
     before = {
-        "before": (root / "kb" / f"{DECISION}.yaml").read_bytes(),
+        "before": held.text(root, DECISION),
         "names": _names(client),
-        "files": everything_under(root / "kb"),
+        "files": held.holds(root),
         "entries": len(journal(client).entries),
     }
     actor, message = SAYING[saying]

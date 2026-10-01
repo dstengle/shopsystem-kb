@@ -1,13 +1,13 @@
 import re
-import subprocess
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, everything_under, journal, listing, read,
+    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, journal, listing, read,
     removal, replacement, write,
 )
-from kb import canonical, client as kb_client
+import held
+from kb import client as kb_client
 from kb.contract import kb_pb2
 
 scenarios("make-several-changes-in-one-go.feature")
@@ -18,15 +18,6 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
-
-
-def _git(root, *args):
-    return subprocess.run(["git", "-C", str(root / "kb"), *args], capture_output=True, text=True, check=True).stdout
-
-
-def _journal(root):
-    """Every journal entry in the store, oldest first."""
-    return [canonical.load(path.read_text()) for path in sorted((root / "kb" / "journal").rglob("*.yaml"))]
 
 
 @given("a store holding a decision type and a work item", target_fixture="client")
@@ -64,20 +55,12 @@ def _a_result_for_each_change(applied):
 
 
 @then("the store's history shows the set as one change")
-def _one_change_in_the_history(root, applied):
-    in_set = [entry for entry in _journal(root) if entry["batch"] == applied.batch]
-    assert [(entry["op"], entry["artifact"], entry["revision"]) for entry in in_set] == [
+def _one_change_in_the_history(client, applied):
+    in_set = [entry for entry in held.history(client) if entry.batch == applied.batch]
+    assert [(entry.op, entry.artifact, entry.revision) for entry in in_set] == [
         ("create", DECISION, 1), ("write", WORK_ITEM, 2),
     ]
-    assert _git(root, "log", "-1", "--format=%an%x09%s").strip() == "client\tMove price reviews to weekly"
-    in_commit = set(_git(root, "show", "--name-only", "--format=", "HEAD").split())
-    assert {f"{DECISION}.yaml", f"{WORK_ITEM}.yaml"} <= in_commit
-    assert len([name for name in in_commit if name.startswith("journal/")]) == 2
-
-
-def _everything_under(directory):
-    """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
-    return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
+    assert {(entry.actor.role, entry.message) for entry in in_set} == {("client", "Move price reviews to weekly")}
 
 
 @given("a set whose second change is missing a section its type requires", target_fixture="bad_set")
@@ -90,9 +73,9 @@ def _a_set_with_a_bad_second_change():
 
 @when("the client asks for the set, saying which role and why", target_fixture="attempt")
 def _ask_for_the_set(root, client, bad_set):
-    before = _everything_under(root)
+    before = held.holds(root)
     response = apply(client, bad_set, message="Record two decisions")
-    return {"response": response, "before": before, "after": _everything_under(root)}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the set is rejected because a change in it does not fit its type")
@@ -134,16 +117,16 @@ def _change_the_work_item_twice(client):
 
 
 @then("the store's history holds an entry for each of the two changes")
-def _an_entry_for_each_change(root, applied):
+def _an_entry_for_each_change(client, applied):
     assert not applied.faults, applied.faults
-    in_set = [entry for entry in _journal(root) if entry["batch"] == applied.batch]
-    assert [(entry["op"], entry["artifact"]) for entry in in_set] == [("write", WORK_ITEM), ("write", WORK_ITEM)]
+    in_set = [entry for entry in held.history(client) if entry.batch == applied.batch]
+    assert [(entry.op, entry.artifact) for entry in in_set] == [("write", WORK_ITEM), ("write", WORK_ITEM)]
 
 
 @then("each entry records the version that change left behind")
-def _each_entry_its_own_version(root, applied):
-    in_set = [entry for entry in _journal(root) if entry["batch"] == applied.batch]
-    assert [entry["revision"] for entry in in_set] == [2, 3]
+def _each_entry_its_own_version(client, applied):
+    in_set = [entry for entry in held.history(client) if entry.batch == applied.batch]
+    assert [entry.revision for entry in in_set] == [2, 3]
     assert [(result.id, result.revision) for result in applied.results] == [(WORK_ITEM, 2), (WORK_ITEM, 3)]
 
 
@@ -178,10 +161,10 @@ SECOND_CHANGES = {
 )
 def _ask_for_a_set_stopped(root, client, fault):
     second = SECOND_CHANGES[fault](root, client)
-    before, history = _everything_under(root), _journal(root)
+    before, history = held.holds(root), held.history(client)
     response = apply(client, [creation("decision", "Prices are reviewed monthly", {"sections": SECTIONS}), second],
                      message="Record a decision and change another")
-    return {"response": response, "before": before, "after": _everything_under(root), "history": history}
+    return {"response": response, "before": before, "after": held.holds(root), "history": history}
 
 
 def _refused_with(attempt, faults):
@@ -208,16 +191,16 @@ def _none_of_the_set_held(client, attempt):
 
 
 @then("the store's history holds no entry for any of them")
-def _no_entry_for_the_set(root, attempt):
-    assert _journal(root) == attempt["history"]
-    assert not [entry for entry in attempt["history"] if entry.get("artifact") == MONTHLY]
+def _no_entry_for_the_set(client, attempt):
+    assert held.history(client) == attempt["history"]
+    assert not [entry for entry in attempt["history"] if entry.artifact == MONTHLY]
 
 
 @when("the client asks, in one go, for a set holding no changes at all, saying which role and why", target_fixture="attempt")
 def _ask_for_an_empty_set(root, client):
     before = {
         "names": [stub.id for stub in listing(client, "decision", ids_only=True).stubs],
-        "files": everything_under(root / "kb"),
+        "files": held.holds(root),
         "entries": len(journal(client).entries),
     }
     return {**before, "response": apply(client, [], message="Change nothing")}

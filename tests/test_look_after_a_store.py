@@ -7,7 +7,8 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, next_version
-from kb import canonical, client as kb_client
+import held
+from kb import client as kb_client
 from kb.contract import kb_pb2
 
 scenarios("operate-a-store.feature")
@@ -49,8 +50,8 @@ def _kb_init_without_a_role(root, tmp_path):
 def _a_store_inside(ran, root):
     """The store is the one thing added to what the directory held."""
     assert (ran.returncode, ran.stderr) == (0, "")
-    assert (root / "kb" / "store.yaml").is_file()
-    assert sorted(path.name for path in root.iterdir()) == ["kb"]
+    assert held.holds_a_store(root)
+    assert held.apart_from_the_store(root) == {}
 
 
 @then("a client can begin defining its own types in it straight away")
@@ -98,10 +99,9 @@ def _store_needing_attention(root):
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ]})
     next_version(client, "decision", DECISION_TYPE)
-    monthly = root / "kb" / "decision" / "prices-are-reviewed-monthly.yaml"
-    held = canonical.load(monthly.read_text())
-    del held["sections"][0]["body"]
-    monthly.write_text(canonical.dump(held))
+    monthly = held.artifact(root, "decision/prices-are-reviewed-monthly")
+    del monthly["sections"][0]["body"]
+    held.plant(root, "decision/prices-are-reviewed-monthly", monthly)
     return root
 
 

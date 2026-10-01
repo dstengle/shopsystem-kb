@@ -1,4 +1,3 @@
-import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -7,6 +6,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 from calls import (
     CLIENT, DECISION_TYPE, MovingClock, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
 )
+import held
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -89,7 +89,7 @@ def _today_is(day):
 
 @pytest.fixture
 def written():
-    """The bytes of the decision's file after each change, in order, for the fingerprints."""
+    """The fingerprint of the decision after each change, in order."""
     return []
 
 
@@ -110,14 +110,14 @@ def _store_with_a_decision_changed_today(root, clock, written):
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ],
     }, message="Review prices weekly", actor=SHOPKEEPER)
-    written.append((root / "kb" / f"{DECISION}.yaml").read_bytes())
+    written.append(held.fingerprint(root, DECISION))
     clock.at = clock.today
     changed = write(client, DECISION, {"sections": [
         {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
         {"title": "Rationale", "body": "Costs move weekly, and the suppliers say so.\n"},
     ]}, message="Say why weekly", actor=AGENT)
     assert not changed.faults, changed.faults
-    written.append((root / "kb" / f"{DECISION}.yaml").read_bytes())
+    written.append(held.fingerprint(root, DECISION))
     return client
 
 
@@ -147,7 +147,7 @@ def _each_entry_says_everything(entries, written):
         ("2026-09-21", "shopkeeper", "", "create", DECISION, "", 1, 1, "Review prices weekly"),
         ("2026-09-23", "agent", "restock-run-12", "write", DECISION, "", 2, 1, "Say why weekly"),
     ]
-    assert [entry.digest for entry in entries] == [hashlib.sha256(text).hexdigest() for text in written]
+    assert [entry.digest for entry in entries] == written
     assert [entry.batch for entry in entries] == [entry.id for entry in entries]
 
 

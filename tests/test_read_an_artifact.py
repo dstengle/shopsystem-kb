@@ -4,7 +4,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, write
-from kb import canonical, client as kb_client
+import held
+from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
 
@@ -364,7 +365,7 @@ def _readied_where_there_is_no_store(tmp_path, monkeypatch):
     here.mkdir()
     monkeypatch.chdir(here)
     monkeypatch.delenv("KB_ROOT", raising=False)
-    return {"client": kb_client.connect(), "store_there": (here / "kb").exists(), "here": here}
+    return {"client": kb_client.connect(), "store_there": held.holds_anything_in_the_place(here), "here": here}
 
 
 @given("a store holding the decision has since been started where the client is working")
@@ -469,7 +470,7 @@ def _read_the_whole_following(client, kind, steps):
 
 @then("the older decision is given in place of the link, as the store holds it now")
 def _older_as_stored(root, whole):
-    assert loads(whole.content)["supersedes"] == canonical.load((root / "kb" / f"{OLDER}.yaml").read_text())
+    assert loads(whole.content)["supersedes"] == held.artifact(root, OLDER)
 
 
 @then("what the older decision itself points at is given as names")

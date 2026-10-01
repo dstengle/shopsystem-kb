@@ -3,7 +3,8 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, PROCESS_TYPE, append, create, define, everything_under, journal, read, write
+from calls import CLIENT, PROCESS_TYPE, append, create, define, journal, read, write
+import held
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -325,9 +326,9 @@ def _process_as_it_was(client, attempt):
 
 @when("the client adds a step to a process by a name the store holds nothing under, saying which role and why", target_fixture="attempt")
 def _add_to_nothing(root, client):
-    before = everything_under(root)
+    before = held.holds(root)
     response = append(client, "process/close-the-shop", "steps", {"title": "Lock the door"})
-    return {"response": response, "before": before, "after": everything_under(root)}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the item is rejected because the store holds nothing by that name, and the name asked for is given back")

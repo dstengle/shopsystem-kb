@@ -1,7 +1,8 @@
 from pytest_bdd import given, scenario, then
 
 from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, next_version
-from kb import canonical, client as kb_client
+import held
+from kb import client as kb_client
 from kb.contract import kb_pb2
 
 
@@ -61,14 +62,12 @@ def _store_with_two_faults(root):
     client = _store_with_a_decision(root)
     define(client, WORK_ITEM_TYPE)
     create(client, "work-item", {"title": "Move the review to Mondays", "decisions": [WEEKLY]})
-    decision = root / "kb" / "decision" / "price-reviews-happen-weekly.yaml"
-    held = canonical.load(decision.read_text())
-    held["sections"] = held["sections"][:1]
-    decision.write_text(canonical.dump(held))
-    work_item = root / "kb" / "work-item" / "move-the-review-to-mondays.yaml"
-    held = canonical.load(work_item.read_text())
-    held["decisions"] = ["decision/prices-are-reviewed-monthly"]
-    work_item.write_text(canonical.dump(held))
+    decision = held.artifact(root, WEEKLY)
+    decision["sections"] = decision["sections"][:1]
+    held.plant(root, WEEKLY, decision)
+    work_item = held.artifact(root, "work-item/move-the-review-to-mondays")
+    work_item["decisions"] = ["decision/prices-are-reviewed-monthly"]
+    held.plant(root, "work-item/move-the-review-to-mondays", work_item)
     return client
 
 

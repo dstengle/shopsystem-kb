@@ -2,8 +2,9 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, everything_under, read, request
-from kb import canonical, content, client as kb_client
+from calls import CLIENT, DECISION_TYPE, create, define, read, request
+import held
+from kb import content, client as kb_client
 from kb.contract import kb_pb2
 
 
@@ -224,7 +225,7 @@ def _read_back_in_declared_order(root, client, created):
         ("options", "keep-weekly", "Keep weekly"),
         ("options", "go-monthly", "Go monthly"),
     ]
-    on_disk = canonical.load((root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").read_text())
+    on_disk = held.artifact(root, "decision/price-reviews-happen-weekly")
     assert list(on_disk) == ["id", "type", "schema_version", "revision", "title", "sections", "options"]
     assert on_disk["sections"] == SECTIONS
     assert on_disk["options"] == [
@@ -263,7 +264,7 @@ def _create_titled(client, title):
 @then("the title reads back as the text that was written, not as a date")
 def _title_is_text_not_a_date(root, client, created):
     assert read(client, created.id).title == "2026-09-24"
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["title"] == "2026-09-24"
 
 
@@ -329,7 +330,7 @@ def _rejected_for_an_empty_name(created):
 @then("the title reads back as the text that was written, not as a yes or a no")
 def _title_is_text_not_a_bool(root, client, created):
     assert read(client, created.id).title == "yes"
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["title"] == "yes"
 
 
@@ -408,7 +409,7 @@ def _create_with_values_yaml_1_1_would_convert(client):
 )
 def _both_fields_are_text(root, created):
     assert not created.faults, created.faults
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert (on_disk["switch"], on_disk["time"]) == ("on", "1:20")
 
 
@@ -476,9 +477,9 @@ def _rejected_for_a_section_missing_a_key(refused):
     target_fixture="attempt",
 )
 def _create_of_a_kind(client, tmp_path, kind):
-    before = everything_under(tmp_path)
+    before = held.everything_in(tmp_path)
     response = request(client, kind, "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it")
-    return {"response": response, "before": before, "after": everything_under(tmp_path)}
+    return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
 
 
 @then("the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path")
@@ -509,7 +510,7 @@ def _create_with_that_title(client, title):
 def _title_reads_back_as(root, client, created, text):
     assert not created.faults, created.faults
     assert read(client, created.id).title == text
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["title"] == text
 
 
@@ -607,13 +608,13 @@ def _content_with_typed_values():
 @then("the first field reads back as a yes-or-no, the second as nothing at all, and the third as a number")
 def _typed_values_read_back(root, created):
     assert not created.faults, created.faults
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert (on_disk["urgent"], on_disk["owner"], on_disk["weight"]) == (True, None, 12.5)
 
 
 @then("none of the three reads back as text")
 def _none_of_them_text(root, created):
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert not any(isinstance(on_disk[name], str) for name in ("urgent", "owner", "weight"))
 
 
@@ -628,13 +629,13 @@ def _a_title_that_is_a_number():
     target_fixture="attempt",
 )
 def _create_with_two_faults(client, tmp_path):
-    before = everything_under(tmp_path)
+    before = held.everything_in(tmp_path)
     response = request(client, "decision", "Price reviews happen weekly", {
         "supersedes": "decision/prices-are-reviewed-monthly",
         "sections": [SECTIONS[1]],
     }, message="Record it")
     return {
-        "response": response, "before": before, "after": everything_under(tmp_path),
+        "response": response, "before": before, "after": held.everything_in(tmp_path),
         "faults": [("sections", "sections"), ("supersedes", "ref")],
     }
 
@@ -657,7 +658,7 @@ def _store_unchanged(attempt):
 def _a_decision_already_held(root, client, title):
     created = request(client, "decision", title, {"sections": SECTIONS}, message="Record it")
     assert not created.faults, created.faults
-    return {"id": created.id, "title": title, "bytes": (root / "kb" / f"{created.id}.yaml").read_bytes()}
+    return {"id": created.id, "title": title, "bytes": held.text(root, created.id)}
 
 
 @when("the client creates another decision with that same title, saying which role and why", target_fixture="created")
@@ -679,7 +680,7 @@ def _a_numbered_name(client, first, created):
 def _the_first_keeps_its_name(root, client, first):
     kept = read(client, first["id"])
     assert (kept.id, kept.revision) == (first["id"], 1)
-    assert (root / "kb" / f"{first['id']}.yaml").read_bytes() == first["bytes"]
+    assert held.text(root, first['id']) == first["bytes"]
 
 
 TWICE = [
@@ -715,7 +716,7 @@ def _options_named_apart(root, client, created):
     assert [(stub.id, stub.title) for stub in read(client, created.id).parts] == [
         ("keep-weekly", "Keep weekly"), ("keep-weekly-2", "Keep weekly"),
     ]
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["options"] == [{"id": "keep-weekly", **TWICE[0]}, {"id": "keep-weekly-2", **TWICE[1]}]
 
 
@@ -760,10 +761,10 @@ def _rejected_for_the_link(refused):
     target_fixture="attempt",
 )
 def _create_with_two_kinds_of_fault(root, client):
-    before = everything_under(root)
+    before = held.holds(root)
     response = request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS[1:], "options": "Keep weekly"})
     return {
-        "response": response, "before": before, "after": everything_under(root),
+        "response": response, "before": before, "after": held.holds(root),
         "faults": [("options", "type"), ("sections", "sections")],
     }
 
@@ -787,10 +788,10 @@ SENSELESS = {
     target_fixture="attempt",
 )
 def _create_from_senseless_content(root, client, senseless):
-    before = everything_under(root)
+    before = held.holds(root)
     text, place = SENSELESS[senseless]
     response = _raw(client, text)
-    return {"response": response, "before": before, "after": everything_under(root), "place": place}
+    return {"response": response, "before": before, "after": held.holds(root), "place": place}
 
 
 REASONS = {
@@ -829,7 +830,7 @@ def _create_with_a_bare_date(client):
 def _field_is_text_not_a_date(root, client, created):
     assert not created.faults, created.faults
     assert content.loads(read(client, created.id, whole=True).content)["options"][0]["body"] == "2026-09-24"
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["options"][0]["body"] == "2026-09-24"
 
 
@@ -849,7 +850,7 @@ def _rationale_reads_back_empty(root, client, created):
     rationale = read(client, created.id, section="Rationale")
     assert not rationale.faults, rationale.faults
     assert content.loads(rationale.content) == {"title": "Rationale", "body": ""}
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["sections"][1] == {"title": "Rationale", "body": ""}
 
 
@@ -858,13 +859,13 @@ def _rationale_reads_back_empty(root, client, created):
     target_fixture="attempt",
 )
 def _create_with_a_line_ending_in_a_space(root, client):
-    before = everything_under(root)
+    before = held.holds(root)
     text = (
         "sections:\n  - title: Purpose\n    body: |\n      Keep prices in step with costs.\n"
         "  - title: Rationale\n    body: |\n      Costs move weekly. \n      So we review weekly.\n"
     )
     response = _raw(client, text)
-    return {"response": response, "before": before, "after": everything_under(root)}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then(

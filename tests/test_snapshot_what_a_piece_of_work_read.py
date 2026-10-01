@@ -1,9 +1,9 @@
-import hashlib
 import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, write
+import held
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -42,7 +42,7 @@ def _snapshot(client):
 @then("the journal holds one entry listing each of them with the version read and a fingerprint of it")
 def _one_entry_listing_each(client, root):
     [entry] = [entry for entry in journal(client).entries if entry.op == "snapshot"]
-    fingerprint = {name: hashlib.sha256((root / "kb" / f"{name}.yaml").read_bytes()).hexdigest() for name in (DECISION, PROCESS)}
+    fingerprint = {name: held.fingerprint(root, name) for name in (DECISION, PROCESS)}
     assert [(read.artifact, read.revision, read.digest) for read in entry.read] == [
         (DECISION, 3, fingerprint[DECISION]), (PROCESS, 1, fingerprint[PROCESS]),
     ]

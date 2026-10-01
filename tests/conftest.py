@@ -1,15 +1,14 @@
 """Suite wiring. Step definitions live beside the scenarios they serve; shared Givens are added here by slice 1."""
-import os
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, everything_under, journal, listing, moment
-from kb import canonical, client as kb_client, store
+from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment
+import held
+from kb import client as kb_client, store
 from kb.contract import kb_pb2
 
 
@@ -105,7 +104,7 @@ def _store_with_content(root):
 @given("a directory that already has a store inside it, with content in that store", target_fixture="root")
 def _directory_with_a_store_inside(root, before):
     _store_with_content(root)
-    before.update(store=root, held=everything_under(root))
+    before.update(store=root, held=held.everything_in(root))
     return root
 
 
@@ -114,14 +113,14 @@ def _directory_inside_a_store(root, before):
     _store_with_content(root)
     inside = root / "notes" / "drafts"
     inside.mkdir(parents=True)
-    before.update(store=root, held=everything_under(root))
+    before.update(store=root, held=held.everything_in(root))
     return inside
 
 
 @then("the store that is there holds what it held before")
 @then("the store it sits inside holds what it held before")
 def _store_holds_what_it_held(before):
-    assert everything_under(before["store"]) == before["held"]
+    assert held.everything_in(before["store"]) == before["held"]
 
 
 @when("the client checks the store", target_fixture="checked")
@@ -132,7 +131,7 @@ def _check_the_store(client):
 @then("the store holds no artifact it did not hold before")
 def _no_new_artifact(root, client, attempt):
     assert [stub.id for stub in listing(client, "decision", ids_only=True).stubs] == attempt["names"]
-    assert everything_under(root / "kb") == attempt["files"]
+    assert held.holds(root) == attempt["files"]
 
 
 @then("the store's history holds no entry for it")
@@ -146,27 +145,12 @@ def starter():
     return CLIENT.role
 
 
-def _git(directory, *args):
-    """git run in `directory` alone, its output, with git's own environment variables cleared so it reaches only the
-    directory it names. Task 5 moves this into the one test module that knows how the store is kept."""
-    clean = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-    return subprocess.run(["git", "-C", str(directory), *_IDENTITY, *args], env=clean, capture_output=True, text=True,
-                          check=True).stdout
-
-
-_IDENTITY = ("-c", "user.name=steps", "-c", "user.email=steps@example.com", "-c", "commit.gpgsign=false")
-
-
 @then(
     parsers.parse('the store\'s history holds one entry, under that role, with the message "{message}"'),
     target_fixture="entry",
 )
-def _one_entry_under_the_role(root, starter, message):
-    """The one entry in the journal's files, and the one commit in the store's own git history, both under the role
-    the store was started under."""
-    entries = sorted((root / "kb" / "journal").rglob("*.yaml"))
-    assert len(entries) == 1, entries
-    entry = canonical.load(entries[0].read_text())
-    assert (entry["actor"]["role"], entry["message"]) == (starter, message)
-    assert _git(root / "kb", "log", "--format=%an%x09%s").splitlines() == [f"{starter}\t{message}"]
+def _one_entry_under_the_role(client, starter, message):
+    """The one entry in the store's history, under the role the store was started under."""
+    [entry] = held.history(client)
+    assert (entry.actor.role, entry.message) == (starter, message)
     return entry
