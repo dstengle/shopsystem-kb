@@ -10,7 +10,7 @@ formulated_as: features/change-the-store.feature
 
 ## Purpose
 
-The client creates an artifact, replaces an artifact or one node inside it, adds an item to a collection, or removes an artifact. Each change comes back with what it produced: the name the store gave and the new revision. Only a whole artifact is removed. A removal, or a replacement that drops an item, is refused while anything points at what would go, the refusal handing back every link in the way. Clients changing one store at once on one machine each have their change checked against the store as the one before left it. A change that fails partway leaves the store as it was. This capability does not cover checking (check-a-change), naming (name-artifacts-and-items) or sets of changes (make-several-changes-in-one-go).
+The client creates an artifact, replaces an artifact or one node inside it, adds an item to a collection, or removes an artifact. Each change comes back with what it produced: the name the store gave and the new revision. Only a whole artifact is removed. A removal, or a replacement that drops an item, is refused while anything points at what would go, the refusal handing back every link in the way. Clients on one machine changing one store at the same time, in one program or in several, each have their change checked against the store as the one before left it. A change that fails partway leaves the store as it was. This capability does not cover checking (check-a-change), naming (name-artifacts-and-items) or sets of changes (make-several-changes-in-one-go).
 
 ## Behaviour
 
@@ -29,7 +29,7 @@ The client creates an artifact, replaces an artifact or one node inside it, adds
 - If the clock fails during a change, the client is given a fault and the store holds what it held before.
 - If the client removes a place inside an artifact, the removal is refused because only a whole artifact is removed.
 - If the client replaces an artifact, or a node in it, so that an item something links into is no longer there, the change is refused because something still points at that item, and the client is given each such link.
-- While several clients on one machine change one store in process, each change is checked against the store as every earlier change left it.
+- While several clients on one machine, in one program or in several, change one store at the same time, each change is checked against the store as every earlier change left it, so two items added to one collection at once are both kept.
 - When one client removes an artifact while another adds a link to it, the removal and the new link never both land: whichever lands second is refused, the removal because something still points at it, or the link because a link must land on a node of a kind the type allows.
 - When two clients replace one artifact at the same time, each replacement leaves a revision of its own, both are in the history, and the artifact holds the content of the later one.
 

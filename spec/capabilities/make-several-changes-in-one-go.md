@@ -2,7 +2,7 @@
 id: capability/make-several-changes-in-one-go
 title: Make several changes in one go
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine]
 formulated_as: features/make-several-changes-in-one-go.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/make-several-changes-in-one-go.feature
 
 ## Purpose
 
-The client asks for an ordered set of creates, replacements, additions and removals as one act. The store names the set, and each change still reports its own result and leaves its own history entry. The set is checked once as a whole against the store it leaves, so its changes may point at each other and rely on one another, and it lands whole or not at all. This capability is not the individual changes themselves (change-the-store).
+The client asks for an ordered set of creates, replacements, additions and removals as one act. The store names the set, and each change still reports its own result and leaves its own history entry. Each change acts on the store as the changes before it in the set left it. What a change points at, and the type it is checked against, are judged against the store as the whole set leaves it, so changes in one set may point at each other. The set lands whole or not at all. This capability is not the individual changes themselves (change-the-store).
 
 ## Behaviour
 
@@ -22,7 +22,7 @@ The client asks for an ordered set of creates, replacements, additions and remov
 - When a set changes one artifact twice, the history holds an entry for each change with the revision it left, and the artifact's revision goes up by two.
 - If a set holds no changes, the client is given no name for the set and no results.
 - If a set holding no changes also lacks a role or a message, only the faults of the role and the message come back.
-- When a change in a set relies on what another change in it makes, earlier or later, it is checked against the store as the whole set leaves it.
+- When a change in a set points at what another change in it makes, earlier or later, its links are checked against the store as the whole set leaves it; each change still acts on the store as the changes before it in the set left it.
 - When two new artifacts in one set point at each other, the set lands.
 
 ## Implementation, may change

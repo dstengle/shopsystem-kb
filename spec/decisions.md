@@ -320,3 +320,9 @@ The API is the stable boundary; storage may change behind it, and changed to SQL
 date: 2026-10-01
 supersedes: decision/contract-stability
 source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md
+
+## decision/a-set-is-checked-whole-links-and-types
+A set's links and types are checked once against the state the whole set leaves, so its changes may point at each other, earlier or later, while each change acts on the store as the changes before it in the set left it; each separate change is checked against the state the one before it left.
+date: 2026-10-01
+supersedes: decision/a-set-is-checked-whole
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md; the formulation question on make-several-changes-in-one-go #9, answered 2026-10-01
