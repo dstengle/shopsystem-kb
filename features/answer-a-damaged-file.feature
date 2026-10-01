@@ -2,7 +2,7 @@
 Feature: Answer a damaged file
   Narrator: the client
 
-  @slice-112.1
+  @slice-124
   Scenario Outline: A store whose database cannot be read, because it is damaged or missing beside its marker, refuses every call and command that needs it
     Pins that a database the store cannot read always gives the same named fault, naming the database, never a crash, with nothing written in the store or in a directory an export was aimed at.
     Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
@@ -18,7 +18,7 @@ Feature: Answer a damaged file
       | was damaged behind the store's back                 |
       | is missing, while the store's marker is still there |
 
-  @slice-118
+  @slice-124
   Scenario Outline: A store whose database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, refuses every call and command that needs it
     Pins that a store that cannot be written to gives the same named fault as a damaged one, naming the database, never a crash, with nothing written in the store or in a directory an export was aimed at.
     Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
@@ -34,7 +34,7 @@ Feature: Answer a damaged file
       | lies in a directory that is read-only |
       | is a file that is read-only           |
 
-  @slice-117
+  @slice-124
   Scenario Outline: A store found that was made by an earlier kb, in a form this kb cannot read, refuses every call and command that needs it
     Pins that an earlier kb's store always gives one named fault saying how to move it, however it is found, never a crash, with nothing written.
     Given a store holding a decision, a process and a tag, made by an earlier kb in a form this kb cannot read
@@ -50,7 +50,7 @@ Feature: Answer a damaged file
       | upward from the working directory |
       | through KB_ROOT naming it         |
 
-  @slice-118.3
+  @slice-124
   Scenario: A store found whose marker names a form of store this kb does not know, one a later kb made, refuses every call and command that needs it
     Pins that a later kb's store always gives one named fault saying a later version of kb is needed, never a crash, with the store not opened and nothing written.
     Given a store holding a decision, a process and a tag, whose marker names a form of store this kb does not know, one a later kb made
@@ -60,7 +60,7 @@ Feature: Answer a damaged file
     And the store is not opened
     And nothing is written in the store
 
-  @slice-118.3
+  @slice-124
   Scenario: A store found whose marker cannot be read at all refuses every call and command that needs it, as for a later kb's store
     Pins that a marker that cannot be read is answered as a later kb's store is, with one named fault, never a crash, and nothing written.
     Given a store holding a decision, a process and a tag, whose marker cannot be read at all
