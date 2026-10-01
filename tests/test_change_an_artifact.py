@@ -670,3 +670,18 @@ def _made_again(client, holding):
     holding.let_go()
     again = _replace_the_decision(client)
     assert (list(again.faults), again.revision) == ([], 2)
+
+
+@when("the client reads the decision", target_fixture="shown")
+def _read_the_decision(client):
+    return read(client, DECISION)
+
+
+@then("the client is given the decision")
+def _given_the_decision(shown):
+    assert (shown.id, shown.title, shown.revision) == (DECISION, "Price reviews happen weekly", 1)
+
+
+@then("the read is not refused because the store was busy with another change")
+def _read_not_busy(shown):
+    assert list(shown.faults) == []
