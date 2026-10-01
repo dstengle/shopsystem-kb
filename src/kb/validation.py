@@ -59,12 +59,22 @@ def _item(item_schema: dict, corpus) -> dict:
     return {**item_schema, "allOf": [*item_schema.get("allOf", []), *collections]}
 
 
+_DIALECT = "https://json-schema.org/draft/2020-12/"
+_VOCABULARIES = (
+    "applicator", "content", "core", "format-annotation", "format-assertion", "meta-data", "unevaluated", "validation",
+)
+METASCHEMAS = Registry().with_resources(
+    (uri, SPECIFICATIONS[uri]) for uri in (_DIALECT + "schema", *(_DIALECT + "meta/" + name for name in _VOCABULARIES))
+)
+
+
 def registry(corpus) -> Registry:
-    """The 2020-12 metaschema and its vocabularies, from the specifications package kb declares, and every type the
-    corpus holds, found by the URI kb:schema/<type> when a schema refers to it, and only then."""
+    """The 2020-12 metaschema and its vocabularies, the nine resources kb takes from the specifications package it
+    declares (`METASCHEMAS`), and every type the corpus holds, found by the URI kb:schema/<type> when a schema refers
+    to it, and only then."""
     def retrieve(uri: str):
         return DRAFT202012.create_resource(type_schema(uri, corpus))
-    return SPECIFICATIONS.combine(Registry(retrieve=retrieve))
+    return METASCHEMAS.combine(Registry(retrieve=retrieve))
 
 
 def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_pb2.Fault]:
