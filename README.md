@@ -8,17 +8,18 @@ that an in-process client uses today and a server can host later.
 
 ## The contract: v1 (kb 0.5.0)
 
-The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release: nothing of v0 remains.
+The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release: no v0 rpc or request remains (`Actor` stays only as the type of `Entry.actor`).
 
 - Changes: `Create`, `Replace`, `Add` and `Remove`, each taking one `Signature { role, execution, message }` and
   answering its result or a `Refusal`; the same four as sets, `CreateMany`, `ReplaceMany`, `AddMany` and
-  `RemoveMany`. An artifact, or a place inside it, is named by a `Locator { id, place }`. A replace, add or remove
+  `RemoveMany`. A `CreateItem` of a set carries a `key`, and links in that set written `@<key>` reach the artifact
+  that create makes. An artifact, or a place inside it, is named by a `Locator { id, place }`. A replace, add or remove
   may say the `revision` it read, and is refused with rule `revision` if the artifact moved since.
 - Reads: `Read` (one level: `summary`, `whole` with a depth, or `section`), `List`, `Follow`, `Search`, `History`,
   the signed `Snapshot`, and `Check`. They replace v0's `Refs`, `Journal` and `Validate`.
 - No rpc starts a store: `kb.init(root, role, *, execution="", clock=None)` does, in your own process, and raises
   `kb.NotStarted` carrying the faults when it refuses. `kb.client.connect(root, *, clock=None)` gives the client.
-- `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`. Rule names are those of `kb.rules`, with `busy`
+- `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`. The published rule names are listed in spec/index.md, with `busy`
   and `revision` among them; a JSON Schema keyword passes through as the rule of a content fault.
 
 Upgrading a store made by kb 0.3.0: start a new store and import the old

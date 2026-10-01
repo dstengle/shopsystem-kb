@@ -1,4 +1,4 @@
-"""The name of every rule a fault of kb's own carries, which kb publishes (adrs/0018)."""
+"""The name of every rule a fault of kb's own carries, which kb publishes (decision/published-contract-v1)."""
 
 NOT_FOUND = "not-found"
 KIND = "kind"

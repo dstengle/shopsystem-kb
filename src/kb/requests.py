@@ -1,6 +1,6 @@
 """Each rpc's request but the changes (kb.changes) as the values its one domain call takes, built from the
 conversions in kb.values. A request that does not convert is refused here, before anything else sees it. Among the
-names a snapshot is given, or the changes of a set, an entry that does not convert stands in its place as a Refusal, so
+names a snapshot is given, an entry that does not convert stands in its place as a Refusal, so
 the faults come back in the order of the entries."""
 from dataclasses import dataclass
 from datetime import datetime

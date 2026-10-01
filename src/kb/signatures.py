@@ -56,7 +56,7 @@ def reader(signature: kb_pb2.Signature) -> Signed:
 
 
 def starter(role: str, execution: str) -> Actor:
-    """The actor who starts a store, as `kb.init` is given it, who must name a role."""
-    if not role:
+    """The actor who starts a store, as `kb.init` is given it, who must name a role; role and execution are text."""
+    if not isinstance(role, str) or not isinstance(execution, str) or not role:
         raise Refused([kb_pb2.Fault(rule=rules.ACTOR, message="a store can only be started under a role")])
     return Actor(role, execution)

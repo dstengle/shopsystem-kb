@@ -1,0 +1,268 @@
+package kb.v1
+message Actor
+  role = 1 singular string
+  execution = 2 singular string
+message Signature
+  role = 1 singular string
+  execution = 2 singular string
+  message = 3 singular string
+message Locator
+  id = 1 singular string
+  place = 2 singular string
+message Fault
+  artifact = 1 singular string
+  place = 2 singular string
+  rule = 3 singular string
+  message = 4 singular string
+message Refusal
+  faults = 1 repeated kb.v1.Fault
+message CreateRequest
+  kind = 1 singular string
+  title = 2 singular string
+  content = 3 singular string
+  signature = 4 singular kb.v1.Signature
+message Created
+  id = 1 singular string
+  revision = 2 singular int32
+message CreateResponse
+  result = 1 singular kb.v1.Created oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message ReadRequest
+  locator = 1 singular kb.v1.Locator
+  summary = 2 singular kb.v1.ReadRequest.Summary oneof level
+  whole = 3 singular kb.v1.ReadRequest.Whole oneof level
+  section = 4 singular kb.v1.ReadRequest.Section oneof level
+  message Summary
+  message Whole
+    depth = 1 singular int32
+  message Section
+    title = 1 singular string
+message Artifact
+  id = 1 singular string
+  kind = 2 singular string
+  schema_version = 3 singular int32
+  revision = 4 singular int32
+  title = 5 singular string
+  content = 6 singular string
+  references = 7 repeated kb.v1.Stub
+  parts = 8 repeated kb.v1.PartStub
+  inbound = 9 repeated kb.v1.InboundCount
+message ReadResponse
+  result = 1 singular kb.v1.Artifact oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message Stub
+  field = 1 singular string
+  id = 2 singular string
+  kind = 3 singular string
+  title = 4 singular string
+  fields = 5 singular string
+message PartStub
+  collection = 1 singular string
+  id = 2 singular string
+  title = 3 singular string
+message InboundCount
+  kind = 1 singular string
+  field = 2 singular string
+  count = 3 singular int32
+message CheckRequest
+message Checked
+  violations = 1 repeated kb.v1.Fault
+  stale = 2 repeated kb.v1.Stale
+message CheckResponse
+  result = 1 singular kb.v1.Checked oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message Stale
+  artifact = 1 singular string
+  schema_version = 2 singular int32
+  current = 3 singular int32
+message ReplaceRequest
+  locator = 1 singular kb.v1.Locator
+  content = 2 singular string
+  signature = 3 singular kb.v1.Signature
+  revision = 4 singular int32
+message Replaced
+  revision = 1 singular int32
+  id = 2 singular string
+message ReplaceResponse
+  result = 1 singular kb.v1.Replaced oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message HistoryRequest
+  artifact = 1 singular string
+  role = 2 singular string
+  execution = 3 singular string
+  since = 4 singular string
+  batch = 5 singular string
+message Entry
+  id = 1 singular string
+  at = 2 singular string
+  actor = 3 singular kb.v1.Actor
+  op = 4 singular string
+  artifact = 5 singular string
+  place = 6 singular string
+  revision = 7 singular int32
+  schema_version = 8 singular int32
+  digest = 9 singular string
+  message = 10 singular string
+  batch = 11 singular string
+  read = 12 repeated kb.v1.Snapshotted
+message Snapshotted
+  artifact = 1 singular string
+  revision = 2 singular int32
+  digest = 3 singular string
+message Entries
+  entries = 1 repeated kb.v1.Entry
+message HistoryResponse
+  result = 1 singular kb.v1.Entries oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message SearchRequest
+  text = 1 singular string
+  kind = 2 singular string
+  scope = 3 singular kb.v1.SearchRequest.Scope
+  enum Scope
+    SECTIONS = 0
+    FIELDS = 1
+    ALL = 2
+message Match
+  stub = 1 singular kb.v1.Stub
+  section = 2 singular string
+  snippet = 3 singular string
+  field = 4 singular string
+message Found
+  matches = 1 repeated kb.v1.Match
+message SearchResponse
+  result = 1 singular kb.v1.Found oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message FollowRequest
+  locator = 1 singular kb.v1.Locator
+  depth = 2 singular int32
+  direction = 3 singular kb.v1.FollowRequest.Direction
+  via = 4 singular string
+  kind = 5 singular string
+  enum Direction
+    OUT = 0
+    IN = 1
+message Hop
+  field = 1 singular string
+  id = 2 singular string
+message Reached
+  stub = 1 singular kb.v1.Stub
+  route = 2 repeated kb.v1.Hop
+message Followed
+  reached = 1 repeated kb.v1.Reached
+message FollowResponse
+  result = 1 singular kb.v1.Followed oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message ListRequest
+  kind = 1 singular string
+  fields = 2 repeated kb.v1.ListRequest.FieldsEntry
+  form = 3 singular kb.v1.ListRequest.Form
+  message FieldsEntry
+    key = 1 singular string
+    value = 2 singular string
+  enum Form
+    STUBS = 0
+    IDS = 1
+message Listed
+  stubs = 1 repeated kb.v1.Stub
+  ids = 2 repeated string
+message ListResponse
+  result = 1 singular kb.v1.Listed oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message SnapshotRequest
+  signature = 1 singular kb.v1.Signature
+  artifacts = 2 repeated string
+message Recorded
+  entry = 1 singular string
+message SnapshotResponse
+  result = 1 singular kb.v1.Recorded oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message AddRequest
+  locator = 1 singular kb.v1.Locator
+  content = 2 singular string
+  signature = 3 singular kb.v1.Signature
+  revision = 4 singular int32
+message Added
+  id = 1 singular string
+  revision = 2 singular int32
+  artifact = 3 singular string
+message AddResponse
+  result = 1 singular kb.v1.Added oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message RemoveRequest
+  locator = 1 singular kb.v1.Locator
+  signature = 2 singular kb.v1.Signature
+  revision = 3 singular int32
+message Removed
+  revision = 1 singular int32
+  id = 2 singular string
+message RemoveResponse
+  result = 1 singular kb.v1.Removed oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message CreateItem
+  kind = 1 singular string
+  title = 2 singular string
+  content = 3 singular string
+  key = 4 singular string
+message CreateManyRequest
+  items = 1 repeated kb.v1.CreateItem
+  signature = 2 singular kb.v1.Signature
+message CreatedMany
+  batch = 1 singular string
+  results = 2 repeated kb.v1.Created
+message CreateManyResponse
+  result = 1 singular kb.v1.CreatedMany oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message ReplaceItem
+  locator = 1 singular kb.v1.Locator
+  content = 2 singular string
+  revision = 3 singular int32
+message ReplaceManyRequest
+  items = 1 repeated kb.v1.ReplaceItem
+  signature = 2 singular kb.v1.Signature
+message ReplacedMany
+  batch = 1 singular string
+  results = 2 repeated kb.v1.Replaced
+message ReplaceManyResponse
+  result = 1 singular kb.v1.ReplacedMany oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message AddItem
+  locator = 1 singular kb.v1.Locator
+  content = 2 singular string
+  revision = 3 singular int32
+message AddManyRequest
+  items = 1 repeated kb.v1.AddItem
+  signature = 2 singular kb.v1.Signature
+message AddedMany
+  batch = 1 singular string
+  results = 2 repeated kb.v1.Added
+message AddManyResponse
+  result = 1 singular kb.v1.AddedMany oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+message RemoveItem
+  locator = 1 singular kb.v1.Locator
+  revision = 2 singular int32
+message RemoveManyRequest
+  items = 1 repeated kb.v1.RemoveItem
+  signature = 2 singular kb.v1.Signature
+message RemovedMany
+  batch = 1 singular string
+  results = 2 repeated kb.v1.Removed
+message RemoveManyResponse
+  result = 1 singular kb.v1.RemovedMany oneof outcome
+  refusal = 2 singular kb.v1.Refusal oneof outcome
+service Kb
+  rpc Create(kb.v1.CreateRequest) returns (kb.v1.CreateResponse)
+  rpc Read(kb.v1.ReadRequest) returns (kb.v1.ReadResponse)
+  rpc Check(kb.v1.CheckRequest) returns (kb.v1.CheckResponse)
+  rpc Replace(kb.v1.ReplaceRequest) returns (kb.v1.ReplaceResponse)
+  rpc History(kb.v1.HistoryRequest) returns (kb.v1.HistoryResponse)
+  rpc Search(kb.v1.SearchRequest) returns (kb.v1.SearchResponse)
+  rpc Follow(kb.v1.FollowRequest) returns (kb.v1.FollowResponse)
+  rpc List(kb.v1.ListRequest) returns (kb.v1.ListResponse)
+  rpc Snapshot(kb.v1.SnapshotRequest) returns (kb.v1.SnapshotResponse)
+  rpc Add(kb.v1.AddRequest) returns (kb.v1.AddResponse)
+  rpc Remove(kb.v1.RemoveRequest) returns (kb.v1.RemoveResponse)
+  rpc CreateMany(kb.v1.CreateManyRequest) returns (kb.v1.CreateManyResponse)
+  rpc ReplaceMany(kb.v1.ReplaceManyRequest) returns (kb.v1.ReplaceManyResponse)
+  rpc AddMany(kb.v1.AddManyRequest) returns (kb.v1.AddManyResponse)
+  rpc RemoveMany(kb.v1.RemoveManyRequest) returns (kb.v1.RemoveManyResponse)

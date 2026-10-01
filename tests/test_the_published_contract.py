@@ -251,3 +251,14 @@ def test_a_root_that_is_neither_text_nor_a_path_is_refused_as_not_started(root, 
         kb.init(root, "client")
     assert [fault.rule for fault in refused.value.faults] == ["root"]
     assert list(here.iterdir()) == []
+
+
+@pytest.mark.parametrize("role, execution", [(5, ""), ("client", 7), ("client", None)])
+def test_a_role_or_execution_that_is_not_text_is_refused_as_not_started(role, execution, tmp_path, monkeypatch):
+    here = tmp_path / "here"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    with pytest.raises(kb.NotStarted) as refused:
+        kb.init(here, role, execution=execution)
+    assert [fault.rule for fault in refused.value.faults] == ["actor"]
+    assert list(here.iterdir()) == []
