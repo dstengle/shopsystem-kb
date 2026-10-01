@@ -146,3 +146,64 @@ Feature: Answer a damaged file
       | through KB_ROOT naming it         | the operator runs kb export in that store, aimed at the empty directory                                          |
       | through KB_ROOT naming it         | the operator checks a directory exported from another store for import in that store                             |
       | through KB_ROOT naming it         | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
+
+  @slice-118.3
+  Scenario Outline: A store found whose marker names a form of store this kb does not know, one a later kb made, refuses every call and command that needs it
+    Pins that a later kb's store always gives one named fault saying a later version of kb is needed, never a crash, with the store not opened and nothing written.
+    Given a store holding a decision, a process and a tag, whose marker names a form of store this kb does not know, one a later kb made
+    And an empty directory outside the store
+    When <someone does something that needs the store>
+    Then what was asked is rejected because the store was made by a later version of kb, which is needed to read it
+    And the fault is given as any other fault is given, never breaking off
+    And the store is not opened
+    And nothing is written in the store, nor in the empty directory, which stays as it was
+
+    Examples:
+      | someone does something that needs the store                                                                      |
+      | the client creates a decision with a title and both required sections, saying which role and why                 |
+      | the client reads the decision                                                                                    |
+      | the client replaces the decision, saying which role and why                                                      |
+      | the client adds an item to a collection of the decision, saying which role and why                               |
+      | the client removes the decision, saying which role and why                                                       |
+      | the client asks, in one go, for two decisions to be created, saying which role and why                           |
+      | the client lists the decisions                                                                                   |
+      | the client follows the links out of the decision                                                                 |
+      | the client follows the links into the decision                                                                   |
+      | the client searches the prose for a word that decision holds                                                     |
+      | the client reads the journal                                                                                     |
+      | the client snapshots the decision and the process for a piece of work                                            |
+      | the client checks the store                                                                                      |
+      | the operator runs kb validate in that store                                                                      |
+      | the operator runs kb export in that store, aimed at the empty directory                                          |
+      | the operator checks a directory exported from another store for import in that store                             |
+      | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
+
+  @slice-118.3
+  Scenario Outline: A store found whose marker cannot be read at all refuses every call and command that needs it, as for a later kb's store
+    Pins that a marker that cannot be read is answered as a later kb's store is, with one named fault, never a crash, and nothing written.
+    Given a store holding a decision, a process and a tag, whose marker cannot be read at all
+    And an empty directory outside the store
+    When <someone does something that needs the store>
+    Then what was asked is rejected because the store was made by a later version of kb, which is needed to read it
+    And the fault is given as any other fault is given, never breaking off
+    And nothing is written in the store, nor in the empty directory, which stays as it was
+
+    Examples:
+      | someone does something that needs the store                                                                      |
+      | the client creates a decision with a title and both required sections, saying which role and why                 |
+      | the client reads the decision                                                                                    |
+      | the client replaces the decision, saying which role and why                                                      |
+      | the client adds an item to a collection of the decision, saying which role and why                               |
+      | the client removes the decision, saying which role and why                                                       |
+      | the client asks, in one go, for two decisions to be created, saying which role and why                           |
+      | the client lists the decisions                                                                                   |
+      | the client follows the links out of the decision                                                                 |
+      | the client follows the links into the decision                                                                   |
+      | the client searches the prose for a word that decision holds                                                     |
+      | the client reads the journal                                                                                     |
+      | the client snapshots the decision and the process for a piece of work                                            |
+      | the client checks the store                                                                                      |
+      | the operator runs kb validate in that store                                                                      |
+      | the operator runs kb export in that store, aimed at the empty directory                                          |
+      | the operator checks a directory exported from another store for import in that store                             |
+      | the operator runs kb import in that store on a directory exported from another store, saying which role they are |

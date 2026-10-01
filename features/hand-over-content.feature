@@ -105,6 +105,28 @@ Feature: Hand over content
       | content whose options are a single value rather than a collection | the content does not fit the type |
       | content one of whose options is a bare value                   | the content does not fit the type   |
 
+  @slice-118.4
+  Scenario: A character beyond the first 65,536 written as two escapes reads back as that one character
+    Pins that two escapes, one for each half of a character, are read together as the one character they stand for, as JSON reads them, rather than refused or kept as two.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    When the client creates a decision carrying a field written as a character beyond the first 65,536 in two escapes, one for each half, saying which role and why
+    Then the two halves read together as that one character
+    And the field reads back holding it
+
+  @slice-118.4
+  Scenario Outline: Content holding half of a character alone is refused
+    Pins that half of a character with no other half beside it is a named refusal, whichever half it is, never a character made up of one half.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    When the client creates a decision from <content>, saying which role and why
+    Then the artifact is rejected because the content cannot be read as written
+    And the call comes back with its answer rather than breaking off
+    And nothing is written anywhere in the store
+
+    Examples:
+      | content                                                                                                   |
+      | content holding an escape for the first half of a character, followed by text that is not its other half |
+      | content holding an escape for the second half of a character, with no first half before it               |
+
   @slice-78
   Scenario: A field written as a bare date is the text that was written
     Pins the last of the reading traps: a date written without quotes is text like anything else, so a field the type declares as text is not refused for looking like a day.

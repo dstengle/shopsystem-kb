@@ -59,6 +59,14 @@ Feature: Start a store
     Then starting the store is rejected because that directory already has a store inside it
     And the store that is there is left as it was
 
+  @slice-118.3
+  Scenario: Starting a store in a directory that already has one made by a later kb is refused
+    Pins that a store made by a later kb counts as a store here, so starting never writes over it whichever kb made it.
+    Given a directory that already has a store inside it, made by a later kb
+    When the client starts a store there, saying which role it is
+    Then starting the store is rejected because that directory already has a store inside it
+    And the store that is there is left as it was
+
   @slice-45
   Scenario: Starting a store inside a store is refused
     Pins that stores do not nest, so looking upward for a store can only ever find one.
