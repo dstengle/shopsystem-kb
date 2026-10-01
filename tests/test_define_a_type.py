@@ -474,3 +474,53 @@ def _define_a_type_using(client, keyword):
 def _the_type_is_accepted(defined):
     assert not defined.faults, defined.faults
     assert (defined.id, defined.revision) == ("schema/note", 1)
+
+
+WRITTEN_ORDER = [
+    ("schema/properties/about/sections", "placement"),
+    ("schema/properties/relates_to", "ref"),
+    ("schema/properties/relates_to", "targets"),
+    ("schema/parts/attachments/items/sections", "placement"),
+]
+
+
+@when(
+    "the client defines a type where one field breaks two of kb's rules for a link field, a field's nested schema "
+    "declares required sections, and a collection's items declare required sections",
+    target_fixture="attempt",
+)
+def _define_a_type_with_several_faults(root, client):
+    """Written so the order its places stand in differs from the order a walk of its keywords finds them in: the
+    field with nested sections before the link field, the collection last."""
+    before = held.holds(root)
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "about": {"type": "object", "sections": [{"title": "Context"}]},
+            "relates_to": {"type": "string", "ref": {"cardinality": "one", "parts": False}},
+        },
+        "parts": {"attachments": {"items": {"type": "object", "sections": [{"title": "Outcome"}]}}},
+    }
+    response = request(client, "schema", "Note", {"version": 1, "schema": schema}, message="Define Note")
+    return {"response": response, "before": before, "after": held.holds(root)}
+
+
+@then("the type is rejected with every fault, each naming the place")
+def _rejected_with_every_fault(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert {fault.artifact for fault in refused.faults} == {"schema/note"}
+    assert sorted((fault.place, fault.rule) for fault in refused.faults) == sorted(WRITTEN_ORDER)
+
+
+@then("the faults come in the order the places stand in the type as it reads back, which is the order the client wrote it in")
+def _faults_in_the_written_order(attempt):
+    assert [fault.place for fault in attempt["response"].faults] == [place for place, _ in WRITTEN_ORDER]
+
+
+@then("the two faults at the link field come in the alphabetical order of the names of the rules they break")
+def _two_faults_at_the_link_field_in_rule_order(attempt):
+    assert [fault.rule for fault in attempt["response"].faults if fault.place == "schema/properties/relates_to"] == [
+        "ref", "targets",
+    ]

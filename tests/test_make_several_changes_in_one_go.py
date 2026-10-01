@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, WORK_ITEM_TYPE, add_many, added, create, create_many, created, define, journal, listing,
-    read, refs, remove_many, removed, replace, replace_many, replaced, start_a_store,
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, add_many, added,
+    create, create_many, created, define, journal, listing, next_version, read, refs, remove_many, removed, replace, replace_many, replaced, start_a_store,
 )
 import held
 from kb import client as kb_client
@@ -94,12 +94,20 @@ def _one_change_in_the_history(client, applied):
     assert {(entry.actor.role, entry.message) for entry in in_set} == {("client", "Move price reviews to weekly")}
 
 
+class Set(list):
+    """A set of changes to ask for, and the (artifact, rule) of every fault it is to be refused with."""
+
+    def __init__(self, changes, refused):
+        super().__init__(changes)
+        self.refused = refused
+
+
 @given("a set whose second change is missing a section its type requires", target_fixture="bad_set")
 def _a_set_with_a_bad_second_change():
-    return [
+    return Set([
         created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
         created("decision", "Prices are reviewed monthly", {"sections": []}),
-    ]
+    ], {("decision/prices-are-reviewed-monthly", "sections")})
 
 
 @when("the client asks for the set, saying which role and why", target_fixture="attempt")
@@ -110,10 +118,59 @@ def _ask_for_the_set(root, client, bad_set):
 
 
 @then("the set is rejected because a change in it does not fit its type")
-def _set_rejected(attempt):
+def _set_rejected(attempt, bad_set):
     refused = attempt["response"]
     assert refused.refused
-    assert {(fault.artifact, fault.rule) for fault in refused.faults} == {("decision/prices-are-reviewed-monthly", "sections")}
+    assert {(fault.artifact, fault.rule) for fault in refused.faults} == bad_set.refused
+
+
+@given("the decision type declares its fields first, then its required sections, then its collection of options")
+def _decision_type_in_reading_order(client):
+    assert not next_version(client, "decision", ORDERED_DECISION_TYPE).faults
+
+
+@given(
+    "a set whose second change is a decision written with its options first, then its sections, then its fields, "
+    "where a field breaks two rules of the type, the second option is of a shape the type does not allow, and the "
+    "rationale is missing",
+    target_fixture="bad_set",
+)
+def _a_set_with_a_misordered_second_change():
+    return Set([
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+        created("decision", "Prices are reviewed monthly", MISORDERED_DECISION),
+    ], {("decision/prices-are-reviewed-monthly", rule) for _, rule in READING_ORDER})
+
+
+@then(
+    "that change's faults come in the order the places stand in its artifact as it would read back: the field "
+    "first, then the sections, then the options"
+)
+def _that_changes_faults_in_reading_order(attempt):
+    faults = [(fault.place, fault.rule) for fault in attempt["response"].faults]
+    assert [place for place, _ in faults] == [place for place, _ in READING_ORDER]
+
+
+@then("the two faults at the field come in the alphabetical order of the names of the rules they break")
+def _two_faults_at_the_field_in_rule_order(attempt):
+    assert [fault.rule for fault in attempt["response"].faults if fault.place == "status"] == ["maxLength", "pattern"]
+
+
+@given("a set whose first and second changes are each missing a section its type requires", target_fixture="bad_set")
+def _a_set_with_two_bad_changes():
+    return Set([
+        created("decision", "Price reviews happen weekly", {"sections": []}),
+        created("decision", "Prices are reviewed monthly", {"sections": []}),
+    ], {("decision/price-reviews-happen-weekly", "sections"), ("decision/prices-are-reviewed-monthly", "sections")})
+
+
+@then("the first change's fault comes back before the second change's fault")
+def _the_first_changes_fault_first(attempt):
+    refused = attempt["response"]
+    assert list(dict.fromkeys(fault.artifact for fault in refused.faults)) == [
+        "decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly",
+    ]
+    assert [fault.artifact for fault in refused.faults] == sorted(fault.artifact for fault in refused.faults)
 
 
 @then("the store holds neither change")

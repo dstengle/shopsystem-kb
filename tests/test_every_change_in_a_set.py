@@ -100,7 +100,7 @@ def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(client):
 
 @pytest.mark.parametrize("earlier, faults", [
     ({"version": "two"}, [("schema/decision", "version", "type")]),
-    ({"schema": None}, [("schema/decision", "version", "version"), ("schema/decision", "", "required")]),
+    ({"schema": None}, [("schema/decision", "", "required"), ("schema/decision", "version", "version")]),
 ])
 def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(client, earlier, faults):
     content = {key: value for key, value in DECISION_TYPE.items() if key != "title"}

@@ -2,7 +2,10 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import DECISION_TYPE, create, define, read, request, start_a_store
+from calls import (
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, create, define, next_version, read,
+    request, start_a_store,
+)
 import held
 from kb import content, client as kb_client
 from kb.contract import kb_pb2
@@ -35,6 +38,14 @@ def test_an_artifact_with_several_faults_reports_them_all():
 
 @scenario("check-a-change.feature", "Faults found by different rules all come back together")
 def test_faults_found_by_different_rules_all_come_back_together():
+    pass
+
+
+@scenario(
+    "check-a-change.feature",
+    "An artifact refused with several faults has them given in the order its places stand when it reads back",
+)
+def test_an_artifact_refused_with_several_faults_has_them_in_reading_order():
     pass
 
 
@@ -929,3 +940,42 @@ def _rejected_as_unreadable_content(attempt):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.place, fault.rule) for fault in refused.faults] == [(attempt["place"], "content")]
     assert "it is not YAML that can be read" in refused.faults[0].message
+
+
+@given("the decision type declares its fields first, then its required sections, then its collection of options")
+def _decision_type_in_reading_order(client):
+    assert not next_version(client, "decision", ORDERED_DECISION_TYPE).faults
+
+
+@when(
+    "the client creates a decision written with its options first, then its sections, then its fields, where a "
+    "field breaks two rules of the type, the second option is of a shape the type does not allow, and the "
+    "rationale is missing, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_a_misordered_decision(root, client):
+    before = held.everything_in(root)
+    response = request(client, "decision", "Price reviews happen weekly", MISORDERED_DECISION, message="Record it")
+    return {"response": response, "before": before, "after": held.everything_in(root)}
+
+
+@then("the artifact is rejected with every fault, each naming the artifact, the place in it and the rule broken")
+def _rejected_with_every_fault(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert {fault.artifact for fault in refused.faults} == {"decision/price-reviews-happen-weekly"}
+    assert sorted((fault.place, fault.rule) for fault in refused.faults) == sorted(READING_ORDER)
+
+
+@then(
+    "the faults come in the order the places stand in the decision as it would read back: the field first, then "
+    "the sections, then the options"
+)
+def _faults_in_reading_order(attempt):
+    faults = [(fault.place, fault.rule) for fault in attempt["response"].faults]
+    assert [place for place, _ in faults] == [place for place, _ in READING_ORDER]
+
+
+@then("the two faults at the field come in the alphabetical order of the names of the rules they break")
+def _two_faults_at_the_field_in_rule_order(attempt):
+    assert [fault.rule for fault in attempt["response"].faults if fault.place == "status"] == ["maxLength", "pattern"]

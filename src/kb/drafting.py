@@ -5,7 +5,7 @@ the types it was read through. A fault anywhere refuses the whole set with every
 from typing import NamedTuple
 
 from kb import (
-    canonical, composition, definitions, edits, keys, links, places, port, refusals, requests, search, settled,
+    canonical, composition, definitions, edits, fault_order, keys, links, places, port, refusals, requests, search, settled,
     validation, values,
 )
 from kb.draft import Draft
@@ -82,7 +82,18 @@ def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
     faults = [*outcome.faults, *_fits(draft, outcome)]
     if not faults and last[outcome.artifact_id] is outcome and outcome.artifact_id.kind == values.TYPE_KIND:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
-    return faults
+    return _in_order(draft, outcome, faults)
+
+
+def _in_order(draft: Draft, change: Change, faults: list) -> list:
+    """A change's faults in the order its artifact reads back, read through the type it is checked against."""
+    if len(faults) < 2:
+        return faults
+    try:
+        declared = composition.declared(_typed(draft, change)["schema"], draft)
+    except Refused:
+        return faults
+    return fault_order.ordered(faults, settled.checked(change.left), declared)
 
 
 def _fits(draft: Draft, change: Change) -> list:

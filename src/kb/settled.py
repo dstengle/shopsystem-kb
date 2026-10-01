@@ -39,7 +39,7 @@ def order(artifact: dict, schema: dict) -> dict:
     is not written in the shape its type gives it, which a set may leave before a later change in it fixes it, is
     left as it was written."""
     parts = schema.get("parts", {})
-    ordered = {key: artifact[key] for key in IDENTITY}
+    ordered = {key: artifact[key] for key in IDENTITY if key in artifact}
     for name in schema.get("properties", {}):
         if name in artifact and name not in ordered:
             ordered[name] = artifact[name]

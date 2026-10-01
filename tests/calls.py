@@ -46,6 +46,25 @@ DECISION_TYPE = {
     },
 }
 
+# DECISION_TYPE's fields, sections and options in that order, and a field whose two constraints are written in the
+# reverse of their alphabetical order, so the order the validator finds them in and kb's order differ.
+ORDERED_DECISION_TYPE = copy.deepcopy(DECISION_TYPE)
+ORDERED_DECISION_TYPE["schema"]["properties"]["status"] = {"type": "string", "pattern": "^[a-z-]+$", "maxLength": 5}
+
+# A decision written options first, then sections, then fields; the field breaks both its constraints, the second
+# option's title is a number and the rationale is missing.
+MISORDERED_DECISION = {
+    "options": [{"title": "Go weekly"}, {"title": 7}],
+    "sections": [{"title": "Purpose", "body": "Keep prices in step with costs.\n"}],
+    "status": "Not-Lower-Case",
+}
+
+# The places and rules of its faults in the order the decision reads back: field, sections, options.
+READING_ORDER = [
+    ("status", "maxLength"), ("status", "pattern"), ("sections", "sections"), ("options/1/title", "type"),
+]
+
+
 WORK_ITEM_TYPE = {
     "title": "Work item",
     "version": 1,
