@@ -5,6 +5,7 @@ that call alone and closed when it ends, its request becomes values (kb.requests
 the domain, and its response is made from what comes back. A refusal anywhere becomes that rpc's faults, here and only here, and so does any exception that escapes: the
 clock's failure, the database's, or anything else, each with nothing written.
 """
+import contextlib
 import functools
 import sqlite3
 from datetime import datetime
@@ -42,16 +43,17 @@ def _escaped(error: Exception) -> kb_pb2.Fault:
     return refusals.escaped(f"{type(error).__name__}: {error}")
 
 
-def boundary(response, opens: bool = True):
-    """The rpc or the operator's command, over the store opened for it unless it starts one, answered with a response
-    of this type carrying the faults when anything in it is refused or any exception escapes it."""
+def boundary(response, opens: bool = True, at_one_moment: bool = False):
+    """The rpc or the operator's command, over the store opened for it unless it starts one, every read it makes
+    seeing the store at one moment when it only reads, answered with a response of this type carrying the faults when
+    anything in it is refused or any exception escapes it."""
     def wrap(rpc):
         @functools.wraps(rpc)
         def run(self, request, context=None):
             try:
                 if not opens:
                     return rpc(self, request)
-                with store.opened(self._root) as held:
+                with store.opened(self._root) as held, _reading(held, at_one_moment):
                     return rpc(self, request, held)
             except values.Refused as refused:
                 return response(faults=refused.faults)
@@ -59,6 +61,11 @@ def boundary(response, opens: bool = True):
                 return response(faults=[_escaped(error)])
         return run
     return wrap
+
+
+def _reading(held: port.Port, at_one_moment: bool):
+    """The block the rpc runs in: one moment of the store for an rpc that only reads, nothing more for one that lands."""
+    return held.at_one_moment() if at_one_moment else contextlib.nullcontext()
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
@@ -110,27 +117,27 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         """A set of operations landed under the request's actor and message."""
         return write.land(held, *requests.change(operations, request.actor, request.message), self._clock)
 
-    @boundary(kb_pb2.ReadResponse)
+    @boundary(kb_pb2.ReadResponse, at_one_moment=True)
     def Read(self, request, held):
         return read.artifact(held, requests.reading(request))
 
-    @boundary(kb_pb2.ValidateResponse)
+    @boundary(kb_pb2.ValidateResponse, at_one_moment=True)
     def Validate(self, request, held):
         return check.everything(held)
 
-    @boundary(kb_pb2.JournalResponse)
+    @boundary(kb_pb2.JournalResponse, at_one_moment=True)
     def Journal(self, request, held):
         return query.entries(held, requests.journal(request))
 
-    @boundary(kb_pb2.SearchResponse)
+    @boundary(kb_pb2.SearchResponse, at_one_moment=True)
     def Search(self, request, held):
         return query.found(held, requests.searching(request))
 
-    @boundary(kb_pb2.RefsResponse)
+    @boundary(kb_pb2.RefsResponse, at_one_moment=True)
     def Refs(self, request, held):
         return query.walk(held, requests.walk(request))
 
-    @boundary(kb_pb2.ListResponse)
+    @boundary(kb_pb2.ListResponse, at_one_moment=True)
     def List(self, request, held):
         return query.listing(held, requests.listing(request))
 

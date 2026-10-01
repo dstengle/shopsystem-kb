@@ -27,7 +27,7 @@ class Operator:
         export.written(held, values.directory(directory))
         return export.Exported()
 
-    @boundary(importing.Checked)
+    @boundary(importing.Checked, at_one_moment=True)
     def import_check(self, directory: str, held):
         """A directory read as a set for import into the store, its errors and what would be skipped; nothing written."""
         return importing.checked(held, values.directory(directory))

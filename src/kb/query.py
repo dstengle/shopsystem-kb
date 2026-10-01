@@ -81,13 +81,12 @@ def snapshotted(store: Port, named: list) -> list[dict]:
             faults.append(refusals.not_found(artifact_id))
     if faults:
         raise Refused(faults)
-    return [
-        {
-            "artifact": str(artifact_id), "revision": store.artifact(artifact_id)["revision"],
-            "digest": journal.digest(store.artifact(artifact_id)),
-        }
-        for artifact_id in named
-    ]
+    return [_snapshotted(artifact_id, store.artifact(artifact_id)) for artifact_id in named]
+
+
+def _snapshotted(artifact_id: ArtifactId, artifact: dict) -> dict:
+    """One artifact as a snapshot lists it: its name, its version and the fingerprint of its canonical text."""
+    return {"artifact": str(artifact_id), "revision": artifact["revision"], "digest": journal.digest(artifact)}
 
 
 def _outward(store: Port, locator: Locator) -> list[tuple[str, ArtifactId]]:

@@ -108,10 +108,12 @@ def _landing_on(link: port.Linking) -> str:
 
 
 def record(held: port.Port, named: list, signed: Signed, clock: journal.Clock | None = None) -> str:
-    """One history entry listing each artifact named as it stands now, stamped by the clock, landed as a set of its
-    own; stamped and landed again while the port holds the write lock when another entry took its id first. Returns
-    the entry's id; raises Refused, having written nothing, when a name did not convert or the store lacks it."""
-    read = query.snapshotted(held, named)
+    """One history entry listing each artifact named as it stands now, every one read at one moment, stamped by the
+    clock, and landed as a set of its own once that reading is done; stamped and landed again while the port holds
+    the write lock when another entry took its id first. Returns the entry's id; raises Refused, having written
+    nothing, when a name did not convert or the store lacks it."""
+    with held.at_one_moment():
+        read = query.snapshotted(held, named)
     try:
         return _snapshot(held, read, signed, clock)
     except port.Conflict:
