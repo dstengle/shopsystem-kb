@@ -40,3 +40,36 @@ GOLDEN = (
 
 def test_the_canonical_dump_of_an_artifact_is_these_bytes():
     assert canonical.dump(ARTIFACT) == GOLDEN
+
+
+# Every other way a value is written, outside a prose `body`.
+OTHER_WAYS = {
+    "note": "line one\nline two",
+    "name": "Zoë – café ✅",
+    "empty": None,
+    "ratio": 1.5,
+    "whole": 2.0,
+    "grid": [[1, 2], ["a", ["deep"]]],
+    "long": "the quick brown fox jumps over the lazy dog " * 3 + "end",
+}
+
+OTHER_WAYS_GOLDEN = (
+    'note: |-\n'
+    '  line one\n'
+    '  line two\n'
+    'name: Zoë – café ✅\n'
+    'empty: null\n'
+    'ratio: 1.5\n'
+    'whole: 2.0\n'
+    'grid:\n'
+    '  -   - 1\n'
+    '      - 2\n'
+    '  -   - a\n'
+    '      -   - deep\n'
+    'long: the quick brown fox jumps over the lazy dog the quick brown fox jumps over the lazy dog '
+    'the quick brown fox jumps over the lazy dog end\n'
+)
+
+
+def test_the_canonical_dump_of_every_other_way_a_value_is_written_is_these_bytes():
+    assert canonical.dump(OTHER_WAYS) == OTHER_WAYS_GOLDEN
