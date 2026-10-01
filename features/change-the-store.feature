@@ -121,11 +121,57 @@ Feature: Change the store
       | replaces the decision with content that leaves that option out            |
       | replaces the decision's collection of options with one that leaves it out |
 
-  @slice-108
-  Scenario Outline: Several clients on one machine change one store at the same time
+  @slice-122
+  Scenario Outline: A change that says the version its artifact still stands at lands
+    Pins that saying what was read costs nothing while nobody else has changed the artifact: the change goes through as it would without it.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And the client read the decision at its first version
+    When the client <change>, saying the version it read the decision at and which role and why
+    Then the change lands
+
+    Examples:
+      | change                          |
+      | replaces the decision           |
+      | adds an option to the decision  |
+      | removes the decision            |
+
+  @slice-122
+  Scenario Outline: A change that says a version its artifact no longer stands at is refused
+    Pins that a client which says what it read never overwrites a change it did not see: it is told the artifact moved, and where it stands now, so it can read again.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And the client read the decision at its first version
+    And another client has since replaced the decision
+    When the client <change>, saying the version it read the decision at and which role and why
+    Then the change is rejected because the artifact moved since it was read
+    And the version the decision stands at is given back
+    And nothing is written
+
+    Examples:
+      | change                          |
+      | replaces the decision           |
+      | adds an option to the decision  |
+      | removes the decision            |
+
+  @slice-122
+  Scenario Outline: A change that says no version acts on its artifact as it stands
+    Pins that a client which does not say what it read is never refused for a change it did not see: its change is made on whatever the artifact is now.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And the client read the decision at its first version
+    And another client has since replaced the decision
+    When the client <change>, without saying the version it read the decision at, saying which role and why
+    Then <outcome>
+
+    Examples:
+      | change                          | outcome                                                                                                       |
+      | replaces the decision           | the decision holds the client's replacement, one version on from the version the other client left           |
+      | adds an option to the decision  | the new option comes after the options the other client's replacement left, one version on from that version |
+      | removes the decision            | the store no longer holds the decision                                                                        |
+
+  @slice-122
+  Scenario Outline: Several clients on one machine change one store at the same time, none saying the version it read
     Pins that changes made at once are taken one after another, each against what the earlier ones left, so neither of two items added to one collection together is lost, whether the clients share a program or not.
     Given a store holding a process with two steps and a shared step other processes use
-    And <clients>, one adding a step to the process while the other adds a different step, each saying which role and why
+    And <clients>, one adding a step to the process while the other adds a different step, each saying which role and why and neither saying the version it read the process at
     When the client adding the different step lands its change second
     Then the process holds both new steps
     And the different step comes after the other new step, and both come after the steps already there
@@ -149,11 +195,11 @@ Feature: Change the store
       | creating the decision | removal      | something still points at it                          | the tag and the decision that points at it |
       | removing the tag      | new decision | a link must land on a node of a kind the type allows | neither the tag nor the new decision       |
 
-  @slice-108
-  Scenario: Two clients replace one artifact at the same time
+  @slice-122
+  Scenario: Two clients replace one artifact at the same time, neither saying the version it read
     Pins that two replacements made at once each count: neither is lost from the history and neither takes the other's version, and the artifact ends with whichever came last.
     Given a store holding a decision with a purpose and a rationale, at its first version
-    And one client is replacing the decision with one rationale while another replaces it with a different rationale, each saying which role and why
+    And one client is replacing the decision with one rationale while another replaces it with a different rationale, each saying which role and why and neither saying the version it read the decision at
     When the client with the different rationale lands its change second
     Then each replacement left a version of its own, and the decision's version has gone up by two
     And both replacements are in the history
