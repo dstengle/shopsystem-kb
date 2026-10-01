@@ -10,7 +10,7 @@ import contextlib
 import functools
 from datetime import datetime
 
-from kb import check, escapes, port, query, read, requests, responses, store, values, write
+from kb import changes, check, escapes, port, query, read, requests, responses, store, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
 
 
@@ -70,25 +70,25 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @boundary(kb_pb2.CreateResponse)
     def Create(self, request, held):
-        result = self._land(held, requests.creating(request)).results[0]
+        result = self._land(held, changes.creating(request)).results[0]
         return kb_pb2.Created(id=str(result.artifact_id), revision=result.revision)
 
     @boundary(kb_pb2.ReplaceResponse)
     def Replace(self, request, held):
-        return kb_pb2.Replaced(revision=self._land(held, requests.replacing(request)).results[0].revision)
+        return kb_pb2.Replaced(revision=self._land(held, changes.replacing(request)).results[0].revision)
 
     @boundary(kb_pb2.AddResponse)
     def Add(self, request, held):
-        result = self._land(held, requests.adding(request)).results[0]
+        result = self._land(held, changes.adding(request)).results[0]
         return kb_pb2.Added(id=result.item, revision=result.revision)
 
     @boundary(kb_pb2.RemoveResponse)
     def Remove(self, request, held):
-        return kb_pb2.Removed(revision=self._land(held, requests.removing(request)).results[0].revision)
+        return kb_pb2.Removed(revision=self._land(held, changes.removing(request)).results[0].revision)
 
     @boundary(kb_pb2.ApplyResponse)
     def Apply(self, request, held):
-        landed = self._land(held, requests.change(request.operations, request.actor, request.message))
+        landed = self._land(held, changes.change(request.operations, request.actor, request.message))
         return kb_pb2.ApplyResponse(batch=landed.batch, results=[
             kb_pb2.Result(id=str(result.artifact_id), revision=result.revision, item=result.item)
             for result in landed.results

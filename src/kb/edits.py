@@ -6,7 +6,7 @@ the whole set has acted (kb.write). An import puts an artifact in the draft whol
 import copy
 from typing import NamedTuple
 
-from kb import composition, definitions, names, places, refusals, requests, settled, values
+from kb import changes, composition, definitions, names, places, refusals, settled, values
 from kb.draft import Draft
 from kb.values import ArtifactId, Refused
 
@@ -36,7 +36,7 @@ class Change(NamedTuple):
 
 def apply(draft: Draft, operation) -> Change:
     """One operation applied to the draft. Returns what it did, settled as it did it; raises Refused."""
-    if isinstance(operation, requests.Remove):
+    if isinstance(operation, changes.Remove):
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
@@ -50,14 +50,14 @@ def _changed(draft: Draft, operation) -> Change:
     if isinstance(operation, Import):
         draft.put(operation.artifact_id, copy.deepcopy(operation.artifact))
         return Change("import", operation.artifact_id)
-    if isinstance(operation, requests.Create):
+    if isinstance(operation, changes.Create):
         return Change("create", _create(draft, operation))
-    if isinstance(operation, requests.Add):
+    if isinstance(operation, changes.Add):
         return _append(draft, operation)
     return _replace(draft, operation)
 
 
-def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
+def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     kind = creation.kind
     type_id = composition.kind_type(kind, draft)
     at, faults = creation.at, list(creation.title_faults)
@@ -76,7 +76,7 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     return artifact_id
 
 
-def _replace(draft: Draft, replacement: requests.Replace) -> Change:
+def _replace(draft: Draft, replacement: changes.Replace) -> Change:
     locator = replacement.locator
     if not draft.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])
@@ -89,7 +89,7 @@ def _replace(draft: Draft, replacement: requests.Replace) -> Change:
     return Change("write", locator.id, names.placed(locator.place), faults=faults)
 
 
-def _append(draft: Draft, addition: requests.Add) -> Change:
+def _append(draft: Draft, addition: changes.Add) -> Change:
     """One item put at the end of a collection the artifact's type declares, and named there."""
     locator = addition.locator
     if not draft.holds(locator.id):
@@ -123,7 +123,7 @@ def _collections_at(draft: Draft, locator: values.Locator) -> dict:
     return declared["parts"]
 
 
-def _delete(draft: Draft, removal: requests.Remove) -> Change:
+def _delete(draft: Draft, removal: changes.Remove) -> Change:
     """A whole artifact taken out of the draft; what still points at it is judged once the whole set has acted."""
     locator = removal.locator
     if not draft.holds(locator.id):
