@@ -199,6 +199,19 @@ def root(text: str) -> Root:
     return Root(Path(text), text)
 
 
+@dataclass(frozen=True)
+class Directory:
+    """A directory the operator names for the store's files, and the name given, which a refusal quotes."""
+    path: Path
+    named: str
+
+
+def directory(text: str) -> Directory:
+    """The directory the operator names, as named; relative names stay relative. What stands there is the export's
+    to check."""
+    return Directory(Path(text), text)
+
+
 def _not_a_plain_name(text: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=text, rule=rules.LOCATOR,

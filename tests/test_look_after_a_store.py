@@ -1,28 +1,12 @@
-import os
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, next_version
+from calls import DECISION_TYPE, define
+from conftest import OPERATOR, _kb, _store_needing_attention
 import held
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 scenarios("operate-a-store.feature")
-
-KB = Path(sys.executable).with_name("kb")
-OPERATOR = "operator"
-
-
-def _kb(*args, cwd, env=None):
-    """kb's own console command, run as the operator runs it: in a directory, with KB_ROOT and KB_ACTOR set only when
-    a step sets them."""
-    clean = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
-    return subprocess.run([str(KB), *args], cwd=cwd, env={**clean, **(env or {})}, capture_output=True, text=True)
-
 
 @given("a directory that has no store inside it", target_fixture="root")
 @given("a directory that has no store inside it, and nothing names which role the operator is", target_fixture="root")
@@ -87,24 +71,6 @@ def _init_rejected_as_inside_a_store(ran, root, before):
     )
 
 
-def _store_needing_attention(root):
-    """A store a client filled: two decisions behind the decision type, and one of them, edited by hand, missing the
-    body of its purpose."""
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    define(client, DECISION_TYPE)
-    for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
-        create(client, "decision", {"title": title, "sections": [
-            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-            {"title": "Rationale", "body": "Costs move weekly.\n"},
-        ]})
-    next_version(client, "decision", DECISION_TYPE)
-    monthly = held.artifact(root, "decision/prices-are-reviewed-monthly")
-    del monthly["sections"][0]["body"]
-    held.plant(root, "decision/prices-are-reviewed-monthly", monthly)
-    return root
-
-
 REPORT = (
     "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t'body' is a required property\n"
     "stale\tdecision/price-reviews-happen-weekly\tchecked against version 1 of its type, which is at 2\n"
@@ -139,31 +105,10 @@ def _kb_help(root):
     return _kb("--help", cwd=root)
 
 
-@given("a store, with the operator working in a folder deep inside the directory it sits in", target_fixture="where")
-def _working_deep_inside(root):
-    deep = _store_needing_attention(root) / "notes" / "2026" / "september"
-    deep.mkdir(parents=True)
-    return {"cwd": deep, "env": {}}
-
-
 @then("the store found above where they are working is the one checked")
 @then("the store KB_ROOT names is the one checked")
 def _that_store_checked(ran):
     assert (ran.returncode, ran.stdout, ran.stderr) == (1, REPORT, "")
-
-
-@given("a store, with the operator working outside any store and KB_ROOT naming that one", target_fixture="where")
-def _outside_with_kb_root(root, tmp_path):
-    outside = tmp_path / "elsewhere"
-    outside.mkdir()
-    return {"cwd": outside, "env": {"KB_ROOT": str(_store_needing_attention(root))}}
-
-
-@given("the operator is working outside any store and nothing names one", target_fixture="where")
-def _outside_with_nothing_named(tmp_path):
-    outside = tmp_path / "elsewhere"
-    outside.mkdir()
-    return {"cwd": outside, "env": {}}
 
 
 @then("the check is rejected because no store was found, neither above where they are working nor named outright")
@@ -172,31 +117,12 @@ def _rejected_as_no_store(ran, where):
     assert ran.stderr == f"kb validate: refused: store: no store was found, neither above {where['cwd']} nor named outright\n"
 
 
-@given(
-    "the operator is working outside any store, with KB_ROOT naming a directory that holds no store",
-    target_fixture="where",
-)
-def _outside_with_kb_root_naming_no_store(tmp_path):
-    outside, empty = tmp_path / "elsewhere", tmp_path / "empty"
-    outside.mkdir()
-    empty.mkdir()
-    return {"cwd": outside, "env": {"KB_ROOT": str(empty)}}
-
-
 @then("the check is rejected because KB_ROOT names a directory that holds no store")
 def _rejected_as_kb_root_names_no_store(ran, where):
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr == (
         f"kb validate: refused: store: KB_ROOT names a directory that holds no store: {where['env']['KB_ROOT']}\n"
     )
-
-
-@given("the operator is working inside a store, with KB_ROOT naming a different store", target_fixture="where")
-def _inside_one_naming_another(root, tmp_path):
-    other = tmp_path / "other"
-    other.mkdir()
-    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
-    return {"cwd": _store_needing_attention(root), "env": {"KB_ROOT": str(other)}}
 
 
 @then(

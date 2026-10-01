@@ -350,3 +350,13 @@ def test_links_restated_without_a_new_revision_at_the_revision_read(store):
         store.land([], [entry("moved")], [port.Relink(name("note/n"), (), 2)])
     assert store.artifact(name("note/n")) == {"about": "tag/t"} and store.history(batch="moved") == []
     assert [str(each) for each in store.ids()] == ["note/n", "tag/t"]
+
+
+def test_reads_at_one_moment_see_the_store_as_it_stood_whatever_lands_meanwhile(opener, store):
+    land(store, put("note/a", {"title": "A"}))
+    with store.at_one_moment():
+        first = store.ids()
+        with opener() as other:
+            land(other, put("note/a", {"title": "A", "v": 2}, read=1), put("note/b", {"title": "B"}))
+        assert (store.ids(), store.artifact(name("note/a"))) == (first, {"title": "A"})
+    assert [str(each) for each in store.ids()] == ["note/a", "note/b"]

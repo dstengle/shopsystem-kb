@@ -9,7 +9,7 @@ import functools
 import sqlite3
 from datetime import datetime
 
-from kb import check, port, query, read, refusals, requests, store, values, write
+from kb import check, export, port, query, read, refusals, requests, store, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
 
 
@@ -137,3 +137,9 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     @_boundary(kb_pb2.SnapshotResponse)
     def Snapshot(self, request, held):
         return kb_pb2.SnapshotResponse(entry=write.record(held, *requests.snapshot(request), self._clock))
+
+    @_boundary(export.Exported)
+    def Export(self, request, held):
+        """Not an rpc: the operator's export of the store to the directory the request names."""
+        export.written(held, values.directory(request))
+        return export.Exported()

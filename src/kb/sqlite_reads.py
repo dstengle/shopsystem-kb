@@ -1,9 +1,11 @@
 """The SQLite adapter's reads, over one open connection, and content as the database keeps it.
 
-Every read is one statement whose rows are all fetched, so no read leaves a transaction open behind it. Names come
+Every read is one statement whose rows are all fetched, so no read leaves a transaction open behind it; reads inside
+`at_one_moment` share the one read transaction it holds for its block, and so one view of the store. Names come
 back in `names.order`, links in the order they were handed in, and fields are compared in Python on the text YAML 1.2
 writes a value as, never through SQLite's JSON functions, which turn a large integer into a float.
 """
+import contextlib
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -60,6 +62,15 @@ class Reads:
 
     def _rows(self, sql: str, *args) -> list:
         return self._db.execute(sql, args).fetchall()
+
+    @contextlib.contextmanager
+    def at_one_moment(self):
+        """One read transaction around the block: in WAL mode its first read fixes the view every later one sees."""
+        self._db.execute("BEGIN")
+        try:
+            yield
+        finally:
+            self._db.execute("COMMIT")
 
     def holds(self, artifact_id: ArtifactId) -> bool:
         return bool(self._rows("SELECT 1 FROM artifacts WHERE id = ?", str(artifact_id)))

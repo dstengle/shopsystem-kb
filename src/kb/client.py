@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from kb import store
+from kb import export, store
 from kb.contract import kb_pb2
 from kb.servicer import KbServicer
 
@@ -74,6 +74,10 @@ class InProcessClient:
 
     def Delete(self, request, timeout=None):
         return self._call("Delete", request, kb_pb2.DeleteResponse)
+
+    def Export(self, directory: str):
+        """The operator's export of the store this call finds to the directory named; not part of the contract."""
+        return self._call("Export", directory, export.Exported)
 
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:

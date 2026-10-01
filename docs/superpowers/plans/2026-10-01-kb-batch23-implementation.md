@@ -214,7 +214,7 @@ No questions for the spec remain open from planning. The seven found were answer
 
 **Check** (ninth review's R2):
 - `grep -nE '/ "kb"|"kb" /|"journal"|"git"|git\(' tests/*.py | grep -v '^tests/held.py'` gives none.
-- `grep -n subprocess tests/*.py` gives only `tests/test_look_after_a_store.py`'s `_kb` runner of the command line and, since Task 14, `tests/at_once.py`'s runner of the other program a scenario's held client runs in (`InAnotherProgram`).
+- `grep -n subprocess tests/*.py` gives only `tests/conftest.py`'s `_kb` runner of the command line (in `tests/test_look_after_a_store.py` until Task 15 moved it) and, since Task 14, `tests/at_once.py`'s runner of the other program a scenario's held client runs in (`InAnotherProgram`).
 - The suite gives `231 passed, 7 failed`, the same 7.
 
 **Where it lands:** a new test module, `tests/held.py`, the only test code that knows how the store is kept. Task 8 rewrites this module alone. Its public functions, each named for what a step asks:

@@ -1,5 +1,5 @@
-"""kb's own command line, for the operator: set a store up, and check one. Nothing else; every change to content goes
-through a client.
+"""kb's own command line, for the operator: set a store up, check one, and export one. Nothing else; every change to
+content goes through a client.
 
 Each command is one call on the in-process client. A refusal is printed to stderr and exits 2; a check that finds a
 violation exits 1.
@@ -21,9 +21,13 @@ def main(argv=None) -> int:
     init = commands.add_parser("init", help="set up a store in a directory")
     init.add_argument("root", help="the directory the store is made inside, as its kb/ subdirectory")
     commands.add_parser("validate", help="check the store found here, or the one KB_ROOT names")
+    exporting = commands.add_parser("export", help="write the store found here, or the one KB_ROOT names, out as files")
+    exporting.add_argument("directory", help="an empty directory, or one that does not exist, for the files")
     args = parser.parse_args(argv)
     if args.command == "init":
         return _init(args.root)
+    if args.command == "export":
+        return _export(args.directory)
     return _validate()
 
 
@@ -51,6 +55,14 @@ def _validate() -> int:
         print(f"stale\t{stale.artifact}\tchecked against version {stale.schema_version} of its type, "
               f"which is at {stale.current}")
     return VIOLATED if checked.violations else 0
+
+
+def _export(directory: str) -> int:
+    """Write the store this directory finds out as files into the directory named."""
+    exported = kb_client.connect().Export(directory)
+    if exported.faults:
+        return _refused("export", exported.faults)
+    return 0
 
 
 def _refused(command: str, faults) -> int:

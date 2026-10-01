@@ -9,7 +9,7 @@ The port refuses with the exceptions named here. None of them is published, and 
 """
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import ContextManager, Protocol
 
 from kb.values import ArtifactId, Kind
 
@@ -127,6 +127,9 @@ class Unreadable(Exception):
 
 class Port(Protocol):
     """Reads answer from the store as it stands; `land` changes it. Names come back in `names.order`."""
+
+    def at_one_moment(self) -> ContextManager[None]:
+        """A block whose reads all see the store as it stood when the first of them was made, whatever lands meanwhile."""
 
     def holds(self, artifact_id: ArtifactId) -> bool: ...
 
