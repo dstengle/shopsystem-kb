@@ -106,11 +106,17 @@ def tagged_decision_type():
 
 
 class Answer:
-    """A change's response as a step reads it: the fields of its result, and the faults of its refusal, none when it
-    gave a result; a field of a refused change reads as unset. The response itself is `response`."""
+    """A change's response as a step reads it: whether it is a refusal, the fields of its result, and the faults of its
+    refusal, none when it gave a result; a field of a refused change reads as unset. The response itself is
+    `response`. A response that is neither a result nor a refusal is never read as either."""
 
     def __init__(self, response):
+        assert response.WhichOneof("outcome") is not None, f"neither a result nor a refusal: {response!r}"
         self.response = response
+
+    @property
+    def refused(self):
+        return self.response.WhichOneof("outcome") == "refusal"
 
     @property
     def faults(self):
