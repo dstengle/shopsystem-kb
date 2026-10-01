@@ -97,7 +97,7 @@ Feature: Change the store
     Then the removal is rejected because something still points at it
     And the client is given that link among the links that block it
 
-  @slice-109
+  @slice-104
   Scenario: The clock fails during a change
     Pins that a clock that breaks down never leaves a change half made: the client hears about it, and nothing it asked for has happened.
     Given a store holding a decision with a purpose and a rationale, at its first version
