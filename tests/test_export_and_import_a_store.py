@@ -1086,3 +1086,43 @@ def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the
     assert (checked.faults, list(checked.errors), list(checked.skipped)) == ([], [], [])
     assert kb_client.import_(str(exported), OPERATOR).faults == []
     assert held.artifact(target, "note/x")["b"] == "second"
+
+
+@scenario(
+    FEATURE,
+    'Exporting to something that is a file, not a directory, is refused',
+)
+def test_exporting_to_something_that_is_a_file_not_a_directory_is_refused():
+    pass
+
+
+@scenario(
+    FEATURE,
+    'Checking for import something that is not a directory is refused',
+)
+def test_checking_for_import_something_that_is_not_a_directory_is_refused():
+    pass
+
+
+@scenario(
+    FEATURE,
+    'Importing from something that is not a directory is refused',
+)
+def test_importing_from_something_that_is_not_a_directory_is_refused():
+    pass
+
+
+@scenario(
+    FEATURE,
+    'An import that waits longer than the store waits for another change is refused as busy',
+)
+def test_an_import_that_waits_longer_than_the_store_waits_for_another_change_is():
+    pass
+
+
+@scenario(
+    FEATURE,
+    'The operator exports the store while another change is being written',
+)
+def test_the_operator_exports_the_store_while_another_change_is_being_written():
+    pass

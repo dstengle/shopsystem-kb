@@ -482,3 +482,35 @@ def _for_the_second_since(client, reading):
 @then("the client is given the creation of the second decision")
 def _given_its_creation(asked):
     assert ([(entry.op, entry.artifact) for entry in asked.entries], list(asked.faults)) == ([("create", SECOND)], [])
+
+
+@scenario(
+    "keep-the-history.feature",
+    'The history of one artifact comes in the order its changes landed',
+)
+def test_the_history_of_one_artifact_comes_in_the_order_its_changes_landed():
+    pass
+
+
+@scenario(
+    "keep-the-history.feature",
+    'The history across artifacts comes in the order of the moments',
+)
+def test_the_history_across_artifacts_comes_in_the_order_of_the_moments():
+    pass
+
+
+@scenario(
+    "keep-the-history.feature",
+    'Entries for different artifacts at the same moment come in the order they landed',
+)
+def test_entries_for_different_artifacts_at_the_same_moment_come_in_the_order_t():
+    pass
+
+
+@scenario(
+    "keep-the-history.feature",
+    'An entry stamped before a moment that lands after a read since it is not given by a later read',
+)
+def test_an_entry_stamped_before_a_moment_that_lands_after_a_read_since_it_is_n():
+    pass

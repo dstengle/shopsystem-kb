@@ -637,3 +637,19 @@ def _both_in_the_history(client):
 @then("the decision holds the different rationale")
 def _holds_the_different_rationale(client):
     assert loads(read(client, DECISION, whole=True).content)["sections"] == [SECTIONS[0], DIFFERENT_RATIONALE]
+
+
+@scenario(
+    "change-the-store.feature",
+    'A change that waits longer than the store waits for another change is refused as busy',
+)
+def test_a_change_that_waits_longer_than_the_store_waits_for_another_change_is():
+    pass
+
+
+@scenario(
+    "change-the-store.feature",
+    'A read while another change is being written is not refused as busy',
+)
+def test_a_read_while_another_change_is_being_written_is_not_refused_as_busy():
+    pass

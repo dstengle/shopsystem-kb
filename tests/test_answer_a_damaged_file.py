@@ -179,3 +179,19 @@ def _kb_import_check(root, before, tmp_path):
 def _kb_import(root, before, tmp_path):
     exported = _exported_from_another_store(tmp_path)
     return _answered(root, before, lambda: _kb("import", str(exported), cwd=root, env={"KB_ACTOR": OPERATOR}))
+
+
+@scenario(
+    FEATURE,
+    'A store whose database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, refuses every call and command that needs it',
+)
+def test_a_store_whose_database_cannot_be_opened_for_writing_because_the_direct():
+    pass
+
+
+@scenario(
+    FEATURE,
+    'A store found that was made by an earlier kb, in a form this kb cannot read, refuses every call and command that needs it',
+)
+def test_a_store_found_that_was_made_by_an_earlier_kb_in_a_form_this_kb_cannot():
+    pass
