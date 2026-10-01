@@ -6,10 +6,9 @@ corpus it is checked against, are given; nothing here finds or opens a file.
 """
 from jsonschema import Draft202012Validator
 from referencing import Registry
-from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
-from kb import links, places, rules, values
+from kb import links, places, refusals, rules, values
 from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
 
@@ -74,7 +73,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
     """
     errors = _errors(content, compose(schema, corpus), corpus)
     faults = [
-        kb_pb2.Fault(artifact=artifact_id, path=_place(error), rule=error.validator, message=error.message)
+        kb_pb2.Fault(artifact=artifact_id, place=_place(error), rule=error.validator, message=error.message)
         for error in errors
     ]
     if not _misread("sections", errors):
@@ -82,32 +81,13 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
         faults += _sections(artifact_id, content.get("sections", []), required, "sections")
     for link in links.carried(content, schema, corpus):
         if not _misread(link.place, errors) and not _lands(link.target, link.ref, corpus):
-            faults.append(kb_pb2.Fault(
-                artifact=artifact_id, path=link.place, rule=rules.REF,
-                message=f"a link must land on a node of a kind the type allows; {link.target!r} does not",
-            ))
+            faults.append(refusals.unlanded(artifact_id, link.place, link.target))
     return faults
 
 
 def _errors(content: dict, composed: dict, corpus) -> list:
-    """JSON Schema's every error. A type met through a reference whose file cannot be read refuses the check with the
-    fault naming that file, as meeting it directly does, rather than as the library's own failure to resolve it."""
-    try:
-        return list(Draft202012Validator(composed, registry=registry(corpus)).iter_errors(content))
-    except Unresolvable as unresolvable:
-        refusal = _refusal_behind(unresolvable)
-        if refusal is None:
-            raise
-        raise refusal from None
-
-
-def _refusal_behind(error: Exception) -> values.Refused | None:
-    """The refusal a type gave while it was being retrieved, found among what caused the error; None when no refusal
-    caused it."""
-    cause = error.__cause__
-    while cause is not None and not isinstance(cause, values.Refused):
-        cause = cause.__cause__
-    return cause
+    """JSON Schema's every error."""
+    return list(Draft202012Validator(composed, registry=registry(corpus)).iter_errors(content))
 
 
 def _place(error) -> str:
@@ -155,7 +135,7 @@ def _sections(artifact_id: str, sections: list, required: list, place: str) -> l
             continue
         where = "is out of its place" if wanted["title"] in titles else "is missing"
         faults.append(kb_pb2.Fault(
-            artifact=artifact_id, path=place, rule=rules.SECTIONS,
+            artifact=artifact_id, place=place, rule=rules.SECTIONS,
             message=f"the sections the type requires must all be present, in order; {wanted['title']!r} {where}",
         ))
     return faults

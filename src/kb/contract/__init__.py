@@ -1,2 +1,2 @@
 """The contract: kb.proto and the code generated from it. The contract itself is versioned by kb's release
-tag (adrs/0018)."""
+tag (decision/published-contract-v1)."""

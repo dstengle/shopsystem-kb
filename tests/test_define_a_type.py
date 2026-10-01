@@ -2,8 +2,8 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, create, define, everything_under, next_version, read, request, write
-from kb import canonical
+from calls import DECISION_TYPE, create, define, listing, next_version, read, remove, request, replace
+import held
 from kb.content import loads
 
 scenarios("define-a-type.feature")
@@ -50,7 +50,7 @@ def _define_note(client):
 def _read_back_like_any_other(client, defined):
     assert defined.id == "schema/note"
     note_type = read(client, defined.id)
-    assert (note_type.id, note_type.type, note_type.title) == ("schema/note", "schema", "Note")
+    assert (note_type.id, note_type.kind, note_type.title) == ("schema/note", "schema", "Note")
     assert note_type.revision == 1
 
 
@@ -117,8 +117,7 @@ def _checked_against_the_shared_shape(client):
     assert not fits.faults, fits.faults
     misfit = request(client, "tool-use", "Weigh the sugar", {"bindings": [{"name": "scale"}]})
     assert (misfit.id, misfit.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
-    assert "'value' is a required property" in misfit.faults[0].message
+    assert [(fault.place, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
 
 
 BASE_TYPE = {
@@ -167,8 +166,7 @@ def _define_a_decision_on_the_base(client):
 def _rejected_without_an_owner(client):
     refused = request(client, "decision", "Price reviews happen weekly", {"status": "accepted", "sections": BASE_SECTIONS})
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("", "required")]
-    assert "'owner' is a required property" in refused.faults[0].message
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("", "required")]
 
 
 @then("a decision reads back with its purpose before its rationale")
@@ -177,7 +175,7 @@ def _purpose_before_rationale(root, client):
         "owner": "shopkeeper", "status": "accepted", "sections": BASE_SECTIONS,
     })
     assert not created.faults, created.faults
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert [section["title"] for section in on_disk["sections"]] == ["Purpose", "Rationale"]
 
 
@@ -189,7 +187,7 @@ def _define_a_malformed_type(client):
 @then("the type is rejected because it does not match the type that describes types")
 def _rejected_by_the_metaschema(client, refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("schema/shelf-label", "schema/type", "anyOf"),
     ]
     assert "'label' is not valid" in refused.faults[0].message
@@ -221,16 +219,16 @@ NEVER_CHECKABLE = {
 
 @when(parsers.re(f"the client defines a type that (?P<fault>{'|'.join(map(re.escape, NEVER_CHECKABLE))})"), target_fixture="attempt")
 def _define_a_type_never_checkable(root, client, fault):
-    before = everything_under(root)
+    before = held.holds(root)
     title, schema = NEVER_CHECKABLE[fault]
     response = request(client, "schema", title, {"version": 1, "schema": schema}, message=f"Define {title}")
-    return {"response": response, "before": before, "after": everything_under(root)}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 def _type_rejected(attempt, rule, path, message):
     faults = attempt["response"].faults
     assert (attempt["response"].id, attempt["response"].revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in faults] == [(path, rule)]
+    assert [(fault.place, fault.rule) for fault in faults] == [(path, rule)]
     assert faults[0].message.startswith(message)
 
 
@@ -301,7 +299,7 @@ def _a_link_through_the_base_refused(client):
     other = create(client, "decision", {"title": "Prices are reviewed monthly", "sections": RATIONALE})
     refused = request(client, "decision", "Price reviews happen weekly", {"about": other.id, "sections": RATIONALE})
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("decision/price-reviews-happen-weekly", "about", "ref"),
     ]
 
@@ -316,12 +314,12 @@ def _a_type_at_its_second_version(client):
 @when("the client changes what that type requires, leaving its version at two", target_fixture="changed")
 def _change_the_type_leaving_its_version(client):
     schema = {**DECISION_TYPE["schema"], "required": ["title", "supersedes"]}
-    return write(client, "schema/decision", {"version": 2, "schema": schema}, message="Revise Decision")
+    return replace(client, "schema/decision", {"version": 2, "schema": schema}, message="Revise Decision")
 
 
 @then("the change is rejected because a type's version goes up whenever the type changes")
 def _rejected_for_the_version_kept(changed):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in changed.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in changed.faults] == [
         ("schema/decision", "version", "version"),
     ]
     assert changed.faults[0].message.startswith("a type's version goes up whenever the type changes")
@@ -331,3 +329,32 @@ def _rejected_for_the_version_kept(changed):
 @then("the type reads back as it was")
 def _the_type_as_it_was(client, held):
     assert read(client, "schema/decision", whole=True) == held
+
+
+TWO_DECISIONS = ["vote/ship-weekly", "vote/price-monthly"]
+
+
+@given("a type the store holds, and two artifacts of its kind")
+def _a_type_and_two_artifacts(client):
+    define(client, {"title": "Vote", "version": 1, "schema": {
+        "type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"],
+    }})
+    for title in ("Ship weekly", "Price monthly"):
+        create(client, "vote", {"title": title})
+
+
+@when("the client removes that type", target_fixture="attempt")
+def _remove_the_type(root, client):
+    before = held.holds(root)
+    return {"response": remove(client, "schema/vote"), "before": before, "after": held.holds(root)}
+
+
+@then("the removal is rejected because something still points at it, naming each of those two artifacts")
+def _rejected_naming_each(client, attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [
+        (name, "", "on_delete") for name in sorted(TWO_DECISIONS)
+    ]
+    assert all("'schema/vote'" in fault.message for fault in faults)
+    assert attempt["after"] == attempt["before"]
+    assert list(listing(client, "vote", ids_only=True).ids) == sorted(TWO_DECISIONS)

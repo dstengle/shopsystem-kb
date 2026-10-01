@@ -1,17 +1,81 @@
-import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
+    DECISION_TYPE, MovingClock, add, create, create_many, created, define, journal, moment, remove, snapshot,
+    replace, start_a_store,
 )
+import held
 from kb import client as kb_client
-from kb import journal as kb_journal
 from kb.contract import kb_pb2
 
-scenarios("read-the-journal.feature")
+
+@scenario("keep-the-history.feature", "Every change leaves an entry")
+def test_every_change_leaves_an_entry():
+    pass
+
+
+@scenario("keep-the-history.feature", "The journal alone shows what landed together")
+def test_the_journal_alone_shows_what_landed_together():
+    pass
+
+
+@scenario("keep-the-history.feature", "The client reads the journal for one role")
+def test_the_client_reads_the_journal_for_one_role():
+    pass
+
+
+@scenario("keep-the-history.feature", "The client reads the journal for one piece of work")
+def test_the_client_reads_the_journal_for_one_piece_of_work():
+    pass
+
+
+@scenario("keep-the-history.feature", "The client reads the journal since a time")
+def test_the_client_reads_the_journal_since_a_time():
+    pass
+
+
+@scenario("keep-the-history.feature", "A client given a clock stamps each change it makes with the moment the clock gives")
+def test_a_client_given_a_clock_stamps_each_change_it_makes_with_the_moment_the_clock_gives():
+    pass
+
+
+@scenario("keep-the-history.feature", "Changes stamped with the same moment each leave an entry of their own")
+def test_changes_stamped_with_the_same_moment_each_leave_an_entry_of_their_own():
+    pass
+
+
+@scenario("keep-the-history.feature", "Sets of changes made at the same moment are told apart")
+def test_sets_of_changes_made_at_the_same_moment_are_told_apart():
+    pass
+
+
+@scenario("keep-the-history.feature", "A moment the clock gives in another zone is kept as the same moment")
+def test_a_moment_the_clock_gives_in_another_zone_is_kept_as_the_same_moment():
+    pass
+
+
+@scenario("keep-the-history.feature", "A moment the clock gives with no zone is recorded as that moment in UTC")
+def test_a_moment_the_clock_gives_with_no_zone_is_recorded_as_that_moment_in_utc():
+    pass
+
+
+@scenario("keep-the-history.feature", "The history read since a time answers plainly whatever zone the clock gave")
+def test_the_history_read_since_a_time_answers_plainly_whatever_zone_the_clock_gave():
+    pass
+
+
+@scenario("keep-the-history.feature", "Every way the history can be asked for is checked and answered plainly")
+def test_every_way_the_history_can_be_asked_for_is_checked_and_answered_plainly():
+    pass
+
+
+@scenario("keep-the-history.feature", "A change aimed at one place records the place it changed")
+def test_a_change_aimed_at_one_place_records_the_place_it_changed():
+    pass
+
 
 DECISION = "decision/price-reviews-happen-weekly"
 SHOPKEEPER = kb_pb2.Actor(role="shopkeeper")
@@ -19,23 +83,14 @@ AGENT = kb_pb2.Actor(role="agent", execution="restock-run-12")
 
 
 @given(parsers.parse("today is {day}"), target_fixture="clock")
-def _today_is(monkeypatch, day):
-    """kb stamps each entry from journal.now. Here it reads this clock, which moves on a second at every stamp so no
-    two entries share one; a step sets the clock back to make a change on an earlier day."""
-    clock = {"today": datetime.fromisoformat(f"{day}T09:00:00+00:00")}
-    clock["at"] = clock["today"]
-
-    def now():
-        clock["at"] += timedelta(seconds=1)
-        return clock["at"]
-
-    monkeypatch.setattr(kb_journal, "now", now)
-    return clock
+def _today_is(day):
+    """The clock the client is given to stamp each entry from; see MovingClock."""
+    return MovingClock(day)
 
 
 @pytest.fixture
 def written():
-    """The bytes of the decision's file after each change, in order, for the fingerprints."""
+    """The fingerprint of the decision after each change, in order."""
     return []
 
 
@@ -45,9 +100,9 @@ def written():
     target_fixture="client",
 )
 def _store_with_a_decision_changed_today(root, clock, written):
-    clock["at"] = datetime.fromisoformat("2026-09-21T09:00:00+00:00")
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    clock.at = datetime.fromisoformat("2026-09-21T09:00:00+00:00")
+    client = kb_client.connect(root, clock=clock)
+    start_a_store(root, clock)
     define(client, DECISION_TYPE)
     create(client, "decision", {
         "title": "Price reviews happen weekly",
@@ -56,14 +111,14 @@ def _store_with_a_decision_changed_today(root, clock, written):
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ],
     }, message="Review prices weekly", actor=SHOPKEEPER)
-    written.append((root / "kb" / f"{DECISION}.yaml").read_bytes())
-    clock["at"] = clock["today"]
-    changed = write(client, DECISION, {"sections": [
+    written.append(held.fingerprint(root, DECISION))
+    clock.at = clock.today
+    changed = replace(client, DECISION, {"sections": [
         {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
         {"title": "Rationale", "body": "Costs move weekly, and the suppliers say so.\n"},
     ]}, message="Say why weekly", actor=AGENT)
     assert not changed.faults, changed.faults
-    written.append((root / "kb" / f"{DECISION}.yaml").read_bytes())
+    written.append(held.fingerprint(root, DECISION))
     return client
 
 
@@ -86,14 +141,14 @@ def _one_entry_for_each_change(entries):
 )
 def _each_entry_says_everything(entries, written):
     assert [
-        (entry.at[:10], entry.actor.role, entry.actor.execution, entry.op, entry.artifact, entry.path,
+        (entry.at[:10], entry.actor.role, entry.actor.execution, entry.op, entry.artifact, entry.place,
          entry.revision, entry.schema_version, entry.message)
         for entry in entries
     ] == [
         ("2026-09-21", "shopkeeper", "", "create", DECISION, "", 1, 1, "Review prices weekly"),
         ("2026-09-23", "agent", "restock-run-12", "write", DECISION, "", 2, 1, "Say why weekly"),
     ]
-    assert [entry.digest for entry in entries] == [hashlib.sha256(text).hexdigest() for text in written]
+    assert [entry.digest for entry in entries] == written
     assert [entry.batch for entry in entries] == [entry.id for entry in entries]
 
 
@@ -107,9 +162,9 @@ ALONE = "decision/close-early-on-sundays"
 
 @given("a store where two artifacts were changed in one go and a third was changed on its own")
 def _two_together_and_one_alone(client):
-    applied = apply(client, [
-        creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
-        creation("decision", "Count the till nightly", {"sections": SECTIONS}),
+    applied = create_many(client, [
+        created("decision", "Restock on Thursdays", {"sections": SECTIONS}),
+        created("decision", "Count the till nightly", {"sections": SECTIONS}),
     ], message="Two decisions at once")
     assert not applied.faults, applied.faults
     create(client, "decision", {"title": "Close early on Sundays", "sections": SECTIONS}, message="One on its own")
@@ -174,9 +229,14 @@ def _since(client, day):
     return _journal_of(client, since=day)
 
 
-@then("the client is given only the change made today")
+@then("the client is given only the entries stamped from that moment on, which is the change made today")
 def _only_todays_change(narrowed):
     assert narrowed == [("write", DECISION, "agent", "restock-run-12")]
+
+
+@then("the client is given none stamped before that moment")
+def _none_stamped_before(narrowed):
+    assert ("create", DECISION, "shopkeeper", "") not in narrowed
 
 
 @when("the client reads the journal for a set of changes the history holds nothing under", target_fixture="asked")
@@ -201,21 +261,21 @@ def _nothing_and_no_fault(asked):
 
 @then("the read is rejected because since names a moment in time")
 def _rejected_since(asked):
-    assert [(fault.rule, fault.path) for fault in asked.faults] == [("since", "")]
+    assert [(fault.rule, fault.place) for fault in asked.faults] == [("since", "")]
     assert "'last Tuesday'" in asked.faults[0].message
     assert list(asked.entries) == []
 
 
 @given("a store where an agent replaced one section of a decision")
 def _one_section_replaced(client):
-    replaced = write(client, DECISION, {"title": "Rationale", "body": "Costs move every week.\n"},
+    replaced = replace(client, DECISION, {"title": "Rationale", "body": "Costs move every week.\n"},
                      message="Say it plainer", actor=AGENT, path="sections/rationale")
     assert not replaced.faults, replaced.faults
 
 
 @then("the entry for that change names the place inside the decision that was changed")
 def _names_the_place(entries):
-    assert [(entry.op, entry.path, entry.message) for entry in entries][-1] == (
+    assert [(entry.op, entry.place, entry.message) for entry in entries][-1] == (
         "write", "sections/rationale", "Say it plainer",
     )
 
@@ -224,16 +284,16 @@ CHANGES = {
     "creates a second decision": lambda client, message: create(
         client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}, message=message, actor=SHOPKEEPER,
     ),
-    "changes the decision": lambda client, message: write(
+    "changes the decision": lambda client, message: replace(
         client, DECISION, {"sections": SECTIONS}, message=message, actor=SHOPKEEPER,
     ),
-    "adds an item to one of the decision's collections": lambda client, message: append(
+    "adds an item to one of the decision's collections": lambda client, message: add(
         client, DECISION, "options", {"title": "Every week"}, message=message, actor=SHOPKEEPER,
     ),
     "removes the decision": lambda client, message: remove(client, DECISION, message=message, actor=SHOPKEEPER),
-    "makes several changes in one go": lambda client, message: apply(client, [
-        creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
-        creation("decision", "Count the till nightly", {"sections": SECTIONS}),
+    "makes several changes in one go": lambda client, message: create_many(client, [
+        created("decision", "Restock on Thursdays", {"sections": SECTIONS}),
+        created("decision", "Count the till nightly", {"sections": SECTIONS}),
     ], message=message, actor=SHOPKEEPER),
     "snapshots what a piece of work read": lambda client, message: snapshot(
         client, "restock-run-12", [DECISION], message=message, role=SHOPKEEPER.role,
@@ -273,15 +333,9 @@ def _every_entry_left_at(client, the_change, reading):
     assert [datetime.fromisoformat(entry.at) for entry in left] == [moment(reading)] * len(left)
 
 
-@then("every entry that change left is in the store's history, under the role and with the message the client gave")
-def _every_entry_left_in_the_history(client, the_change):
-    left = _left_by(client, the_change)
-    assert [(entry.actor.role, entry.message) for entry in left] == [_signed(the_change["change"])] * len(left)
-
-
 def _changed_five_times(client):
     for turn in range(1, 6):
-        changed = write(client, DECISION, {"sections": [
+        changed = replace(client, DECISION, {"sections": [
             {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
             {"title": "Rationale", "body": f"Costs move weekly; said {turn} times.\n"},
         ]})
@@ -354,8 +408,8 @@ SECOND_GO = ["decision/close-early-on-sundays", "decision/order-flour-monthly"]
 
 
 def _in_one_go(client, artifacts):
-    applied = apply(client, [
-        creation("decision", artifact.split("/")[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
+    applied = create_many(client, [
+        created("decision", artifact.split("/")[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
         for artifact in artifacts
     ])
     assert not applied.faults, applied.faults
@@ -367,7 +421,7 @@ def _in_one_go(client, artifacts):
 def _two_goes_and_one_alone(client):
     """The name the client was given for each go, first and second."""
     first = _in_one_go(client, FIRST_GO)
-    alone = write(client, DECISION, {"sections": SECTIONS})
+    alone = replace(client, DECISION, {"sections": SECTIONS})
     assert not alone.faults, alone.faults
     return [first, _in_one_go(client, SECOND_GO)]
 
@@ -434,3 +488,164 @@ def _for_the_second_since(client, reading):
 @then("the client is given the creation of the second decision")
 def _given_its_creation(asked):
     assert ([(entry.op, entry.artifact) for entry in asked.entries], list(asked.faults)) == ([("create", SECOND)], [])
+
+
+@scenario(
+    "keep-the-history.feature",
+    'The history of one artifact comes in the order its changes landed',
+)
+def test_the_history_of_one_artifact_comes_in_the_order_its_changes_landed():
+    pass
+
+
+@scenario(
+    "keep-the-history.feature",
+    'The history across artifacts comes in the order of the moments',
+)
+def test_the_history_across_artifacts_comes_in_the_order_of_the_moments():
+    pass
+
+
+@scenario(
+    "keep-the-history.feature",
+    'Entries for different artifacts at the same moment come in the order they landed',
+)
+def test_entries_for_different_artifacts_at_the_same_moment_come_in_the_order_t():
+    pass
+
+
+@scenario(
+    "keep-the-history.feature",
+    'An entry stamped before a moment that lands after a read since it is not given by a later read',
+)
+def test_an_entry_stamped_before_a_moment_that_lands_after_a_read_since_it_is_n():
+    pass
+
+
+def _changed_at(root, reading, artifact, body):
+    """The artifact changed by a client whose clock stands at the moment the reading gives."""
+    stood = moment(reading)
+    changed = replace(kb_client.connect(root, clock=lambda: stood), artifact, {"sections": [
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": body},
+    ]}, message=body)
+    assert not changed.faults, changed.faults
+
+
+@given(
+    "the client has changed the decision with a clock that reads 2026-09-23 at 14:30, "
+    "and then changed it again with a clock that reads 2026-09-23 at 14:00",
+)
+def _changed_with_a_clock_that_ran_back(root):
+    _changed_at(root, "2026-09-23 at 14:30", DECISION, "Costs move weekly, said first.\n")
+    _changed_at(root, "2026-09-23 at 14:00", DECISION, "Costs move weekly, said second.\n")
+
+
+@when("the client reads the journal for the decision", target_fixture="entries")
+def _read_the_journal_for_the_decision_itself(client):
+    return _read_the_journal_for_the_decision(client)
+
+
+@then("the client is given the entries in the order the changes landed")
+def _in_landing_order(entries):
+    assert [entry.revision for entry in entries] == [1, 2, 3, 4]
+
+
+@then("the change that landed second comes after the one that landed first, though its moment is earlier")
+def _the_later_landing_comes_after(entries):
+    first, second = entries[-2:]
+    assert (first.message, second.message) == ("Costs move weekly, said first.\n", "Costs move weekly, said second.\n")
+    assert datetime.fromisoformat(second.at) < datetime.fromisoformat(first.at)
+
+
+FIRST_ARTIFACT, OTHER_ARTIFACT = DECISION, "decision/restock-on-thursdays"
+
+
+def _create_other(client):
+    made = create(client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}, message="Restock")
+    assert not made.faults, made.faults
+
+
+@given(
+    "the client has changed one artifact with a clock that reads 2026-09-23 at 14:30, "
+    "and then changed another artifact with a clock that reads 2026-09-23 at 14:00",
+    target_fixture="landed",
+)
+def _changed_two_artifacts_with_a_clock_that_ran_back(root):
+    _changed_at(root, "2026-09-23 at 14:30", FIRST_ARTIFACT, "Costs move weekly, said first.\n")
+    stood = moment("2026-09-23 at 14:00")
+    _create_other(kb_client.connect(root, clock=lambda: stood))
+    return [FIRST_ARTIFACT, OTHER_ARTIFACT]
+
+
+def _entry_for(entries, artifact, at):
+    [found] = [entry for entry in entries if entry.artifact == artifact and entry.at.startswith(at)]
+    return entries.index(found)
+
+
+@then(
+    "the entry for the other artifact, stamped 2026-09-23 at 14:00, is given before the entry for the first, "
+    "stamped 2026-09-23 at 14:30"
+)
+def _the_earlier_moment_comes_first(entries):
+    assert _entry_for(entries, OTHER_ARTIFACT, "2026-09-23T14:00") < _entry_for(entries, FIRST_ARTIFACT, "2026-09-23T14:30")
+
+
+@then("that is the opposite order to the one the two changes landed in")
+def _opposite_to_landing(entries, landed):
+    at = {FIRST_ARTIFACT: "2026-09-23T14:30", OTHER_ARTIFACT: "2026-09-23T14:00"}
+    read = sorted(landed, key=lambda artifact: _entry_for(entries, artifact, at[artifact]))
+    assert read == landed[::-1]
+
+
+SAME_MOMENT = ["decision/zebra-crossings", "decision/mango-stalls", "decision/apple-carts"]
+
+
+@given("the client has changed one artifact, and then changed a different artifact", target_fixture="landed")
+def _changed_one_then_a_different_one(client):
+    changed = replace(client, FIRST_ARTIFACT, {"sections": SECTIONS}, message="Say it plainly")
+    assert not changed.faults, changed.faults
+    for artifact in SAME_MOMENT:
+        made = create(client, "decision", {"title": artifact.split("/")[1].replace("-", " ").capitalize(),
+                                           "sections": SECTIONS}, message="Another")
+        assert not made.faults, made.faults
+    return [FIRST_ARTIFACT, *SAME_MOMENT]
+
+
+@then("the two entries both say they happened at 2026-09-23 at 14:30")
+def _both_at_the_moment(entries, landed):
+    both = [entry for entry in entries if entry.artifact in landed and entry.at.startswith("2026-09-23T14:30")]
+    assert sorted(entry.artifact for entry in both) == sorted(landed)
+
+
+@then("the entry for the artifact changed first is given before the entry for the artifact changed second")
+def _landing_order_settles_the_tie(entries, landed):
+    at_the_moment = [entry.artifact for entry in entries if entry.at.startswith("2026-09-23T14:30")]
+    assert at_the_moment == landed
+
+
+
+@given(parsers.parse("the client has read the journal since {reading}"), target_fixture="first_read")
+def _read_since_a_moment(root, client, reading):
+    _changed_at(root, "2026-09-23 at 15:00", DECISION, "Costs move weekly, said at three.\n")
+    read = journal(client, since=moment(reading).isoformat())
+    assert not read.faults, read.faults
+    assert read.entries
+    return [entry.id for entry in read.entries]
+
+
+@given(parsers.parse("a change stamped {reading} has landed since that read"))
+def _a_late_change_landed(root, reading):
+    _changed_at(root, reading, DECISION, "Costs move weekly, said late.\n")
+
+
+@when(parsers.parse("the client reads the journal since {reading} again"), target_fixture="asked")
+def _read_since_again(client, reading):
+    return journal(client, since=moment(reading).isoformat())
+
+
+@then(parsers.parse("the client is not given the entry stamped {reading}"))
+def _not_given_the_late_entry(client, asked, first_read, reading):
+    assert not asked.faults, asked.faults
+    assert [entry.id for entry in asked.entries] == first_read
+    assert moment(reading) in [datetime.fromisoformat(entry.at) for entry in journal(client).entries]

@@ -1,5 +1,6 @@
+# formulated from spec/capabilities/check-the-store.md
 Feature: Check the store
-So that a client can tell whether everything the store holds still fits its type, the client can check the store.
+  Narrator: the client
 
   @slice-43
   Scenario: A store with nothing wrong reports nothing
@@ -31,21 +32,3 @@ So that a client can tell whether everything the store holds still fits its type
     Then that decision is listed as behind its type
     And it is also reported as a violation, naming the artifact, the place in it and the rule broken
     And the check itself does not fail
-
-  @slice-1.20
-  Scenario: A stored file that cannot be read is reported as a violation
-    Pins that a file mangled behind the store's back becomes a named finding rather than an exception, and does not stop the rest of the store being checked.
-    Given a store where someone edited a decision's file by hand and left it in a shape the store cannot read
-    When the client checks the store
-    Then that file is reported as a violation, naming the file
-    And everything else in the store is checked and reported alongside it
-    And the check comes back with its answer rather than breaking off
-
-  @slice-81
-  Scenario: An artifact of a kind the store holds no type for is reported as a violation
-    Pins that a kind with no type behind it is a finding like any other, so a store that has lost a type is told about rather than crashing the very check that would have said so.
-    Given a store holding an artifact of a kind the store holds no type for
-    When the client checks the store
-    Then that artifact is reported as a violation, naming the artifact and the kind it claims
-    And everything else in the store is checked and reported alongside it
-    And the check comes back with its answer rather than breaking off

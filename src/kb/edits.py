@@ -1,18 +1,28 @@
 """What each operation of a set does to the draft: a new artifact, a whole or placed replacement, an item added to a
-collection, an artifact removed. Each is checked against the draft as the operations before it left it, and refused
-with every fault it finds."""
+collection, an artifact removed. Each acts on the draft as the operations before it left it, on a copy of what it was
+asked to put there, so the same set can act again on another draft, and is refused there with every fault it finds in
+what it names, the revisions it makes and the names of its items; what its content and links come to is checked once
+the whole set has acted (kb.write). An import puts an artifact in the draft whole, as the file it came from gives it."""
 import copy
 from typing import NamedTuple
 
-from kb import composition, definitions, links, names, places, refusals, requests, settled, validation, values
-from kb.store import Draft
+from kb import changes, composition, definitions, names, places, refusals, settled, values
+from kb.draft import Draft
 from kb.values import ArtifactId, Refused
+
+
+class Import(NamedTuple):
+    """An artifact brought whole from a file for import: its name, and the artifact, identity and all."""
+    artifact_id: ArtifactId
+    artifact: dict
 
 
 class Change(NamedTuple):
     """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name; the
-    version its entry records and the version of the type it was last checked against; and the artifact as this
-    operation left it, None for a removal."""
+    version its entry records and the version of the type it was last checked against; the artifact as this
+    operation left it, None for a removal; the type of its kind as it acted, which it is checked against when the set
+    leaves none; and the faults of the names it handed back and of a type's version kept, which refuse the set while
+    it still acts, so what it leaves is checked too."""
     op: str
     artifact_id: ArtifactId
     path: str = ""
@@ -20,26 +30,34 @@ class Change(NamedTuple):
     revision: int = 0
     schema_version: int = 0
     left: dict | None = None
+    acted: dict | None = None
+    faults: tuple = ()
 
 
 def apply(draft: Draft, operation) -> Change:
     """One operation applied to the draft. Returns what it did, settled as it did it; raises Refused."""
-    if isinstance(operation, requests.Remove):
+    if isinstance(operation, changes.Remove):
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
-    return change._replace(revision=left["revision"], schema_version=left["schema_version"], left=left)
+    return change._replace(
+        revision=left["revision"], schema_version=left["schema_version"], left=left,
+        acted=composition.kind_schema(change.artifact_id.kind, draft),
+    )
 
 
 def _changed(draft: Draft, operation) -> Change:
-    if isinstance(operation, requests.Create):
+    if isinstance(operation, Import):
+        draft.put(operation.artifact_id, copy.deepcopy(operation.artifact))
+        return Change("import", operation.artifact_id)
+    if isinstance(operation, changes.Create):
         return Change("create", _create(draft, operation))
-    if isinstance(operation, requests.Add):
+    if isinstance(operation, changes.Add):
         return _append(draft, operation)
-    return Change("write", _replace(draft, operation), names.placed(operation.locator.place))
+    return _replace(draft, operation)
 
 
-def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
+def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     kind = creation.kind
     type_id = composition.kind_type(kind, draft)
     at, faults = creation.at, list(creation.title_faults)
@@ -49,11 +67,8 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     faults += creation.content.refusal(at)
     if faults:
         raise Refused(faults)
-    content = creation.content.tree
+    content = copy.deepcopy(creation.content.tree)
     schema = draft.artifact(type_id)
-    faults = _fits(draft, artifact_id, {"title": creation.title, **content}, schema)
-    if faults:
-        raise Refused(faults)
     declared = composition.declared(schema["schema"], draft)
     names.items(declared["parts"], content, False, _item_parts(draft))
     artifact = settled.given(content, str(artifact_id), kind.name, schema["version"], 1, creation.title)
@@ -61,24 +76,22 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     return artifact_id
 
 
-def _replace(draft: Draft, replacement: requests.Replace) -> ArtifactId:
+def _replace(draft: Draft, replacement: changes.Replace) -> Change:
     locator = replacement.locator
-    if not draft.holds(locator.id):
-        raise Refused([refusals.not_found(locator.id)])
+    _as_read(draft, locator.id, replacement.expected)
     if replacement.content.problems:
         raise Refused(replacement.content.refusal(str(locator.id)))
-    content, current = replacement.content.tree, draft.artifact(locator.id)
+    content, current = copy.deepcopy(replacement.content.tree), draft.artifact(locator.id)
     if locator.place:
         content = _placed(current, locator, content)
-    _revise(draft, locator.id, current, content)
-    return locator.id
+    faults = _revise(draft, locator.id, current, content)
+    return Change("write", locator.id, names.placed(locator.place), faults=faults)
 
 
-def _append(draft: Draft, addition: requests.Add) -> Change:
+def _append(draft: Draft, addition: changes.Add) -> Change:
     """One item put at the end of a collection the artifact's type declares, and named there."""
     locator = addition.locator
-    if not draft.holds(locator.id):
-        raise Refused([refusals.not_found(locator.id)])
+    _as_read(draft, locator.id, addition.expected)
     if addition.item.problems:
         raise Refused(addition.item.refusal(str(locator.id)))
     if not locator.place:
@@ -88,10 +101,12 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
     spot = places.resolve(content, locator)
     if spot.key not in _collections_at(draft, locator):
         raise Refused([refusals.not_a_collection(locator)])
-    item = addition.item.tree
+    if not isinstance(spot.holder.get(spot.key, []), list):
+        raise Refused([refusals.not_a_collection(locator)])
+    item = copy.deepcopy(addition.item.tree)
     spot.holder.setdefault(spot.key, []).append(item)
-    _revise(draft, locator.id, current, content)
-    return Change("append", locator.id, names.placed((*locator.place, item["id"])), item["id"])
+    faults = _revise(draft, locator.id, current, content)
+    return Change("append", locator.id, names.placed((*locator.place, item["id"])), item["id"], faults=faults)
 
 
 def _collections_at(draft: Draft, locator: values.Locator) -> dict:
@@ -106,58 +121,49 @@ def _collections_at(draft: Draft, locator: values.Locator) -> dict:
     return declared["parts"]
 
 
-def _delete(draft: Draft, removal: requests.Remove) -> Change:
-    """A whole artifact taken out of the draft, refused with one fault for each link that still points at it."""
+def _delete(draft: Draft, removal: changes.Remove) -> Change:
+    """A whole artifact taken out of the draft; what still points at it is judged once the whole set has acted."""
     locator = removal.locator
-    if not draft.holds(locator.id):
-        raise Refused([refusals.not_found(locator.id)])
+    _as_read(draft, locator.id, removal.expected)
     if locator.place:
         raise Refused([refusals.whole_only(locator)])
-    blocking = []
-    for other_id in draft.ids():
-        if other_id == locator.id:
-            continue
-        schema = composition.kind_schema(other_id.kind, draft)["schema"]
-        for link in links.carried(draft.artifact(other_id), schema, draft):
-            if links.points_at(link.target, locator.id):
-                blocking.append(refusals.still_linked(locator.id, other_id, link.place))
-    if blocking:
-        raise Refused(blocking)
     removed = draft.artifact(locator.id)
     draft.remove(locator.id)
     return Change("delete", locator.id, revision=removed["revision"] + 1, schema_version=removed["schema_version"])
 
 
-def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> None:
-    """The artifact's next version put in the draft: the names its items hand back checked against those the artifact
-    held, the content checked against the current version of its type, its new items named, its version up by one,
-    its title kept. Raises Refused with every fault."""
+def _as_read(draft: Draft, artifact_id: ArtifactId, expected: int | None) -> None:
+    """Refuse a change to an artifact the draft does not hold, or to one that stands at another revision than the one
+    the change says it was read at, as the changes before it in the set left it."""
+    if not draft.holds(artifact_id):
+        raise Refused([refusals.not_found(artifact_id)])
+    revision = draft.artifact(artifact_id)["revision"]
+    if expected is not None and revision != expected:
+        raise Refused([refusals.moved(artifact_id, revision)])
+
+
+def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> tuple:
+    """The artifact's next version put in the draft: its new items named, its version up by one, its title kept.
+    Returns the faults of the names its items hand back that the artifact did not hold, with any of which no item is
+    named, and, for a type, of a schema changed while its version did not move on from the one it acted on."""
     schema = composition.kind_schema(artifact_id.kind, draft)
     declared = composition.declared(schema["schema"], draft)
     held = names.held(declared["parts"], current)
-    faults = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
-    faults += _fits(draft, artifact_id, {"title": current["title"], **content}, schema)
-    if faults:
-        raise Refused(faults)
-    names.items(declared["parts"], content, True, _item_parts(draft))
+    misnamed = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
+    if not misnamed:
+        names.items(declared["parts"], content, True, _item_parts(draft))
+    kept = definitions.version_kept(artifact_id, content, current) if artifact_id.kind == values.TYPE_KIND else []
     artifact = settled.given(
         content, current["id"], current["type"], schema["version"], current["revision"] + 1, current["title"],
     )
     draft.put(artifact_id, settled.order(artifact, declared))
+    return (*misnamed, *kept)
 
 
 def _item_parts(draft: Draft):
     """What gives the collections an item's type declares, read through its composition, from the declaration of the
     collection the item is in."""
     return lambda part: composition.declared(part.get("items", {}), draft)["parts"]
-
-
-def _fits(draft: Draft, artifact_id: ArtifactId, content: dict, schema: dict) -> list:
-    """Every fault of the content against its type; a type, once it fits the type of types, checked as a type too."""
-    faults = validation.validate(str(artifact_id), content, schema["schema"], draft)
-    if not faults and artifact_id.kind == values.TYPE_KIND:
-        faults = definitions.faults(artifact_id, content, draft)
-    return faults
 
 
 def _content_of(artifact: dict) -> dict:

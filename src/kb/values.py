@@ -2,6 +2,7 @@
 
 Storage takes only these values, never a string that came from a request.
 """
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -64,7 +65,7 @@ def artifact_id(text: str) -> ArtifactId:
 
 def locator(request: kb_pb2.Locator) -> Locator:
     """A locator's name and its place, each checked; both faults when both fail."""
-    return _located(request.id, request.path)
+    return _located(request.id, request.place)
 
 
 def target(text: str) -> Locator:
@@ -82,7 +83,7 @@ def _located(name: str, path: str) -> Locator:
     place = names.steps(path)
     if not all(names.plain(part) for part in place):
         faults.append(kb_pb2.Fault(
-            artifact=name, path=path, rule=rules.LOCATOR,
+            artifact=name, place=path, rule=rules.LOCATOR,
             message=f"a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it; {path!r} is not",
         ))
     if faults:
@@ -117,7 +118,22 @@ def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
         message = _leaves_nothing(title)
     else:
         return ArtifactId(kind, slug), at, ()
-    return None, at, (kb_pb2.Fault(artifact=at, path="title", rule=rules.TITLE, message=message),)
+    return None, at, (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE, message=message),)
+
+
+def key(text: str) -> str:
+    """The key a create in a set carries, a plain name; none when it carries none."""
+    if text and not names.plain(text):
+        raise Refused([kb_pb2.Fault(
+            rule=rules.REF,
+            message=f"a key is a plain name of lower-case letters, digits and single hyphens; {text!r} is not",
+        )])
+    return text
+
+
+def expected(revision: int) -> int | None:
+    """The revision a change says the client read its artifact at; None when it says none, as 0 says."""
+    return revision or None
 
 
 def _leaves_nothing(title: str) -> str:
@@ -132,7 +148,7 @@ class Content:
     problems: tuple[tuple[str, str, str], ...] = ()
 
     def refusal(self, artifact: str) -> list[kb_pb2.Fault]:
-        return [kb_pb2.Fault(artifact=artifact, path=path, rule=rule, message=message)
+        return [kb_pb2.Fault(artifact=artifact, place=path, rule=rule, message=message)
                 for path, rule, message in self.problems]
 
 
@@ -188,15 +204,34 @@ class Root:
     named: str
 
 
-def root(text: str) -> Root:
-    """The directory a store is started in, as the request names it; relative names stay relative. What stands
-    there is the store's to check."""
+def root(named: "str | os.PathLike") -> Root:
+    """The directory a store is started in, as it is named, as text or as a path; relative names stay relative.
+    What stands there is the store's to check. Anything else, and no name, is refused."""
+    text = os.fspath(named) if isinstance(named, os.PathLike) else named
+    if not isinstance(text, str):
+        raise Refused([kb_pb2.Fault(
+            rule=rules.ROOT,
+            message=f"a store is started in a directory named as text or as a path; it was named {named!r}",
+        )])
     if not text:
         raise Refused([kb_pb2.Fault(
             rule=rules.ROOT,
             message="a store is started in a directory that was named and that exists; no directory was named",
         )])
     return Root(Path(text), text)
+
+
+@dataclass(frozen=True)
+class Directory:
+    """A directory the operator names for the store's files, and the name given, which a refusal quotes."""
+    path: Path
+    named: str
+
+
+def directory(text: str) -> Directory:
+    """The directory the operator names, as named; relative names stay relative. What stands there is the export's
+    to check."""
+    return Directory(Path(text), text)
 
 
 def _not_a_plain_name(text: str) -> kb_pb2.Fault:

@@ -51,7 +51,12 @@ _Representer.add_representer(str, _represent_str)
 
 
 class _Constructor(SafeConstructor):
-    """A value is read as written: one that looks like a date or a time is the text it was written as."""
+    """A value is read as written: one that looks like a date or a time is the text it was written as, and a character
+    written as two escapes, one for each half, is that one character, in a key as in a value."""
+
+    def construct_scalar(self, node):
+        value = super().construct_scalar(node)
+        return _joined(value) if isinstance(value, str) else value
 
 
 _Constructor.add_constructor("tag:yaml.org,2002:timestamp", SafeConstructor.construct_yaml_str)
@@ -64,7 +69,7 @@ def _yaml() -> YAML:
     yaml.Constructor = _Constructor
     yaml.default_flow_style = False
     yaml.allow_unicode = True
-    yaml.width = float("inf")
+    yaml.width = 2**31 - 1
     yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
 
@@ -96,7 +101,9 @@ def check(text: str) -> None:
         )
     if sum(isinstance(event, events.DocumentStartEvent) for event in parsed) > 1:
         raise NotCanonical("content holds exactly one document")
-    _named_once(_yaml().compose(text), ())
+    composed = _yaml().compose(text)
+    _named_once(composed, ())
+    _held_as_text(composed, ())
 
 
 def _no_directive(text: str) -> None:
@@ -119,14 +126,54 @@ def _named_once(node, place: tuple) -> None:
         for key, value in node.value:
             if key.value in seen:
                 raise NotCanonical(
-                    f"an entry is named once and only once; {key.value!r} is named again at line {key.start_mark.line + 1}",
-                    "/".join((*place, str(key.value))),
+                    f"an entry is named once and only once; {_label(key)!r} is named again at line {key.start_mark.line + 1}",
+                    "/".join((*place, _label(key))),
                 )
             seen.add(key.value)
-            _named_once(value, (*place, str(key.value)))
+            _named_once(value, (*place, _label(key)))
     elif isinstance(node, nodes.SequenceNode):
         for index, item in enumerate(node.value):
             _named_once(item, (*place, str(index)))
+
+
+def _held_as_text(node, place: tuple) -> None:
+    """Every scalar is text once each pair of escapes for the two halves of a character is read as that character: an
+    escape for half of a character alone (\\ud800) reads as a value no text can hold, and nothing downstream could
+    write or fingerprint it. Raises NotCanonical naming the place."""
+    if isinstance(node, nodes.ScalarNode):
+        try:
+            _joined(node.value)
+        except UnicodeDecodeError:
+            raise NotCanonical(
+                "it is not YAML that can be read: it holds an escape for half of a character, which no text can hold",
+                "/".join(place),
+            ) from None
+    elif isinstance(node, nodes.MappingNode):
+        for key, value in node.value:
+            _held_as_text(key, place)
+            _held_as_text(value, (*place, _label(key)))
+    elif isinstance(node, nodes.SequenceNode):
+        for index, item in enumerate(node.value):
+            _held_as_text(item, (*place, str(index)))
+
+
+def _label(key) -> str:
+    """A key as a place names it: its pairs of halves read as one character, and a half standing alone written as its
+    escape, so that the place is always text."""
+    try:
+        return _joined(str(key.value))
+    except UnicodeDecodeError:
+        return "".join(f"\\u{ord(each):04x}" if 0xD800 <= ord(each) <= 0xDFFF else each for each in str(key.value))
+
+
+def _joined(value: str) -> str:
+    """The text with each pair of halves of a character, as YAML 1.2 reads two escapes, read as that one character.
+    Raises UnicodeDecodeError when a half stands alone, in either order."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return value.encode("utf-16-le", "surrogatepass").decode("utf-16-le")
+    return value
 
 
 def dump(artifact: dict) -> str:
@@ -148,14 +195,6 @@ def load(text: str):
         return _yaml().load(text)
     except YAMLError as error:
         raise NotCanonical(_unreadable(error)) from None
-
-
-def decoded(data: bytes) -> str:
-    """A stored file's bytes as the text they are written as, UTF-8. Bytes that are not raise NotCanonical."""
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        raise NotCanonical("it is not text written in UTF-8") from None
 
 
 def entries(text: str) -> dict:

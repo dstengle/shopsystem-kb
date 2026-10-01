@@ -6,6 +6,15 @@ SETTLED = {"id": str, "type": str, "schema_version": int, "revision": int, "titl
 IDENTITY = tuple(SETTLED)
 
 
+def identified(artifact: dict) -> bool:
+    """Whether an artifact as written opens with the keys naming it, in their order, each what it must be."""
+    if list(artifact)[:len(IDENTITY)] != list(IDENTITY):
+        return False
+    return all(
+        isinstance(artifact[key], kind) and not isinstance(artifact[key], bool) for key, kind in SETTLED.items()
+    )
+
+
 def given(content: dict, artifact_id: str, kind: str, schema_version: int, revision: int, title: str) -> dict:
     """The content as an artifact: with its name, its kind, the version of its type it was checked against, its own
     version and its title."""
@@ -25,20 +34,10 @@ def checked(artifact: dict) -> dict:
     return {key: value for key, value in artifact.items() if key not in IDENTITY or key == "title"}
 
 
-def lacking(loaded: dict) -> str:
-    """What a stored artifact lacks of what the store settles, said as the problem with its file; empty when it lacks
-    nothing. A yes-or-no is never a number here."""
-    missing = [
-        key for key, kind in SETTLED.items()
-        if not isinstance(loaded.get(key), kind) or isinstance(loaded.get(key), bool)
-    ]
-    if not missing:
-        return ""
-    return f"it does not carry what the store settles for every artifact: {', '.join(missing)}"
-
-
 def order(artifact: dict, schema: dict) -> dict:
-    """Identity keys first, then fields in schema order, then sections, then part collections in schema order."""
+    """Identity keys first, then fields in schema order, then sections, then part collections in schema order. What
+    is not written in the shape its type gives it, which a set may leave before a later change in it fixes it, is
+    left as it was written."""
     parts = schema.get("parts", {})
     ordered = {key: artifact[key] for key in IDENTITY}
     for name in schema.get("properties", {}):
@@ -48,26 +47,34 @@ def order(artifact: dict, schema: dict) -> dict:
         if name not in ordered and name != "sections" and name not in parts:
             ordered[name] = value
     if "sections" in artifact:
-        ordered["sections"] = [_section(section) for section in artifact["sections"]]
+        ordered["sections"] = _listed(artifact["sections"], _section)
     for name in parts:
         if name in artifact:
-            ordered[name] = [_item(item, parts[name]["items"]) for item in artifact[name]]
+            ordered[name] = _listed(artifact[name], lambda item, name=name: _item(item, parts[name]["items"]))
     return ordered
 
 
-def _section(section: dict) -> dict:
-    ordered = {"title": section["title"], "body": section["body"]}
+def _listed(found, each):
+    """Each entry of a list put in order, a value that is not a list as it was."""
+    return [each(entry) for entry in found] if isinstance(found, list) else found
+
+
+def _section(section) -> dict:
+    """A section's title, body and sections first, then anything else it carries as it was written."""
+    if not isinstance(section, dict):
+        return section
+    ordered = {key: section[key] for key in ("title", "body") if key in section}
     if "sections" in section:
-        ordered["sections"] = [_section(child) for child in section["sections"]]
-    return ordered
+        ordered["sections"] = _listed(section["sections"], _section)
+    return {**ordered, **{key: value for key, value in section.items() if key not in ordered}}
 
 
-def _item(item: dict, item_schema: dict) -> dict:
+def _item(item, item_schema: dict) -> dict:
     """An item's id first, then its fields in the item schema's order; an item that is not a set of named entries as
     it was written."""
     if not isinstance(item, dict):
         return item
-    ordered = {"id": item["id"]}
+    ordered = {"id": item["id"]} if "id" in item else {}
     for name in item_schema.get("properties", {}):
         if name in item and name not in ordered:
             ordered[name] = item[name]

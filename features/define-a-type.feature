@@ -1,5 +1,6 @@
+# formulated from spec/capabilities/define-a-type.md
 Feature: Define a type
-So that a client decides for itself what its artifacts are made of, the client can define a type.
+  Narrator: the client
 
   Background:
     Given a store
@@ -65,3 +66,10 @@ So that a client decides for itself what its artifacts are made of, the client c
     When the client changes what that type requires, leaving its version at two
     Then the change is rejected because a type's version goes up whenever the type changes
     And the type reads back as it was
+
+  @slice-106
+  Scenario: Removing a type while the store holds artifacts of its kind is refused
+    Pins that a type cannot be taken away from under the artifacts it checks, and that the client is told exactly which artifacts stand in the way.
+    Given a type the store holds, and two artifacts of its kind
+    When the client removes that type
+    Then the removal is rejected because something still points at it, naming each of those two artifacts

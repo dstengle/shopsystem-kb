@@ -1,14 +1,32 @@
 import copy
 import re
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, listing, read, refs, search
+from calls import DECISION_TYPE, create, define, listing, read, refs, search, start_a_store
 from kb import client as kb_client
 from kb.content import loads
-from kb.contract import kb_pb2
 
-scenarios("list-artifacts-of-a-kind.feature")
+
+@scenario("name-what-is-asked-for.feature", "Asking by a kind the store holds no type for is refused")
+def test_asking_by_a_kind_the_store_holds_no_type_for_is_refused():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists every artifact of a kind")
+def test_the_client_lists_every_artifact_of_a_kind():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists the artifacts matching a field")
+def test_the_client_lists_the_artifacts_matching_a_field():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists names only")
+def test_the_client_lists_names_only():
+    pass
+
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep the shop running.\n"},
@@ -22,7 +40,7 @@ THURSDAYS = "decision/restock-on-thursdays"
 @given("a store holding three decisions, one of them superseded", target_fixture="client")
 def _store_with_three_decisions(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     decision_type = copy.deepcopy(DECISION_TYPE)
     decision_type["schema"]["properties"]["status"] = {"type": "string"}
     decision_type["schema"]["summary"] = ["supersedes", "status"]
@@ -43,7 +61,7 @@ def _list_the_decisions(client):
 @then("the client is given a stub of each of the three")
 def _a_stub_of_each(listed):
     assert not listed.faults, listed.faults
-    assert [(stub.id, stub.type, stub.title, loads(stub.fields)) for stub in listed.stubs] == [
+    assert [(stub.id, stub.kind, stub.title, loads(stub.fields)) for stub in listed.stubs] == [
         (WEEKLY, "decision", "Price reviews happen weekly", {"supersedes": MONTHLY, "status": "accepted"}),
         (MONTHLY, "decision", "Prices are reviewed monthly", {"status": "superseded"}),
         (THURSDAYS, "decision", "Restock on Thursdays", {"status": "accepted"}),
@@ -95,6 +113,6 @@ def _ask_by_that_kind(client, call):
 
 @then("the call is rejected because a kind must name a type the store holds, and the kind asked for is given back")
 def _rejected_for_its_kind(answered):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in answered.faults] == [("", "", "kind")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in answered.faults] == [("", "", "kind")]
     assert "a kind must name a type the store holds" in answered.faults[0].message
     assert "'invoice'" in answered.faults[0].message

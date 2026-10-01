@@ -1,48 +1,20 @@
-"""Each rpc's request as the values its one domain call takes, built from the conversions in kb.values. A request that
-does not convert is refused here, before anything else sees it. In a set, or among the names a snapshot is given, an
-entry that does not convert stands in its place as a Refusal, so the faults come back in the order of the entries."""
+"""Each rpc's request but the changes (kb.changes) as the values its one domain call takes, built from the
+conversions in kb.values. A request that does not convert is refused here, before anything else sees it. Among the
+names a snapshot is given, an entry that does not convert stands in its place as a Refusal, so
+the faults come back in the order of the entries."""
 from dataclasses import dataclass
 from datetime import datetime
 
-from kb import rules, signatures, values
+from kb import signatures, values
 from kb.contract import kb_pb2
-from kb.signatures import Actor, Signed
-from kb.values import ArtifactId, Content, Kind, Locator, Refused, Root
+from kb.signatures import Signed
+from kb.values import ArtifactId, Kind, Locator, Refused
 
 
 @dataclass(frozen=True)
 class Refusal:
     """An entry that did not convert, and its faults."""
     faults: tuple
-
-
-@dataclass(frozen=True)
-class Create:
-    """A new artifact: its kind, its title, the name the title gives (None when it gives none, the title's faults
-    saying why), the name its faults are said of until it has one, and its content."""
-    kind: Kind
-    title: str
-    name: ArtifactId | None
-    at: str
-    title_faults: tuple
-    content: Content
-
-
-@dataclass(frozen=True)
-class Replace:
-    locator: Locator
-    content: Content
-
-
-@dataclass(frozen=True)
-class Add:
-    locator: Locator
-    item: Content
-
-
-@dataclass(frozen=True)
-class Remove:
-    locator: Locator
 
 
 @dataclass(frozen=True)
@@ -86,56 +58,14 @@ class Listing:
     ids: bool
 
 
-def starting(request: kb_pb2.InitRequest) -> tuple[Actor, Root]:
-    """Who starts a store, then where; the first refusal only."""
-    return signatures.starter(request.actor), values.root(request.root)
-
-
-def change(requested, actor: kb_pb2.Actor, message: str) -> tuple[list, Signed]:
-    """A change request as the domain takes it: who makes it and why first, refused alone when it does not say; then
-    a set holding nothing is refused; then each operation, converted or standing as its refusal."""
-    signed = signatures.signed(actor, message)
-    if not requested:
-        raise Refused([kb_pb2.Fault(rule=rules.OPERATIONS, message="a set must hold at least one change")])
-    return operations(requested), signed
-
-
-def operations(requested) -> list:
-    """Every operation of a set, each converted or standing as its refusal."""
-    converted = []
-    for operation in requested:
-        try:
-            converted.append(_operation(operation))
-        except Refused as refused:
-            converted.append(Refusal(tuple(refused.faults)))
-    return converted
-
-
-def _operation(operation: kb_pb2.Operation):
-    which = operation.WhichOneof("operation")
-    if which == "create":
-        return _create(operation.create)
-    if which == "append":
-        return Add(values.locator(operation.append.locator), values.item(operation.append.content))
-    if which == "delete":
-        return Remove(values.locator(operation.delete.locator))
-    locator = values.locator(operation.write.locator)
-    return Replace(locator, values.content(operation.write.content, at_root=not locator.place))
-
-
-def _create(creation: kb_pb2.Creation) -> Create:
-    kind = values.kind(creation.type)
-    name, at, title_faults = values.named(kind, creation.title)
-    return Create(kind, creation.title, name, at, title_faults, values.content(creation.content))
-
-
 def reading(request: kb_pb2.ReadRequest) -> Reading:
-    level = {kb_pb2.ReadRequest.WHOLE: "whole", kb_pb2.ReadRequest.SECTION: "section"}.get(request.level, "summary")
-    return Reading(values.locator(request.locator), level, request.depth, request.section)
+    """The level asked for, a summary when none is: a whole read's depth, a section read's title."""
+    level = request.WhichOneof("level") or "summary"
+    return Reading(values.locator(request.locator), level, request.whole.depth, request.section.title)
 
 
-def journal(request: kb_pb2.JournalRequest) -> JournalFilter:
-    """The journal's filters; both faults when the artifact and the time both fail."""
+def history(request: kb_pb2.HistoryRequest) -> JournalFilter:
+    """The history's filters; both faults when the artifact and the time both fail."""
     artifact, since, faults = None, None, []
     try:
         artifact = values.artifact_id(request.artifact) if request.artifact else None
@@ -151,32 +81,39 @@ def journal(request: kb_pb2.JournalRequest) -> JournalFilter:
 
 
 def searching(request: kb_pb2.SearchRequest) -> Searching:
-    kind = values.kind(request.type) if request.type else None
+    kind = values.kind(request.kind) if request.kind else None
     scope = request.scope
     return Searching(kind, request.text, scope != kb_pb2.SearchRequest.FIELDS, scope != kb_pb2.SearchRequest.SECTIONS)
 
 
-def walk(request: kb_pb2.RefsRequest) -> Walk:
-    """The walk's start and its narrowing by type; both faults when both fail."""
+def following(request: kb_pb2.FollowRequest) -> Walk:
+    """The walk's start and its narrowing by kind; both faults when both fail."""
     locator, kind, faults = None, None, []
     try:
         locator = values.locator(request.locator)
     except Refused as refused:
         faults += refused.faults
     try:
-        kind = values.kind(request.type) if request.type else None
+        kind = values.kind(request.kind) if request.kind else None
     except Refused as refused:
         faults += refused.faults
     if faults:
         raise Refused(faults)
-    return Walk(locator, kind, request.depth, request.via, request.direction == kb_pb2.RefsRequest.IN)
+    return Walk(locator, kind, request.depth, request.via, request.direction == kb_pb2.FollowRequest.IN)
 
 
 def listing(request: kb_pb2.ListRequest) -> Listing:
-    return Listing(values.kind(request.type), dict(request.fields), request.form == kb_pb2.ListRequest.IDS)
+    return Listing(values.kind(request.kind), dict(request.fields), request.form == kb_pb2.ListRequest.IDS)
 
 
-def snapshotted(requested) -> list:
+def snapshot(request: kb_pb2.SnapshotRequest) -> tuple[list, Signed]:
+    """A snapshot request as the domain takes it: the reader's signature first, refused alone when it does not sign;
+    the piece of work it records is the signature's; then each name, converted or standing as its refusal."""
+    signed = signatures.reader(request.signature)
+    return _names(request.artifacts), signed
+
+
+def _names(requested) -> list:
     """Each name a snapshot is given, converted or standing as its refusal."""
     converted = []
     for name in requested:

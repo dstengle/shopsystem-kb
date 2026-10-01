@@ -6,7 +6,6 @@ from typing import NamedTuple
 from referencing.exceptions import NoSuchResource
 
 from kb import names, refusals, values
-from kb.contract import kb_pb2
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -68,22 +67,53 @@ def declared(schema: dict, corpus) -> dict:
 def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
     """The type a kind names. Raises Refused when the corpus holds none, since a kind must name a type the store
     holds, wherever it is given."""
-    found = named_type(kind, corpus)
-    if isinstance(found, kb_pb2.Fault):
-        raise values.Refused([found])
-    return found
+    type_id = values.type_of(kind)
+    if not corpus.holds(type_id):
+        raise values.Refused([refusals.no_type(kind.name)])
+    return type_id
 
 
 def kind_schema(kind: values.Kind, corpus) -> dict:
     """The type a kind names, as the corpus holds it, its JSON Schema under `schema`. Raises Refused when the corpus
-    holds none, or when its file cannot be read."""
+    holds none."""
     return corpus.artifact(kind_type(kind, corpus))
 
 
-def named_type(kind: values.Kind, corpus, artifact: str = "") -> values.ArtifactId | kb_pb2.Fault:
-    """The type a kind names, or, when the corpus holds none, the fault saying so, of the artifact named when an
-    artifact claims the kind."""
-    type_id = values.type_of(kind)
-    if not corpus.holds(type_id):
-        return refusals.no_type(kind.name, artifact=artifact)
-    return type_id
+def read_through(kind: values.Kind, corpus) -> list[values.ArtifactId]:
+    """The types an artifact of a kind is checked and its links read through: its kind's type and every type a kb:
+    reference names, in that type's schema or in one it names, each once; those the corpus holds."""
+    found = []
+
+    def visit(type_id: values.ArtifactId) -> None:
+        if type_id in found or not corpus.holds(type_id):
+            return
+        found.append(type_id)
+        for each in referred(corpus.artifact(type_id).get("schema")):
+            visit(each)
+    visit(values.type_of(kind))
+    return found
+
+
+def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], corpus) -> list[values.Kind]:
+    """The kinds whose type, of those given, reads a changed type: is one, or refers by a kb: reference anywhere in
+    its schema to a type that reads one. What an artifact's links are read through can change only for these."""
+    def reads(type_id: values.ArtifactId, seen: frozenset) -> bool:
+        if type_id in changed:
+            return True
+        if type_id in seen or not corpus.holds(type_id):
+            return False
+        return any(reads(each, seen | {type_id}) for each in referred(corpus.artifact(type_id).get("schema")))
+    return [values.Kind(type_id.slug) for type_id in types if reads(type_id, frozenset())]
+
+
+def referred(node):
+    """Every type a kb: reference anywhere in a schema names."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            named = reference(value) if key == "$ref" and isinstance(value, str) else None
+            if named is not None and named.type_id is not None:
+                yield named.type_id
+            yield from referred(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from referred(value)

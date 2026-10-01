@@ -1,5 +1,6 @@
+# formulated from spec/capabilities/start-a-store.md
 Feature: Start a store
-So that a client has somewhere to keep typed artifacts before it has any types of its own, the client can start a store.
+  Narrator: the client
 
   @slice-1
   Scenario: The client starts a store
@@ -18,20 +19,6 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
-  @slice-102.6.1
-  Scenario Outline: Starting a store while the client's environment names another git repository begins the store's own history
-    Pins that the first entry of a history belongs to the store it starts, whatever repository the environment the client runs in names, and that the repository named is not touched.
-    Given a directory that is itself a git repository, holding files that have nothing to do with a store
-    And the client runs with its environment naming <repository> as the git repository to work in, the way git does for a program it runs from a hook
-    When the client starts a store there, saying which role it is
-    Then the store's history holds one entry, under that role, with the message "initialise store"
-    And that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit
-
-    Examples:
-      | repository                                       |
-      | the git repository that directory is             |
-      | a git repository elsewhere, which holds no store |
-
   @slice-102
   Scenario: Starting a store is stamped with the moment the client's clock gives
     Pins that the first entry in a history is timed like every entry after it, so a client laying down a history across several days can begin it on the day it chooses.
@@ -39,14 +26,6 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     And the client was readied with a clock that reads 2026-09-20 at 08:00
     When the client starts a store there, saying which role it is
     Then the store's one history entry says it happened at 2026-09-20 at 08:00
-
-  @slice-102.3
-  Scenario: Starting a store and the first change after it keep separate entries at the same moment
-    Pins that the first entry in a history is never lost to the change that follows it, however close together the client's clock puts them.
-    Given a store the client started, readied with a clock that reads 2026-09-20 at 08:00
-    When the client defines its own type
-    Then the store's history holds two entries, both saying they happened at 2026-09-20 at 08:00
-    And each names itself as its own set
 
   @slice-1.10
   Scenario: Starting a store without saying which role is refused
@@ -71,6 +50,22 @@ So that a client has somewhere to keep typed artifacts before it has any types o
     When the client starts a store there, saying which role it is
     Then starting the store is rejected because that directory already has a store inside it
     And the store that is there holds what it held before
+
+  @slice-117
+  Scenario: Starting a store in a directory that already has one made by an earlier kb is refused
+    Pins that a store made by an earlier kb counts as a store here, so starting never writes over it whichever kb made it.
+    Given a directory that already has a store inside it, made by an earlier kb
+    When the client starts a store there, saying which role it is
+    Then starting the store is rejected because that directory already has a store inside it
+    And the store that is there is left as it was
+
+  @slice-118.3
+  Scenario: Starting a store in a directory that already has one made by a later kb is refused
+    Pins that a store made by a later kb counts as a store here, so starting never writes over it whichever kb made it.
+    Given a directory that already has a store inside it, made by a later kb
+    When the client starts a store there, saying which role it is
+    Then starting the store is rejected because that directory already has a store inside it
+    And the store that is there is left as it was
 
   @slice-45
   Scenario: Starting a store inside a store is refused

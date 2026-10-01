@@ -1,95 +1,116 @@
-// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (adrs/0018).
+// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (decision/published-contract-v1).
 //
 // Artifact content crosses as canonical YAML text beside the fixed
 // identity fields, since content shape is schema-defined at runtime.
-// Errors are a typed list of faults on the response; a response that
-// carries faults is a refusal and nothing was written.
+// Every response is its result or a refusal holding every fault, never
+// both; a refusal means nothing was written. A store is started off the
+// wire, by `kb.init` in the client's own process; no rpc starts one.
 syntax = "proto3";
 
-package kb;
+package kb.v1;
 
 
 service Kb {
-  rpc Init(InitRequest) returns (InitResponse);
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Read(ReadRequest) returns (ReadResponse);
-  rpc Validate(ValidateRequest) returns (ValidateResponse);
-  rpc Write(WriteRequest) returns (WriteResponse);
-  rpc Apply(ApplyRequest) returns (ApplyResponse);
-  rpc Journal(JournalRequest) returns (JournalResponse);
+  rpc Check(CheckRequest) returns (CheckResponse);
+  rpc Replace(ReplaceRequest) returns (ReplaceResponse);
+  rpc History(HistoryRequest) returns (HistoryResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
-  rpc Refs(RefsRequest) returns (RefsResponse);
+  rpc Follow(FollowRequest) returns (FollowResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
-  rpc Append(AppendRequest) returns (AppendResponse);
-  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Add(AddRequest) returns (AddResponse);
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
+  rpc CreateMany(CreateManyRequest) returns (CreateManyResponse);
+  rpc ReplaceMany(ReplaceManyRequest) returns (ReplaceManyResponse);
+  rpc AddMany(AddManyRequest) returns (AddManyResponse);
+  rpc RemoveMany(RemoveManyRequest) returns (RemoveManyResponse);
 }
 
+// Who made an entry in the history: the role, and the piece of work. The
+// history's record alone; a request says who makes it with a Signature.
 message Actor {
   string role = 1;
   string execution = 2;
 }
 
-// An artifact root when path is empty; a node inside it otherwise.
+// Who makes a change and why: the role, the piece of work, and the message.
+message Signature {
+  string role = 1;
+  string execution = 2;
+  string message = 3;
+}
+
+// An artifact root when place is empty; a node inside it otherwise.
 message Locator {
   string id = 1;
-  string path = 2;
+  string place = 2;
 }
 
 message Fault {
   string artifact = 1;
-  string path = 2;
+  string place = 2;
   string rule = 3;
   string message = 4;
 }
 
-message InitRequest {
-  string root = 1;
-  Actor actor = 2;
-}
-
-// With faults, a refusal: no role.
-message InitResponse {
+// Every fault a call was refused for; nothing was written.
+message Refusal {
   repeated Fault faults = 1;
 }
 
-// The title travels here, never inside the content.
+// A new artifact of a kind. The title travels here, never inside the
+// content.
 message CreateRequest {
-  string type = 1;
-  string content = 2;  // canonical YAML: fields, sections, parts
-  Actor actor = 3;
-  string message = 4;
-  string title = 5;
+  string kind = 1;
+  string title = 2;
+  string content = 3;  // canonical YAML: fields, sections, parts
+  Signature signature = 4;
+}
+
+// The name kb gave the artifact, and its version.
+message Created {
+  string id = 1;
+  int32 revision = 2;
 }
 
 message CreateResponse {
-  string id = 1;
-  int32 revision = 2;
-  repeated Fault faults = 3;
+  oneof outcome {
+    Created result = 1;
+    Refusal refusal = 2;
+  }
 }
 
-// A summary by default. A whole read gives the artifact's content with
-// each link followed as many steps as depth says, the target in place of
-// its name; a target already filled in on the way is left as its name.
-// A section read gives the section with the title named, and nothing else.
+// One level of an artifact, a summary when none is asked for. A whole
+// read gives the artifact's content with each link followed as many steps
+// as depth says, the target in place of its name; a target already filled
+// in on the way is left as its name. A section read gives the section
+// with the title named, and nothing else.
 message ReadRequest {
-  enum Level {
-    SUMMARY = 0;
-    WHOLE = 1;
-    SECTION = 2;
+  message Summary {
+  }
+  message Whole {
+    int32 depth = 1;
+  }
+  message Section {
+    string title = 1;
   }
   Locator locator = 1;
-  Level level = 2;
-  int32 depth = 3;
-  string section = 4;
+  oneof level {
+    Summary summary = 2;
+    Whole whole = 3;
+    Section section = 4;
+  }
 }
 
-// A summary: identity, the fields the type shows at a glance, a stub of
-// each reference target and of each part, and inbound counts. With faults,
-// a refusal: a bad locator, a name the store lacks, or no store found.
-message ReadResponse {
+// An artifact at the level read: its identity and its content at that
+// level; a summary's content is the fields the type shows at a glance,
+// with a stub of each reference target and of each part, and inbound
+// counts.
+message Artifact {
   string id = 1;
-  string type = 2;
+  string kind = 2;
   int32 schema_version = 3;
   int32 revision = 4;
   string title = 5;
@@ -97,13 +118,21 @@ message ReadResponse {
   repeated Stub references = 7;
   repeated PartStub parts = 8;
   repeated InboundCount inbound = 9;
-  repeated Fault faults = 10;
+}
+
+// A refusal: a bad locator, a name the store lacks, a place or a section
+// it holds nothing at, or no store found.
+message ReadResponse {
+  oneof outcome {
+    Artifact result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 message Stub {
   string field = 1;
   string id = 2;
-  string type = 3;
+  string kind = 3;
   string title = 4;
   string fields = 5;   // canonical YAML
 }
@@ -115,23 +144,29 @@ message PartStub {
 }
 
 message InboundCount {
-  string type = 1;
+  string kind = 1;
   string field = 2;
   int32 count = 3;
 }
 
-message ValidateRequest {
+message CheckRequest {
 }
 
 // Every violation the store holds, each a fault naming the artifact, the
-// place and the rule; a stored file that cannot be read is one of them.
-// Every artifact last checked against an older version of its type is
-// listed as stale, whether or not it still fits. With faults, a refusal:
-// no store found.
-message ValidateResponse {
+// place and the rule; they are what the store holds, not a refusal. Every
+// artifact last checked against an older version of its type is listed as
+// stale, whether or not it still fits.
+message Checked {
   repeated Fault violations = 1;
-  repeated Fault faults = 2;
-  repeated Stale stale = 3;
+  repeated Stale stale = 2;
+}
+
+// A refusal: no store found, or one that cannot be read.
+message CheckResponse {
+  oneof outcome {
+    Checked result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // An artifact behind its type: the version it was last checked against,
@@ -142,86 +177,38 @@ message Stale {
   int32 current = 3;
 }
 
-// A new content for an artifact the store holds; its title is kept.
-message WriteRequest {
+// A new content for an artifact the store holds, or for the node at the
+// locator's place inside it; its title is kept. A replacement, an
+// addition or a removal, alone or in a set, may say the revision the
+// client read the artifact at; when the artifact stands at another as
+// the change lands, the change is refused with rule `revision`, naming
+// the revision it stands at, and nothing of its set is written.
+message ReplaceRequest {
   Locator locator = 1;
   string content = 2;  // canonical YAML: fields, sections, parts
-  Actor actor = 3;
-  string message = 4;
+  Signature signature = 3;
+  int32 revision = 4;  // the revision the client read the artifact at; 0 says none
 }
 
-// With faults, a refusal, and the artifact is as it was.
-message WriteResponse {
+// The artifact replaced, and its version now.
+message Replaced {
   int32 revision = 1;
-  repeated Fault faults = 2;
+  string id = 2;
 }
 
-// One change in a set: a create, a replacement, an item added, or a
-// removal, with no role or message of its own, since the set carries those.
-message Operation {
-  oneof operation {
-    Creation create = 1;
-    Replacement write = 2;
-    Addition append = 3;
-    Removal delete = 4;
+message ReplaceResponse {
+  oneof outcome {
+    Replaced result = 1;
+    Refusal refusal = 2;
   }
 }
 
-// What a Create carries but the role and the message.
-message Creation {
-  string type = 1;
-  string title = 2;
-  string content = 3;  // canonical YAML: fields, sections, parts
-}
-
-// A new content for an artifact the store holds; its title is kept.
-message Replacement {
-  Locator locator = 1;
-  string content = 2;  // canonical YAML: fields, sections, parts
-}
-
-// One item for a collection inside an artifact the store holds: the
-// locator's path is the collection's name. kb names the item.
-message Addition {
-  Locator locator = 1;
-  string content = 2;  // canonical YAML: the item's fields, never its id
-}
-
-// A whole artifact the store holds, to be taken out.
-message Removal {
-  Locator locator = 1;
-}
-
-// Every operation lands, in order, as one change, or none does.
-message ApplyRequest {
-  repeated Operation operations = 1;
-  Actor actor = 2;
-  string message = 3;
-}
-
-// The set's name, minted by kb, and one result per operation in order.
-// With faults, a refusal: every fault of every operation, and nothing
-// was written.
-message ApplyResponse {
-  string batch = 1;
-  repeated Result results = 2;
-  repeated Fault faults = 3;
-}
-
-// The artifact changed and its version now; for an item added, the name
-// kb gave it.
-message Result {
-  string id = 1;
-  int32 revision = 2;
-  string item = 3;
-}
-
-// Narrows the journal to the entries about one artifact, made under one
+// Narrows the history to the entries about one artifact, made under one
 // role, for one piece of work, at or after a time (ISO 8601, a date alone
 // meaning its midnight, UTC unless it says otherwise), or landed in one
-// set, named by the batch Apply gave, by each one given; with none, every
+// set, named by the batch a *Many gave, by each one given; with none, every
 // entry.
-message JournalRequest {
+message HistoryRequest {
   string artifact = 1;
   string role = 2;
   string execution = 3;
@@ -229,7 +216,7 @@ message JournalRequest {
   string batch = 5;
 }
 
-// One journal entry, as the store holds it. `at` is ISO 8601 in UTC; a
+// One entry in the history, as the store holds it. `at` is ISO 8601 in UTC; a
 // change made alone names itself as its batch. A snapshot's entry has op
 // `snapshot`, lists what was read, and names no artifact of its own.
 message Entry {
@@ -238,7 +225,7 @@ message Entry {
   Actor actor = 3;
   string op = 4;
   string artifact = 5;
-  string path = 6;
+  string place = 6;
   int32 revision = 7;
   int32 schema_version = 8;
   string digest = 9;
@@ -255,15 +242,22 @@ message Snapshotted {
   string digest = 3;
 }
 
-// The entries, oldest first. With faults, a refusal: a name that is not a
-// plain name, a time that cannot be read, or no store found.
-message JournalResponse {
+// The entries, oldest first.
+message Entries {
   repeated Entry entries = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: a name that is not a plain name, a time that cannot be read,
+// or no store found.
+message HistoryResponse {
+  oneof outcome {
+    Entries result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // The words to look for in the prose, the fields, or both, among the
-// artifacts of one kind when a type is given.
+// artifacts of one kind when a kind is given.
 message SearchRequest {
   enum Scope {
     SECTIONS = 0;
@@ -271,7 +265,7 @@ message SearchRequest {
     ALL = 2;
   }
   string text = 1;
-  string type = 2;
+  string kind = 2;
   Scope scope = 3;
 }
 
@@ -285,17 +279,24 @@ message Match {
   string field = 4;
 }
 
-// The matches, the one holding the words most often first. With faults, a
-// refusal: a type that is not a plain name, or no store found.
-message SearchResponse {
+// The matches, the one holding the words most often first.
+message Found {
   repeated Match matches = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: a kind that is not a plain name, a kind the store holds no
+// type for, or no store found.
+message SearchResponse {
+  oneof outcome {
+    Found result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // The links out of an artifact, or into it, followed as many steps as
-// depth says. A via names the one field a link may be; a type, the one
+// depth says. A via names the one field a link may be; a kind, the one
 // kind an artifact reached may be. Either narrows every step.
-message RefsRequest {
+message FollowRequest {
   enum Direction {
     OUT = 0;
     IN = 1;
@@ -304,7 +305,7 @@ message RefsRequest {
   int32 depth = 2;
   Direction direction = 3;
   string via = 4;
-  string type = 5;
+  string kind = 5;
 }
 
 // One step of a route: the link taken and the name it landed on. Going
@@ -321,12 +322,18 @@ message Reached {
   repeated Hop route = 2;
 }
 
-// Each artifact reached once, by the shortest route, nearest first. With
-// faults, a refusal: a bad locator, a name the store lacks, a type that is
-// not a plain name, or no store found.
-message RefsResponse {
+// Each artifact reached once, by the shortest route, nearest first.
+message Followed {
   repeated Reached reached = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: a bad locator, a name the store lacks, a kind that is not a
+// plain name, or no store found.
+message FollowResponse {
+  oneof outcome {
+    Followed result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // The artifacts of one kind, narrowed to those whose fields hold the
@@ -337,67 +344,203 @@ message ListRequest {
     STUBS = 0;
     IDS = 1;
   }
-  string type = 1;
+  string kind = 1;
   map<string, string> fields = 2;
   Form form = 3;
 }
 
 // The matches in the order the store holds them, as stubs or as names.
-// With faults, a refusal: a kind that is not a plain name, or no store
-// found.
-message ListResponse {
+message Listed {
   repeated Stub stubs = 1;
   repeated string ids = 2;
-  repeated Fault faults = 3;
 }
 
-// What a piece of work read, as the store holds it now: the actor names
-// the role and the piece of work, the message says why.
+// A refusal: a kind that is not a plain name, a kind the store holds no
+// type for, or no store found.
+message ListResponse {
+  oneof outcome {
+    Listed result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// What a piece of work read, as the store holds it now: the signature
+// names the role and the piece of work, which the snapshot is of, and says
+// why.
 message SnapshotRequest {
-  Actor actor = 1;
+  Signature signature = 1;
   repeated string artifacts = 2;
-  string message = 3;
 }
 
-// The name of the journal entry that records the snapshot. With faults, a
-// refusal: a name that is not a plain name, a name the store lacks, or no
-// store found, and nothing was written.
-message SnapshotResponse {
+// The name of the entry in the history that records the snapshot.
+message Recorded {
   string entry = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: an unsigned snapshot, or one naming no piece of work, a name
+// that is not a plain name, a name the store lacks, or no store found;
+// nothing was written.
+message SnapshotResponse {
+  oneof outcome {
+    Recorded result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // One item added at the end of a collection inside an artifact the store
-// holds: the locator's path is the collection's name, and kb names the
+// holds: the locator's place is the collection's name, and kb names the
 // item.
-message AppendRequest {
+message AddRequest {
   Locator locator = 1;
   string content = 2;  // canonical YAML: the item's fields, never its id
-  Actor actor = 3;
-  string message = 4;
+  Signature signature = 3;
+  int32 revision = 4;  // the revision the client read the artifact at; 0 says none
 }
 
-// The name kb gave the item, and the artifact's version now. With faults,
-// a refusal, and the artifact is as it was.
-message AppendResponse {
+// The name kb gave the item, the artifact's version now, and the
+// artifact it was added to.
+message Added {
   string id = 1;
   int32 revision = 2;
-  repeated Fault faults = 3;
+  string artifact = 3;
+}
+
+message AddResponse {
+  oneof outcome {
+    Added result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // A whole artifact the store holds, taken out, as long as nothing points
 // at it.
-message DeleteRequest {
+message RemoveRequest {
   Locator locator = 1;
-  Actor actor = 2;
-  string message = 3;
+  Signature signature = 2;
+  int32 revision = 3;  // the revision the client read the artifact at; 0 says none
 }
 
-// The version the removal left behind. With faults, a refusal, and the
-// store is as it was: a bad locator, a name the store lacks, or, one fault
-// each, every link that points at the artifact, naming the artifact that
-// holds it and its place there.
-message DeleteResponse {
+// The artifact removed, and the version the removal left behind.
+message Removed {
   int32 revision = 1;
-  repeated Fault faults = 2;
+  string id = 2;
+}
+
+// A refusal: a bad locator, a name the store lacks, or, one fault each,
+// every link that points at the artifact, naming the artifact that holds
+// it and its place there.
+message RemoveResponse {
+  oneof outcome {
+    Removed result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of creates, landing in order as one change, or none does. A
+// create may carry a key of the client's choosing, unique in the set; a
+// link written `@` and the key, anywhere in the set, names the artifact
+// that create makes, and kb puts the name it gives that artifact in its
+// place before anything is checked. A key names a whole artifact, never
+// a place inside one.
+message CreateItem {
+  string kind = 1;
+  string title = 2;
+  string content = 3;  // canonical YAML: fields, sections, parts
+  string key = 4;
+}
+
+message CreateManyRequest {
+  repeated CreateItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each create's result in the order of
+// the set.
+message CreatedMany {
+  string batch = 1;
+  repeated Created results = 2;
+}
+
+message CreateManyResponse {
+  oneof outcome {
+    CreatedMany result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of replacements, landing in order as one change, or none does.
+message ReplaceItem {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: fields, sections, parts
+  int32 revision = 3;  // the revision the client read the artifact at; 0 says none
+}
+
+message ReplaceManyRequest {
+  repeated ReplaceItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each replacement's result, naming the
+// artifact it replaced, in the order of the set.
+message ReplacedMany {
+  string batch = 1;
+  repeated Replaced results = 2;
+}
+
+message ReplaceManyResponse {
+  oneof outcome {
+    ReplacedMany result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of items added, landing in order as one change, or none does.
+message AddItem {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: the item's fields, never its id
+  int32 revision = 3;  // the revision the client read the artifact at; 0 says none
+}
+
+message AddManyRequest {
+  repeated AddItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each addition's result, in the order
+// of the set.
+message AddedMany {
+  string batch = 1;
+  repeated Added results = 2;
+}
+
+message AddManyResponse {
+  oneof outcome {
+    AddedMany result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of removals, landing in order as one change, or none does.
+message RemoveItem {
+  Locator locator = 1;
+  int32 revision = 2;  // the revision the client read the artifact at; 0 says none
+}
+
+message RemoveManyRequest {
+  repeated RemoveItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each removal's result, naming the
+// artifact it removed, in the order of the set.
+message RemovedMany {
+  string batch = 1;
+  repeated Removed results = 2;
+}
+
+message RemoveManyResponse {
+  oneof outcome {
+    RemovedMany result = 1;
+    Refusal refusal = 2;
+  }
 }

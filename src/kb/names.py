@@ -6,6 +6,8 @@ from typing import Callable, NamedTuple
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
+KEYED = "@"
+
 TYPES = "schema"
 TYPE_URI = "kb:"
 
@@ -21,10 +23,38 @@ def parted(text: str) -> tuple[str, str]:
     return kind, slug
 
 
+def order(artifact_id) -> tuple[str, str]:
+    """The one order artifacts' names are given in: by kind, then by `<slug>.yaml`, compared as the paths of the
+    files a store once kept them in compared, so `work/...` comes before `work-item/...`, and `price-2` before
+    `price`."""
+    return place(artifact_id)
+
+
+def place(artifact_id) -> tuple[str, str]:
+    """The place the export layout gives an artifact, as steps below the directory: its kind, then `<slug>.yaml`;
+    the inverse of `filed`."""
+    kind, slug = parted(str(artifact_id))
+    return kind, f"{slug}.yaml"
+
+
+def filed(steps: tuple[str, ...]) -> str | None:
+    """The written name of the artifact the export layout puts at a file's place, `<kind>/<slug>.yaml`, given the
+    place's steps below the directory; None for a place where the layout puts no artifact."""
+    if len(steps) != 2 or not steps[1].endswith(".yaml"):
+        return None
+    kind, slug = steps[0], steps[1].removesuffix(".yaml")
+    return written(kind, slug) if plain(kind) and plain(slug) else None
+
+
 def linked(text: str) -> tuple[str, str]:
     """A link as a field holds it read as the name it points at and, after `#`, the place inside that artifact."""
     name, _, place = text.partition("#")
     return name, place
+
+
+def keyed(text) -> str | None:
+    """The key a link written as `@` and a key refers to; None for a link written any other way."""
+    return text.removeprefix(KEYED) if isinstance(text, str) and text.startswith(KEYED) else None
 
 
 def placed(steps) -> str:
@@ -83,9 +113,10 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
     number, true or false, as an artifact's is, otherwise from its place in the collection, counted from 1, with a
     number added as an artifact's name has when an item beside it already has that name. On a write an item already
     carrying a name is the item of that name, moved or changed where it stands, and keeps it; a name is minted once
-    and never worked out again. An item that is not a set of named entries carries no name, and is passed over."""
+    and never worked out again. An item that is not a set of named entries carries no name, and is passed over, as is
+    a collection that is not a list."""
     for collection, part in parts.items():
-        found = node.get(collection, [])
+        found = _listed(node, collection)
         taken = {item["id"] for item in found if isinstance(item, dict) and keep_named and "id" in item}
         for place, item in enumerate(found, start=1):
             if not isinstance(item, dict):
@@ -98,10 +129,10 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
 
 
 def held(parts: dict, node: dict) -> dict[str, set]:
-    """The names the items of each collection the node holds carry; an item that is not a set of named entries
-    carries none."""
+    """The names the items of each collection the node holds carry; an item that is not a set of named entries, or a
+    collection that is not a list, carries none."""
     return {
-        collection: {item.get("id") for item in node.get(collection, []) if isinstance(item, dict)}
+        collection: {item.get("id") for item in _listed(node, collection) if isinstance(item, dict)}
         for collection in parts
     }
 
@@ -121,7 +152,7 @@ def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misna
     found = []
     for collection in schema.get("parts", {}):
         seen = set()
-        for index, item in enumerate(content.get(collection, [])):
+        for index, item in enumerate(_listed(content, collection)):
             if not isinstance(item, dict) or "id" not in item:
                 continue
             name = item["id"]
@@ -133,3 +164,9 @@ def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misna
                 found.append(Misnamed(collection, index, name, "unknown"))
             seen.add(name)
     return found
+
+
+def _listed(node: dict, collection: str) -> list:
+    """The items of a collection a node holds; none when it holds none, or a value that is not a list."""
+    found = node.get(collection, [])
+    return found if isinstance(found, list) else []

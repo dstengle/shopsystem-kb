@@ -42,6 +42,20 @@ def holds_part(content: dict, place: tuple) -> bool:
     return not len(place) % 2 and "sections" not in place[::2] and _walk(content, place) is not None
 
 
+def parts(content: dict) -> list[str]:
+    """The place of every part the content holds, at every depth, written as a link names it: each a place
+    `holds_part` says names a part."""
+    found = []
+    for collection, items in content.items():
+        if collection == "sections" or not isinstance(collection, str) or not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict) and isinstance(item.get("id"), str):
+                place = names.placed((collection, item["id"]))
+                found += [place, *(names.placed((place, inner)) for inner in parts(item))]
+    return found
+
+
 def _walk(content: dict, place: tuple) -> Spot | None:
     """Where a place stands in the content, step by step, or None when a step names nothing there."""
     steps = list(place)

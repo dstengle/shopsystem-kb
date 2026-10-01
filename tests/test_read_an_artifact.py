@@ -1,15 +1,42 @@
 import re
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, write
-from kb import canonical, client as kb_client
+from calls import PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
+import held
+from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
-from repositories import hooked, made
 
+scenarios("find-the-store.feature")
 scenarios("read-an-artifact.feature")
+
+
+@scenario("name-what-is-asked-for.feature", "A name that is not a plain name is refused")
+def test_a_name_that_is_not_a_plain_name_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A name that begins at the root of the disk is refused")
+def test_a_name_that_begins_at_the_root_of_the_disk_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A place inside an artifact that is not a plain place is refused")
+def test_a_place_inside_an_artifact_that_is_not_a_plain_place_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "Reading something the store does not hold is refused")
+def test_reading_something_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A read that names a place the artifact does not hold is refused")
+def test_a_read_that_names_a_place_the_artifact_does_not_hold_is_refused():
+    pass
+
 
 OLDER = "decision/prices-are-reviewed-monthly"
 DECISION = "decision/price-reviews-happen-weekly"
@@ -32,7 +59,7 @@ def _store_with_a_linked_decision(root):
 def _start_with_a_linked_decision(root):
     """Start a store at root holding the decision, what it supersedes, and two work items pointing at it."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, tagged_decision_type())
     define(client, WORK_ITEM_TYPE)
     create(client, "decision", {"title": "Prices are reviewed monthly", "sections": OLDER_SECTIONS})
@@ -60,13 +87,13 @@ def _read_at_a_glance(client):
 
 @then("the client is given its name, its kind, its title and the few fields the type shows at a glance")
 def _identity_and_summary_fields(summary):
-    assert (summary.id, summary.type, summary.title) == (DECISION, "decision", "Price reviews happen weekly")
+    assert (summary.id, summary.kind, summary.title) == (DECISION, "decision", "Price reviews happen weekly")
     assert loads(summary.content) == {"supersedes": OLDER}
 
 
 @then("a stub of each thing it points at and of each of its parts")
 def _stubs(summary):
-    assert {(stub.field, stub.id, stub.type, stub.title) for stub in summary.references} == {
+    assert {(stub.field, stub.id, stub.kind, stub.title) for stub in summary.references} == {
         ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
     }
     assert [(stub.collection, stub.id, stub.title) for stub in summary.parts] == [
@@ -77,7 +104,7 @@ def _stubs(summary):
 
 @then("how many things point at it, counted by their kind and by the link they use")
 def _inbound_counts(summary):
-    assert [(count.type, count.field, count.count) for count in summary.inbound] == [
+    assert [(count.kind, count.field, count.count) for count in summary.inbound] == [
         ("work-item", "decisions", 2),
     ]
 
@@ -106,7 +133,7 @@ def _another_store(tmp_path):
     """A second store, started beside the one the scenario reads from."""
     other = tmp_path / "other"
     other.mkdir()
-    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
+    start_a_store(other)
     return other
 
 
@@ -191,7 +218,7 @@ def asked():
 @when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, PLACES))})"), target_fixture="shown")
 def _read_a_place_inside(client, asked, what):
     asked["what"] = PLACES[what]
-    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, path=PLACES[what])))
+    return answer(client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, place=PLACES[what]))))
 
 
 @when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, SECTIONS_NOT_HELD))})"), target_fixture="shown")
@@ -211,7 +238,7 @@ def _rejected_for_nothing_at_that_place(shown, asked):
     "or a collection and an item in it"
 )
 def _rejected_as_not_a_plain_place(shown):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in shown.faults] == [(DECISION, "sections/../..", "locator")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in shown.faults] == [(DECISION, "sections/../..", "locator")]
     assert "plain alphabet" in shown.faults[0].message
 
 
@@ -224,33 +251,6 @@ def _outside_with_kb_root_naming_this_one(root, tmp_path, monkeypatch):
 @then("the client is given the decision, from the store KB_ROOT names")
 def _from_the_store_kb_root_names(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
-
-
-def _working_deep_inside(root, tmp_path, monkeypatch):
-    monkeypatch.chdir(_deep_inside(root))
-    monkeypatch.delenv("KB_ROOT", raising=False)
-
-
-def _working_outside_naming_this_one(root, tmp_path, monkeypatch):
-    monkeypatch.chdir(_elsewhere(tmp_path))
-    monkeypatch.setenv("KB_ROOT", str(root))
-
-
-WORKING = {
-    "in a folder deep inside the directory the store sits in": _working_deep_inside,
-    "outside any store, with KB_ROOT naming this one": _working_outside_naming_this_one,
-}
-
-
-@given(parsers.re(
-    f"the client is working (?P<where>{'|'.join(map(re.escape, WORKING))}), with its environment naming a git "
-    f"repository other than this store, the way git does for a program it runs from a hook"
-))
-def _working_with_a_repository_named(root, tmp_path, monkeypatch, where):
-    """A git repository made under tmp_path, holding no store, named in this process's environment, restored after."""
-    WORKING[where](root, tmp_path, monkeypatch)
-    for name, value in hooked(made(tmp_path / "elsewhere-repository")).items():
-        monkeypatch.setenv(name, value)
 
 
 @given("the client is working outside any store and nothing names one", target_fixture="elsewhere")
@@ -346,7 +346,7 @@ def _removed_outside_with_nothing_naming_one(root, tmp_path, monkeypatch):
 
 @then("the client is given that refusal as it is given any other fault, the call never breaking off")
 def _given_the_refusal_as_an_answer(shown):
-    assert isinstance(shown, kb_pb2.ReadResponse)
+    assert isinstance(shown.response, kb_pb2.ReadResponse)
     assert [fault.rule for fault in shown.faults] == ["store"]
 
 
@@ -365,7 +365,7 @@ def _readied_where_there_is_no_store(tmp_path, monkeypatch):
     here.mkdir()
     monkeypatch.chdir(here)
     monkeypatch.delenv("KB_ROOT", raising=False)
-    return {"client": kb_client.connect(), "store_there": (here / "kb").exists(), "here": here}
+    return {"client": kb_client.connect(), "store_there": held.holds_anything_in_the_place(here), "here": here}
 
 
 @given("a store holding the decision has since been started where the client is working")
@@ -385,18 +385,6 @@ def _never_readied_again(readied):
     assert readied["used"] is readied["client"]
 
 
-@then("the read is rejected because that file cannot be read, and the file is named")
-def _rejected_as_unreadable(shown):
-    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(DECISION, "unreadable")]
-    assert f"{DECISION}.yaml cannot be read" in shown.faults[0].message
-
-
-@then("the client is given that fault as it is given any other, the call never breaking off")
-def _given_as_any_other_fault(shown):
-    assert isinstance(shown, kb_pb2.ReadResponse)
-    assert (shown.id, shown.title, shown.content) == ("", "", "")
-
-
 DAILY = "decision/stock-is-counted-daily"
 NIGHTLY = "decision/stock-is-counted-nightly"
 COUNTING = [
@@ -409,7 +397,7 @@ COUNTING = [
 def _two_decisions_pointing_at_each_other(client):
     create(client, "decision", {"title": "Stock is counted daily", "sections": COUNTING})
     create(client, "decision", {"title": "Stock is counted nightly", "supersedes": DAILY, "sections": COUNTING})
-    changed = write(client, DAILY, {"supersedes": NIGHTLY, "sections": COUNTING}, message="Point back")
+    changed = replace(client, DAILY, {"supersedes": NIGHTLY, "sections": COUNTING}, message="Point back")
     assert not changed.faults, changed.faults
 
 
@@ -455,7 +443,7 @@ def _read_the_whole_decision(client):
 
 @then("the client is given every field, every section and every part, in the order the type declares")
 def _everything_in_declared_order(whole):
-    assert (whole.id, whole.type, whole.schema_version, whole.revision, whole.title) == (
+    assert (whole.id, whole.kind, whole.schema_version, whole.revision, whole.title) == (
         DECISION, "decision", 1, 1, "Price reviews happen weekly",
     )
     content = loads(whole.content)
@@ -482,7 +470,7 @@ def _read_the_whole_following(client, kind, steps):
 
 @then("the older decision is given in place of the link, as the store holds it now")
 def _older_as_stored(root, whole):
-    assert loads(whole.content)["supersedes"] == canonical.load((root / "kb" / f"{OLDER}.yaml").read_text())
+    assert loads(whole.content)["supersedes"] == held.artifact(root, OLDER)
 
 
 @then("what the older decision itself points at is given as names")
@@ -496,7 +484,7 @@ def _older_links_as_names(whole):
 def _older_decision_tagged(client, tag):
     define(client, TAG_TYPE)
     tagged = create(client, "tag", {"title": tag})
-    changed = write(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
+    changed = replace(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
     assert not changed.faults, changed.faults
 
 

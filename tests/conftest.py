@@ -1,15 +1,16 @@
 """Suite wiring. Step definitions live beside the scenarios they serve; shared Givens are added here by slice 1."""
+import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing, moment
-from kb import canonical, client as kb_client, store
-from kb.contract import kb_pb2
-from repositories import git, hooked, made, standing
+from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version, start_a_store, check
+import held
+from kb import cli, client as kb_client, store
 
 
 def pytest_configure(config):
@@ -21,17 +22,17 @@ def pytest_configure(config):
         config.addinivalue_line("markers", f"{tag}: scenario of that slice in the plan")
 
 
-def _guard_starts(config):
+def _guard_starts(rootpath, base_temp):
     """Where the guard looks for a store, upward from each: the checkout, the system's temporary directory, and
     pytest's own base temp root, wherever `--basetemp` or `TMPDIR` puts it. A seam a demonstration can point
     elsewhere without touching where the real ones sit."""
-    return (config.rootpath, Path(tempfile.gettempdir()), config._tmp_path_factory.getbasetemp())
+    return (rootpath, Path(tempfile.gettempdir()), base_temp)
 
 
-def pytest_sessionstart(session):
+def _refuse_a_store_above(starts):
     """Refuse to run rather than reach a store outside the suite's own temporary directories: one is never found by
-    looking upward, discovery's own way, from any of `_guard_starts`."""
-    for start in _guard_starts(session.config):
+    looking upward, discovery's own way, from any of `starts`."""
+    for start in starts:
         found = store.find_above(start)
         if found is not None:
             pytest.exit(
@@ -39,6 +40,12 @@ def pytest_sessionstart(session):
                 f"no test may reach a store outside its own temporary directory",
                 returncode=1,
             )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _no_store_outside_the_suite(request, tmp_path_factory):
+    """The guard, before the first test: pytest's public base temp is one of the places it looks."""
+    _refuse_a_store_above(_guard_starts(request.config.rootpath, tmp_path_factory.getbasetemp()))
 
 
 @pytest.fixture(autouse=True)
@@ -63,15 +70,24 @@ def root(tmp_path):
 @given("a store", target_fixture="client")
 def _a_store(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     return client
 
 
+@pytest.fixture
+def readied_clock():
+    """The clock the client was readied with, under `clock`, for a step that starts a store with it; none until a
+    Given readies one."""
+    return {}
+
+
 @given(parsers.parse("the client was readied with a clock that reads {reading}"), target_fixture="client")
-def _readied_with_a_clock(root, reading):
-    """A client over the store at root whose clock stands still at that moment, given in the zone the step names."""
+def _readied_with_a_clock(root, reading, readied_clock):
+    """A client over the store at root whose clock stands still at that moment, given in the zone the step names; a
+    store it starts takes the same clock."""
     stood = moment(reading)
-    return kb_client.connect(root, clock=lambda: stood)
+    readied_clock["clock"] = lambda: stood
+    return kb_client.connect(root, clock=readied_clock["clock"])
 
 
 @pytest.fixture
@@ -84,7 +100,7 @@ def before():
 def _store_with_content(root):
     """A store started in root, holding the decision type and a decision."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     create(client, "decision", {
         "title": "Price reviews happen weekly",
@@ -98,7 +114,7 @@ def _store_with_content(root):
 @given("a directory that already has a store inside it, with content in that store", target_fixture="root")
 def _directory_with_a_store_inside(root, before):
     _store_with_content(root)
-    before.update(store=root, held=everything_under(root))
+    before.update(store=root, held=held.everything_in(root))
     return root
 
 
@@ -107,47 +123,25 @@ def _directory_inside_a_store(root, before):
     _store_with_content(root)
     inside = root / "notes" / "drafts"
     inside.mkdir(parents=True)
-    before.update(store=root, held=everything_under(root))
+    before.update(store=root, held=held.everything_in(root))
     return inside
 
 
 @then("the store that is there holds what it held before")
 @then("the store it sits inside holds what it held before")
 def _store_holds_what_it_held(before):
-    assert everything_under(before["store"]) == before["held"]
-
-
-@given("someone edited the decision's file by hand and left it in a shape the store cannot read")
-def _decision_file_mangled_by_hand(root, monkeypatch):
-    """The decision a feature's Background holds, decision/price-reviews-happen-weekly, left unreadable, with the
-    client working in the store and nothing naming it."""
-    (root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").write_text(MANGLED)
-    monkeypatch.chdir(root)
-    monkeypatch.delenv("KB_ROOT", raising=False)
+    assert held.everything_in(before["store"]) == before["held"]
 
 
 @when("the client checks the store", target_fixture="checked")
 def _check_the_store(client):
-    return client.Validate(kb_pb2.ValidateRequest())
-
-
-@then("that file is reported as a violation, naming the file")
-def _reported_as_unreadable(checked):
-    unreadable = [fault for fault in checked.violations if fault.rule == "unreadable"]
-    assert [fault.artifact for fault in unreadable] == ["decision/price-reviews-happen-weekly"]
-    assert "decision/price-reviews-happen-weekly.yaml cannot be read" in unreadable[0].message
-
-
-@then("the check comes back with its answer rather than breaking off")
-def _answers(checked):
-    assert isinstance(checked, kb_pb2.ValidateResponse)
-    assert not checked.faults, checked.faults
+    return check(client)
 
 
 @then("the store holds no artifact it did not hold before")
 def _no_new_artifact(root, client, attempt):
     assert [stub.id for stub in listing(client, "decision", ids_only=True).stubs] == attempt["names"]
-    assert everything_under(root / "kb") == attempt["files"]
+    assert held.holds(root) == attempt["files"]
 
 
 @then("the store's history holds no entry for it")
@@ -165,41 +159,92 @@ def starter():
     parsers.parse('the store\'s history holds one entry, under that role, with the message "{message}"'),
     target_fixture="entry",
 )
-def _one_entry_under_the_role(root, starter, message):
-    """The one entry in the journal's files, and the one commit in the store's own git history, both under the role
-    the store was started under."""
-    entries = sorted((root / "kb" / "journal").rglob("*.yaml"))
-    assert len(entries) == 1, entries
-    entry = canonical.load(entries[0].read_text())
-    assert (entry["actor"]["role"], entry["message"]) == (starter, message)
-    assert git(root / "kb", "log", "--format=%an%x09%s").splitlines() == [f"{starter}\t{message}"]
+def _one_entry_under_the_role(client, starter, message):
+    """The one entry in the store's history, under the role the store was started under."""
+    [entry] = held.history(client)
+    assert (entry.actor.role, entry.message) == (starter, message)
     return entry
 
 
-REPOSITORIES = {
-    "the git repository the directory the store sits in belongs to": lambda root, tmp_path: made(root),
-    "the git repository that directory is": lambda root, tmp_path: root,
-    "a git repository elsewhere, which holds no store": lambda root, tmp_path: made(tmp_path / "elsewhere-repository"),
-}
+@given("another change is being written and holds the store longer than the store waits", target_fixture="holding")
+def _another_change_holds_the_store(root, request, monkeypatch, before):
+    holding = held.another_change_holds(root, request, monkeypatch)
+    before.update(held=holding.held)
+    return holding
+
+
+@then("nothing is written")
+def _nothing_written(root, before):
+    """The store holds what it held when the Given that readied the change took what it held."""
+    assert held.holds(root) == before["held"]
+
+
+# The operator's command line, and the Givens that set where the operator works and which store, if any, is named.
+
+OPERATOR = "operator"
+
+
+def _kb(*args, cwd, env=None):
+    """kb's own command line, run as the operator runs it: in a directory, with KB_ROOT and KB_ACTOR set only when a
+    step sets them. It runs in this process (tests/test_the_kb_command.py shows the installed command runs the same
+    command line), so a step answers in milliseconds and sees the store's wait as the test set it."""
+    clean = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
+    return held.in_process(cli.main, list(args), cwd, {**clean, **(env or {})})
+
+
+def _store_needing_attention(root):
+    """A store a client filled: two decisions behind the decision type, and one of them, edited by hand, missing the
+    body of its purpose."""
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
+        create(client, "decision", {"title": title, "sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+            {"title": "Rationale", "body": "Costs move weekly.\n"},
+        ]})
+    next_version(client, "decision", DECISION_TYPE)
+    monthly = held.artifact(root, "decision/prices-are-reviewed-monthly")
+    del monthly["sections"][0]["body"]
+    held.plant(root, "decision/prices-are-reviewed-monthly", monthly)
+    return root
+
+
+@given("a store, with the operator working in a folder deep inside the directory it sits in", target_fixture="where")
+def _working_deep_inside(root):
+    deep = _store_needing_attention(root) / "notes" / "2026" / "september"
+    deep.mkdir(parents=True)
+    return {"cwd": deep, "env": {}}
+
+
+@given("a store, with the operator working outside any store and KB_ROOT naming that one", target_fixture="where")
+def _outside_with_kb_root(root, tmp_path):
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    return {"cwd": outside, "env": {"KB_ROOT": str(_store_needing_attention(root))}}
+
+
+@given("the operator is working outside any store and nothing names one", target_fixture="where")
+def _outside_with_nothing_named(tmp_path):
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    return {"cwd": outside, "env": {}}
 
 
 @given(
-    parsers.re(
-        f"the client runs with its environment naming (?P<repository>{'|'.join(REPOSITORIES)}) as the git repository "
-        f"to work in, the way git does for a program it runs from a hook"
-    ),
-    target_fixture="named_repository",
+    "the operator is working outside any store, with KB_ROOT naming a directory that holds no store",
+    target_fixture="where",
 )
-def _environment_naming_a_repository(root, tmp_path, monkeypatch, repository):
-    """The repository named, under tmp_path, set in this process's environment, restored after, and how it stood."""
-    path = REPOSITORIES[repository](root, tmp_path)
-    for name, value in hooked(path).items():
-        monkeypatch.setenv(name, value)
-    return {"path": path, "standing": standing(path)}
+def _outside_with_kb_root_naming_no_store(tmp_path):
+    outside, empty = tmp_path / "elsewhere", tmp_path / "empty"
+    outside.mkdir()
+    empty.mkdir()
+    return {"cwd": outside, "env": {"KB_ROOT": str(empty)}}
 
 
-@then(
-    "that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit"
-)
-def _repository_left_as_it_was(named_repository):
-    assert standing(named_repository["path"]) == named_repository["standing"]
+@given("the operator is working inside a store, with KB_ROOT naming a different store", target_fixture="where")
+def _inside_one_naming_another(root, tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    start_a_store(other)
+    return {"cwd": _store_needing_attention(root), "env": {"KB_ROOT": str(other)}}

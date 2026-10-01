@@ -1,10 +1,23 @@
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, search
+from calls import DECISION_TYPE, create, define, search, start_a_store
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
-scenarios("search-the-store.feature")
+
+@scenario("query-the-store.feature", "The client searches the prose")
+def test_the_client_searches_the_prose():
+    pass
+
+
+@scenario("query-the-store.feature", "The client searches within one kind")
+def test_the_client_searches_within_one_kind():
+    pass
+
+
+@scenario("query-the-store.feature", "The client searches the fields as well as the prose")
+def test_the_client_searches_the_fields_as_well_as_the_prose():
+    pass
+
 
 PROCESS_TYPE = {
     "title": "Process",
@@ -16,7 +29,7 @@ PROCESS_TYPE = {
 @given("a store where two decisions and a process mention restocking in their prose", target_fixture="client")
 def _store_mentioning_restocking(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     define(client, PROCESS_TYPE)
     create(client, "decision", {
@@ -81,7 +94,7 @@ def _search_the_decisions(client):
 @then("the client is given the two decisions and not the process")
 def _the_two_decisions(found):
     assert {match.stub.id for match in found} == {"decision/restock-on-thursdays", "decision/price-reviews-happen-weekly"}
-    assert all(match.stub.type == "decision" for match in found)
+    assert all(match.stub.kind == "decision" for match in found)
 
 
 @when("the client searches the fields and the prose for restocking", target_fixture="found")

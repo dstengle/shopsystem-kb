@@ -4,13 +4,13 @@ from kb import composition, links, places, refusals, settled, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
-from kb.store import Store
+from kb.port import Port
 from kb.values import ArtifactId, Locator, Refused
 
 
-def artifact(store: Store, reading: Reading) -> kb_pb2.ReadResponse:
+def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     """The artifact at the level asked. Raises Refused for a name the store lacks, a place or a section it holds
-    nothing at, or a stored file that cannot be read."""
+    nothing at."""
     locator = reading.locator
     if not store.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])
@@ -23,22 +23,35 @@ def artifact(store: Store, reading: Reading) -> kb_pb2.ReadResponse:
     return _summary(store, locator)
 
 
-def stub(store: Store, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
+def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
-    target = store.artifact(target_id)
-    schema = composition.kind_schema(target_id.kind, store)["schema"]
+    return _stub(field, store.artifact(target_id), _shown(store, target_id.kind))
+
+
+def stubs(store: Port, kind: values.Kind, artifact_ids: list[ArtifactId]) -> list[kb_pb2.Stub]:
+    """Artifacts of one kind in brief, as `stub` gives each under no field, their type read once."""
+    shown = _shown(store, kind)
+    return [_stub("", store.artifact(artifact_id), shown) for artifact_id in artifact_ids]
+
+
+def _shown(store: Port, kind: values.Kind) -> dict:
+    """What a kind's type declares, the fields it shows at a glance among it."""
+    return composition.declared(composition.kind_schema(kind, store)["schema"], store)
+
+
+def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
     return kb_pb2.Stub(
-        field=field, id=target["id"], type=target["type"], title=target["title"],
-        fields=dumps(_summary_fields(target, composition.declared(schema, store))),
+        field=field, id=target["id"], kind=target["type"], title=target["title"],
+        fields=dumps(_summary_fields(target, shown)),
     )
 
 
-def _whole(store: Store, locator: Locator, depth: int) -> kb_pb2.ReadResponse:
+def _whole(store: Port, locator: Locator, depth: int) -> kb_pb2.Artifact:
     found = _resolved(store, locator.id, depth, {str(locator.id)})
     return _response(found, dumps(settled.content(found)))
 
 
-def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:
+def _section(store: Port, locator: Locator, title: str) -> kb_pb2.Artifact:
     """The first section with that title, at any depth, in the order the artifact holds them, and nothing else."""
     found = store.artifact(locator.id)
     section = _find_section(found.get("sections", []), title)
@@ -47,7 +60,7 @@ def _section(store: Store, locator: Locator, title: str) -> kb_pb2.ReadResponse:
     return _response(found, dumps(section))
 
 
-def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
+def _summary(store: Port, locator: Locator) -> kb_pb2.Artifact:
     found = store.artifact(locator.id)
     schema = composition.kind_schema(locator.id.kind, store)["schema"]
     declared = composition.declared(schema, store)
@@ -58,18 +71,18 @@ def _summary(store: Store, locator: Locator) -> kb_pb2.ReadResponse:
         for item in found.get(collection, []):
             response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
     for (type_name, field), count in _inbound(store, locator.id).items():
-        response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
+        response.inbound.append(kb_pb2.InboundCount(kind=type_name, field=field, count=count))
     return response
 
 
-def _response(found: dict, content: str) -> kb_pb2.ReadResponse:
-    return kb_pb2.ReadResponse(
-        id=found["id"], type=found["type"], schema_version=found["schema_version"], revision=found["revision"],
+def _response(found: dict, content: str) -> kb_pb2.Artifact:
+    return kb_pb2.Artifact(
+        id=found["id"], kind=found["type"], schema_version=found["schema_version"], revision=found["revision"],
         title=found["title"], content=content,
     )
 
 
-def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
+def _resolved(store: Port, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
     """The artifact as stored, each link in its own fields followed depth steps with the target, itself resolved, in
     place of its name; a link inside one of its items stays a name. A target on the path already being filled in
     stays a name, so a loop ends."""
@@ -88,15 +101,9 @@ def _resolved(store: Store, artifact_id: ArtifactId, depth: int, on_path: set) -
     return resolved
 
 
-def _inbound(store: Store, artifact_id: ArtifactId) -> dict:
+def _inbound(store: Port, artifact_id: ArtifactId) -> dict:
     """How many artifacts point at this one or at a part inside it, by their type and the field they use."""
-    counts = {}
-    for other in store.artifacts():
-        schema = composition.kind_schema(values.kind(other["type"]), store)["schema"]
-        pointing = {link.field for link in links.carried(other, schema, store) if links.points_at(link.target, artifact_id)}
-        for field in pointing:
-            counts[(other["type"], field)] = counts.get((other["type"], field), 0) + 1
-    return counts
+    return store.inbound(artifact_id)
 
 
 def _find_section(sections: list, title: str) -> dict | None:

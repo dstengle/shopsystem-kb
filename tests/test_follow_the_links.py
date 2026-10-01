@@ -1,14 +1,43 @@
 import copy
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, refs, remove, tagged_decision_type, write,
+    PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, refs, remove, tagged_decision_type, replace,
+    start_a_store,
 )
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
-scenarios("follow-the-links.feature")
+
+@scenario("query-the-store.feature", "The client follows the links out of an artifact")
+def test_the_client_follows_the_links_out_of_an_artifact():
+    pass
+
+
+@scenario("query-the-store.feature", "The client follows the links into an artifact")
+def test_the_client_follows_the_links_into_an_artifact():
+    pass
+
+
+@scenario("query-the-store.feature", "The client narrows the links to one link and one kind")
+def test_the_client_narrows_the_links_to_one_link_and_one_kind():
+    pass
+
+
+@scenario("query-the-store.feature", "The client follows the links two steps out")
+def test_the_client_follows_the_links_two_steps_out():
+    pass
+
+
+@scenario("query-the-store.feature", "The client follows the links out of one place inside an artifact")
+def test_the_client_follows_the_links_out_of_one_place_inside_an_artifact():
+    pass
+
+
+@scenario("query-the-store.feature", "A link into a part counts as a link into the artifact holding it")
+def test_a_link_into_a_part_counts_as_a_link_into_the_artifact_holding_it():
+    pass
+
 
 OLDER = "decision/prices-are-reviewed-monthly"
 DECISION = "decision/price-reviews-happen-weekly"
@@ -21,7 +50,7 @@ OLDER_SECTIONS = [
 @given("a store where a decision supersedes an older decision", target_fixture="client")
 def _store_with_a_superseded_decision(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, TAG_TYPE)
     define(client, tagged_decision_type())
     define(client, WORK_ITEM_TYPE)
@@ -46,7 +75,7 @@ def _two_work_items(client):
 @given(parsers.parse('the older decision is tagged "{tag}"'))
 def _older_decision_tagged(client, tag):
     tagged = create(client, "tag", {"title": tag})
-    changed = write(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
+    changed = replace(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
     assert not changed.faults, changed.faults
 
 
@@ -59,7 +88,7 @@ def _follow_two_steps_out(client):
 
 @then("the client is given the older decision and the tag")
 def _older_decision_and_tag(reached):
-    assert [(found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+    assert [(found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
         (OLDER, "decision", "Prices are reviewed monthly"),
         ("tag/pricing", "tag", "pricing"),
     ]
@@ -85,7 +114,7 @@ def _follow_out(client):
 
 @then("the client is given a stub of the older decision")
 def _stub_of_the_older_decision(reached):
-    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+    assert [(found.stub.field, found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
         ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
     ]
 
@@ -99,7 +128,7 @@ def _follow_in(client):
 
 @then("the client is given a stub of each work item")
 def _stub_of_each_work_item(reached):
-    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+    assert [(found.stub.field, found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
         ("decisions", WORK_ITEMS[0], "work-item", "Move the review to Mondays"),
         ("decisions", WORK_ITEMS[1], "work-item", "Tell the pricing team"),
     ]
@@ -138,7 +167,7 @@ def _a_work_item_pointing_into_a_process(client):
     following["properties"]["follows"] = {
         "type": "string", "ref": {"targets": ["process"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
     }
-    revised = write(client, "schema/work-item", {"version": 2, "schema": following}, message="Let work items follow a step")
+    revised = replace(client, "schema/work-item", {"version": 2, "schema": following}, message="Let work items follow a step")
     assert not revised.faults, revised.faults
     create(client, "work-item", {"title": "Check the till float", "follows": f"{PROCESS}#steps/count-the-till"})
 
@@ -159,13 +188,13 @@ def _a_stub_of_the_work_item(reached):
 def _counted_at_a_glance(client):
     summary = read(client, PROCESS)
     assert not summary.faults, summary.faults
-    assert [(count.type, count.field, count.count) for count in summary.inbound] == [("work-item", "follows", 1)]
+    assert [(count.kind, count.field, count.count) for count in summary.inbound] == [("work-item", "follows", 1)]
 
 
 @then("removing the process is refused while that work item points into it")
 def _removal_refused(client):
     refused = remove(client, PROCESS)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(INTO_A_STEP, "follows", "on_delete")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(INTO_A_STEP, "follows", "on_delete")]
     assert read(client, PROCESS).revision == 1
 
 
@@ -196,9 +225,9 @@ def _a_work_item_pointing_twice(client):
     revised["properties"]["follows"] = {
         "type": "string", "ref": {"targets": ["decision"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
     }
-    changed = write(client, "schema/work-item", {"version": 2, "schema": revised}, message="Let work items follow a decision")
+    changed = replace(client, "schema/work-item", {"version": 2, "schema": revised}, message="Let work items follow a decision")
     assert not changed.faults, changed.faults
-    changed = write(client, WORK_ITEMS[1], {"decisions": [DECISION], "follows": DECISION}, message="Follow it too")
+    changed = replace(client, WORK_ITEMS[1], {"decisions": [DECISION], "follows": DECISION}, message="Follow it too")
     assert not changed.faults, changed.faults
     inward = refs(client, DECISION, depth=1, inward=True)
     assert {(found.stub.field, found.stub.id) for found in inward.reached} >= {("decisions", NOTE)}
@@ -228,7 +257,7 @@ def _follow_out_of_a_step(client):
 
 @then("the client is given a stub of that tag and nothing else the process points at")
 def _only_the_tag(reached):
-    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+    assert [(found.stub.field, found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
         ("uses", OPENING, "tag", "opening"),
     ]
     assert [[(hop.field, hop.id) for hop in found.route] for found in reached] == [[("uses", OPENING)]]

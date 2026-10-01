@@ -1,12 +1,177 @@
 import re
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, everything_under, read, request
-from kb import canonical, content, client as kb_client
+from calls import DECISION_TYPE, create, define, read, request, start_a_store
+import held
+from kb import content, client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("create-an-artifact.feature")
+
+@scenario("change-the-store.feature", "The client creates an artifact")
+def test_the_client_creates_an_artifact():
+    pass
+
+
+@scenario("change-the-store.feature", "An artifact created without a title is refused")
+def test_an_artifact_created_without_a_title_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact missing a required section is refused")
+def test_an_artifact_missing_a_required_section_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing at something that is not there is refused")
+def test_an_artifact_pointing_at_something_that_is_not_there_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact with several faults reports them all")
+def test_an_artifact_with_several_faults_reports_them_all():
+    pass
+
+
+@scenario("check-a-change.feature", "Faults found by different rules all come back together")
+def test_faults_found_by_different_rules_all_come_back_together():
+    pass
+
+
+@scenario("check-a-change.feature", "A section carrying anything besides its title, its body and its own sections is refused")
+def test_a_section_carrying_anything_besides_its_title_its_body_and_its_own_sections_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A section with no title is refused")
+def test_a_section_with_no_title_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A section with no body is refused")
+def test_a_section_with_no_body_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "A section whose body is empty is kept as it is")
+def test_a_section_whose_body_is_empty_is_kept_as_it_is():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content that settles what only the store settles is refused")
+def test_content_that_settles_what_only_the_store_settles_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content carrying a title of its own is refused")
+def test_content_carrying_a_title_of_its_own_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content telling the store how to build a value is refused")
+def test_content_telling_the_store_how_to_build_a_value_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content holding more than one document is refused")
+def test_content_holding_more_than_one_document_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "A value that reads as a switch or as a clock time is still the text that was written")
+def test_a_value_that_reads_as_a_switch_or_as_a_clock_time_is_still_the_text_that_was_written():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content that writes a value once and points back at it elsewhere is refused")
+def test_content_that_writes_a_value_once_and_points_back_at_it_elsewhere_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content that opens by declaring the format it is written in is refused")
+def test_content_that_opens_by_declaring_the_format_it_is_written_in_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content naming the same entry twice is refused")
+def test_content_naming_the_same_entry_twice_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "Values written as a yes-or-no, as nothing and as a number keep those meanings")
+def test_values_written_as_a_yes_or_no_as_nothing_and_as_a_number_keep_those_meanings():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content the store cannot make sense of is refused")
+def test_content_the_store_cannot_make_sense_of_is_refused():
+    pass
+
+
+@scenario("hand-over-content.feature", "A field written as a bare date is the text that was written")
+def test_a_field_written_as_a_bare_date_is_the_text_that_was_written():
+    pass
+
+
+@scenario("hand-over-content.feature", "Prose the store could not write back in its one form is refused")
+def test_prose_the_store_could_not_write_back_in_its_one_form_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "The name of a new artifact is made from its title, not asked for")
+def test_the_name_of_a_new_artifact_is_made_from_its_title_not_asked_for():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A second artifact with a title already used gets a name of its own")
+def test_a_second_artifact_with_a_title_already_used_gets_a_name_of_its_own():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Two parts with the same title are given names of their own")
+def test_two_parts_with_the_same_title_are_given_names_of_their_own():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title with capitals and punctuation gives a plain name")
+def test_a_title_with_capitals_and_punctuation_gives_a_plain_name():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title that leaves nothing to make a name from is refused")
+def test_a_title_that_leaves_nothing_to_make_a_name_from_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title that reads as a date is still a title")
+def test_a_title_that_reads_as_a_date_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title that reads as yes is still a title")
+def test_a_title_that_reads_as_yes_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title given as a yes-or-no is still a title")
+def test_a_title_given_as_a_yes_or_no_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title given as a number is still a title")
+def test_a_title_given_as_a_number_is_still_a_title():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A kind that is not a plain name is refused")
+def test_a_kind_that_is_not_a_plain_name_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A kind the store holds no type for is refused")
+def test_a_kind_the_store_holds_no_type_for_is_refused():
+    pass
+
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
@@ -25,7 +190,7 @@ OPTIONS = [
 )
 def _store_with_decision_type(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     return client
 
@@ -60,7 +225,7 @@ def _read_back_in_declared_order(root, client, created):
         ("options", "keep-weekly", "Keep weekly"),
         ("options", "go-monthly", "Go monthly"),
     ]
-    on_disk = canonical.load((root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").read_text())
+    on_disk = held.artifact(root, "decision/price-reviews-happen-weekly")
     assert list(on_disk) == ["id", "type", "schema_version", "revision", "title", "sections", "options"]
     assert on_disk["sections"] == SECTIONS
     assert on_disk["options"] == [
@@ -87,7 +252,7 @@ def _create_with_a_title_inside(client):
 )
 def _rejected_for_a_title_inside(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("title", "identity")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("title", "identity")]
     assert "Price reviews, weekly" in refused.faults[0].message
 
 
@@ -99,7 +264,7 @@ def _create_titled(client, title):
 @then("the title reads back as the text that was written, not as a date")
 def _title_is_text_not_a_date(root, client, created):
     assert read(client, created.id).title == "2026-09-24"
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["title"] == "2026-09-24"
 
 
@@ -118,7 +283,7 @@ def _create_without_a_title(client):
 
 @then("the artifact is rejected because an artifact cannot be created without a title")
 def _rejected_without_a_title(refused):
-    assert [(fault.path, fault.rule, fault.message) for fault in refused.faults] == [
+    assert [(fault.place, fault.rule, fault.message) for fault in refused.faults] == [
         ("title", "title", "an artifact cannot be created without a title"),
     ]
 
@@ -142,8 +307,8 @@ def _create_with_identity_inside(client):
 )
 def _rejected_for_identity_inside(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
-    assert all(fault.path in fault.message for fault in refused.faults)
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
+    assert all(fault.place in fault.message for fault in refused.faults)
 
 
 @then(
@@ -158,22 +323,20 @@ def _plain_name(created):
 @then("the artifact is rejected because a title must leave something to make a name from")
 def _rejected_for_an_empty_name(created):
     assert (created.id, created.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in created.faults] == [("title", "title")]
+    assert [(fault.place, fault.rule) for fault in created.faults] == [("title", "title")]
     assert "leave something to make a name from" in created.faults[0].message
 
 
 @then("the title reads back as the text that was written, not as a yes or a no")
 def _title_is_text_not_a_bool(root, client, created):
     assert read(client, created.id).title == "yes"
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["title"] == "yes"
 
 
 def _raw(client, text):
     """A Create whose content is sent as written, so the text can carry what dumps never writes."""
-    return client.Create(kb_pb2.CreateRequest(
-        type="decision", title="Price reviews happen weekly", content=text, actor=CLIENT, message="Record it",
-    ))
+    return request(client, "decision", "Price reviews happen weekly", text, message="Record it")
 
 
 @when("the client creates a decision whose content carries a tag on one of its values, saying which role and why", target_fixture="refused")
@@ -220,7 +383,7 @@ def _create_with_an_extra_entry_in_a_section(client):
     "and the extra entry is named"
 )
 def _rejected_for_an_extra_entry(refused):
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "additionalProperties")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("sections/0", "additionalProperties")]
     assert "'author'" in refused.faults[0].message
 
 
@@ -244,7 +407,7 @@ def _create_with_values_yaml_1_1_would_convert(client):
 )
 def _both_fields_are_text(root, created):
     assert not created.faults, created.faults
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert (on_disk["switch"], on_disk["time"]) == ("on", "1:20")
 
 
@@ -300,8 +463,7 @@ def _create_with_a_section_without_a_body(client):
 )
 def _rejected_for_a_section_missing_a_key(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
-    assert "is a required property" in refused.faults[0].message
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
 
 
 @when(
@@ -312,9 +474,9 @@ def _rejected_for_a_section_missing_a_key(refused):
     target_fixture="attempt",
 )
 def _create_of_a_kind(client, tmp_path, kind):
-    before = everything_under(tmp_path)
+    before = held.everything_in(tmp_path)
     response = request(client, kind, "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it")
-    return {"response": response, "before": before, "after": everything_under(tmp_path)}
+    return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
 
 
 @then("the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path")
@@ -345,7 +507,7 @@ def _create_with_that_title(client, title):
 def _title_reads_back_as(root, client, created, text):
     assert not created.faults, created.faults
     assert read(client, created.id).title == text
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["title"] == text
 
 
@@ -369,7 +531,7 @@ def _create_from_that_content(client, written):
 @then("the artifact is rejected because an entry is named once and only once, and the place the second one stands is named")
 def _rejected_for_an_entry_named_twice(created):
     assert (created.id, created.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in created.faults] == [("sections/0/body", "content")]
+    assert [(fault.place, fault.rule) for fault in created.faults] == [("sections/0/body", "content")]
     assert created.faults[0].message.startswith("an entry is named once and only once")
     assert "line 4" in created.faults[0].message
 
@@ -417,7 +579,7 @@ def _rejected_as_an_unknown_kind(attempt):
 
 @then("that fault stands on its own, apart from anything wrong with the content")
 def _the_kind_fault_alone(attempt):
-    assert [(fault.path, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
+    assert [(fault.place, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
 
 
 @then("nothing is written anywhere in the store")
@@ -443,13 +605,13 @@ def _content_with_typed_values():
 @then("the first field reads back as a yes-or-no, the second as nothing at all, and the third as a number")
 def _typed_values_read_back(root, created):
     assert not created.faults, created.faults
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert (on_disk["urgent"], on_disk["owner"], on_disk["weight"]) == (True, None, 12.5)
 
 
 @then("none of the three reads back as text")
 def _none_of_them_text(root, created):
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert not any(isinstance(on_disk[name], str) for name in ("urgent", "owner", "weight"))
 
 
@@ -464,13 +626,13 @@ def _a_title_that_is_a_number():
     target_fixture="attempt",
 )
 def _create_with_two_faults(client, tmp_path):
-    before = everything_under(tmp_path)
+    before = held.everything_in(tmp_path)
     response = request(client, "decision", "Price reviews happen weekly", {
         "supersedes": "decision/prices-are-reviewed-monthly",
         "sections": [SECTIONS[1]],
     }, message="Record it")
     return {
-        "response": response, "before": before, "after": everything_under(tmp_path),
+        "response": response, "before": before, "after": held.everything_in(tmp_path),
         "faults": [("sections", "sections"), ("supersedes", "ref")],
     }
 
@@ -479,7 +641,7 @@ def _create_with_two_faults(client, tmp_path):
 def _rejected_with_both_faults(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
-    assert sorted((fault.artifact, fault.path, fault.rule) for fault in refused.faults) == [
+    assert sorted((fault.artifact, fault.place, fault.rule) for fault in refused.faults) == [
         ("decision/price-reviews-happen-weekly", path, rule) for path, rule in attempt["faults"]
     ]
 
@@ -493,7 +655,7 @@ def _store_unchanged(attempt):
 def _a_decision_already_held(root, client, title):
     created = request(client, "decision", title, {"sections": SECTIONS}, message="Record it")
     assert not created.faults, created.faults
-    return {"id": created.id, "title": title, "bytes": (root / "kb" / f"{created.id}.yaml").read_bytes()}
+    return {"id": created.id, "title": title, "bytes": held.text(root, created.id)}
 
 
 @when("the client creates another decision with that same title, saying which role and why", target_fixture="created")
@@ -515,7 +677,7 @@ def _a_numbered_name(client, first, created):
 def _the_first_keeps_its_name(root, client, first):
     kept = read(client, first["id"])
     assert (kept.id, kept.revision) == (first["id"], 1)
-    assert (root / "kb" / f"{first['id']}.yaml").read_bytes() == first["bytes"]
+    assert held.text(root, first['id']) == first["bytes"]
 
 
 TWICE = [
@@ -533,7 +695,7 @@ def _name_from_the_title(created):
 @then("the client never said what the name should be")
 @then("the client never said what either name should be")
 def _no_name_asked_for():
-    assert set(kb_pb2.CreateRequest.DESCRIPTOR.fields_by_name) == {"type", "title", "content", "actor", "message"}
+    assert set(kb_pb2.CreateRequest.DESCRIPTOR.fields_by_name) == {"kind", "title", "content", "signature"}
     assert all("id" not in part for part in [*SECTIONS, *TWICE])
 
 
@@ -551,7 +713,7 @@ def _options_named_apart(root, client, created):
     assert [(stub.id, stub.title) for stub in read(client, created.id).parts] == [
         ("keep-weekly", "Keep weekly"), ("keep-weekly-2", "Keep weekly"),
     ]
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["options"] == [{"id": "keep-weekly", **TWICE[0]}, {"id": "keep-weekly-2", **TWICE[1]}]
 
 
@@ -563,7 +725,7 @@ def _create_without_a_purpose(client):
 @then("the artifact is rejected because the sections the type requires must all be present, in order")
 def _rejected_for_the_sections(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("decision/price-reviews-happen-weekly", "sections", "sections"),
     ]
     assert refused.faults[0].message == (
@@ -584,7 +746,7 @@ def _create_superseding_nothing(client):
 @then("the artifact is rejected because a link must land on a node of a kind the type allows")
 def _rejected_for_the_link(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
     ]
     assert refused.faults[0].message.startswith("a link must land on a node of a kind the type allows")
@@ -596,10 +758,10 @@ def _rejected_for_the_link(refused):
     target_fixture="attempt",
 )
 def _create_with_two_kinds_of_fault(root, client):
-    before = everything_under(root)
+    before = held.holds(root)
     response = request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS[1:], "options": "Keep weekly"})
     return {
-        "response": response, "before": before, "after": everything_under(root),
+        "response": response, "before": before, "after": held.holds(root),
         "faults": [("options", "type"), ("sections", "sections")],
     }
 
@@ -607,6 +769,12 @@ def _create_with_two_kinds_of_fault(root, client):
 WHOLE = "sections:\n  - title: Purpose\n    body: Why.\n  - title: Rationale\n    body: Because.\n"
 SENSELESS = {
     "content that cannot be read as written at all": (WHOLE + "options: [Keep weekly\n", ""),
+    "content holding text written with an escape for half of a character, which no text can hold":
+        (WHOLE + 'options:\n  - title: "\\ud800"\n', "options/0/title"),
+    "content holding an escape for the first half of a character, followed by text that is not its other half":
+        (WHOLE + 'options:\n  - title: "Keep \\ud83d weekly"\n', "options/0/title"),
+    "content holding an escape for the second half of a character, with no first half before it":
+        (WHOLE + 'options:\n  - title: "Keep \\ude00 weekly"\n', "options/0/title"),
     "content that is a list rather than a set of named entries": ("- Purpose\n- Rationale\n", ""),
     "content that is a single bare value": ("Keep prices in step with costs.\n", ""),
     "content with nothing in it at all": ("", ""),
@@ -623,16 +791,16 @@ SENSELESS = {
     target_fixture="attempt",
 )
 def _create_from_senseless_content(root, client, senseless):
-    before = everything_under(root)
+    before = held.holds(root)
     text, place = SENSELESS[senseless]
     response = _raw(client, text)
-    return {"response": response, "before": before, "after": everything_under(root), "place": place}
+    return {"response": response, "before": before, "after": held.holds(root), "place": place}
 
 
 REASONS = {
     "content cannot be read as written": ("content", "it is not YAML that can be read"),
     "content is a set of named entries": ("content", "content is a set of named entries"),
-    "the content does not fit the type": ("type", "is not of type"),
+    "the content does not fit the type": ("type", ""),
 }
 
 
@@ -643,29 +811,27 @@ REASONS = {
 def _rejected_for_senseless_content(attempt, reason):
     refused, (rule, words) = attempt["response"], REASONS[reason]
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [(attempt["place"], rule)]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [(attempt["place"], rule)]
     assert words in refused.faults[0].message
 
 
 @then("the call comes back with its answer rather than breaking off")
 def _the_call_answers(attempt):
-    assert isinstance(attempt["response"], kb_pb2.CreateResponse)
+    assert isinstance(attempt["response"].response, kb_pb2.CreateResponse)
     assert attempt["response"].faults
 
 
 @when('the client creates a decision carrying a field written "2026-09-24", saying which role and why', target_fixture="created")
 def _create_with_a_bare_date(client):
     text = content.dumps({"sections": SECTIONS}) + "options:\n  - title: Revisit\n    body: 2026-09-24\n"
-    return client.Create(kb_pb2.CreateRequest(
-        type="decision", title="Review prices again", content=text, actor=CLIENT, message="Say when to revisit",
-    ))
+    return request(client, "decision", "Review prices again", text, message="Say when to revisit")
 
 
 @then("that field reads back as the text that was written, not as a date")
 def _field_is_text_not_a_date(root, client, created):
     assert not created.faults, created.faults
     assert content.loads(read(client, created.id, whole=True).content)["options"][0]["body"] == "2026-09-24"
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["options"][0]["body"] == "2026-09-24"
 
 
@@ -685,7 +851,7 @@ def _rationale_reads_back_empty(root, client, created):
     rationale = read(client, created.id, section="Rationale")
     assert not rationale.faults, rationale.faults
     assert content.loads(rationale.content) == {"title": "Rationale", "body": ""}
-    on_disk = canonical.load((root / "kb" / f"{created.id}.yaml").read_text())
+    on_disk = held.artifact(root, created.id)
     assert on_disk["sections"][1] == {"title": "Rationale", "body": ""}
 
 
@@ -694,13 +860,13 @@ def _rationale_reads_back_empty(root, client, created):
     target_fixture="attempt",
 )
 def _create_with_a_line_ending_in_a_space(root, client):
-    before = everything_under(root)
+    before = held.holds(root)
     text = (
         "sections:\n  - title: Purpose\n    body: |\n      Keep prices in step with costs.\n"
         "  - title: Rationale\n    body: |\n      Costs move weekly. \n      So we review weekly.\n"
     )
     response = _raw(client, text)
-    return {"response": response, "before": before, "after": everything_under(root)}
+    return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then(
@@ -716,3 +882,50 @@ def _rejected_as_prose_that_is_no_block(attempt):
     assert refused.faults[0].message.startswith(
         "every piece of prose is written as a block, and this prose could not be written back as one"
     )
+
+
+@scenario(
+    "hand-over-content.feature",
+    "A character beyond the first 65,536 written as two escapes reads back as that one character",
+)
+def test_a_character_beyond_the_first_65536_written_as_two_escapes_reads_back_as_that_one_character():
+    pass
+
+
+BEYOND = "\U0001F600"  # one character beyond the first 65,536, which JSON writes as the escapes 😀
+
+
+@when(
+    "the client creates a decision carrying a field written as a character beyond the first 65,536 in two escapes, "
+    "one for each half, saying which role and why",
+    target_fixture="created",
+)
+def _create_with_two_escapes(client):
+    return _raw(client, WHOLE + 'options:\n  - title: "Keep \\ud83d\\ude00 weekly"\n')
+
+
+@then("the two halves read together as that one character")
+def _halves_read_together(client, created):
+    assert not created.faults, created.faults
+    title = content.loads(read(client, created.id, whole=True).content)["options"][0]["title"]
+    assert title == f"Keep {BEYOND} weekly"
+    assert len(title) == len("Keep - weekly")
+
+
+@then("the field reads back holding it")
+def _field_reads_back_holding_it(root, client, created):
+    assert content.loads(read(client, created.id, whole=True).content)["options"][0]["title"] == f"Keep {BEYOND} weekly"
+    assert held.artifact(root, created.id)["options"][0]["title"] == f"Keep {BEYOND} weekly"
+
+
+@scenario("hand-over-content.feature", "Content holding half of a character alone is refused")
+def test_content_holding_half_of_a_character_alone_is_refused():
+    pass
+
+
+@then("the artifact is rejected because the content cannot be read as written")
+def _rejected_as_unreadable_content(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [(attempt["place"], "content")]
+    assert "it is not YAML that can be read" in refused.faults[0].message

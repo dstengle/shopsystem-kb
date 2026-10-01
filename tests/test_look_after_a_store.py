@@ -1,120 +1,12 @@
-import os
-import re
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, next_version
-from kb import canonical, client as kb_client
-from kb.contract import kb_pb2
-from repositories import hooked, made, standing
+from calls import DECISION_TYPE, define
+from conftest import OPERATOR, _kb, _store_needing_attention
+import held
+from kb import client as kb_client
 
-scenarios("look-after-a-store.feature")
-
-LONG_LINE = (
-    "Costs move weekly, and a review that runs once a month lags them by three weeks on average, "
-    "which is long enough to lose money on every shelf in the shop."
-)
-
-
-@given(
-    "a store holding a decision whose purpose is one short line and which carries a list of options",
-    target_fixture="decision_file",
-)
-def _store_with_a_short_decision(root):
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    define(client, DECISION_TYPE)
-    created = create(client, "decision", {
-        "title": "Price reviews happen weekly",
-        "sections": [
-            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-            {"title": "Rationale", "body": LONG_LINE + "\n"},
-        ],
-        "options": [
-            {"title": "Keep weekly", "body": "Review every Monday."},
-            {"title": "Go monthly", "body": "Review on the first of the month."},
-        ],
-    })
-    return root / "kb" / f"{created.id}.yaml"
-
-
-@when("the operator opens the decision's file", target_fixture="text")
-def _open_the_file(decision_file):
-    return decision_file.read_text()
-
-
-@then("every piece of prose stands as a block of its own, however short it is")
-def _prose_as_blocks(text):
-    bodies = re.findall(r"^\s*body: (.*)$", text, re.M)
-    assert len(bodies) == 4, text
-    assert all(marker in ("|", "|-") for marker in bodies), text
-
-
-@then("each list is written beneath the name it belongs to, indented under it")
-def _lists_indented(text):
-    assert re.search(r"^sections:\n  - title: Purpose$", text, re.M), text
-    assert re.search(r"^options:\n  - id: keep-weekly$", text, re.M), text
-
-
-@then("no line of prose has been broken to fit a width")
-def _no_folding(text):
-    assert ("\n      " + LONG_LINE + "\n") in text, text
-
-
-@then("nothing in the file tells a reader how to build a value")
-def _no_tags(text):
-    assert not re.search(r"\s!\S", text), text
-
-
-SAME_DECISION = {
-    "title": "Price reviews happen weekly",
-    "sections": [
-        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-        {"title": "Rationale", "body": "Costs move weekly.\n"},
-    ],
-    "options": [{"title": "Keep weekly", "body": "Review every Monday."}],
-}
-
-
-@given("two stores each given the same decision by the same client", target_fixture="files")
-def _two_stores_with_the_same_decision(tmp_path):
-    files = []
-    for name in ("one", "two"):
-        root = tmp_path / name
-        root.mkdir()
-        client = kb_client.connect(root)
-        client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-        define(client, DECISION_TYPE)
-        created = create(client, "decision", SAME_DECISION)
-        files.append(root / "kb" / f"{created.id}.yaml")
-    return files
-
-
-@when("the operator compares the two decision files", target_fixture="comparison")
-def _compare_the_files(files):
-    return [path.read_bytes() for path in files]
-
-
-@then("the two files are the same, byte for byte")
-def _the_same_bytes(comparison):
-    assert comparison[0] == comparison[1]
-    assert len(comparison[0]) > 0
-
-
-KB = Path(sys.executable).with_name("kb")
-OPERATOR = "operator"
-
-
-def _kb(*args, cwd, env=None):
-    """kb's own console command, run as the operator runs it: in a directory, with KB_ROOT and KB_ACTOR set only when
-    a step sets them."""
-    clean = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
-    return subprocess.run([str(KB), *args], cwd=cwd, env={**clean, **(env or {})}, capture_output=True, text=True)
-
+scenarios("operate-a-store.feature")
 
 @given("a directory that has no store inside it", target_fixture="root")
 @given("a directory that has no store inside it, and nothing names which role the operator is", target_fixture="root")
@@ -128,27 +20,9 @@ def starter():
     return OPERATOR
 
 
-@pytest.fixture
-def named_repository():
-    """The git repository the operator's environment names, how it stood, and what its directory held, when a Given
-    names one; otherwise an environment naming none, and a directory that held nothing."""
-    return {"environment": {}, "held": []}
-
-
-@given(
-    "a directory that is itself a git repository, and the operator's environment naming that repository as the git "
-    "repository to work in, the way git does for a program it runs from a hook",
-    target_fixture="named_repository",
-)
-def _git_repository_named_by_the_operators_environment(root):
-    made(root)
-    held = [path.name for path in root.iterdir()]
-    return {"path": root, "standing": standing(root), "environment": hooked(root), "held": held}
-
-
 @when("the operator runs kb init against that directory, saying which role they are", target_fixture="ran")
-def _kb_init_with_a_role(root, tmp_path, named_repository):
-    return _kb("init", str(root), cwd=tmp_path, env={**named_repository["environment"], "KB_ACTOR": OPERATOR})
+def _kb_init_with_a_role(root, tmp_path):
+    return _kb("init", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
 
 
 @when("the operator runs kb init against that directory", target_fixture="ran")
@@ -157,11 +31,11 @@ def _kb_init_without_a_role(root, tmp_path):
 
 
 @then("there is a store inside that directory, in a place of its own")
-def _a_store_inside(ran, root, named_repository):
+def _a_store_inside(ran, root):
     """The store is the one thing added to what the directory held."""
     assert (ran.returncode, ran.stderr) == (0, "")
-    assert (root / "kb" / "store.yaml").is_file()
-    assert sorted(path.name for path in root.iterdir()) == sorted([*named_repository["held"], "kb"])
+    assert held.holds_a_store(root)
+    assert held.apart_from_the_store(root) == {}
 
 
 @then("a client can begin defining its own types in it straight away")
@@ -197,30 +71,19 @@ def _init_rejected_as_inside_a_store(ran, root, before):
     )
 
 
-def _store_needing_attention(root):
-    """A store a client filled: two decisions behind the decision type, and one of them, edited by hand, missing the
-    body of its purpose."""
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    define(client, DECISION_TYPE)
-    for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
-        create(client, "decision", {"title": title, "sections": [
-            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-            {"title": "Rationale", "body": "Costs move weekly.\n"},
-        ]})
-    next_version(client, "decision", DECISION_TYPE)
-    monthly = root / "kb" / "decision" / "prices-are-reviewed-monthly.yaml"
-    held = canonical.load(monthly.read_text())
-    del held["sections"][0]["body"]
-    monthly.write_text(canonical.dump(held))
-    return root
-
-
 REPORT = (
-    "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t'body' is a required property\n"
+    "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t<the validator's message>\n"
     "stale\tdecision/price-reviews-happen-weekly\tchecked against version 1 of its type, which is at 2\n"
     "stale\tdecision/prices-are-reviewed-monthly\tchecked against version 1 of its type, which is at 2\n"
 )
+
+
+def _unworded(report):
+    """A report with each violation's message, which is the validator's wording, left out; its rule and place stay."""
+    return "".join(
+        "\t".join(line.split("\t")[:4]) + "\n" if line.startswith("violation\t") else line + "\n"
+        for line in report.splitlines()
+    )
 
 
 @given("a store whose content the operator did not write", target_fixture="where")
@@ -237,12 +100,13 @@ def _kb_validate(where):
 @then("the operator is told of everything in the store that does not fit its type, and where")
 def _told_of_every_violation(ran):
     assert (ran.returncode, ran.stderr) == (1, "")
-    assert [line for line in ran.stdout.splitlines() if line.startswith("violation")] == REPORT.splitlines()[:1]
+    violations = [line for line in _unworded(ran.stdout).splitlines() if line.startswith("violation")]
+    assert violations == _unworded(REPORT).splitlines()[:1]
 
 
 @then("of everything that is behind the type it was last checked against")
 def _told_of_everything_stale(ran):
-    assert ran.stdout == REPORT
+    assert _unworded(ran.stdout) == _unworded(REPORT)
 
 
 @when("the operator asks what the command line offers", target_fixture="ran")
@@ -250,46 +114,30 @@ def _kb_help(root):
     return _kb("--help", cwd=root)
 
 
-@then("it offers setting a store up and checking one")
-def _offers_init_and_validate(ran):
+@then("it offers setting a store up, checking and exporting one, and importing into a freshly started store")
+def _offers_four_commands(ran):
     assert (ran.returncode, ran.stderr) == (0, "")
-    assert re.search(r"^ +init +set up a store in a directory$", ran.stdout, re.M), ran.stdout
-    assert re.search(r"^ +validate +check the store", ran.stdout, re.M), ran.stdout
+    listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
+    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import}"
+    lines = " ".join(listed.split())
+    assert "init set up a store in a directory" in lines
+    assert "validate check the store" in lines
+    assert "export write the store" in lines
+    assert "import bring a directory of files into a freshly started store" in lines
 
 
-@then("nothing that changes what the store holds")
-def _offers_nothing_else(ran, root):
-    assert set(re.findall(r"\{(.*)\}", ran.stdout)) == {"init,validate"}, ran.stdout
-    refused = _kb("create", "decision", cwd=root)
-    assert refused.returncode == 2
-    assert "invalid choice: 'create'" in refused.stderr
-
-
-@given("a store, with the operator working in a folder deep inside the directory it sits in", target_fixture="where")
-def _working_deep_inside(root):
-    deep = _store_needing_attention(root) / "notes" / "2026" / "september"
-    deep.mkdir(parents=True)
-    return {"cwd": deep, "env": {}}
+@then("nothing else that changes what the store holds")
+def _nothing_else(root):
+    for command in ("serve", "create"):
+        refused = _kb(command, cwd=root)
+        assert refused.returncode == 2
+        assert f"invalid choice: '{command}'" in refused.stderr
 
 
 @then("the store found above where they are working is the one checked")
 @then("the store KB_ROOT names is the one checked")
 def _that_store_checked(ran):
-    assert (ran.returncode, ran.stdout, ran.stderr) == (1, REPORT, "")
-
-
-@given("a store, with the operator working outside any store and KB_ROOT naming that one", target_fixture="where")
-def _outside_with_kb_root(root, tmp_path):
-    outside = tmp_path / "elsewhere"
-    outside.mkdir()
-    return {"cwd": outside, "env": {"KB_ROOT": str(_store_needing_attention(root))}}
-
-
-@given("the operator is working outside any store and nothing names one", target_fixture="where")
-def _outside_with_nothing_named(tmp_path):
-    outside = tmp_path / "elsewhere"
-    outside.mkdir()
-    return {"cwd": outside, "env": {}}
+    assert (ran.returncode, _unworded(ran.stdout), ran.stderr) == (1, _unworded(REPORT), "")
 
 
 @then("the check is rejected because no store was found, neither above where they are working nor named outright")
@@ -298,31 +146,12 @@ def _rejected_as_no_store(ran, where):
     assert ran.stderr == f"kb validate: refused: store: no store was found, neither above {where['cwd']} nor named outright\n"
 
 
-@given(
-    "the operator is working outside any store, with KB_ROOT naming a directory that holds no store",
-    target_fixture="where",
-)
-def _outside_with_kb_root_naming_no_store(tmp_path):
-    outside, empty = tmp_path / "elsewhere", tmp_path / "empty"
-    outside.mkdir()
-    empty.mkdir()
-    return {"cwd": outside, "env": {"KB_ROOT": str(empty)}}
-
-
 @then("the check is rejected because KB_ROOT names a directory that holds no store")
 def _rejected_as_kb_root_names_no_store(ran, where):
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr == (
         f"kb validate: refused: store: KB_ROOT names a directory that holds no store: {where['env']['KB_ROOT']}\n"
     )
-
-
-@given("the operator is working inside a store, with KB_ROOT naming a different store", target_fixture="where")
-def _inside_one_naming_another(root, tmp_path):
-    other = tmp_path / "other"
-    other.mkdir()
-    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
-    return {"cwd": _store_needing_attention(root), "env": {"KB_ROOT": str(other)}}
 
 
 @then(
@@ -335,3 +164,14 @@ def _rejected_as_two_stores(ran, where):
         f"kb validate: refused: store: KB_ROOT names a store other than the one {where['cwd']} is working in: "
         f"KB_ROOT is {where['env']['KB_ROOT']}, the working directory is inside {where['cwd']}; neither is guessed at\n"
     )
+
+
+@then("the store is checked")
+def _the_store_is_checked(ran):
+    assert ran.returncode == 1, ran.stderr
+    assert _unworded(ran.stdout) == _unworded(REPORT)
+
+
+@then("kb validate is not refused because the store was busy with another change")
+def _validate_not_busy(ran):
+    assert (ran.returncode, ran.stderr) == (1, "")

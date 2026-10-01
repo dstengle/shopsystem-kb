@@ -1,71 +1,35 @@
-from pytest_bdd import given, scenarios, then
+from pytest_bdd import given, scenario, then
 
-from calls import CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, create, define, next_version
-from kb import canonical, client as kb_client
+from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, next_version, start_a_store
+import held
+from kb import client as kb_client
 from kb.contract import kb_pb2
 
-scenarios("check-the-store.feature")
+
+@scenario("check-the-store.feature", "A store with nothing wrong reports nothing")
+def test_a_store_with_nothing_wrong_reports_nothing():
+    pass
+
+
+@scenario("check-the-store.feature", "Every violation is reported")
+def test_every_violation_is_reported():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact behind its type is reported as stale")
+def test_an_artifact_behind_its_type_is_reported_as_stale():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact behind its type that no longer fits it is reported both ways")
+def test_an_artifact_behind_its_type_that_no_longer_fits_it_is_reported_both_ways():
+    pass
+
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
-
-
-@given(
-    "a store where someone edited a decision's file by hand and left it in a shape the store cannot read",
-    target_fixture="client",
-)
-def _store_with_a_file_mangled_by_hand(root, before):
-    """Two decisions edited by hand: one left unreadable, one left readable but without the body of its purpose."""
-    client = _store_with_a_decision_without_its_purpose(root)
-    (root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").write_text(MANGLED)
-    before.update(reported=[
-        ("decision/price-reviews-happen-weekly", "", "unreadable"),
-        ("decision/prices-are-reviewed-monthly", "sections/0", "required"),
-    ])
-    return client
-
-
-@given("a store holding an artifact of a kind the store holds no type for", target_fixture="client")
-def _store_with_an_artifact_of_no_type(root, before):
-    """Beside the two decisions, an invoice written by hand, whole but of a kind the store has no type for."""
-    client = _store_with_a_decision_without_its_purpose(root)
-    (root / "kb" / "invoice").mkdir()
-    (root / "kb" / "invoice" / "march-takings.yaml").write_text(canonical.dump({
-        "id": "invoice/march-takings", "type": "invoice", "schema_version": 1, "revision": 1, "title": "March takings",
-    }))
-    before.update(reported=[
-        ("decision/prices-are-reviewed-monthly", "sections/0", "required"),
-        ("invoice/march-takings", "", "kind"),
-    ])
-    return client
-
-
-def _store_with_a_decision_without_its_purpose(root):
-    """Two decisions that fit their type, then one of them edited by hand to lose the body of its purpose."""
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    define(client, DECISION_TYPE)
-    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
-    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": SECTIONS})
-    monthly = root / "kb" / "decision" / "prices-are-reviewed-monthly.yaml"
-    held = canonical.load(monthly.read_text())
-    del held["sections"][0]["body"]
-    monthly.write_text(canonical.dump(held))
-    return client
-
-
-@then("that artifact is reported as a violation, naming the artifact and the kind it claims")
-def _reported_as_of_no_type(checked):
-    of_no_type = [fault for fault in checked.violations if fault.rule == "kind"]
-    assert [fault.artifact for fault in of_no_type] == ["invoice/march-takings"]
-    assert "'invoice'" in of_no_type[0].message
-
-
-@then("everything else in the store is checked and reported alongside it")
-def _the_rest_checked_alongside(checked, before):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == before["reported"]
 
 
 WEEKLY = "decision/price-reviews-happen-weekly"
@@ -74,7 +38,7 @@ WEEKLY = "decision/price-reviews-happen-weekly"
 def _store_with_a_decision(root):
     """A client over a new store holding the decision type and one decision that fits it."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
     return client
@@ -98,21 +62,19 @@ def _store_with_two_faults(root):
     client = _store_with_a_decision(root)
     define(client, WORK_ITEM_TYPE)
     create(client, "work-item", {"title": "Move the review to Mondays", "decisions": [WEEKLY]})
-    decision = root / "kb" / "decision" / "price-reviews-happen-weekly.yaml"
-    held = canonical.load(decision.read_text())
-    held["sections"] = held["sections"][:1]
-    decision.write_text(canonical.dump(held))
-    work_item = root / "kb" / "work-item" / "move-the-review-to-mondays.yaml"
-    held = canonical.load(work_item.read_text())
-    held["decisions"] = ["decision/prices-are-reviewed-monthly"]
-    work_item.write_text(canonical.dump(held))
+    decision = held.artifact(root, WEEKLY)
+    decision["sections"] = decision["sections"][:1]
+    held.plant(root, WEEKLY, decision)
+    work_item = held.artifact(root, "work-item/move-the-review-to-mondays")
+    work_item["decisions"] = ["decision/prices-are-reviewed-monthly"]
+    held.plant(root, "work-item/move-the-review-to-mondays", work_item)
     return client
 
 
 @then("both are reported, each naming the artifact, the place in it and the rule broken")
 def _both_reported(checked):
     assert not checked.faults, checked.faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in checked.violations] == [
         (WEEKLY, "sections", "sections"),
         ("work-item/move-the-review-to-mondays", "decisions/0", "ref"),
     ]
@@ -158,7 +120,7 @@ def _not_a_violation(checked):
 
 @then("it is also reported as a violation, naming the artifact, the place in it and the rule broken")
 def _also_a_violation(checked):
-    assert [(fault.artifact, fault.path, fault.rule, fault.message) for fault in checked.violations] == [
+    assert [(fault.artifact, fault.place, fault.rule, fault.message) for fault in checked.violations] == [
         (WEEKLY, "sections", "sections",
          "the sections the type requires must all be present, in order; 'Review' is missing"),
     ]
@@ -166,5 +128,5 @@ def _also_a_violation(checked):
 
 @then("the check itself does not fail")
 def _the_check_does_not_fail(checked):
-    assert isinstance(checked, kb_pb2.ValidateResponse)
+    assert isinstance(checked.response, kb_pb2.CheckResponse)
     assert not checked.faults, checked.faults
