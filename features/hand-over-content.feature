@@ -97,6 +97,7 @@ Feature: Hand over content
     Examples:
       | content                                                        | reason                              |
       | content that cannot be read as written at all                  | content cannot be read as written   |
+      | content holding text written with an escape for half of a character, which no text can hold | content cannot be read as written |
       | content that is a list rather than a set of named entries      | content is a set of named entries   |
       | content that is a single bare value                            | content is a set of named entries   |
       | content with nothing in it at all                              | content is a set of named entries   |

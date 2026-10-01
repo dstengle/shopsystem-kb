@@ -44,6 +44,33 @@ Feature: Export and import a store
     Then the export is rejected because export never overwrites
     And what the directory holds is left as it was
 
+  @slice-118.2
+  Scenario: Exporting to something that is a file, not a directory, is refused
+    Pins that an export is written into a directory and never into a file, and that the file in the way is not touched.
+    Given a store holding a decision
+    And a file where the export is to go, and no directory
+    When the operator exports the store to that file
+    Then the export is rejected because export writes into a directory
+    And the file is left as it was
+
+  @slice-118.2
+  Scenario: Checking for import something that is not a directory is refused
+    Pins that files for import are read only from a directory, so a check pointed at anything else is refused rather than run.
+    Given a store
+    And a file where a directory for import should be
+    When the operator checks that file for import
+    Then the check is rejected because files for import are read from a directory
+    And nothing is written
+
+  @slice-118.2
+  Scenario: Importing from something that is not a directory is refused
+    Pins that an import reads only from a directory, so one pointed at anything else is refused and takes nothing.
+    Given a freshly started store
+    And a file where a directory for import should be
+    When the operator imports that file, saying which role they are
+    Then the import is rejected because files for import are read from a directory
+    And nothing is written
+
   @slice-111
   Scenario Outline: The operator checks a directory for import and each error is reported by file and reason
     Pins that the check reads every file rather than stopping at the first fault, and that each fault names the file it is in and the reason it is one.

@@ -91,3 +91,17 @@
 - Why red: `mode=rw` on a read-only file opens it read-only without a word, and reads may succeed.
 - Where it lands: `sqlite_store.opened` refuses with `Unreadable`, naming the database and saying it cannot be opened for writing, when the database file or its directory cannot be written, before any statement; nothing is made beside it.
 - Test seam: steps make the directory or the file read-only with `chmod` and restore it at teardown; skip-free (the suite does not run as root).
+
+### Task 12: Slice 118.1 — content holding half of a character is refused as content that cannot be read
+
+- Scenarios: hand-over-content / Content the store cannot make sense of is refused, the Examples row "content holding text written with an escape for half of a character, which no text can hold" (rule `content`, the place named).
+- Why red: ruamel turns a `"\ud800"` escape into a lone surrogate, `canonical.check` passes it, and Create answers the catch-all `store` (UnicodeEncodeError) (review C16, Not met 10).
+- Where it lands: `canonical.py` (rule 5, the one canonical checker): text that does not encode as UTF-8 is `NotCanonical`, naming the place, so it is refused where content is converted.
+- Reuse: the outline's existing steps; only the row's content needs a value in the step that builds each row's content.
+
+### Task 13: Slice 118.2 — the operator's directory is refused by its shape
+
+- Scenarios (3, `-m slice-118.2`): export-and-import-a-store / Exporting to something that is a file, not a directory, is refused; Checking for import something that is not a directory is refused; Importing from something that is not a directory is refused.
+- Why red: no steps yet; the refusals exist (`export.py` and `offers.py`, rule `root`, review open question 1), so the slice is likely the steps alone.
+- Where it lands: steps in `tests/test_export_and_import_a_store.py`; behaviour in `export.py`/`offers.py` only if a run shows a gap.
+
