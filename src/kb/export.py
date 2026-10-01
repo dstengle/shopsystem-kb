@@ -31,11 +31,8 @@ def written(store: Port, into: Directory) -> None:
 
 
 def _ordered(store: Port, name, artifact: dict) -> dict:
-    """The artifact, its entries in the order the current version of its type declares; as held when its kind has
-    no type."""
+    """The artifact, its entries in the order the current version of its type declares."""
     type_id = values.type_of(name.kind)
-    if not store.holds(type_id):
-        return artifact
     return settled.order(artifact, composition.declared(store.artifact(type_id)["schema"], store))
 
 

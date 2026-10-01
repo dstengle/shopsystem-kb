@@ -6,7 +6,6 @@ corpus it is checked against, are given; nothing here finds or opens a file.
 """
 from jsonschema import Draft202012Validator
 from referencing import Registry
-from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
 from kb import links, places, refusals, rules, values
@@ -87,24 +86,8 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
 
 
 def _errors(content: dict, composed: dict, corpus) -> list:
-    """JSON Schema's every error. A type met through a reference whose file cannot be read refuses the check with the
-    fault naming that file, as meeting it directly does, rather than as the library's own failure to resolve it."""
-    try:
-        return list(Draft202012Validator(composed, registry=registry(corpus)).iter_errors(content))
-    except Unresolvable as unresolvable:
-        refusal = _refusal_behind(unresolvable)
-        if refusal is None:
-            raise
-        raise refusal from None
-
-
-def _refusal_behind(error: Exception) -> values.Refused | None:
-    """The refusal a type gave while it was being retrieved, found among what caused the error; None when no refusal
-    caused it."""
-    cause = error.__cause__
-    while cause is not None and not isinstance(cause, values.Refused):
-        cause = cause.__cause__
-    return cause
+    """JSON Schema's every error."""
+    return list(Draft202012Validator(composed, registry=registry(corpus)).iter_errors(content))
 
 
 def _place(error) -> str:
