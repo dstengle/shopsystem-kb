@@ -2,7 +2,7 @@
 id: capability/export-and-import-a-store
 title: Export and import a store
 narrator: the operator
-rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git, decision/busy-rule, decision/earlier-store-told-apart]
+rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git, decision/busy-rule, decision/earlier-store-told-apart, decision/operator-directory-refused-by-shape]
 formulated_as: features/export-and-import-a-store.feature
 ---
 
@@ -18,6 +18,9 @@ The operator takes a store out as files people can read and review, checks a dir
 - When the operator opens an exported artifact's file, every piece of prose stands as a block of its own however short, each list is written beneath the name it belongs to, indented under it, no line of prose is broken to fit a width, and nothing in the file tells a reader how to build a value.
 - When two stores given the same content by the same client are exported, their files for it are the same, byte for byte.
 - If the directory named for an export holds anything, the export is refused because export never overwrites, and what the directory holds is left as it was.
+- If the operator exports to something that is a file, not a directory, the export is refused because export writes into a directory, and the file is left as it was.
+- If the operator checks for import something that is not a directory, the check is refused because files for import are read from a directory, and nothing is written.
+- If the operator imports from something that is not a directory, the import is refused because files for import are read from a directory, and nothing is written.
 - When the operator checks a directory for import, every file is read and each error is reported, naming the file and the reason: it cannot be read as YAML 1.2 or is not in canonical form, it claims a kind neither the directory nor the store holds a type for, its content does not fit its type, or it carries a link that lands on nothing in the directory or the store.
 - When the operator checks a directory for import that holds a file with an error, every file linking to it, directly or through other files, an artifact's link to its own type included, is reported as one that would be skipped, with the chain of links that leads to the broken file.
 - When the operator checks a directory for import that holds no error, the check reports success.
@@ -40,13 +43,14 @@ The operator takes a store out as files people can read and review, checks a dir
 ## Implementation, may change
 
 - The commands are `kb export <dir>`, `kb import <dir> --check`, `kb import <dir>` and `kb import <dir> --skip-errors`. `kb import` always runs the check first; the role it signs under comes from `KB_ACTOR`. Both commands find the store upward from the working directory or from `KB_ROOT` (find-the-store).
+- A directory refused by its shape, for export, check or import, is the fault with rule `root`.
 - Layout of an export: `<dir>/<kind>/<slug>.yaml`, one file per artifact; types at `<dir>/schema/<kind>.yaml`, the type that describes types at `<dir>/schema/schema.yaml`.
 - Canonical form: identity keys first, in the order `id`, `type`, `schema_version`, `revision`, `title`, then fields in schema order, then `sections`, then part collections in schema order. Every prose body is a literal block scalar. Two-space indent, sequences indented under their key, no line folding at any width, no flow style, no comments, no anchors, no tags.
 - Loading uses a standard YAML 1.2 parser; no YAML 1.1 loader or emitter appears anywhere in kb.
 - `kb import <dir> --check` exits 0 when clean and 1 with errors.
 - The check's skip analysis follows every link a file carries, plus each artifact's implicit link to its type file (`schema/<kind>.yaml`), so artifacts of a kind whose type file is broken are skipped with the chain artifact → type file.
 - A freshly started store holds no artifact besides `schema/schema`. An imported `schema/schema.yaml` is compared with the store's and passed over when it matches; it is not one of the artifacts that land and has no import entry.
-- A store laid out before the database (`<root>/kb/`) already has the export layout; its `journal/` and `store.yaml` are ignored on import.
+- An import passes over a store's history, its marker, `.git/`, `journal/`, and the database with its side files.
 - An import refused as busy is the fault with rule `busy` (change-the-store). Reads never wait for the write lock, so an export never meets it.
 
 ## Not yet

@@ -34,7 +34,7 @@ The client finds artifacts without knowing their names. It can list a kind, opti
 - `Follow` (until v1 `Refs`) takes a locator, a direction, an optional via-field, an optional kind and a depth, and returns stubs with the route taken.
 - `Search` takes text, an optional kind and a scope (`sections`, `fields`, `all`), and returns stubs with the matching section title and snippet, ranked by term frequency in the section.
 - Each has a request and a response message of its own; a request or response names a kind as a kind, never a type, and a place inside an artifact as a place, never a path.
-- The storage port answers reads: an artifact (now, or as of a set); whether a name is held; names by kind with field equality filters; links out of an artifact or one place in it; links in, narrowed by field and source kind; inbound counts; traversal; search, indexed per section and per field so results keep the section title and snippet; history with today's filters. The adapter keeps the link index and the search rows as it writes. A section carries no links.
+- The storage port answers reads: whether a name is held; an artifact now; names by kind with field filters; links in, narrowed by field and source kind; inbound counts; search, indexed per section and per field so results keep the section title and snippet; and the history. It has no traversal, no links-out read and no read of a past state; the queries above it do those. The adapter keeps the link index and the search rows as it writes. A section carries no links.
 
 ## Not yet
 

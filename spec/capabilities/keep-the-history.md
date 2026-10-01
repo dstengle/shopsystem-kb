@@ -37,7 +37,7 @@ Every change leaves an entry in the store's own history. The entry says when, by
 
 ## Implementation, may change
 
-- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `place`, `revision`, `schema_version`, `digest` (sha256 of the canonical bytes after the write), `message` and `batch`: the name of the set (`CreateMany`, `ReplaceMany`, `AddMany` or `RemoveMany`) that wrote it, or the entry's own id for a single change. Snapshot entries keep their shape.
+- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `place`, `revision`, `schema_version`, `digest` (sha256 of the canonical text, encoded as UTF-8), `message` and `batch`: the name of the set (`CreateMany`, `ReplaceMany`, `AddMany` or `RemoveMany`) that wrote it, or the entry's own id for a single change. Snapshot entries keep their shape.
 - History entries are rows in the store's database, replacing the journal files. They ride with the set handed to the storage port, named by `journal.py` and fingerprinted from the canonical text.
 - The adapter keeps each artifact's content at every revision; today's contract does not read it.
 - `History` (until v1 `Journal`) takes filters: artifact, actor, execution, batch, since.

@@ -32,8 +32,8 @@ Every call names what it means: a kind, an artifact's name, a place inside an ar
 ## Implementation, may change
 
 - A locator is `{ id, place }`, with `place` empty for the artifact root; a request or response names a place inside an artifact as a place, never a path, and a kind as a kind, never a type. Every node is addressable by a place from the root, such as `steps/draft/branches/0` or `sections/purpose/sections/rationale`.
-- An id matches `<kind>/<slug>`, where `kind` is a kind the store holds a type for and `slug` is `[a-z0-9]+(-[a-z0-9]+)*`. A place is a sequence of node names of the same alphabet, or a collection name followed by an item id. `.`, `..`, `/` in a segment and absolute paths are faults; no file is resolved from them.
-- Every request is converted at the boundary into validated values (an id, a locator, a content tree) by one function per kind of value. Storage accepts only those values; one function derives a file's path from a validated id, and export writes a file only at that path, inside the directory it was given.
+- An id matches `<kind>/<slug>`, where `slug` is `[a-z0-9]+(-[a-z0-9]+)*`. An id's grammar is checked when a request is converted; whether the store holds a type for its kind is checked when it is looked up. A place is a sequence of node names of the same alphabet, or a collection name followed by an item id. `.`, `..`, `/` in a segment and absolute paths are faults; no file is resolved from them.
+- Every request is converted at the boundary into validated values (an id, a locator, a content tree) by one function per kind of value. Storage accepts only those values; one function in `names.py` gives the place a name takes in an export, and export writes a file only at that place, inside the directory it was given.
 
 ## Not yet
 

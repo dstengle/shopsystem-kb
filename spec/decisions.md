@@ -413,3 +413,8 @@ What a client may depend on is still versioned together by the release tag: `kb.
 date: 2026-10-01
 supersedes: decision/0018-the-published-contract
 source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
+
+## decision/operator-directory-refused-by-shape
+Export aimed at a file, and a check for import or an import aimed at something that is not a directory, are refused with rule `root`, because export writes into a directory and files for import are read from one; the export leaves the file as it was and the check and import write nothing.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-eleventh-review-answers.md
