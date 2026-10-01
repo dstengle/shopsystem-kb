@@ -13,7 +13,6 @@ from kb.contract import kb_pb2
 from repositories import hooked, made, standing
 
 scenarios("operate-a-store.feature")
-scenarios("review-the-files-on-disk.feature")
 
 LONG_LINE = (
     "Costs move weekly, and a review that runs once a month lags them by three weeks on average, "

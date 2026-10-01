@@ -40,7 +40,6 @@ Feature: Make several changes in one go
       | fault                                                                | reason                                                                  |
       | the second change names an artifact the store holds nothing under    | the store holds nothing by that name, and the name asked for is given back |
       | the second change removes an artifact something still points at      | something still points at it                                            |
-      | the second change touches an artifact whose stored file cannot be read | that file cannot be read, and the file is named                        |
 
   @slice-97
   Scenario: A set holding no changes at all is refused
@@ -57,3 +56,22 @@ Feature: Make several changes in one go
     Then the store's history holds an entry for each of the two changes
     And each entry records the version that change left behind
     And the work item's version has gone up by two
+
+  Scenario Outline: A change in a set points at what another change in it makes, earlier or later
+    Pins the two clocks a set runs on: a link may point at what any change in the set makes, before or after it, because links are judged against the set's end, while each change itself acts only on what the changes before it have done.
+    When the client asks, in one go, for <changes>, in that order, saying which role and why
+    Then <outcome>
+
+    Examples:
+      | changes                                                              | outcome                                                                                                |
+      | a decision to be created and the work item to point at it            | the set lands, and the work item points at the new decision                                            |
+      | the work item to point at a decision and that decision to be created | the set lands, and the work item points at the new decision                                            |
+      | a decision to be created and that decision to be replaced            | the set lands, and the decision holds the replacement                                                  |
+      | a decision to be replaced and that decision to be created            | the set is rejected because the store holds nothing by that name, and the name asked for is given back |
+
+  Scenario: Two new artifacts in one set that point at each other land
+    Pins that a set is checked as a whole, so two artifacts that each need the other to exist can be made together, which no order of single changes allows.
+    Given the decision type lets a decision point at another decision
+    When the client asks, in one go, for two decisions to be created, each pointing at the other, saying which role and why
+    Then the set lands
+    And the store holds both decisions, each pointing at the other

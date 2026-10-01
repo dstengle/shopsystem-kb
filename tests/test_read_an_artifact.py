@@ -13,11 +13,6 @@ scenarios("find-the-store.feature")
 scenarios("read-an-artifact.feature")
 
 
-@scenario("answer-a-damaged-file.feature", "Reading an artifact whose stored file cannot be read is refused")
-def test_reading_an_artifact_whose_stored_file_cannot_be_read_is_refused():
-    pass
-
-
 @scenario("name-what-is-asked-for.feature", "A name that is not a plain name is refused")
 def test_a_name_that_is_not_a_plain_name_is_refused():
     pass

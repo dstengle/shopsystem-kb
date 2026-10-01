@@ -96,3 +96,60 @@ Feature: Change the store
     When the client removes that tag, saying which role and why
     Then the removal is rejected because something still points at it
     And the client is given that link among the links that block it
+
+  Scenario: The clock fails during a change
+    Pins that a clock that breaks down never leaves a change half made: the client hears about it, and nothing it asked for has happened.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And the client was readied with a clock that fails when it is asked the time
+    When the client replaces the decision, saying which role and why
+    Then the client is given a fault
+    And the store holds what it held before
+
+  Scenario Outline: A replacement that leaves out an item something links into is refused
+    Pins that dropping an item is held to the same rule as removing an artifact, whether the whole artifact or only a part of it is resent, so no link is left pointing at nothing.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And the decision carries two options
+    And another artifact links into one of those options
+    When the client <change>, saying which role and why
+    Then the change is rejected because something still points at that item
+    And the client is given each link into that option
+
+    Examples:
+      | change                                                                     |
+      | replaces the decision with content that leaves that option out            |
+      | replaces the decision's collection of options with one that leaves it out |
+
+  Scenario Outline: Several clients on one machine change one store at the same time
+    Pins that changes made at once are taken one after another, each against what the earlier ones left, so neither of two items added to one collection together is lost, whether the clients share a program or not.
+    Given a store holding a process with two steps and a shared step other processes use
+    And <clients>, one adding a step to the process while the other adds a different step, each saying which role and why
+    When the client adding the different step lands its change second
+    Then the process holds both new steps
+    And the different step comes after the other new step, and both come after the steps already there
+
+    Examples:
+      | clients                                                  |
+      | two clients in one program                               |
+      | two clients in two separate programs on the same machine |
+
+  Scenario Outline: A removal and a new link to the same artifact made at once never both land
+    Pins that two clients working at once cannot between them leave a link pointing at nothing: whichever change comes second is judged against what the first one left.
+    Given a store holding a tag nothing points at
+    And one client is removing the tag while another is creating a decision that points at it, each saying which role and why
+    When the client <first> lands its change first
+    Then the <second> is rejected because <reason>
+    And the store holds <held>
+
+    Examples:
+      | first                 | second       | reason                                                | held                                       |
+      | creating the decision | removal      | something still points at it                          | the tag and the decision that points at it |
+      | removing the tag      | new decision | a link must land on a node of a kind the type allows | neither the tag nor the new decision       |
+
+  Scenario: Two clients replace one artifact at the same time
+    Pins that two replacements made at once each count: neither is lost from the history and neither takes the other's version, and the artifact ends with whichever came last.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    And one client is replacing the decision with one rationale while another replaces it with a different rationale, each saying which role and why
+    When the client with the different rationale lands its change second
+    Then each replacement left a version of its own, and the decision's version has gone up by two
+    And both replacements are in the history
+    And the decision holds the different rationale

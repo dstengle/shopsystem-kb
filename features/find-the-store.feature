@@ -42,18 +42,6 @@ Feature: Find the store
     Then the read is rejected because KB_ROOT names a store other than the one it is working in, and neither of the two is guessed at
     And no content comes back, from either store
 
-  @slice-102.6.1
-  Scenario Outline: A git repository named by the environment is no way of saying which store is meant
-    Pins that only where the client is working and KB_ROOT say which store is meant: a git repository named by the environment the client runs in is neither a third answer nor a disagreement to refuse, so a read comes from the store found and from nowhere else.
-    Given the client is working <where>, with its environment naming a git repository other than this store, the way git does for a program it runs from a hook
-    When the client reads the decision
-    Then the client is given the decision, from <store>
-
-    Examples:
-      | where                                                   | store                                     |
-      | in a folder deep inside the directory the store sits in | the store found above where it is working |
-      | outside any store, with KB_ROOT naming this one         | the store KB_ROOT names                   |
-
   @slice-99
   Scenario Outline: The client names the store from a working directory that has since been removed
     Pins that losing the working directory takes away only the looking upward: KB_ROOT still reaches its store, and a directory that is gone is inside no store, so it cannot disagree with the one KB_ROOT names.

@@ -10,15 +10,6 @@ Feature: Operate a store
     Then there is a store inside that directory, in a place of its own
     And a client can begin defining its own types in it straight away
 
-  @slice-102.6.1
-  Scenario: The operator sets up a store from a shell whose environment names another git repository
-    Pins that setting a store up from a hook, or any shell that names a git repository to work in, still begins the store's own history and leaves the repository named untouched.
-    Given a directory that is itself a git repository, and the operator's environment naming that repository as the git repository to work in, the way git does for a program it runs from a hook
-    When the operator runs kb init against that directory, saying which role they are
-    Then there is a store inside that directory, in a place of its own
-    And the store's history holds one entry, under that role, with the message "initialise store"
-    And that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit
-
   @slice-46
   Scenario: Setting up a store without naming which role is refused
     Pins that every change is attributable from the very first one, so a store cannot be created by nobody.
@@ -52,12 +43,12 @@ Feature: Operate a store
     And of everything that is behind the type it was last checked against
 
   @slice-46
-  Scenario: The command line does nothing to content
-    Pins the limit of the command line: it starts and checks stores and nothing else, because every change to content goes through a client.
+  Scenario: The command line changes content only by importing into a freshly started store
+    Pins the limit of the command line: it sets stores up, checks, serves and exports them, and imports into a freshly started one, and nothing else, because every other change to content goes through a client.
     Given a store
     When the operator asks what the command line offers
-    Then it offers setting a store up and checking one
-    And nothing that changes what the store holds
+    Then it offers setting a store up, checking, serving and exporting one, and importing into a freshly started store
+    And nothing else that changes what the store holds
 
   @slice-46
   Scenario: The operator checks the store from a folder inside it

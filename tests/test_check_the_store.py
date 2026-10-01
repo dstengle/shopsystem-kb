@@ -25,16 +25,6 @@ def test_an_artifact_behind_its_type_that_no_longer_fits_it_is_reported_both_way
     pass
 
 
-@scenario("check-the-store.feature", "A stored file that cannot be read is reported as a violation")
-def test_a_stored_file_that_cannot_be_read_is_reported_as_a_violation():
-    pass
-
-
-@scenario("check-the-store.feature", "An artifact of a kind the store holds no type for is reported as a violation")
-def test_an_artifact_of_a_kind_the_store_holds_no_type_for_is_reported_as_a_violation():
-    pass
-
-
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},

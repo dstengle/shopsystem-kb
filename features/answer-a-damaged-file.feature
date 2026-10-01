@@ -2,49 +2,52 @@
 Feature: Answer a damaged file
   Narrator: the client
 
-  @slice-1.19
-  Scenario: Reading an artifact whose stored file cannot be read is refused
-    Pins that damage done behind the store's back surfaces as an ordinary named fault, so one broken file cannot take a client down.
-    Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
-    Given someone edited the decision's file by hand and left it in a shape the store cannot read
-    When the client reads the decision
-    Then the read is rejected because that file cannot be read, and the file is named
-    And the client is given that fault as it is given any other, the call never breaking off
-
-  @slice-63
-  Scenario Outline: Every call refuses a file it cannot read, naming the file
-    Pins that the fault is the same answer whichever call runs into the damage, so no client has to handle one call breaking off where another answers politely.
+  Scenario Outline: A store whose database cannot be read, because it is damaged or missing beside its marker, refuses every call and command that needs it
+    Pins that a database the store cannot read always gives the same named fault, naming the database, never a crash, with nothing served and nothing written in the store or in a directory an export was aimed at.
     Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
-    Given someone edited the decision's file by hand and left it in a shape the store cannot read
-    When the client <call>
-    Then the call is rejected because that file cannot be read, and the file is named
-    And the client is given that fault as it is given any other, the call never breaking off
-    And nothing is written anywhere in the store
+    And the store's database <damage>
+    And an empty directory outside the store
+    When <someone does something that needs the store>
+    Then what was asked is rejected because the store's database cannot be read, and the database is named
+    And the fault is given as any other fault is given, never breaking off
+    And nothing is served
+    And nothing is written in the store, nor in the empty directory, which stays as it was
 
     Examples:
-      | call                                                        |
-      | replaces the decision, saying which role and why            |
-      | adds an item to a collection of the decision, saying which role and why |
-      | removes the decision, saying which role and why             |
-      | lists the decisions                                         |
-      | searches the prose for a word that decision holds           |
-      | follows the links into the decision                         |
-      | follows the links out of the decision                       |
-
-  @slice-79
-  Scenario: Creating an artifact of a kind whose type cannot be read is refused
-    Pins that a type the store cannot read is the same named fault as any other damaged file, rather than a crash in the middle of checking a perfectly good artifact against it.
-    Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
-    Given someone edited the decision type's file by hand and left it in a shape the store cannot read
-    When the client creates a decision with a title and both required sections, saying which role and why
-    Then the create is rejected because that file cannot be read, and the file is named
-    And nothing is written anywhere in the store
-
-  @slice-79
-  Scenario: An entry of the history that cannot be read is refused in the same way
-    Pins that the history is held to the same rule as the content, so a damaged entry is a named fault rather than a crash in the middle of reading the past.
-    Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
-    Given someone edited one of the store's history entries by hand and left it in a shape the store cannot read
-    When the client reads the journal
-    Then the read is rejected because that file cannot be read, and the file is named
-    And the client is given that fault as it is given any other, the call never breaking off
+      | damage                                              | someone does something that needs the store                                                                      |
+      | was damaged behind the store's back                 | the client creates a decision with a title and both required sections, saying which role and why                 |
+      | was damaged behind the store's back                 | the client reads the decision                                                                                    |
+      | was damaged behind the store's back                 | the client replaces the decision, saying which role and why                                                      |
+      | was damaged behind the store's back                 | the client adds an item to a collection of the decision, saying which role and why                               |
+      | was damaged behind the store's back                 | the client removes the decision, saying which role and why                                                       |
+      | was damaged behind the store's back                 | the client asks, in one go, for two decisions to be created, saying which role and why                           |
+      | was damaged behind the store's back                 | the client lists the decisions                                                                                   |
+      | was damaged behind the store's back                 | the client follows the links out of the decision                                                                 |
+      | was damaged behind the store's back                 | the client follows the links into the decision                                                                   |
+      | was damaged behind the store's back                 | the client searches the prose for a word that decision holds                                                     |
+      | was damaged behind the store's back                 | the client reads the journal                                                                                     |
+      | was damaged behind the store's back                 | the client snapshots the decision and the process for a piece of work                                            |
+      | was damaged behind the store's back                 | the client checks the store                                                                                      |
+      | was damaged behind the store's back                 | the operator runs kb validate in that store                                                                      |
+      | was damaged behind the store's back                 | the operator runs kb serve in that store                                                                         |
+      | was damaged behind the store's back                 | the operator runs kb export in that store, aimed at the empty directory                                          |
+      | was damaged behind the store's back                 | the operator checks a directory exported from another store for import in that store                             |
+      | was damaged behind the store's back                 | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
+      | is missing, while the store's marker is still there | the client creates a decision with a title and both required sections, saying which role and why                 |
+      | is missing, while the store's marker is still there | the client reads the decision                                                                                    |
+      | is missing, while the store's marker is still there | the client replaces the decision, saying which role and why                                                      |
+      | is missing, while the store's marker is still there | the client adds an item to a collection of the decision, saying which role and why                               |
+      | is missing, while the store's marker is still there | the client removes the decision, saying which role and why                                                       |
+      | is missing, while the store's marker is still there | the client asks, in one go, for two decisions to be created, saying which role and why                           |
+      | is missing, while the store's marker is still there | the client lists the decisions                                                                                   |
+      | is missing, while the store's marker is still there | the client follows the links out of the decision                                                                 |
+      | is missing, while the store's marker is still there | the client follows the links into the decision                                                                   |
+      | is missing, while the store's marker is still there | the client searches the prose for a word that decision holds                                                     |
+      | is missing, while the store's marker is still there | the client reads the journal                                                                                     |
+      | is missing, while the store's marker is still there | the client snapshots the decision and the process for a piece of work                                            |
+      | is missing, while the store's marker is still there | the client checks the store                                                                                      |
+      | is missing, while the store's marker is still there | the operator runs kb validate in that store                                                                      |
+      | is missing, while the store's marker is still there | the operator runs kb serve in that store                                                                         |
+      | is missing, while the store's marker is still there | the operator runs kb export in that store, aimed at the empty directory                                          |
+      | is missing, while the store's marker is still there | the operator checks a directory exported from another store for import in that store                             |
+      | is missing, while the store's marker is still there | the operator runs kb import in that store on a directory exported from another store, saying which role they are |

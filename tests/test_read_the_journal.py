@@ -17,11 +17,6 @@ def test_every_change_leaves_an_entry():
     pass
 
 
-@scenario("keep-the-history.feature", "A change made while the client's environment names another git repository is recorded in the store's own history")
-def test_a_change_made_while_the_client_s_environment_names_another_git_repository_is_recorded_in_the_store_s_own_history():
-    pass
-
-
 @scenario("keep-the-history.feature", "The journal alone shows what landed together")
 def test_the_journal_alone_shows_what_landed_together():
     pass
