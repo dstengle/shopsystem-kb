@@ -351,6 +351,7 @@ def test_an_artifact_changed_and_then_removed_leaves_no_row_matching_its_words(s
     assert (found["zebra"], found["gnu"]) == ([], [])
     assert [len(found["okapi"]), len(found["lemur"])] == [3, 3]
 
+
 def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_first(store):
     later, half = T0 + timedelta(hours=2), T0 + timedelta(milliseconds=500)
     store.land([], [entry("late", at=later, artifact="note/a", role="writer")])
