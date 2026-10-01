@@ -10,7 +10,7 @@ from kb.values import ArtifactId, Locator, Refused
 
 def artifact(store: Port, reading: Reading) -> kb_pb2.ReadResponse:
     """The artifact at the level asked. Raises Refused for a name the store lacks, a place or a section it holds
-    nothing at, or a stored file that cannot be read."""
+    nothing at."""
     locator = reading.locator
     if not store.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])

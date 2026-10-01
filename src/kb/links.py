@@ -1,5 +1,5 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-and whether a link points at an artifact. The checks, removal, reads and walks all read links here."""
+and those links as the port takes them. The checks, removal, reads and walks all read links here."""
 from typing import NamedTuple
 
 from kb import composition, names, port, values
@@ -75,8 +75,3 @@ def _fields(node: dict, refs: dict[str, dict], at: str) -> list[Link]:
         elif value is not None:
             found.append(Link(field, f"{at}{field}", value, ref, not at))
     return found
-
-
-def points_at(target: str, artifact_id) -> bool:
-    """Whether a link lands on the artifact or on a part inside it."""
-    return names.linked(target)[0] == str(artifact_id)

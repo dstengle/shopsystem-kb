@@ -59,13 +59,6 @@ def still_linked(removed: ArtifactId, other: ArtifactId, place: str) -> kb_pb2.F
     )
 
 
-def unreadable(named: str, file, problem: str) -> kb_pb2.Fault:
-    """A stored file that cannot be read: an artifact's, named, or an entry of the history, which names none."""
-    return kb_pb2.Fault(
-        artifact=named, rule=rules.UNREADABLE, message=f"the stored file {file} cannot be read: {problem}",
-    )
-
-
 MISNAMED = {
     "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
     "repeated": "the items of a collection each have a name of their own; {name!r} is on more than one",

@@ -25,18 +25,6 @@ def checked(artifact: dict) -> dict:
     return {key: value for key, value in artifact.items() if key not in IDENTITY or key == "title"}
 
 
-def lacking(loaded: dict) -> str:
-    """What a stored artifact lacks of what the store settles, said as the problem with its file; empty when it lacks
-    nothing. A yes-or-no is never a number here."""
-    missing = [
-        key for key, kind in SETTLED.items()
-        if not isinstance(loaded.get(key), kind) or isinstance(loaded.get(key), bool)
-    ]
-    if not missing:
-        return ""
-    return f"it does not carry what the store settles for every artifact: {', '.join(missing)}"
-
-
 def order(artifact: dict, schema: dict) -> dict:
     """Identity keys first, then fields in schema order, then sections, then part collections in schema order."""
     parts = schema.get("parts", {})

@@ -1,6 +1,6 @@
-"""The check of the whole store: every artifact against the current version of its type, the stale listed beside
-the violations, and a file that cannot be read, or an artifact of a kind with no type, reported as what it is, the
-check going on past it."""
+"""The check of the whole store, read through the port: every artifact against the current version of its type, the
+stale listed beside the violations, and an artifact of a kind with no type reported as what it is, the check going on
+past it."""
 from kb import composition, settled, validation
 from kb.contract import kb_pb2
 from kb.port import Port
@@ -8,8 +8,7 @@ from kb.port import Port
 
 def everything(store: Port) -> kb_pb2.ValidateResponse:
     """Every artifact checked against the current version of its type, and listed as stale when it was last
-    checked against an older one; a file that cannot be read, or an artifact of a kind with no type, is reported and
-    the check goes on."""
+    checked against an older one; an artifact of a kind with no type is reported and the check goes on."""
     violations, stale = [], []
     for artifact_id in store.ids():
         found = _with_type(store, artifact_id)

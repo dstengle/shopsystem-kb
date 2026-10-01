@@ -76,7 +76,7 @@ def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
 
 def kind_schema(kind: values.Kind, corpus) -> dict:
     """The type a kind names, as the corpus holds it, its JSON Schema under `schema`. Raises Refused when the corpus
-    holds none, or when its file cannot be read."""
+    holds none."""
     return corpus.artifact(kind_type(kind, corpus))
 
 
