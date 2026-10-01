@@ -1,15 +1,21 @@
 # kb
 
 A schema-typed, graph-oriented artifact store. Typed documents with
-addressable parts, schemas stored as artifacts, a git repository as the
-canonical serialization, and one versioned API contract that an in-process
-client uses today and a server can host later.
+addressable parts, schemas stored as artifacts, one SQLite database as the
+canonical store (written out as canonical YAML files on the operator's
+`kb export`, and read back by `kb import`), and one versioned API contract
+that an in-process client uses today and a server can host later.
+
+Upgrading a store made by kb 0.3.0: start a new store and import the old
+one's files: `kb init <new-root>`, then `kb import <old-root>/kb` run inside
+the new store (or with `KB_ROOT=<new-root>`).
 
 kb ships no domain schemas and no renderers. A client such as
 [shopsystem-knowledge](https://github.com/dstengle/shopsystem-knowledge)
 supplies the types, seed content, and presentation.
 
-Design: `docs/superpowers/specs/2026-09-23-kb-design.md`.
+Spec: `spec/index.md`. Storage design: `docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md`.
+`make bench` checks the performance bounds at 30,000 artifacts.
 
 ## Developing
 

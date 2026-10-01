@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from kb import names
 from kb.content import text
-from kb.port import Candidate, Linking, Reached
+from kb.port import Candidate, Linking
 from kb.values import ArtifactId, Kind, artifact_id
 
 PAIRS = "~pairs"
@@ -75,15 +75,9 @@ class Reads:
     def holds(self, artifact_id: ArtifactId) -> bool:
         return bool(self._rows("SELECT 1 FROM artifacts WHERE id = ?", str(artifact_id)))
 
-    def artifact(self, artifact_id: ArtifactId, as_of: str = "") -> dict:
-        if as_of:
-            rows = self._rows(
-                "SELECT content FROM versions WHERE artifact = ? AND landed <= (SELECT seq FROM sets WHERE batch = ?) "
-                "ORDER BY landed DESC, step DESC LIMIT 1", str(artifact_id), as_of,
-            )
-        else:
-            rows = self._rows("SELECT content FROM artifacts WHERE id = ?", str(artifact_id))
-        if not rows or rows[0][0] is None:
+    def artifact(self, artifact_id: ArtifactId) -> dict:
+        rows = self._rows("SELECT content FROM artifacts WHERE id = ?", str(artifact_id))
+        if not rows:
             raise KeyError(str(artifact_id))
         return decoded(rows[0][0])
 
@@ -91,13 +85,6 @@ class Reads:
         narrowed = "" if kind is None else " WHERE kind = ?"
         rows = self._rows(f"SELECT id, content FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
         return ordered([name for name, stored in rows if not fields or _holds(decoded(stored), fields)])
-
-    def links_out(self, artifact_id: ArtifactId, place: str = "") -> list[Linking]:
-        rows = self._rows(
-            "SELECT source, field, place, target, part FROM links WHERE source = ? AND implicit = 0 ORDER BY ordinal", str(artifact_id),
-        )
-        found = [_linking(*row) for row in rows]
-        return [each for each in found if not place or each.place == place or each.place.startswith(f"{place}/")]
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
         return self._links_into(artifact_id, field, kind, implicit=False)
@@ -124,23 +111,6 @@ class Reads:
                 counted.add((key, each.source))
                 counts[key] = counts.get(key, 0) + 1
         return counts
-
-    def traverse(self, artifact_id: ArtifactId, inward: bool, depth: int, field: str = "",
-                 kind: Kind | None = None) -> list[Reached]:
-        reached, seen, frontier = [], {artifact_id}, [(artifact_id, ())]
-        for _ in range(depth):
-            following = []
-            for at, route in frontier:
-                for each in self.links_in(at) if inward else self.links_out(at):
-                    other = each.source if inward else each.target
-                    if other in seen or (field and each.field != field) or (kind is not None and other.kind != kind):
-                        continue
-                    seen.add(other)
-                    taken = (*route, (each.field, other))
-                    reached.append(Reached(other, taken))
-                    following.append((other, taken))
-            frontier = following
-        return reached
 
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:

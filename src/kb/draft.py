@@ -4,7 +4,7 @@ artifact) and the links into an artifact, over the port. A type it reads from th
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names
 from kb.port import Linking, Port
-from kb.values import TYPE_KIND, ArtifactId
+from kb.values import TYPE_KIND, ArtifactId, Kind
 
 
 class Draft:
@@ -57,15 +57,16 @@ class Draft:
         ]
         return sorted(held + drafted, key=lambda each: names.order(each.source))
 
-    def stale(self) -> list[ArtifactId]:
-        """The artifacts the store holds and the draft leaves as they are whose links are read through a type the
-        draft changed or removed, so that what the store keeps of their links is not what they carry now."""
+    def reread(self) -> list[Kind]:
+        """The kinds whose artifacts' links are read through a type the draft changed or removed."""
         changed = {each for each in set(self._pending) | self._removed if each.kind == TYPE_KIND}
         if not changed:
             return []
         types = sorted(set(self._store.ids(TYPE_KIND)) | changed, key=names.order)
+        return list(composition.reading(changed, types, self))
+
+    def stale(self) -> list[ArtifactId]:
+        """The artifacts the store holds and the draft leaves as they are whose links are read through a type the
+        draft changed or removed, so that what the store keeps of their links is not what they carry now."""
         touched = set(self._pending) | self._removed
-        return [
-            each for kind in composition.reading(changed, types, self)
-            for each in self._store.ids(kind) if each not in touched
-        ]
+        return [each for kind in self.reread() for each in self._store.ids(kind) if each not in touched]

@@ -92,20 +92,14 @@ class Candidate:
     field: str
 
 
-@dataclass(frozen=True)
-class Reached:
-    """An artifact a traversal reached, and the route to it: each step's field and the artifact it reached."""
-    artifact: ArtifactId
-    route: tuple[tuple[str, ArtifactId], ...]
-
-
 class Refusal(Exception):
     """A set the port will not land; nothing of it is written."""
 
 
 class Conflict(Refusal):
-    """A change read its artifact, or a type it was read through, at a revision that has since moved, or an entry's
-    id is already held."""
+    """A change read its artifact, or a type it was read through, at a revision that has since moved; an artifact of
+    a kind whose links the set reads anew is held that the set does not change or restate; or an entry's id is
+    already held."""
 
 
 class Linked(Refusal):
@@ -136,26 +130,18 @@ class Port(Protocol):
 
     def holds(self, artifact_id: ArtifactId) -> bool: ...
 
-    def artifact(self, artifact_id: ArtifactId, as_of: str = "") -> dict:
-        """The artifact now, or as it stood once the set named `as_of` landed. KeyError when it was not held."""
+    def artifact(self, artifact_id: ArtifactId) -> dict:
+        """The artifact now. KeyError when it is not held."""
 
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
         """Every artifact held, or those of one kind whose fields each hold the value given, compared as the text
         YAML 1.2 writes the value as."""
-
-    def links_out(self, artifact_id: ArtifactId, place: str = "") -> list[Linking]:
-        """The links an artifact holds, or those at a place in it or inside that place, in the order handed."""
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
         """The links landing on an artifact or a part inside it, narrowed to a field and a kind of source."""
 
     def inbound(self, artifact_id: ArtifactId) -> dict[tuple[str, str], int]:
         """How many artifacts link into an artifact or its parts, by the kind of the source and the field."""
-
-    def traverse(self, artifact_id: ArtifactId, inward: bool, depth: int, field: str = "",
-                 kind: Kind | None = None) -> list[Reached]:
-        """What links reach from an artifact, out or in, a step at a time to the depth: each artifact once, by its
-        shortest route, never the start; a field or a kind narrows every step."""
 
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:
@@ -168,6 +154,13 @@ class Port(Protocol):
     def entry_ids(self, at: datetime) -> list[str]:
         """The ids of the entries stamped at a moment."""
 
-    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = ()) -> None:
-        """The changes, in order, the links restated, and the entries, as one set, or nothing. Raises Conflict,
-        Linked or Unlanded."""
+    def exclusive(self) -> ContextManager[None]:
+        """A block holding the store's write lock from its start to its end: its reads see every set landed before it,
+        no other set lands until it ends, and what `land` lands in it is kept when the block ends without raising.
+        A refusal of `land` inside it takes back only that set, and the lock is still held."""
+
+    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
+             kinds: tuple[Kind, ...] = ()) -> None:
+        """The changes, in order, the links restated, and the entries, as one set, or nothing. `kinds` are those whose
+        every artifact's links the set reads anew: an artifact of one held that the set neither changes nor restates
+        is Conflict. Raises Conflict, Linked or Unlanded."""

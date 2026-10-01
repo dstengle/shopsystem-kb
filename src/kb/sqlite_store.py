@@ -1,10 +1,9 @@
 """The SQLite adapter: one database, made once in WAL mode and opened read-write, never created, for each call; and
 the landing of a set in one BEGIN IMMEDIATE transaction, which takes the write lock before reading anything, so a
-second writer waits, then finds the first's result.
+second writer waits, then finds the first's result. A block may hold that lock across reads and landings
+(`exclusive`), each set landed in it under a savepoint of its own.
 
-Inside the transaction each change's revision, and that of every type it was read through, is compared with the
-one it was read at, every link the set hands must land, and nothing outside the set may link into what the set
-removes or drops. Any refusal rolls the whole set back. Opening checks the SQLite this process runs has FTS5 and is at least FLOOR.
+Inside the transaction the set is checked (kb.sqlite_checks); any refusal rolls the whole set back. Opening checks the SQLite this process runs has FTS5 and is at least FLOOR.
 """
 import contextlib
 import functools
@@ -12,9 +11,11 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from kb import search
-from kb.port import Change, Conflict, Entry, Linked, Linking, Relink, Unlanded, Unreadable
-from kb.sqlite_reads import Reads, encoded, moment
+from kb import sqlite_search
+from kb.port import Change, Entry, Relink, Unreadable
+from kb.sqlite_checks import Checks
+from kb.values import Kind
+from kb.sqlite_reads import encoded, moment
 
 FLOOR = (3, 9, 0)  # FTS5 and its ascii tokenizer; the suite has run on the SQLite Python 3.11 ships
 BUSY = 30.0  # seconds a writer waits for the write lock
@@ -104,17 +105,38 @@ def _lacking() -> str:
     return ""
 
 
-class SqliteStore(Reads):
+class SqliteStore(Checks):
     """The port over one open connection."""
 
-    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = ()) -> None:
-        with self._db:
-            self._db.execute("BEGIN IMMEDIATE")
+    def __init__(self, db: sqlite3.Connection):
+        super().__init__(db)
+        self._locked = False
+
+    @contextlib.contextmanager
+    def exclusive(self):
+        """The write lock taken by BEGIN IMMEDIATE for the block, committed when it ends, rolled back when it raises."""
+        self._db.execute("BEGIN IMMEDIATE")
+        self._locked = True
+        try:
+            yield
+        except BaseException:
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
+        else:
+            self._db.execute("COMMIT")
+        finally:
+            self._locked = False
+
+    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
+             kinds: tuple[Kind, ...] = ()) -> None:
+        with contextlib.nullcontext() if self._locked else self.exclusive(), self._saved():
             self._unheld(entries)
             landed = self._db.execute(
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
             ).lastrowid
             self._unmoved(changes)
+            self._restated(kinds, changes, relinks)
             before = {}
             for step, change in enumerate(changes):
                 held = self._compared(change.artifact, change.read)
@@ -126,25 +148,21 @@ class SqliteStore(Reads):
             self._integral(changes, before)
             self._recorded(entries)
 
-    def _compared(self, artifact, read: int) -> int:
-        """The revision the artifact stands at; Conflict when it was read at another."""
-        rows = self._rows("SELECT revision FROM artifacts WHERE id = ?", str(artifact))
-        held = rows[0][0] if rows else 0
-        if held != read:
-            raise Conflict(f"{artifact} was read at revision {read} and stands at revision {held}")
-        return held
-
-    def _unmoved(self, changes: list[Change]) -> None:
-        """Conflict when a type a change was read through stands at another revision than the one it was read at."""
-        for type_id, read in {each for change in changes for each in change.through}:
-            self._compared(type_id, read)
-
-    def _parts(self, artifact) -> list[str]:
-        return [place for (place,) in self._rows("SELECT place FROM parts WHERE artifact = ?", str(artifact))]
+    @contextlib.contextmanager
+    def _saved(self):
+        """A savepoint around one set: a refusal takes back the set alone, and a lock held for a block stays held."""
+        self._db.execute("SAVEPOINT landing")
+        try:
+            yield
+        except BaseException:
+            self._db.execute("ROLLBACK TO landing")
+            self._db.execute("RELEASE landing")
+            raise
+        self._db.execute("RELEASE landing")
 
     def _written(self, change: Change, landed: int, step: int) -> None:
         name = str(change.artifact)
-        self._unsearched(name)
+        sqlite_search.unsearched(self._db, name)
         for table, column in (("parts", "artifact"), ("artifacts", "id")):
             self._db.execute(f"DELETE FROM {table} WHERE {column} = ?", (name,))
         self._linked(change.artifact, () if change.content is None else change.links)
@@ -160,21 +178,7 @@ class SqliteStore(Reads):
             "INSERT INTO artifacts (id, kind, revision, content) VALUES (?, ?, ?, ?)", (name, kind, change.revision, stored),
         )
         self._db.executemany("INSERT INTO parts VALUES (?, ?)", [(name, place) for place in set(change.parts)])
-        self._searchable(name, kind, change.content)
-
-    def _unsearched(self, name: str) -> None:
-        """An artifact's search rows taken out, found through `searched`, since search finds rows only by words."""
-        self._db.execute("DELETE FROM search WHERE rowid IN (SELECT row FROM searched WHERE artifact = ?)", (name,))
-        self._db.execute("DELETE FROM searched WHERE artifact = ?", (name,))
-
-    def _searchable(self, name: str, kind: str, content: dict) -> None:
-        """An artifact's search rows, each noted in `searched` under the artifact."""
-        for ordinal, (what, label, words) in enumerate(_searched(content)):
-            row = self._db.execute(
-                "INSERT INTO search VALUES (?, ?, ?, ?, ?, ?)",
-                (" ".join(search.tokens(words)), name, kind, what, label, ordinal),
-            ).lastrowid
-            self._db.execute("INSERT INTO searched VALUES (?, ?)", (row, name))
+        sqlite_search.searchable(self._db, name, kind, change.content)
 
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""
@@ -184,40 +188,6 @@ class SqliteStore(Reads):
             for ordinal, link in enumerate(links)
         ])
 
-    def _integral(self, changes: list[Change], before: dict) -> None:
-        """Unlanded for every link the set hands that lands on nothing held or on a kind it may not land on; then
-        Linked for every link from outside the set into an artifact the set removes or a part it drops."""
-        last = {change.artifact: change for change in changes}
-        unlanded = [
-            Linking(artifact, link.field, link.place, link.target, link.part)
-            for artifact, change in last.items() if change.content is not None
-            for link in change.links if not self._lands(link)
-        ]
-        if unlanded:
-            raise Unlanded(unlanded)
-        linked = []
-        for artifact, (held, parts) in before.items():
-            gone = parts - set(self._parts(artifact)) if self.holds(artifact) else None
-            if held:
-                linked += [
-                    each for each in self._links_into(artifact)
-                    if each.source not in last and (gone is None or each.part in gone)
-                ]
-        if linked:
-            raise Linked(linked)
-
-    def _lands(self, link) -> bool:
-        if link.target.kind.name not in link.kinds or not self.holds(link.target):
-            return False
-        return not link.part or link.part in self._parts(link.target)
-
-    def _unheld(self, entries: list[Entry]) -> None:
-        """Conflict when an entry's id is already held, or given twice."""
-        ids = [entry.id for entry in entries]
-        held = self._rows(f"SELECT id FROM entries WHERE id IN ({', '.join('?' * len(ids))})", *ids)
-        if held or len(set(ids)) != len(ids):
-            raise Conflict(f"an entry's id is held once; {[each for (each,) in held] or ids} already is")
-
     def _recorded(self, entries: list[Entry]) -> None:
         self._db.executemany("INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
             (entry.id, moment(entry.at), entry.seq, entry.artifact, entry.role, entry.execution, entry.batch,
@@ -225,15 +195,3 @@ class SqliteStore(Reads):
             for entry in entries
         ])
 
-
-def _searched(content: dict):
-    """The rows search keeps of an artifact: each section at every depth by its title, with its body; then each
-    field holding text by its name, with its value."""
-    def sections(held):
-        for section in held:
-            yield "section", section["title"], section["body"]
-            yield from sections(section.get("sections", []))
-    yield from sections(content.get("sections", []))
-    for key, value in content.items():
-        if isinstance(key, str) and isinstance(value, str):
-            yield "field", key, value

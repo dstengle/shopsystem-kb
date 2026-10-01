@@ -25,11 +25,24 @@ def artifact(store: Port, reading: Reading) -> kb_pb2.ReadResponse:
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
-    target = store.artifact(target_id)
-    schema = composition.kind_schema(target_id.kind, store)["schema"]
+    return _stub(field, store.artifact(target_id), _shown(store, target_id.kind))
+
+
+def stubs(store: Port, kind: values.Kind, artifact_ids: list[ArtifactId]) -> list[kb_pb2.Stub]:
+    """Artifacts of one kind in brief, as `stub` gives each under no field, their type read once."""
+    shown = _shown(store, kind)
+    return [_stub("", store.artifact(artifact_id), shown) for artifact_id in artifact_ids]
+
+
+def _shown(store: Port, kind: values.Kind) -> dict:
+    """What a kind's type declares, the fields it shows at a glance among it."""
+    return composition.declared(composition.kind_schema(kind, store)["schema"], store)
+
+
+def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
     return kb_pb2.Stub(
         field=field, id=target["id"], type=target["type"], title=target["title"],
-        fields=dumps(_summary_fields(target, composition.declared(schema, store))),
+        fields=dumps(_summary_fields(target, shown)),
     )
 
 

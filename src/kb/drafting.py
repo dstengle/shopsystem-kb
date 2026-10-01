@@ -14,12 +14,13 @@ from kb.values import Refused
 
 class Drafted(NamedTuple):
     """A set drafted against the store as it stood: the draft, its changes, their texts, the changes as the port takes
-    them, and the links read again of what the set leaves as it is."""
+    them, the links read again of what the set leaves as it is, and the kinds whose links it reads anew."""
     draft: Draft
     changes: list[Change]
     texts: list[str | None]
     handed: list[port.Change]
     relinks: list[port.Relink]
+    kinds: tuple[values.Kind, ...]
 
 
 def drafted(held: port.Port, operations: list) -> Drafted:
@@ -34,7 +35,7 @@ def drafted(held: port.Port, operations: list) -> Drafted:
         port.Relink(each, tuple(links.handed(each, draft.artifact(each), draft)), draft.artifact(each)["revision"])
         for each in draft.stale()
     ]
-    return Drafted(draft, changes, texts, handed, relinks)
+    return Drafted(draft, changes, texts, handed, relinks, tuple(draft.reread()))
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:
