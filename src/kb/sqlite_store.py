@@ -135,7 +135,7 @@ class SqliteStore(Checks):
             landed = self._db.execute(
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
             ).lastrowid
-            self._unmoved(changes)
+            self._unmoved(changes, relinks)
             self._restated(kinds, changes, relinks)
             before = {}
             for step, change in enumerate(changes):

@@ -378,6 +378,16 @@ def test_links_restated_without_a_new_revision_at_the_revision_read(store):
     assert [str(each) for each in store.ids()] == ["note/n", "tag/t"]
 
 
+def test_a_relink_read_through_a_type_that_has_since_moved_is_refused_and_writes_nothing(store):
+    land(store, put("schema/note", {"v": 1}), put("tag/t", {}), put("note/n", {}))
+    land(store, put("schema/note", {"v": 2}, read=1))
+    before = written(store)
+    moved = port.Relink(name("note/n"), (link("about", "about", "tag/t", ["tag"]),), 1, ((name("schema/note"), 1),))
+    with pytest.raises(port.Conflict):
+        store.land([], [entry("moved-type")], [moved])
+    assert written(store) == before
+
+
 def test_reads_at_one_moment_see_the_store_as_it_stood_whatever_lands_meanwhile(opener, store):
     land(store, put("note/a", {"title": "A"}))
     with store.at_one_moment():

@@ -31,11 +31,18 @@ def drafted(held: port.Port, operations: list) -> Drafted:
     texts = _serialised(changes)
     last = {change.artifact_id: index for index, change in enumerate(changes)}
     handed = [_handed(draft, change, last[change.artifact_id] == index) for index, change in enumerate(changes)]
-    relinks = [
-        port.Relink(each, tuple(links.handed(each, draft.artifact(each), draft)), draft.artifact(each)["revision"])
-        for each in draft.stale()
-    ]
+    relinks = [_relinked(draft, each) for each in draft.stale()]
     return Drafted(draft, changes, texts, handed, relinks, tuple(draft.reread()))
+
+
+def _relinked(draft: Draft, artifact_id: values.ArtifactId) -> port.Relink:
+    """The links of an artifact the set leaves as it is, read again through the types as the set leaves them, with the
+    revision it was read at and those of the types it was read through that the set leaves as they are."""
+    artifact = draft.artifact(artifact_id)
+    return port.Relink(
+        artifact_id, tuple(links.handed(artifact_id, artifact, draft)), artifact["revision"],
+        draft.as_read(composition.read_through(artifact_id.kind, draft)),
+    )
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:

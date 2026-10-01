@@ -81,3 +81,31 @@ def test_an_artifact_made_while_a_type_it_reads_is_drafted_anew_is_held_to_its_l
     assert [each.stub.id for each in refs(client, "tag/a", 1, inward=True).reached] == ["note/before", "note/meanwhile"]
     refused = remove(client, "tag/a")
     assert sorted(fault.artifact for fault in refused.faults) == ["note/before", "note/meanwhile"]
+
+
+def test_a_type_changed_while_a_type_built_on_it_moved_relinks_through_the_types_as_they_now_stand(root):
+    client = kb_client.connect(root)
+    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    for type_content in [TAG_TYPE, _typed("Base", {"about": ABOUT}), _typed("Note", {}, built_on="base")]:
+        define(client, type_content)
+    create(client, "tag", {"title": "A"})
+    create(client, "note", {"title": "X", "about": "tag/a"})
+    linked_base = _typed("Base", {"about": LINKED}, version=2)
+    del linked_base["title"]
+    writing = kb_pb2.WriteRequest(
+        locator=kb_pb2.Locator(id="schema/base"), content=dumps(linked_base), actor=CLIENT, message="Make it a link",
+    )
+    standing_alone = _typed("Note", {"about": ABOUT}, version=2)
+    del standing_alone["title"]
+
+    def first():
+        written = client.Write(kb_pb2.WriteRequest(
+            locator=kb_pb2.Locator(id="schema/note"), content=dumps(standing_alone), actor=CLIENT,
+            message="Stand alone",
+        ))
+        assert not written.faults, written.faults
+
+    landed = at_once.landed_second(at_once.OnAThread(root, "Write", writing), first)
+    assert not landed.faults, landed.faults
+    assert refs(client, "tag/a", 1, inward=True).reached == []
+    assert not remove(client, "tag/a").faults

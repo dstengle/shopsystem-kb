@@ -62,11 +62,14 @@ class Change:
 @dataclass(frozen=True)
 class Relink:
     """The links of an artifact a set leaves as it is, read again because a type they are read through changed: the
-    artifact, its links now, and the revision they were read at. It leaves no new revision, and its links are not
-    held to landing, since what the artifact holds was not checked again."""
+    artifact, its links now, the revision they were read at, and the types they were read through that the set does
+    not change, each with the revision it was read at. It leaves no new revision, and its links are not held to
+    landing, since what the artifact holds was not checked again. The adapter lands none of the set when the artifact
+    or any of those types has since moved."""
     artifact: ArtifactId
     links: tuple[Link, ...]
     read: int
+    through: tuple[tuple[ArtifactId, int], ...] = ()
 
 
 @dataclass(frozen=True)

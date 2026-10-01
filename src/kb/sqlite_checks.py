@@ -17,9 +17,10 @@ class Checks(Reads):
             raise Conflict(f"{artifact} was read at revision {read} and stands at revision {held}")
         return held
 
-    def _unmoved(self, changes: list[Change]) -> None:
-        """Conflict when a type a change was read through stands at another revision than the one it was read at."""
-        for type_id, read in {each for change in changes for each in change.through}:
+    def _unmoved(self, changes: list[Change], relinks: list[Relink] = ()) -> None:
+        """Conflict when a type a change or a relink was read through stands at another revision than the one it was
+        read at."""
+        for type_id, read in {each for change in [*changes, *relinks] for each in change.through}:
             self._compared(type_id, read)
 
     def _restated(self, kinds, changes: list[Change], relinks: list[Relink]) -> None:
