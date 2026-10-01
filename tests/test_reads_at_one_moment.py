@@ -46,8 +46,8 @@ def test_a_read_and_a_snapshot_beside_a_create_and_remove_loop_are_never_a_store
     try:
         reader = kb_client.connect(root)
         for _ in range(ROUNDS):
-            faults.extend(fault for fault in read(reader, "tag/t", whole=True).faults if fault.rule == "store")
-            faults.extend(fault for fault in snapshot(reader, "x", ["tag/t"]).faults if fault.rule == "store")
+            faults.extend(fault for fault in read(reader, "tag/t", whole=True).faults if fault.rule != "not-found")
+            faults.extend(fault for fault in snapshot(reader, "x", ["tag/t"]).faults if fault.rule != "not-found")
     finally:
         done.set()
         writer.join(30)
