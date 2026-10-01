@@ -25,7 +25,7 @@ CREATE INDEX artifacts_by_kind ON artifacts (kind);
 CREATE TABLE parts (artifact TEXT NOT NULL, place TEXT NOT NULL, PRIMARY KEY (artifact, place));
 CREATE TABLE links (
     source TEXT NOT NULL, ordinal INTEGER NOT NULL, field TEXT NOT NULL, place TEXT NOT NULL, target TEXT NOT NULL,
-    part TEXT NOT NULL, PRIMARY KEY (source, ordinal)
+    part TEXT NOT NULL, implicit INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (source, ordinal)
 );
 CREATE INDEX links_in ON links (target, part);
 CREATE TABLE sets (seq INTEGER PRIMARY KEY AUTOINCREMENT, batch TEXT UNIQUE);
@@ -157,8 +157,8 @@ class SqliteStore(Reads):
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""
         self._db.execute("DELETE FROM links WHERE source = ?", (str(artifact),))
-        self._db.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?)", [
-            (str(artifact), ordinal, link.field, link.place, str(link.target), link.part)
+        self._db.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?, ?)", [
+            (str(artifact), ordinal, link.field, link.place, str(link.target), link.part, int(link.implicit))
             for ordinal, link in enumerate(links)
         ])
 
@@ -178,7 +178,7 @@ class SqliteStore(Reads):
             gone = parts - set(self._parts(artifact)) if self.holds(artifact) else None
             if held:
                 linked += [
-                    each for each in self.links_in(artifact)
+                    each for each in self._links_into(artifact)
                     if each.source not in last and (gone is None or each.part in gone)
                 ]
         if linked:

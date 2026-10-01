@@ -40,7 +40,7 @@ class Draft:
         drafted = [
             Linking(source, link.field, link.place, link.target, link.part)
             for source, artifact in sources + [(source, self._store.artifact(source)) for source in stale]
-            for link in links.handed(source, artifact, self) if link.target == target
+            for link in links.handed(source, artifact, self) if link.target == target and not link.implicit
         ]
         return sorted(held + drafted, key=lambda each: names.order(each.source))
 

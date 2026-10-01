@@ -83,14 +83,20 @@ class Reads:
 
     def links_out(self, artifact_id: ArtifactId, place: str = "") -> list[Linking]:
         rows = self._rows(
-            "SELECT source, field, place, target, part FROM links WHERE source = ? ORDER BY ordinal", str(artifact_id),
+            "SELECT source, field, place, target, part FROM links WHERE source = ? AND implicit = 0 ORDER BY ordinal", str(artifact_id),
         )
         found = [_linking(*row) for row in rows]
         return [each for each in found if not place or each.place == place or each.place.startswith(f"{place}/")]
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
+        return self._links_into(artifact_id, field, kind, implicit=False)
+
+    def _links_into(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None,
+                    implicit: bool = True) -> list[Linking]:
+        """The links landing on an artifact or a part inside it; the implicit ones too, unless left out."""
         rows = self._rows(
-            "SELECT source, field, place, target, part, ordinal FROM links WHERE target = ?", str(artifact_id),
+            "SELECT source, field, place, target, part, ordinal FROM links WHERE target = ?"
+            + ("" if implicit else " AND implicit = 0"), str(artifact_id),
         )
         rows.sort(key=lambda row: (names.order(row[0]), row[5]))
         found = [_linking(*row[:5]) for row in rows]

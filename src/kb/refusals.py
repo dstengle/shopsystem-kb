@@ -54,9 +54,10 @@ def whole_only(locator: Locator) -> kb_pb2.Fault:
 
 def still_linked(removed: str, other: ArtifactId, place: str) -> kb_pb2.Fault:
     """One link that still points at what would go: a whole artifact, or an item written `<artifact>#<place>`."""
+    where = f" at {place!r}" if place else ""
     return kb_pb2.Fault(
         artifact=str(other), path=place, rule=rules.ON_DELETE,
-        message=f"{removed!r} cannot be removed while {str(other)!r} points at it at {place!r}",
+        message=f"{removed!r} cannot be removed while {str(other)!r} points at it{where}",
     )
 
 

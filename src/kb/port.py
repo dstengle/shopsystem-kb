@@ -18,12 +18,14 @@ from kb.values import ArtifactId, Kind
 class Link:
     """A link a change hands with an artifact's content: the field holding it, its place in the artifact, the artifact
     it lands on, the place of the part inside that artifact it lands on (empty for the artifact itself), and the kinds
-    it may land on."""
+    it may land on. An implicit link is kb's own bookkeeping: it holds what it lands on in place, and refuses its
+    removal like any link, but no read of links, counts or walks shows it."""
     field: str
     place: str
     target: ArtifactId
     part: str
     kinds: tuple[str, ...]
+    implicit: bool = False
 
 
 @dataclass(frozen=True)

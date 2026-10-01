@@ -2,7 +2,7 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, create, define, next_version, read, request, write
+from calls import DECISION_TYPE, create, define, listing, next_version, read, remove, request, write
 import held
 from kb.content import loads
 
@@ -331,3 +331,32 @@ def _rejected_for_the_version_kept(changed):
 @then("the type reads back as it was")
 def _the_type_as_it_was(client, held):
     assert read(client, "schema/decision", whole=True) == held
+
+
+TWO_DECISIONS = ["vote/ship-weekly", "vote/price-monthly"]
+
+
+@given("a type the store holds, and two artifacts of its kind")
+def _a_type_and_two_artifacts(client):
+    define(client, {"title": "Vote", "version": 1, "schema": {
+        "type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"],
+    }})
+    for title in ("Ship weekly", "Price monthly"):
+        create(client, "vote", {"title": title})
+
+
+@when("the client removes that type", target_fixture="attempt")
+def _remove_the_type(root, client):
+    before = held.holds(root)
+    return {"response": remove(client, "schema/vote"), "before": before, "after": held.holds(root)}
+
+
+@then("the removal is rejected because something still points at it, naming each of those two artifacts")
+def _rejected_naming_each(client, attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [
+        (name, "", "on_delete") for name in sorted(TWO_DECISIONS)
+    ]
+    assert all("'schema/vote'" in fault.message for fault in faults)
+    assert attempt["after"] == attempt["before"]
+    assert list(listing(client, "vote", ids_only=True).ids) == sorted(TWO_DECISIONS)

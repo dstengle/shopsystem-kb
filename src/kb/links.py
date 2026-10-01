@@ -31,12 +31,14 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
 def handed(artifact_id: values.ArtifactId, artifact: dict, corpus) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
     the kinds its field allows, read through the artifact's type as the corpus holds it; none when the corpus holds
-    no such type. A value that could name nothing, which a type changed after it was written can leave in a link
+    no such type. Every artifact carries one implicit link, first, to the artifact of its type. A value that could name nothing, which a type changed after it was written can leave in a link
     field, is not handed."""
-    if not corpus.holds(values.type_of(artifact_id.kind)):
-        return []
+    typed = values.type_of(artifact_id.kind)
+    implicit = port.Link("", "", typed, "", (values.TYPE_KIND.name,), implicit=True)
+    if not corpus.holds(typed):
+        return [implicit]
     schema = composition.kind_schema(artifact_id.kind, corpus)["schema"]
-    found = []
+    found = [implicit]
     for link in carried(artifact, schema, corpus):
         if not isinstance(link.target, str):
             continue
