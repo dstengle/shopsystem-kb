@@ -2,14 +2,15 @@
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
 None; `kb.contract.kb_pb2`'s being importable, as package `kb.v1`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
-`place`; and the set of kb's own rule names against the spec's list. It does not pin the wording of any fault."""
+`place`; that each item an `AddMany` adds names the artifact it went to; and the set of kb's own rule names against
+the spec's list. It does not pin the wording of any fault."""
 import inspect
 import re
 from pathlib import Path
 
 import pytest
 
-from calls import define, request
+from calls import DECISION_TYPE, add_many, added, create, define, request
 from kb import client as kb_client, rules
 from kb import content as kb_content
 from kb.content import NotCanonical, dumps, loads, text
@@ -82,9 +83,9 @@ def test_a_json_schema_keyword_passes_through_as_a_rule_outside_the_pinned_set(t
 
 CHANGES = {
     "Create": ("CreateRequest", {"kind", "title", "content", "signature"}, "Created", {"id", "revision"}),
-    "Replace": ("ReplaceRequest", {"locator", "content", "signature"}, "Replaced", {"id", "revision"}),
-    "Add": ("AddRequest", {"locator", "content", "signature"}, "Added", {"id", "revision"}),
-    "Remove": ("RemoveRequest", {"locator", "signature"}, "Removed", {"id", "revision"}),
+    "Replace": ("ReplaceRequest", {"locator", "content", "signature", "revision"}, "Replaced", {"id", "revision"}),
+    "Add": ("AddRequest", {"locator", "content", "signature", "revision"}, "Added", {"artifact", "id", "revision"}),
+    "Remove": ("RemoveRequest", {"locator", "signature", "revision"}, "Removed", {"id", "revision"}),
 }
 
 
@@ -124,3 +125,21 @@ def test_the_v0_changes_are_gone():
     assert not {"WriteRequest", "AppendRequest", "DeleteRequest"} & set(kb_pb2.DESCRIPTOR.message_types_by_name)
     for rpc, (asked, _, _, _) in CHANGES.items():
         assert "actor" not in _fields(asked)
+
+
+def test_each_item_an_add_many_adds_names_the_artifact_it_went_to(tmp_path):
+    root = tmp_path / "store"
+    root.mkdir()
+    client = kb_client.connect(root)
+    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    define(client, DECISION_TYPE)
+    for title in ("Weekly", "Daily"):
+        sections = [{"title": "Purpose", "body": "Why.\n"}, {"title": "Rationale", "body": "Because.\n"}]
+        create(client, "decision", {"title": title, "sections": sections})
+    landed = add_many(client, [
+        added("decision/weekly", "options", {"title": "Go monthly"}),
+        added("decision/daily", "options", {"title": "Go hourly"}),
+    ])
+    assert [(each.artifact, each.id, each.revision) for each in landed.results] == [
+        ("decision/weekly", "go-monthly", 2), ("decision/daily", "go-hourly", 2),
+    ]

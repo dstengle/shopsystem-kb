@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, create_many, created, define, journal, listing, read, refs,
-    remove_many, removed, replace, replace_many, replaced,
+    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, add_many, added, create, create_many, created, define, journal, listing,
+    read, refs, remove_many, removed, replace, replace_many, replaced,
 )
 import held
 from kb import client as kb_client
@@ -458,3 +458,90 @@ def _create_pointing_at_a_place_by_key(root, client):
 @then("the reference is given back")
 def _the_reference_given_back(attempt):
     assert attempt["reference"] in attempt["response"].faults[0].message
+
+
+SECOND_WORK_ITEM = "work-item/print-the-new-price-labels"
+
+
+@given("the store also holds a second work item, and work items carry a collection of tasks")
+def _a_second_work_item_and_tasks(client):
+    _work_items_carry_tasks(client)
+    create(client, "work-item", {"title": "Print the new price labels"})
+
+
+@given(
+    "the client read the work item at its first version, and another client has since replaced it",
+    target_fixture="moved",
+)
+def _read_then_replaced_by_another(root, client):
+    seen = read(client, WORK_ITEM).revision
+    assert seen == 1
+    since = replace(kb_client.connect(root), WORK_ITEM, {"decisions": []}, message="Point at no decision")
+    assert since.revision == seen + 1
+    return {"seen": seen, "stands_at": since.revision, "held": held.holds(root)}
+
+
+SAYING_WHAT_WAS_READ = {
+    "the work item and the second work item to be replaced": lambda client, seen: replace_many(client, [
+        replaced(WORK_ITEM, {}, revision=seen), replaced(SECOND_WORK_ITEM, {}),
+    ], message="Replace both work items"),
+    "a task to be added to the work item and one to the second work item": lambda client, seen: add_many(client, [
+        added(WORK_ITEM, "tasks", {"title": "Move the meeting"}, revision=seen),
+        added(SECOND_WORK_ITEM, "tasks", {"title": "Order the labels"}),
+    ], message="Give each work item a task"),
+    "the work item and the second work item to be removed": lambda client, seen: remove_many(client, [
+        removed(WORK_ITEM, revision=seen), removed(SECOND_WORK_ITEM),
+    ], message="Remove both work items"),
+}
+
+
+@when(
+    parsers.re(
+        f"the client asks, in one go, for (?P<changes>{'|'.join(map(re.escape, SAYING_WHAT_WAS_READ))}), the change to "
+        "the work item saying the version the client read it at, saying which role and why"
+    ),
+    target_fixture="applied",
+)
+def _ask_saying_what_was_read(client, moved, changes):
+    return SAYING_WHAT_WAS_READ[changes](client, moved["seen"])
+
+
+@then("the set is rejected because the artifact moved since it was read")
+def _set_rejected_as_moved(applied):
+    assert applied.refused
+    assert [(fault.artifact, fault.place, fault.rule) for fault in applied.faults] == [(WORK_ITEM, "", "revision")]
+    assert applied.faults[0].message.startswith("the artifact moved since it was read")
+
+
+@then("the version the work item stands at is given back")
+def _given_where_the_work_item_stands(applied, moved):
+    assert f"stands at revision {moved['stands_at']}" in applied.faults[0].message
+
+
+@then("nothing of the set is written")
+def _nothing_of_the_set_written(root, moved):
+    assert held.holds(root) == moved["held"]
+
+
+SECOND_SAYING = {"the version the first replacement leaves": 2, "the version the work item stood at before the set": 1}
+
+
+@when(
+    parsers.re(
+        f"the client asks, in one go, for the work item to be replaced twice, the second replacement saying "
+        f"(?P<version>{'|'.join(map(re.escape, SECOND_SAYING))}), saying which role and why"
+    ),
+    target_fixture="applied",
+)
+def _replace_twice_the_second_saying(client, version):
+    assert read(client, WORK_ITEM).revision == 1
+    return replace_many(client, [
+        replaced(WORK_ITEM, {"decisions": []}), replaced(WORK_ITEM, {}, revision=SECOND_SAYING[version]),
+    ], message="Change the work item twice")
+
+
+@then("the set lands, and the work item's version has gone up by two")
+def _lands_two_versions_on(client, applied):
+    assert not applied.refused, applied.faults
+    assert [(result.id, result.revision) for result in applied.results] == [(WORK_ITEM, 2), (WORK_ITEM, 3)]
+    assert read(client, WORK_ITEM).revision == 3

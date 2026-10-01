@@ -1,12 +1,13 @@
 """Every change in a set is checked, not only the last a set makes to an artifact: its content against its type as the
 set leaves it, a type's version moved on from the version it acted on; and a change acting on what an earlier one left
-unfit is refused with a typed fault. Through the contract, and, for a set of more than one kind of change, which the
-contract does not take, through kb.write's own `land`; each store under its own tmp_path."""
+unfit is refused with a typed fault; a key two creates carry refused beside every other fault of the set. Through
+the contract, and, for a set of more than one kind of change, which the contract does not take, through kb.write's
+own `land`; each store under its own tmp_path."""
 import copy
 
 import pytest
 
-from calls import CLIENT, DECISION_TYPE, create, define, read, replace_many, replaced
+from calls import CLIENT, DECISION_TYPE, create, create_many, created, define, read, replace_many, replaced
 from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps
 from kb.contract import kb_pb2
@@ -111,3 +112,21 @@ def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(c
     response = replace_many(client, [replaced("schema/decision", first), replaced("schema/decision", changed)])
     assert _faults(response) == faults
     assert read(client, "schema/decision").revision == 1
+
+
+def test_a_key_carried_twice_is_refused_beside_every_other_fault_of_the_set(client):
+    refused = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS[:1]}, key="pricing"),
+    ])
+    assert _faults(refused) == [("decision/price-reviews-happen-daily", "sections", "sections"), ("", "", "ref")]
+    assert "'pricing'" in refused.faults[1].message
+
+
+def test_a_key_carried_twice_is_refused_when_one_of_its_creates_does_not_convert(client):
+    refused = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
+        created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing"),
+    ])
+    assert [fault.rule for fault in refused.faults] == ["kind", "ref"]
+    assert "'pricing'" in refused.faults[1].message

@@ -168,11 +168,16 @@ message Stale {
 }
 
 // A new content for an artifact the store holds, or for the node at the
-// locator's place inside it; its title is kept.
+// locator's place inside it; its title is kept. A replacement, an
+// addition or a removal, alone or in a set, may say the revision the
+// client read the artifact at; when the artifact stands at another as
+// the change lands, the change is refused with rule `revision`, naming
+// the revision it stands at, and nothing of its set is written.
 message ReplaceRequest {
   Locator locator = 1;
   string content = 2;  // canonical YAML: fields, sections, parts
   Signature signature = 3;
+  int32 revision = 4;  // the revision the client read the artifact at; 0 says none
 }
 
 // The artifact replaced, and its version now.
@@ -346,12 +351,15 @@ message AddRequest {
   Locator locator = 1;
   string content = 2;  // canonical YAML: the item's fields, never its id
   Signature signature = 3;
+  int32 revision = 4;  // the revision the client read the artifact at; 0 says none
 }
 
-// The name kb gave the item, and the artifact's version now.
+// The name kb gave the item, the artifact's version now, and the
+// artifact it was added to.
 message Added {
   string id = 1;
   int32 revision = 2;
+  string artifact = 3;
 }
 
 message AddResponse {
@@ -366,6 +374,7 @@ message AddResponse {
 message RemoveRequest {
   Locator locator = 1;
   Signature signature = 2;
+  int32 revision = 3;  // the revision the client read the artifact at; 0 says none
 }
 
 // The artifact removed, and the version the removal left behind.
@@ -420,6 +429,7 @@ message CreateManyResponse {
 message ReplaceItem {
   Locator locator = 1;
   string content = 2;  // canonical YAML: fields, sections, parts
+  int32 revision = 3;  // the revision the client read the artifact at; 0 says none
 }
 
 message ReplaceManyRequest {
@@ -445,6 +455,7 @@ message ReplaceManyResponse {
 message AddItem {
   Locator locator = 1;
   string content = 2;  // canonical YAML: the item's fields, never its id
+  int32 revision = 3;  // the revision the client read the artifact at; 0 says none
 }
 
 message AddManyRequest {
@@ -469,6 +480,7 @@ message AddManyResponse {
 // A set of removals, landing in order as one change, or none does.
 message RemoveItem {
   Locator locator = 1;
+  int32 revision = 2;  // the revision the client read the artifact at; 0 says none
 }
 
 message RemoveManyRequest {

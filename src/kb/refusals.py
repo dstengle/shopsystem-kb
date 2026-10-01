@@ -44,6 +44,14 @@ def settled_place(locator: Locator) -> kb_pb2.Fault:
     )
 
 
+def moved(artifact_id: ArtifactId, revision: int) -> kb_pb2.Fault:
+    """A change that said the revision its artifact was read at, which the artifact no longer stands at."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.REVISION,
+        message=f"the artifact moved since it was read; {str(artifact_id)!r} stands at revision {revision}",
+    )
+
+
 def whole_only(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(

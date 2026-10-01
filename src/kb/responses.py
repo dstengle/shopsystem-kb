@@ -1,8 +1,14 @@
 """An rpc's or an operator's command's response, made from what its call gave or the faults it was refused for: a
 response with an outcome holds the result or a refusal, never both; any other carries its faults beside what it
 gives. A change's result, and a set's, are made here from what the set landed."""
-from kb import write
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from kb.contract import kb_pb2
+
+if TYPE_CHECKING:
+    from kb import write
 
 
 def _has_outcome(response) -> bool:
@@ -32,8 +38,8 @@ def replaced(result: write.Result) -> kb_pb2.Replaced:
 
 
 def added(result: write.Result) -> kb_pb2.Added:
-    """The item added, by the name kb gave it, and the artifact's version now."""
-    return kb_pb2.Added(id=result.item, revision=result.revision)
+    """The item added, by the name kb gave it, the artifact's version now, and the artifact it went to."""
+    return kb_pb2.Added(id=result.item, revision=result.revision, artifact=str(result.artifact_id))
 
 
 def removed(result: write.Result) -> kb_pb2.Removed:

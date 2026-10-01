@@ -130,6 +130,11 @@ def key(text: str) -> str:
     return text
 
 
+def expected(revision: int) -> int | None:
+    """The revision a change says the client read its artifact at; None when it says none, as 0 says."""
+    return revision or None
+
+
 def _leaves_nothing(title: str) -> str:
     return f"a title must leave something to make a name from; {title!r} leaves nothing"
 

@@ -78,8 +78,7 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
 
 def _replace(draft: Draft, replacement: changes.Replace) -> Change:
     locator = replacement.locator
-    if not draft.holds(locator.id):
-        raise Refused([refusals.not_found(locator.id)])
+    _as_read(draft, locator.id, replacement.expected)
     if replacement.content.problems:
         raise Refused(replacement.content.refusal(str(locator.id)))
     content, current = copy.deepcopy(replacement.content.tree), draft.artifact(locator.id)
@@ -92,8 +91,7 @@ def _replace(draft: Draft, replacement: changes.Replace) -> Change:
 def _append(draft: Draft, addition: changes.Add) -> Change:
     """One item put at the end of a collection the artifact's type declares, and named there."""
     locator = addition.locator
-    if not draft.holds(locator.id):
-        raise Refused([refusals.not_found(locator.id)])
+    _as_read(draft, locator.id, addition.expected)
     if addition.item.problems:
         raise Refused(addition.item.refusal(str(locator.id)))
     if not locator.place:
@@ -126,13 +124,22 @@ def _collections_at(draft: Draft, locator: values.Locator) -> dict:
 def _delete(draft: Draft, removal: changes.Remove) -> Change:
     """A whole artifact taken out of the draft; what still points at it is judged once the whole set has acted."""
     locator = removal.locator
-    if not draft.holds(locator.id):
-        raise Refused([refusals.not_found(locator.id)])
+    _as_read(draft, locator.id, removal.expected)
     if locator.place:
         raise Refused([refusals.whole_only(locator)])
     removed = draft.artifact(locator.id)
     draft.remove(locator.id)
     return Change("delete", locator.id, revision=removed["revision"] + 1, schema_version=removed["schema_version"])
+
+
+def _as_read(draft: Draft, artifact_id: ArtifactId, expected: int | None) -> None:
+    """Refuse a change to an artifact the draft does not hold, or to one that stands at another revision than the one
+    the change says it was read at, as the changes before it in the set left it."""
+    if not draft.holds(artifact_id):
+        raise Refused([refusals.not_found(artifact_id)])
+    revision = draft.artifact(artifact_id)["revision"]
+    if expected is not None and revision != expected:
+        raise Refused([refusals.moved(artifact_id, revision)])
 
 
 def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> tuple:

@@ -26,8 +26,11 @@ def test_the_client_adds_an_item_to_a_collection_inside_an_item():
     pass
 
 
-@scenario("change-the-store.feature", "Several clients on one machine change one store at the same time")
-def test_several_clients_on_one_machine_change_one_store_at_the_same_time():
+@scenario(
+    "change-the-store.feature",
+    "Several clients on one machine change one store at the same time, none saying the version it read",
+)
+def test_several_clients_on_one_machine_change_one_store_at_the_same_time_none_saying_the_version_it_read():
     pass
 
 
@@ -236,7 +239,7 @@ def _named_from_its_title(client, added):
 @then("the client never said what the name should be")
 def _never_said(added):
     assert "id" not in added["sent"]
-    assert set(kb_pb2.AddRequest.DESCRIPTOR.fields_by_name) == {"locator", "content", "signature"}
+    assert set(kb_pb2.AddRequest.DESCRIPTOR.fields_by_name) == {"locator", "content", "signature", "revision"}
 
 
 @given("an artifact holding a collection whose items carry no title of their own")
@@ -452,7 +455,8 @@ def _adding(content, message):
 
 @given(
     parsers.re(f"(?P<clients>{'|'.join(map(re.escape, CLIENTS))}), one adding a step to the process while the other "
-               "adds a different step, each saying which role and why"),
+               "adds a different step, each saying which role and why and neither saying the version it read the "
+               "process at"),
     target_fixture="racing",
 )
 def _clients_adding_steps(root, tmp_path, clients):

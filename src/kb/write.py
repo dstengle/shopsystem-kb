@@ -51,7 +51,8 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
 def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock | None = None) -> Landed:
     """The set drafted against the store as it stands, each entry's moment read from the clock, then landed. When
     another change lands between the draft and the landing, the set is drafted, stamped and landed again while the
-    port holds the write lock. Raises Refused with every fault, having written nothing."""
+    port holds the write lock, where a change that says the revision it read is compared again, and refused if its
+    artifact moved. Raises Refused with every fault, having written nothing."""
     try:
         return _round(held, operations, signed, clock)
     except port.Conflict:

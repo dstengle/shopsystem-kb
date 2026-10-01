@@ -143,25 +143,30 @@ def creating(type_name, title, content, message="Create an artifact", actor=CLIE
     return kb_pb2.CreateRequest(kind=type_name, title=title, content=text, signature=signature(message, actor))
 
 
-def replacing(artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):
-    """A ReplaceRequest for a whole artifact, or for the node at path inside it."""
+def replacing(artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0):
+    """A ReplaceRequest for a whole artifact, or for the node at path inside it, saying the revision the client read
+    the artifact at when revision is given."""
     text = content if isinstance(content, str) else dumps(content)
     return kb_pb2.ReplaceRequest(
         locator=kb_pb2.Locator(id=artifact_id, place=path), content=text, signature=signature(message, actor),
+        revision=revision,
     )
 
 
-def adding(artifact_id, collection, content, message="Add an item", actor=CLIENT):
-    """An AddRequest for one item to the collection named inside an artifact."""
+def adding(artifact_id, collection, content, message="Add an item", actor=CLIENT, revision=0):
+    """An AddRequest for one item to the collection named inside an artifact, saying the revision the client read the
+    artifact at when revision is given."""
     return kb_pb2.AddRequest(
         locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(content),
-        signature=signature(message, actor),
+        signature=signature(message, actor), revision=revision,
     )
 
 
-def removing(artifact_id, message="Remove an artifact", actor=CLIENT):
-    """A RemoveRequest for a whole artifact."""
-    return kb_pb2.RemoveRequest(locator=kb_pb2.Locator(id=artifact_id), signature=signature(message, actor))
+def removing(artifact_id, message="Remove an artifact", actor=CLIENT, revision=0):
+    """A RemoveRequest for a whole artifact, saying the revision the client read it at when revision is given."""
+    return kb_pb2.RemoveRequest(
+        locator=kb_pb2.Locator(id=artifact_id), signature=signature(message, actor), revision=revision,
+    )
 
 
 def request(client, type_name, title, content, message="Create an artifact", actor=CLIENT):
@@ -201,9 +206,10 @@ def created(type_name, title, content, key=""):
     return kb_pb2.CreateItem(kind=type_name, title=title, content=dumps(content), key=key)
 
 
-def replaced(artifact_id, content):
-    """A replacement of a whole artifact inside a ReplaceMany."""
-    return kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content))
+def replaced(artifact_id, content, revision=0):
+    """A replacement of a whole artifact inside a ReplaceMany, saying the revision the client read it at when revision
+    is given."""
+    return kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), revision=revision)
 
 
 def create_many(client, items, message="Make several changes", actor=CLIENT):
@@ -218,14 +224,18 @@ def replace_many(client, items, message="Make several changes", actor=CLIENT):
     return answer(client.ReplaceMany(kb_pb2.ReplaceManyRequest(items=items, signature=signature(message, actor))))
 
 
-def added(artifact_id, collection, content):
-    """One item for the collection named inside an artifact, inside an AddMany."""
-    return kb_pb2.AddItem(locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(content))
+def added(artifact_id, collection, content, revision=0):
+    """One item for the collection named inside an artifact, inside an AddMany, saying the revision the client read
+    the artifact at when revision is given."""
+    return kb_pb2.AddItem(
+        locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(content), revision=revision,
+    )
 
 
-def removed(artifact_id):
-    """A removal of a whole artifact inside a RemoveMany."""
-    return kb_pb2.RemoveItem(locator=kb_pb2.Locator(id=artifact_id))
+def removed(artifact_id, revision=0):
+    """A removal of a whole artifact inside a RemoveMany, saying the revision the client read it at when revision is
+    given."""
+    return kb_pb2.RemoveItem(locator=kb_pb2.Locator(id=artifact_id), revision=revision)
 
 
 def add_many(client, items, message="Make several changes", actor=CLIENT):
@@ -240,22 +250,24 @@ def remove_many(client, items, message="Make several changes", actor=CLIENT):
     return answer(client.RemoveMany(kb_pb2.RemoveManyRequest(items=items, signature=signature(message, actor))))
 
 
-def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):
+def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0):
     """A Replace of a whole artifact, or of the node at path inside it, under the client's role unless another actor
-    is given. Returns the answer, faults and all."""
-    return answer(client.Replace(replacing(artifact_id, content, message, actor, path)))
+    is given, saying the revision the client read it at when revision is given. Returns the answer, faults and
+    all."""
+    return answer(client.Replace(replacing(artifact_id, content, message, actor, path, revision)))
 
 
-def add(client, artifact_id, collection, content, message="Add an item", actor=CLIENT):
+def add(client, artifact_id, collection, content, message="Add an item", actor=CLIENT, revision=0):
     """An Add of one item to the collection named inside an artifact, under the client's role unless another actor is
-    given. Returns the answer, faults and all."""
-    return answer(client.Add(adding(artifact_id, collection, content, message, actor)))
+    given, saying the revision the client read the artifact at when revision is given. Returns the answer, faults and
+    all."""
+    return answer(client.Add(adding(artifact_id, collection, content, message, actor, revision)))
 
 
-def remove(client, artifact_id, message="Remove an artifact", actor=CLIENT):
-    """A Remove of a whole artifact, under the client's role unless another actor is given. Returns the answer,
-    faults and all."""
-    return answer(client.Remove(removing(artifact_id, message, actor)))
+def remove(client, artifact_id, message="Remove an artifact", actor=CLIENT, revision=0):
+    """A Remove of a whole artifact, under the client's role unless another actor is given, saying the revision the
+    client read it at when revision is given. Returns the answer, faults and all."""
+    return answer(client.Remove(removing(artifact_id, message, actor, revision)))
 
 
 def journal(client, artifact="", role="", execution="", since="", batch=""):

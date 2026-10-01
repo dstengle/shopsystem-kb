@@ -196,14 +196,16 @@ class Stale(_message.Message):
     def __init__(self, artifact: _Optional[str] = ..., schema_version: _Optional[int] = ..., current: _Optional[int] = ...) -> None: ...
 
 class ReplaceRequest(_message.Message):
-    __slots__ = ("locator", "content", "signature")
+    __slots__ = ("locator", "content", "signature", "revision")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
     signature: Signature
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class Replaced(_message.Message):
     __slots__ = ("revision", "id")
@@ -415,22 +417,26 @@ class SnapshotResponse(_message.Message):
     def __init__(self, entry: _Optional[str] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class AddRequest(_message.Message):
-    __slots__ = ("locator", "content", "signature")
+    __slots__ = ("locator", "content", "signature", "revision")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
     signature: Signature
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class Added(_message.Message):
-    __slots__ = ("id", "revision")
+    __slots__ = ("id", "revision", "artifact")
     ID_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    ARTIFACT_FIELD_NUMBER: _ClassVar[int]
     id: str
     revision: int
-    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
+    artifact: str
+    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., artifact: _Optional[str] = ...) -> None: ...
 
 class AddResponse(_message.Message):
     __slots__ = ("result", "refusal")
@@ -441,12 +447,14 @@ class AddResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Added, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class RemoveRequest(_message.Message):
-    __slots__ = ("locator", "signature")
+    __slots__ = ("locator", "signature", "revision")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     signature: Signature
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class Removed(_message.Message):
     __slots__ = ("revision", "id")
@@ -501,12 +509,14 @@ class CreateManyResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[CreatedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ReplaceItem(_message.Message):
-    __slots__ = ("locator", "content")
+    __slots__ = ("locator", "content", "revision")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ...) -> None: ...
+    revision: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ReplaceManyRequest(_message.Message):
     __slots__ = ("items", "signature")
@@ -533,12 +543,14 @@ class ReplaceManyResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[ReplacedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class AddItem(_message.Message):
-    __slots__ = ("locator", "content")
+    __slots__ = ("locator", "content", "revision")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ...) -> None: ...
+    revision: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class AddManyRequest(_message.Message):
     __slots__ = ("items", "signature")
@@ -565,10 +577,12 @@ class AddManyResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[AddedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class RemoveItem(_message.Message):
-    __slots__ = ("locator",)
+    __slots__ = ("locator", "revision")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class RemoveManyRequest(_message.Message):
     __slots__ = ("items", "signature")

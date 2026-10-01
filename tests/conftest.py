@@ -160,13 +160,16 @@ def _one_entry_under_the_role(client, starter, message):
 
 
 @given("another change is being written and holds the store longer than the store waits", target_fixture="holding")
-def _another_change_holds_the_store(root, request, monkeypatch):
-    return held.another_change_holds(root, request, monkeypatch)
+def _another_change_holds_the_store(root, request, monkeypatch, before):
+    holding = held.another_change_holds(root, request, monkeypatch)
+    before.update(held=holding.held)
+    return holding
 
 
 @then("nothing is written")
-def _nothing_written_while_held(root, holding):
-    assert held.holds(root) == holding.held
+def _nothing_written(root, before):
+    """The store holds what it held when the Given that readied the change took what it held."""
+    assert held.holds(root) == before["held"]
 
 
 # The operator's command line, and the Givens that set where the operator works and which store, if any, is named.

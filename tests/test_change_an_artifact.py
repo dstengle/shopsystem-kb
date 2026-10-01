@@ -1,12 +1,11 @@
 import copy
 import re
 
-import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, NOTE_TYPE, add, define, create, journal, listing, read, refs, remove, replacing, request,
-    replace, answer,
+    CLIENT, DECISION_TYPE, NOTE_TYPE, add, define, create, create_many, created, journal, listing, read, refs, remove,
+    replacing, request, replace, answer,
 )
 import at_once
 import held
@@ -42,8 +41,8 @@ def test_the_clock_fails_during_a_change():
     pass
 
 
-@scenario("change-the-store.feature", "Two clients replace one artifact at the same time")
-def test_two_clients_replace_one_artifact_at_the_same_time():
+@scenario("change-the-store.feature", "Two clients replace one artifact at the same time, neither saying the version it read")
+def test_two_clients_replace_one_artifact_at_the_same_time_neither_saying_the_version_it_read():
     pass
 
 
@@ -500,10 +499,9 @@ UNSIGNED = {
     "adds an option to the decision": lambda client, actor, message: add(
         client, DECISION, "options", {"title": "Go fortnightly"}, message=message, actor=actor),
     "removes the decision": lambda client, actor, message: remove(client, DECISION, message=message, actor=actor),
-    "asks, in one go, for another decision to be created and the decision to be replaced":
-        lambda client, actor, message: pytest.fail(
-            "contract v1 takes one kind of change in a set (decision/sets-one-kind-at-a-time): no call asks for a "
-            "create and a replacement in one go, so this example cannot be made as it is written"),
+    "asks, in one go, for two other decisions to be created": lambda client, actor, message: create_many(
+        client, [created(*ANOTHER), created("decision", "Yet another", {"sections": SECTIONS})],
+        message=message, actor=actor),
 }
 
 SAYING = {
@@ -597,7 +595,7 @@ def _replacing(rationale, message):
 
 @given(
     "one client is replacing the decision with one rationale while another replaces it with a different rationale, "
-    "each saying which role and why",
+    "each saying which role and why and neither saying the version it read the decision at",
     target_fixture="racing",
 )
 def _replacing_at_once():
@@ -684,3 +682,119 @@ def _given_the_decision(shown):
 @then("the read is not refused because the store was busy with another change")
 def _read_not_busy(shown):
     assert list(shown.faults) == []
+
+
+@scenario("change-the-store.feature", "A change that says the version its artifact still stands at lands")
+def test_a_change_that_says_the_version_its_artifact_still_stands_at_lands():
+    pass
+
+
+GO_FORTNIGHTLY = {"title": "Go fortnightly"}
+SAYING_A_REVISION = {
+    "replaces the decision": lambda client, revision: replace(
+        client, DECISION, {"sections": [SECTIONS[0], ONE_RATIONALE]}, message="Say it is the suppliers",
+        revision=revision),
+    "adds an option to the decision": lambda client, revision: add(
+        client, DECISION, "options", GO_FORTNIGHTLY, message="Weigh going fortnightly", revision=revision),
+    "removes the decision": lambda client, revision: remove(
+        client, DECISION, message="Drop the decision", revision=revision),
+}
+
+
+@given("the client read the decision at its first version", target_fixture="seen")
+def _read_at_its_first_version(client):
+    seen = read(client, DECISION)
+    assert seen.revision == 1
+    return seen.revision
+
+
+@when(
+    parsers.re(
+        f"the client (?P<call>{'|'.join(map(re.escape, SAYING_A_REVISION))}), saying the version it read the decision "
+        "at and which role and why"
+    ),
+    target_fixture="changed",
+)
+def _change_saying_the_revision_read(client, seen, call):
+    return SAYING_A_REVISION[call](client, seen)
+
+
+@then("the change lands")
+def _the_change_lands(seen, changed):
+    assert not changed.refused, changed.faults
+    assert changed.revision == seen + 1
+
+
+@scenario("change-the-store.feature", "A change that says a version its artifact no longer stands at is refused")
+def test_a_change_that_says_a_version_its_artifact_no_longer_stands_at_is_refused():
+    pass
+
+
+@given("another client has since replaced the decision")
+def _another_client_replaced_it(root, seen, before):
+    replaced_it = replace(
+        kb_client.connect(root), DECISION, {"sections": [SECTIONS[0], DIFFERENT_RATIONALE], "options": OPTIONS},
+        message="Say it is the customers, and weigh two options",
+    )
+    assert replaced_it.revision == seen + 1
+    before.update(held=held.holds(root), stands_at=replaced_it.revision)
+
+
+MOVED = "the artifact moved since it was read"
+
+
+@then("the change is rejected because the artifact moved since it was read")
+def _rejected_as_moved(changed):
+    assert changed.refused
+    assert [(fault.artifact, fault.place, fault.rule) for fault in changed.faults] == [(DECISION, "", "revision")]
+    assert changed.faults[0].message.startswith(MOVED)
+
+
+@then("the version the decision stands at is given back")
+def _given_where_it_stands(changed, before):
+    assert f"stands at revision {before['stands_at']}" in changed.faults[0].message
+
+
+@scenario("change-the-store.feature", "A change that says no version acts on its artifact as it stands")
+def test_a_change_that_says_no_version_acts_on_its_artifact_as_it_stands():
+    pass
+
+
+@when(
+    parsers.re(
+        f"the client (?P<call>{'|'.join(map(re.escape, SAYING_A_REVISION))}), without saying the version it read the "
+        "decision at, saying which role and why"
+    ),
+    target_fixture="changed",
+)
+def _change_saying_no_revision(client, call):
+    return SAYING_A_REVISION[call](client, 0)
+
+
+@then(
+    "the decision holds the client's replacement, one version on from the version the other client left",
+)
+def _holds_the_replacement(client, changed, before):
+    assert not changed.refused, changed.faults
+    assert changed.revision == read(client, DECISION).revision == before["stands_at"] + 1
+    assert loads(read(client, DECISION, whole=True).content) == {"sections": [SECTIONS[0], ONE_RATIONALE]}
+
+
+@then(
+    "the new option comes after the options the other client's replacement left, one version on from that version",
+)
+def _option_after_the_others(client, changed, before):
+    assert not changed.refused, changed.faults
+    assert changed.revision == read(client, DECISION).revision == before["stands_at"] + 1
+    assert loads(read(client, DECISION, whole=True).content)["options"] == [
+        {"id": "keep-weekly", **OPTIONS[0]}, {"id": "go-monthly", **OPTIONS[1]},
+        {"id": "go-fortnightly", **GO_FORTNIGHTLY},
+    ]
+
+
+@then("the store no longer holds the decision")
+def _no_longer_holds_the_decision(root, client, changed, before):
+    assert not changed.refused, changed.faults
+    assert changed.revision == before["stands_at"] + 1
+    assert DECISION not in _names(client)
+    assert not held.holds_artifact(root, DECISION)
