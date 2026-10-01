@@ -2,6 +2,7 @@
 
 Storage takes only these values, never a string that came from a request.
 """
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -203,9 +204,15 @@ class Root:
     named: str
 
 
-def root(text: str) -> Root:
-    """The directory a store is started in, as the request names it; relative names stay relative. What stands
-    there is the store's to check."""
+def root(named: "str | os.PathLike") -> Root:
+    """The directory a store is started in, as it is named, as text or as a path; relative names stay relative.
+    What stands there is the store's to check. Anything else, and no name, is refused."""
+    text = os.fspath(named) if isinstance(named, os.PathLike) else named
+    if not isinstance(text, str):
+        raise Refused([kb_pb2.Fault(
+            rule=rules.ROOT,
+            message=f"a store is started in a directory named as text or as a path; it was named {named!r}",
+        )])
     if not text:
         raise Refused([kb_pb2.Fault(
             rule=rules.ROOT,

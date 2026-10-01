@@ -211,3 +211,43 @@ def test_each_item_an_add_many_adds_names_the_artifact_it_went_to(tmp_path):
     assert [(each.artifact, each.id, each.revision) for each in landed.results] == [
         ("decision/weekly", "go-monthly", 2), ("decision/daily", "go-hourly", 2),
     ]
+
+
+def _field_type(message, field):
+    return kb_pb2.DESCRIPTOR.message_types_by_name[message].fields_by_name[field].message_type.name
+
+
+@pytest.mark.parametrize("message", ["CreateRequest", "ReplaceRequest", "AddRequest", "RemoveRequest",
+                                     "CreateManyRequest", "ReplaceManyRequest", "AddManyRequest",
+                                     "RemoveManyRequest", "SnapshotRequest"])
+def test_every_change_and_the_snapshot_carry_their_signature_as_a_signature(message):
+    assert _field_type(message, "signature") == "Signature"
+
+
+@pytest.mark.parametrize("message", ["ReadRequest", "FollowRequest", "ReplaceRequest", "AddRequest",
+                                     "RemoveRequest", "ReplaceItem", "AddItem", "RemoveItem"])
+def test_every_request_naming_an_artifact_or_a_place_does_so_with_a_locator(message):
+    assert _field_type(message, "locator") == "Locator"
+
+
+def test_a_part_is_stubbed_by_its_collection_id_and_title():
+    assert _fields("PartStub") == {"collection", "id", "title"}
+    assert _field_type("Artifact", "parts") == "PartStub"
+
+
+@pytest.mark.parametrize("message", ["ReplaceItem", "AddItem", "RemoveItem", "ReplaceRequest", "AddRequest",
+                                     "RemoveRequest"])
+def test_a_change_may_say_the_revision_it_read_as_a_whole_number(message):
+    field = kb_pb2.DESCRIPTOR.message_types_by_name[message].fields_by_name["revision"]
+    assert field.type == field.TYPE_INT32
+
+
+@pytest.mark.parametrize("root", [5, None, b"bytes", ["a"]])
+def test_a_root_that_is_neither_text_nor_a_path_is_refused_as_not_started(root, tmp_path, monkeypatch):
+    here = tmp_path / "here"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    with pytest.raises(kb.NotStarted) as refused:
+        kb.init(root, "client")
+    assert [fault.rule for fault in refused.value.faults] == ["root"]
+    assert list(here.iterdir()) == []

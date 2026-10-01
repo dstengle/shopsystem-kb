@@ -1,7 +1,6 @@
 """A store started in the client's own process, off the wire: `init`, which `kb` publishes, and the operator's
 `kb init` calls, and `NotStarted`, what it raises when it refuses. It runs inside the servicer's one boundary: its
 values made first, then one call into the domain, and any refusal or escaping exception its faults."""
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
@@ -27,7 +26,7 @@ class Started:
 @dataclass(frozen=True)
 class Starting:
     """A start as it is asked for: the root as named, and who starts it."""
-    root: str
+    root: object
     role: str
     execution: str
 
@@ -49,6 +48,6 @@ def init(root, role: str, *, execution: str = "", clock: Callable[[], datetime] 
     in the history stamped with the moment the clock gives, or the machine's with none; the clock is the one
     `kb.client.connect` takes. The root is an absolute or relative path. Raises NotStarted, making nothing, when no
     store can be started there."""
-    started = _Starter(clock).start(Starting(os.fspath(root), role, execution))
+    started = _Starter(clock).start(Starting(root, role, execution))
     if started.faults:
         raise NotStarted(started.faults)

@@ -1,10 +1,10 @@
 """The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later.
 
 Each rpc, each of the operator's commands kb.operating holds, and kb.init (kb.starting), runs inside one boundary:
-the store is opened for that call alone and closed when it ends, unless the call starts one, its request becomes values (kb.requests, kb.values), one call is made into
-the domain, and its response is made from what comes back (kb.responses). A refusal anywhere becomes that rpc's
-refusal, here and only here, and so does any exception that escapes: the clock's failure, the database's, or anything
-else, each with nothing written.
+the store is opened for that call alone and closed when it ends, unless the call starts one, its request becomes
+values (kb.requests, kb.values), one call is made into the domain, and its response is made from what comes back
+(kb.responses). A refusal anywhere becomes that rpc's refusal, here and only here, and so does any exception that
+escapes: the clock's failure, the database's, or anything else, each with nothing written.
 """
 import contextlib
 import functools
