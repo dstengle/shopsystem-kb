@@ -72,10 +72,18 @@ def _init_rejected_as_inside_a_store(ran, root, before):
 
 
 REPORT = (
-    "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t'body' is a required property\n"
+    "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t<the validator's message>\n"
     "stale\tdecision/price-reviews-happen-weekly\tchecked against version 1 of its type, which is at 2\n"
     "stale\tdecision/prices-are-reviewed-monthly\tchecked against version 1 of its type, which is at 2\n"
 )
+
+
+def _unworded(report):
+    """A report with each violation's message, which is the validator's wording, left out; its rule and place stay."""
+    return "".join(
+        "\t".join(line.split("\t")[:4]) + "\n" if line.startswith("violation\t") else line + "\n"
+        for line in report.splitlines()
+    )
 
 
 @given("a store whose content the operator did not write", target_fixture="where")
@@ -92,12 +100,13 @@ def _kb_validate(where):
 @then("the operator is told of everything in the store that does not fit its type, and where")
 def _told_of_every_violation(ran):
     assert (ran.returncode, ran.stderr) == (1, "")
-    assert [line for line in ran.stdout.splitlines() if line.startswith("violation")] == REPORT.splitlines()[:1]
+    violations = [line for line in _unworded(ran.stdout).splitlines() if line.startswith("violation")]
+    assert violations == _unworded(REPORT).splitlines()[:1]
 
 
 @then("of everything that is behind the type it was last checked against")
 def _told_of_everything_stale(ran):
-    assert ran.stdout == REPORT
+    assert _unworded(ran.stdout) == _unworded(REPORT)
 
 
 @when("the operator asks what the command line offers", target_fixture="ran")
@@ -128,7 +137,7 @@ def _nothing_else(root):
 @then("the store found above where they are working is the one checked")
 @then("the store KB_ROOT names is the one checked")
 def _that_store_checked(ran):
-    assert (ran.returncode, ran.stdout, ran.stderr) == (1, REPORT, "")
+    assert (ran.returncode, _unworded(ran.stdout), ran.stderr) == (1, _unworded(REPORT), "")
 
 
 @then("the check is rejected because no store was found, neither above where they are working nor named outright")

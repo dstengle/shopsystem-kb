@@ -118,7 +118,6 @@ def _checked_against_the_shared_shape(client):
     misfit = request(client, "tool-use", "Weigh the sugar", {"bindings": [{"name": "scale"}]})
     assert (misfit.id, misfit.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
-    assert "'value' is a required property" in misfit.faults[0].message
 
 
 BASE_TYPE = {
@@ -168,7 +167,6 @@ def _rejected_without_an_owner(client):
     refused = request(client, "decision", "Price reviews happen weekly", {"status": "accepted", "sections": BASE_SECTIONS})
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.path, fault.rule) for fault in refused.faults] == [("", "required")]
-    assert "'owner' is a required property" in refused.faults[0].message
 
 
 @then("a decision reads back with its purpose before its rationale")

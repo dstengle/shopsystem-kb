@@ -265,7 +265,6 @@ def _rejected_by_the_current_version(attempt):
     refused = attempt["response"]
     assert refused.revision == 0
     assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "", "required")]
-    assert "'owner' is a required property" in refused.faults[0].message
 
 
 @then("it is still listed as behind its type")
