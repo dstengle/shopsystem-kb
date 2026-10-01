@@ -1,5 +1,7 @@
 """Pins the bytes of `canonical.dump`. The emitter's exact output is not ruamel's published contract, yet it feeds
 every digest and the exported files, so a release of ruamel that moves one byte must fail here."""
+import pytest
+
 from kb import canonical
 
 ARTIFACT = {
@@ -73,3 +75,15 @@ OTHER_WAYS_GOLDEN = (
 
 def test_the_canonical_dump_of_every_other_way_a_value_is_written_is_these_bytes():
     assert canonical.dump(OTHER_WAYS) == OTHER_WAYS_GOLDEN
+
+
+def test_half_of_a_character_under_a_key_written_as_two_escapes_is_refused_naming_its_place():
+    with pytest.raises(canonical.NotCanonical) as refused:
+        canonical.load('"\\ud83d\\ude00": "\\ud800"\n')
+    assert refused.value.path == "\U0001F600"
+
+
+def test_a_key_named_twice_with_half_of_a_character_is_refused_naming_a_place_that_is_text():
+    with pytest.raises(canonical.NotCanonical) as refused:
+        canonical.load('"\\ud800": 1\n"\\ud800": 2\n')
+    refused.value.path.encode("utf-8")

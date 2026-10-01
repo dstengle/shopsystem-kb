@@ -126,11 +126,11 @@ def _named_once(node, place: tuple) -> None:
         for key, value in node.value:
             if key.value in seen:
                 raise NotCanonical(
-                    f"an entry is named once and only once; {key.value!r} is named again at line {key.start_mark.line + 1}",
-                    "/".join((*place, str(key.value))),
+                    f"an entry is named once and only once; {_label(key)!r} is named again at line {key.start_mark.line + 1}",
+                    "/".join((*place, _label(key))),
                 )
             seen.add(key.value)
-            _named_once(value, (*place, str(key.value)))
+            _named_once(value, (*place, _label(key)))
     elif isinstance(node, nodes.SequenceNode):
         for index, item in enumerate(node.value):
             _named_once(item, (*place, str(index)))
@@ -151,10 +151,19 @@ def _held_as_text(node, place: tuple) -> None:
     elif isinstance(node, nodes.MappingNode):
         for key, value in node.value:
             _held_as_text(key, place)
-            _held_as_text(value, (*place, str(key.value)))
+            _held_as_text(value, (*place, _label(key)))
     elif isinstance(node, nodes.SequenceNode):
         for index, item in enumerate(node.value):
             _held_as_text(item, (*place, str(index)))
+
+
+def _label(key) -> str:
+    """A key as a place names it: its pairs of halves read as one character, and a half standing alone written as its
+    escape, so that the place is always text."""
+    try:
+        return _joined(str(key.value))
+    except UnicodeDecodeError:
+        return "".join(f"\\u{ord(each):04x}" if 0xD800 <= ord(each) <= 0xDFFF else each for each in str(key.value))
 
 
 def _joined(value: str) -> str:

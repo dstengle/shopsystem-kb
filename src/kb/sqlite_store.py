@@ -135,7 +135,8 @@ class SqliteStore(Checks):
         if self._locked:
             yield
             return
-        assert not self._db.in_transaction, "the write lock is never taken inside reads at one moment"
+        if self._db.in_transaction:
+            raise RuntimeError("the write lock is never taken inside reads at one moment")
         self._db.execute("BEGIN IMMEDIATE")
         self._locked = True
         committed = False

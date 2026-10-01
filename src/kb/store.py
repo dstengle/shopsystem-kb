@@ -53,7 +53,7 @@ def _told_apart(root: Path) -> None:
         marker = canonical.load((root / MARKER).read_text(encoding="utf-8"))
     except (canonical.NotCanonical, UnicodeDecodeError, OSError):
         raise LaterKb(root) from None
-    if marker == {"store": STORE_FORM}:
+    if isinstance(marker, dict) and canonical.dump(marker) == canonical.dump({"store": STORE_FORM}):
         return
     if isinstance(marker, dict) and "contract" in marker:
         raise EarlierKb(root)

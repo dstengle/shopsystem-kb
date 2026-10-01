@@ -436,7 +436,7 @@ def test_a_block_holding_the_write_lock_is_never_opened_inside_reads_at_one_mome
     land(store, put("note/a", {"title": "A"}))
     with store.at_one_moment():
         store.ids()
-        with pytest.raises(AssertionError):
+        with pytest.raises(RuntimeError):
             with store.exclusive():
                 pass
         assert [str(each) for each in store.ids()] == ["note/a"]
