@@ -1143,3 +1143,24 @@ def _import_run_again(root, target, holding):
     again = _kb_import(root, target)
     assert (again.returncode, again.stderr) == (0, "")
     assert held.names(root) == sorted([*_exported_names(target), "schema/schema"])
+
+
+@when("the operator exports the store to an empty directory", target_fixture="ran")
+def _kb_export_to_an_empty_directory(root, tmp_path):
+    target = tmp_path / "exported"
+    target.mkdir()
+    return {"target": target, "ran": _kb("export", str(target), cwd=root)}
+
+
+@then("the export is written")
+def _the_export_is_written(root, ran):
+    assert sorted(str(path.relative_to(ran["target"])) for path in ran["target"].rglob("*.yaml")) == sorted(
+        f"{name}.yaml" for name in held.names(root)
+    )
+    for name in held.names(root):
+        assert (ran["target"] / f"{name}.yaml").read_text(encoding="utf-8") == held.text(root, name)
+
+
+@then("the export is not refused because the store was busy with another change")
+def _export_not_busy(ran):
+    assert (ran["ran"].returncode, ran["ran"].stdout, ran["ran"].stderr) == (0, "", "")
