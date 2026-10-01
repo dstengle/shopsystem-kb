@@ -64,7 +64,7 @@ def _yaml() -> YAML:
     yaml.Constructor = _Constructor
     yaml.default_flow_style = False
     yaml.allow_unicode = True
-    yaml.width = float("inf")
+    yaml.width = 2**31 - 1
     yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
 
