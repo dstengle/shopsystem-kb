@@ -27,13 +27,17 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
 
 def version_kept(type_id: ArtifactId, content: dict, held: dict) -> list[kb_pb2.Fault]:
     """The fault of a type whose schema changed from the one held while its version did not go up from the held
-    version; nothing when the version given is not a number, which the type of types refuses."""
-    version = content.get("version")
-    if isinstance(version, bool) or not isinstance(version, int):
+    version; nothing when either version is not a number, which the type of types refuses."""
+    version, before = content.get("version"), held.get("version")
+    if not _number(version) or not _number(before):
         return []
-    if content.get("schema") == held["schema"] or version > held["version"]:
+    if content.get("schema") == held.get("schema") or version > before:
         return []
-    return [refusals.version_kept(type_id, held["version"])]
+    return [refusals.version_kept(type_id, before)]
+
+
+def _number(version) -> bool:
+    return isinstance(version, int) and not isinstance(version, bool)
 
 
 def _refs(node, place: str):

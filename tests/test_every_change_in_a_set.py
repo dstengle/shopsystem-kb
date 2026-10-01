@@ -82,3 +82,18 @@ def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(client):
     response = apply(client, [replacement("schema/decision", each) for each in content])
     assert _faults(response) == [("schema/decision", "version", "version")]
     assert read(client, "schema/decision").revision == 1
+
+
+@pytest.mark.parametrize("earlier, faults", [
+    ({"version": "two"}, [("schema/decision", "version", "type")]),
+    ({"schema": None}, [("schema/decision", "version", "version"), ("schema/decision", "", "required")]),
+])
+def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(client, earlier, faults):
+    content = {key: value for key, value in DECISION_TYPE.items() if key != "title"}
+    changed = copy.deepcopy(content)
+    changed["version"] = 2
+    changed["schema"]["properties"]["owner"] = {"type": "string"}
+    first = {key: value for key, value in {**content, **earlier}.items() if value is not None}
+    response = apply(client, [replacement("schema/decision", first), replacement("schema/decision", changed)])
+    assert _faults(response) == faults
+    assert read(client, "schema/decision").revision == 1
