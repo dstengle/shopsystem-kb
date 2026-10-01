@@ -1126,3 +1126,20 @@ def test_an_import_that_waits_longer_than_the_store_waits_for_another_change_is(
 )
 def test_the_operator_exports_the_store_while_another_change_is_being_written():
     pass
+
+
+BUSY = "the store was busy with another change"
+
+
+@then("the import is rejected because the store was busy with another change")
+def _import_rejected_as_busy(ran):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr.startswith(f"kb import: refused: busy: {BUSY}"), ran.stderr
+
+
+@then("the same import may be run again")
+def _import_run_again(root, target, holding):
+    holding.let_go()
+    again = _kb_import(root, target)
+    assert (again.returncode, again.stderr) == (0, "")
+    assert held.names(root) == sorted([*_exported_names(target), "schema/schema"])
