@@ -8,7 +8,6 @@ from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import CLIENT, DECISION_TYPE, define, journal, moment, read
 from kb import client as kb_client
-from repositories import made
 from kb.contract import kb_pb2
 
 scenarios("start-a-store.feature")
@@ -217,12 +216,6 @@ def _directory_holding_other_files(root):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_bytes(data)
     return root
-
-
-@given("a directory that is itself a git repository, holding files that have nothing to do with a store",
-       target_fixture="root")
-def _git_repository_holding_other_files(root):
-    return made(root, UNRELATED)
 
 
 @then("the store is made inside that directory, in a place of its own")

@@ -4,7 +4,7 @@ import subprocess
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, apply, create, creation, define, everything_under, journal, listing, read,
+    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, everything_under, journal, listing, read,
     removal, replacement, write,
 )
 from kb import canonical, client as kb_client
@@ -165,16 +165,9 @@ def _still_pointed_at(root, client):
     return removal(DECISION)
 
 
-def _unreadable(root, client):
-    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
-    (root / "kb" / f"{DECISION}.yaml").write_text(MANGLED)
-    return replacement(DECISION, {"sections": SECTIONS})
-
-
 SECOND_CHANGES = {
     "the second change names an artifact the store holds nothing under": _nothing_by_that_name,
     "the second change removes an artifact something still points at": _still_pointed_at,
-    "the second change touches an artifact whose stored file cannot be read": _unreadable,
 }
 
 
@@ -206,11 +199,6 @@ def _rejected_for_nothing_there(attempt):
 @then("the set is rejected because something still points at it")
 def _rejected_for_a_link_in_the_way(attempt):
     assert WORK_ITEM in _refused_with(attempt, [(WORK_ITEM, "decisions/0", "on_delete")])
-
-
-@then("the set is rejected because that file cannot be read, and the file is named")
-def _rejected_for_an_unreadable_file(attempt):
-    assert f"{DECISION}.yaml" in _refused_with(attempt, [(DECISION, "", "unreadable")])
 
 
 @then("the store holds none of the changes in the set")

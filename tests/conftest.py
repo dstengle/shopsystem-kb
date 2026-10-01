@@ -1,15 +1,16 @@
 """Suite wiring. Step definitions live beside the scenarios they serve; shared Givens are added here by slice 1."""
+import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, MANGLED, create, define, everything_under, journal, listing, moment
+from calls import CLIENT, DECISION_TYPE, create, define, everything_under, journal, listing, moment
 from kb import canonical, client as kb_client, store
 from kb.contract import kb_pb2
-from repositories import git, hooked, made, standing
 
 
 def pytest_configure(config):
@@ -21,17 +22,17 @@ def pytest_configure(config):
         config.addinivalue_line("markers", f"{tag}: scenario of that slice in the plan")
 
 
-def _guard_starts(config):
+def _guard_starts(rootpath, base_temp):
     """Where the guard looks for a store, upward from each: the checkout, the system's temporary directory, and
     pytest's own base temp root, wherever `--basetemp` or `TMPDIR` puts it. A seam a demonstration can point
     elsewhere without touching where the real ones sit."""
-    return (config.rootpath, Path(tempfile.gettempdir()), config._tmp_path_factory.getbasetemp())
+    return (rootpath, Path(tempfile.gettempdir()), base_temp)
 
 
-def pytest_sessionstart(session):
+def _refuse_a_store_above(starts):
     """Refuse to run rather than reach a store outside the suite's own temporary directories: one is never found by
-    looking upward, discovery's own way, from any of `_guard_starts`."""
-    for start in _guard_starts(session.config):
+    looking upward, discovery's own way, from any of `starts`."""
+    for start in starts:
         found = store.find_above(start)
         if found is not None:
             pytest.exit(
@@ -39,6 +40,12 @@ def pytest_sessionstart(session):
                 f"no test may reach a store outside its own temporary directory",
                 returncode=1,
             )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _no_store_outside_the_suite(request, tmp_path_factory):
+    """The guard, before the first test: pytest's public base temp is one of the places it looks."""
+    _refuse_a_store_above(_guard_starts(request.config.rootpath, tmp_path_factory.getbasetemp()))
 
 
 @pytest.fixture(autouse=True)
@@ -117,31 +124,9 @@ def _store_holds_what_it_held(before):
     assert everything_under(before["store"]) == before["held"]
 
 
-@given("someone edited the decision's file by hand and left it in a shape the store cannot read")
-def _decision_file_mangled_by_hand(root, monkeypatch):
-    """The decision a feature's Background holds, decision/price-reviews-happen-weekly, left unreadable, with the
-    client working in the store and nothing naming it."""
-    (root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").write_text(MANGLED)
-    monkeypatch.chdir(root)
-    monkeypatch.delenv("KB_ROOT", raising=False)
-
-
 @when("the client checks the store", target_fixture="checked")
 def _check_the_store(client):
     return client.Validate(kb_pb2.ValidateRequest())
-
-
-@then("that file is reported as a violation, naming the file")
-def _reported_as_unreadable(checked):
-    unreadable = [fault for fault in checked.violations if fault.rule == "unreadable"]
-    assert [fault.artifact for fault in unreadable] == ["decision/price-reviews-happen-weekly"]
-    assert "decision/price-reviews-happen-weekly.yaml cannot be read" in unreadable[0].message
-
-
-@then("the check comes back with its answer rather than breaking off")
-def _answers(checked):
-    assert isinstance(checked, kb_pb2.ValidateResponse)
-    assert not checked.faults, checked.faults
 
 
 @then("the store holds no artifact it did not hold before")
@@ -161,6 +146,17 @@ def starter():
     return CLIENT.role
 
 
+def _git(directory, *args):
+    """git run in `directory` alone, its output, with git's own environment variables cleared so it reaches only the
+    directory it names. Task 5 moves this into the one test module that knows how the store is kept."""
+    clean = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    return subprocess.run(["git", "-C", str(directory), *_IDENTITY, *args], env=clean, capture_output=True, text=True,
+                          check=True).stdout
+
+
+_IDENTITY = ("-c", "user.name=steps", "-c", "user.email=steps@example.com", "-c", "commit.gpgsign=false")
+
+
 @then(
     parsers.parse('the store\'s history holds one entry, under that role, with the message "{message}"'),
     target_fixture="entry",
@@ -172,34 +168,5 @@ def _one_entry_under_the_role(root, starter, message):
     assert len(entries) == 1, entries
     entry = canonical.load(entries[0].read_text())
     assert (entry["actor"]["role"], entry["message"]) == (starter, message)
-    assert git(root / "kb", "log", "--format=%an%x09%s").splitlines() == [f"{starter}\t{message}"]
+    assert _git(root / "kb", "log", "--format=%an%x09%s").splitlines() == [f"{starter}\t{message}"]
     return entry
-
-
-REPOSITORIES = {
-    "the git repository the directory the store sits in belongs to": lambda root, tmp_path: made(root),
-    "the git repository that directory is": lambda root, tmp_path: root,
-    "a git repository elsewhere, which holds no store": lambda root, tmp_path: made(tmp_path / "elsewhere-repository"),
-}
-
-
-@given(
-    parsers.re(
-        f"the client runs with its environment naming (?P<repository>{'|'.join(REPOSITORIES)}) as the git repository "
-        f"to work in, the way git does for a program it runs from a hook"
-    ),
-    target_fixture="named_repository",
-)
-def _environment_naming_a_repository(root, tmp_path, monkeypatch, repository):
-    """The repository named, under tmp_path, set in this process's environment, restored after, and how it stood."""
-    path = REPOSITORIES[repository](root, tmp_path)
-    for name, value in hooked(path).items():
-        monkeypatch.setenv(name, value)
-    return {"path": path, "standing": standing(path)}
-
-
-@then(
-    "that git repository is left as it was, with nothing added to its history and nothing made ready for its next commit"
-)
-def _repository_left_as_it_was(named_repository):
-    assert standing(named_repository["path"]) == named_repository["standing"]

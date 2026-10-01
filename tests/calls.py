@@ -17,8 +17,6 @@ ZONES = {
     ", with no zone": None,
 }
 
-MANGLED = "title: [a bracket opened by hand and never closed\n"
-
 DECISION_TYPE = {
     "title": "Decision",
     "version": 1,

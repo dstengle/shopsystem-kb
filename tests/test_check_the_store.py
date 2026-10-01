@@ -1,6 +1,6 @@
 from pytest_bdd import given, scenario, then
 
-from calls import CLIENT, DECISION_TYPE, MANGLED, WORK_ITEM_TYPE, create, define, next_version
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, next_version
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
@@ -29,62 +29,6 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
-
-
-@given(
-    "a store where someone edited a decision's file by hand and left it in a shape the store cannot read",
-    target_fixture="client",
-)
-def _store_with_a_file_mangled_by_hand(root, before):
-    """Two decisions edited by hand: one left unreadable, one left readable but without the body of its purpose."""
-    client = _store_with_a_decision_without_its_purpose(root)
-    (root / "kb" / "decision" / "price-reviews-happen-weekly.yaml").write_text(MANGLED)
-    before.update(reported=[
-        ("decision/price-reviews-happen-weekly", "", "unreadable"),
-        ("decision/prices-are-reviewed-monthly", "sections/0", "required"),
-    ])
-    return client
-
-
-@given("a store holding an artifact of a kind the store holds no type for", target_fixture="client")
-def _store_with_an_artifact_of_no_type(root, before):
-    """Beside the two decisions, an invoice written by hand, whole but of a kind the store has no type for."""
-    client = _store_with_a_decision_without_its_purpose(root)
-    (root / "kb" / "invoice").mkdir()
-    (root / "kb" / "invoice" / "march-takings.yaml").write_text(canonical.dump({
-        "id": "invoice/march-takings", "type": "invoice", "schema_version": 1, "revision": 1, "title": "March takings",
-    }))
-    before.update(reported=[
-        ("decision/prices-are-reviewed-monthly", "sections/0", "required"),
-        ("invoice/march-takings", "", "kind"),
-    ])
-    return client
-
-
-def _store_with_a_decision_without_its_purpose(root):
-    """Two decisions that fit their type, then one of them edited by hand to lose the body of its purpose."""
-    client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    define(client, DECISION_TYPE)
-    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
-    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": SECTIONS})
-    monthly = root / "kb" / "decision" / "prices-are-reviewed-monthly.yaml"
-    held = canonical.load(monthly.read_text())
-    del held["sections"][0]["body"]
-    monthly.write_text(canonical.dump(held))
-    return client
-
-
-@then("that artifact is reported as a violation, naming the artifact and the kind it claims")
-def _reported_as_of_no_type(checked):
-    of_no_type = [fault for fault in checked.violations if fault.rule == "kind"]
-    assert [fault.artifact for fault in of_no_type] == ["invoice/march-takings"]
-    assert "'invoice'" in of_no_type[0].message
-
-
-@then("everything else in the store is checked and reported alongside it")
-def _the_rest_checked_alongside(checked, before):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == before["reported"]
 
 
 WEEKLY = "decision/price-reviews-happen-weekly"

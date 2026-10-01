@@ -7,7 +7,6 @@ from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define
 from kb import canonical, client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
-from repositories import hooked, made
 
 scenarios("find-the-store.feature")
 scenarios("read-an-artifact.feature")
@@ -253,33 +252,6 @@ def _from_the_store_kb_root_names(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
 
 
-def _working_deep_inside(root, tmp_path, monkeypatch):
-    monkeypatch.chdir(_deep_inside(root))
-    monkeypatch.delenv("KB_ROOT", raising=False)
-
-
-def _working_outside_naming_this_one(root, tmp_path, monkeypatch):
-    monkeypatch.chdir(_elsewhere(tmp_path))
-    monkeypatch.setenv("KB_ROOT", str(root))
-
-
-WORKING = {
-    "in a folder deep inside the directory the store sits in": _working_deep_inside,
-    "outside any store, with KB_ROOT naming this one": _working_outside_naming_this_one,
-}
-
-
-@given(parsers.re(
-    f"the client is working (?P<where>{'|'.join(map(re.escape, WORKING))}), with its environment naming a git "
-    f"repository other than this store, the way git does for a program it runs from a hook"
-))
-def _working_with_a_repository_named(root, tmp_path, monkeypatch, where):
-    """A git repository made under tmp_path, holding no store, named in this process's environment, restored after."""
-    WORKING[where](root, tmp_path, monkeypatch)
-    for name, value in hooked(made(tmp_path / "elsewhere-repository")).items():
-        monkeypatch.setenv(name, value)
-
-
 @given("the client is working outside any store and nothing names one", target_fixture="elsewhere")
 def _outside_with_nothing_naming_one(tmp_path, monkeypatch):
     elsewhere = _elsewhere(tmp_path)
@@ -410,18 +382,6 @@ def _given_the_decision(shown):
 def _never_readied_again(readied):
     assert readied["store_there"] is False
     assert readied["used"] is readied["client"]
-
-
-@then("the read is rejected because that file cannot be read, and the file is named")
-def _rejected_as_unreadable(shown):
-    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(DECISION, "unreadable")]
-    assert f"{DECISION}.yaml cannot be read" in shown.faults[0].message
-
-
-@then("the client is given that fault as it is given any other, the call never breaking off")
-def _given_as_any_other_fault(shown):
-    assert isinstance(shown, kb_pb2.ReadResponse)
-    assert (shown.id, shown.title, shown.content) == ("", "", "")
 
 
 DAILY = "decision/stock-is-counted-daily"

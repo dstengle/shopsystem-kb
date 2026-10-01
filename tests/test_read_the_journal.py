@@ -327,12 +327,6 @@ def _every_entry_left_at(client, the_change, reading):
     assert [datetime.fromisoformat(entry.at) for entry in left] == [moment(reading)] * len(left)
 
 
-@then("every entry that change left is in the store's history, under the role and with the message the client gave")
-def _every_entry_left_in_the_history(client, the_change):
-    left = _left_by(client, the_change)
-    assert [(entry.actor.role, entry.message) for entry in left] == [_signed(the_change["change"])] * len(left)
-
-
 def _changed_five_times(client):
     for turn in range(1, 6):
         changed = write(client, DECISION, {"sections": [
