@@ -38,7 +38,7 @@ CREATE TABLE entries (
     id TEXT PRIMARY KEY, moment INTEGER NOT NULL, seq INTEGER NOT NULL, artifact TEXT NOT NULL, role TEXT NOT NULL,
     execution TEXT NOT NULL, batch TEXT NOT NULL, record TEXT NOT NULL
 );
-CREATE INDEX entries_in_order ON entries (moment, seq);
+CREATE INDEX entries_in_order ON entries (moment);
 CREATE VIRTUAL TABLE search USING fts5 (
     words, artifact UNINDEXED, kind UNINDEXED, what UNINDEXED, name UNINDEXED, ordinal UNINDEXED,
     tokenize = "ascii tokenchars '_'"

@@ -597,12 +597,18 @@ def _opposite_to_landing(entries, landed):
     assert read == landed[::-1]
 
 
+SAME_MOMENT = ["decision/zebra-crossings", "decision/mango-stalls", "decision/apple-carts"]
+
+
 @given("the client has changed one artifact, and then changed a different artifact", target_fixture="landed")
 def _changed_one_then_a_different_one(client):
     changed = write(client, FIRST_ARTIFACT, {"sections": SECTIONS}, message="Say it plainly")
     assert not changed.faults, changed.faults
-    _create_other(client)
-    return [FIRST_ARTIFACT, OTHER_ARTIFACT]
+    for artifact in SAME_MOMENT:
+        made = create(client, "decision", {"title": artifact.split("/")[1].replace("-", " ").capitalize(),
+                                           "sections": SECTIONS}, message="Another")
+        assert not made.faults, made.faults
+    return [FIRST_ARTIFACT, *SAME_MOMENT]
 
 
 @then("the two entries both say they happened at 2026-09-23 at 14:30")
@@ -617,11 +623,14 @@ def _landing_order_settles_the_tie(entries, landed):
     assert at_the_moment == landed
 
 
+
 @given(parsers.parse("the client has read the journal since {reading}"), target_fixture="first_read")
-def _read_since_a_moment(client, reading):
+def _read_since_a_moment(root, client, reading):
+    _changed_at(root, "2026-09-23 at 15:00", DECISION, "Costs move weekly, said at three.\n")
     read = journal(client, since=moment(reading).isoformat())
     assert not read.faults, read.faults
-    return list(read.entries)
+    assert read.entries
+    return [entry.id for entry in read.entries]
 
 
 @given(parsers.parse("a change stamped {reading} has landed since that read"))
@@ -635,6 +644,7 @@ def _read_since_again(client, reading):
 
 
 @then(parsers.parse("the client is not given the entry stamped {reading}"))
-def _not_given_the_late_entry(asked, reading):
+def _not_given_the_late_entry(client, asked, first_read, reading):
     assert not asked.faults, asked.faults
-    assert moment(reading) not in [datetime.fromisoformat(entry.at) for entry in asked.entries]
+    assert [entry.id for entry in asked.entries] == first_read
+    assert moment(reading) in [datetime.fromisoformat(entry.at) for entry in journal(client).entries]

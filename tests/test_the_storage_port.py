@@ -369,6 +369,14 @@ def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_f
     assert sorted(store.entry_ids(T0)) == ["first", "second"]
 
 
+def test_a_read_narrowed_to_one_artifact_keeps_landing_order_whatever_else_it_carries(store):
+    store.land([], [entry("late", at=T0 + timedelta(hours=2), artifact="note/a", role="writer")])
+    store.land([], [entry("early", at=T0, artifact="note/a", role="writer")])
+    ids = lambda **filters: [record["id"] for record in store.history(artifact=name("note/a"), **filters)]
+    assert ids(since=T0) == ["late", "early"]
+    assert ids(role="writer") == ["late", "early"]
+
+
 def test_an_entry_id_already_held_is_refused(store):
     store.land([put("note/a", {})], [entry("once")])
     before = written(store)
