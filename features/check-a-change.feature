@@ -32,6 +32,7 @@ Feature: Check a change
     Then the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken
     And the store is unchanged
 
+  @slice-126
   Scenario: An artifact refused with several faults has them given in the order its places stand when it reads back
     Pins that a refusal reads in the order the artifact would read back, not the order the client wrote it in, and that faults at one place are told apart by a fixed order of their rules, so a client can compare refusals from one attempt to the next.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options

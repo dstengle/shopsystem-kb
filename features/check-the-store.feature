@@ -16,6 +16,7 @@ Feature: Check the store
     When the client checks the store
     Then both are reported, each naming the artifact, the place in it and the rule broken
 
+  @slice-126
   Scenario: An artifact's violations are given in the order its places stand when it reads back
     Pins that a check reports one artifact's violations in the order the artifact reads back, whatever order they were stored in, and tells apart violations at one place by a fixed order of their rules.
     Given a store holding a decision type that declares its fields first, then its required sections, then its collection of options
