@@ -13,12 +13,6 @@ from kb.store import Damaged
 Clock = Callable[[], datetime]
 
 
-def now() -> datetime:
-    """The machine's clock, which stamps an entry when no clock is given. Looked up as each entry is stamped, so a
-    replacement made from outside still takes effect."""
-    return datetime.now(timezone.utc)
-
-
 class Stamp(NamedTuple):
     """An entry's moment, the clock's, in UTC, and its id, free in the journal and in the set it belongs to."""
     at: datetime
@@ -40,9 +34,9 @@ def stamps(store_dir: Path, count: int, clock: Clock | None = None) -> list[Stam
 
 
 def _stamp(clock: Clock | None) -> datetime:
-    """The moment an entry is stamped with: the clock given, read now, or, with none, this module's `now`; in UTC,
-    a moment given with no zone read as UTC."""
-    return values.in_utc((now if clock is None else clock)())
+    """The moment an entry is stamped with: the clock given, read now, or, with none, the machine's clock, read
+    here and nowhere else; in UTC, a moment given with no zone read as UTC."""
+    return values.in_utc(datetime.now(timezone.utc) if clock is None else clock())
 
 
 def _moment(at: datetime) -> str:

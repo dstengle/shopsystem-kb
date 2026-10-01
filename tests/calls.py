@@ -253,3 +253,16 @@ def next_version(client, kind, type_content, sections=None):
 def everything_under(directory):
     """Every file below a directory, with its bytes, so a step can tell whether anything was written."""
     return {path: path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
+
+
+class MovingClock:
+    """A clock for a dated scenario: it reads `at`, moving on a second at each reading so no two entries share a
+    moment; a step sets `at` to make a change on another day. `today` is the day the scenario named."""
+
+    def __init__(self, day):
+        self.today = datetime.fromisoformat(f"{day}T09:00:00+00:00")
+        self.at = self.today
+
+    def __call__(self):
+        self.at += timedelta(seconds=1)
+        return self.at

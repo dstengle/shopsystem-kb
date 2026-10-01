@@ -5,10 +5,9 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
+    CLIENT, DECISION_TYPE, MovingClock, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
 )
 from kb import client as kb_client
-from kb import journal as kb_journal
 from kb.contract import kb_pb2
 
 
@@ -83,18 +82,9 @@ AGENT = kb_pb2.Actor(role="agent", execution="restock-run-12")
 
 
 @given(parsers.parse("today is {day}"), target_fixture="clock")
-def _today_is(monkeypatch, day):
-    """kb stamps each entry from journal.now. Here it reads this clock, which moves on a second at every stamp so no
-    two entries share one; a step sets the clock back to make a change on an earlier day."""
-    clock = {"today": datetime.fromisoformat(f"{day}T09:00:00+00:00")}
-    clock["at"] = clock["today"]
-
-    def now():
-        clock["at"] += timedelta(seconds=1)
-        return clock["at"]
-
-    monkeypatch.setattr(kb_journal, "now", now)
-    return clock
+def _today_is(day):
+    """The clock the client is given to stamp each entry from; see MovingClock."""
+    return MovingClock(day)
 
 
 @pytest.fixture
@@ -109,8 +99,8 @@ def written():
     target_fixture="client",
 )
 def _store_with_a_decision_changed_today(root, clock, written):
-    clock["at"] = datetime.fromisoformat("2026-09-21T09:00:00+00:00")
-    client = kb_client.connect(root)
+    clock.at = datetime.fromisoformat("2026-09-21T09:00:00+00:00")
+    client = kb_client.connect(root, clock=clock)
     client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, DECISION_TYPE)
     create(client, "decision", {
@@ -121,7 +111,7 @@ def _store_with_a_decision_changed_today(root, clock, written):
         ],
     }, message="Review prices weekly", actor=SHOPKEEPER)
     written.append((root / "kb" / f"{DECISION}.yaml").read_bytes())
-    clock["at"] = clock["today"]
+    clock.at = clock.today
     changed = write(client, DECISION, {"sections": [
         {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
         {"title": "Rationale", "body": "Costs move weekly, and the suppliers say so.\n"},
