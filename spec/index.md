@@ -16,9 +16,9 @@ kb knows nothing about any domain. It ships no type beyond the one that describe
 - The boundary is enforced mechanically: a corpus-only role gets the client and no shell; a shell-bearing role runs where the store is not.
 - All YAML kb reads or writes is YAML 1.2: content over the contract, types, exported and imported files, and the type that describes types.
 - What a client may depend on is published and versioned together by kb's release tag, which clients pin: `kb.proto` and its messages, the in-process client's `connect` with its clock, `kb.content` (content as canonical text, and `NotCanonical`), the connection file's form (`kb/server.yaml` and its `address`), and each fault's `rule` name. A fault's message wording, the store's files and layout, the storage port and every other module may change behind the contract.
-- A fault's `rule` is one of kb's own rule names, or, for content that breaks a type's JSON Schema, the JSON Schema keyword it breaks. kb's own rule names: `not-found`, `kind`, `locator`, `collection`, `identity`, `on_delete`, `unreadable`, `item-name`, `shape`, `built-on`, `targets`, `version`, `content`, `sections`, `ref`, `actor`, `message`, `operations`, `since`, `title`, `root`, `store`, `clock`.
+- A fault's `rule` is one of kb's own rule names, or, for content that breaks a type's JSON Schema, the JSON Schema keyword it breaks. kb's own rule names: `not-found`, `kind`, `locator`, `collection`, `identity`, `on_delete`, `unreadable`, `item-name`, `shape`, `built-on`, `targets`, `version`, `content`, `sections`, `ref`, `actor`, `message`, `operations`, `since`, `title`, `root`, `store`, `clock`, `busy`.
 - Errors are a typed list of `{ artifact, path, rule, message }`.
-- Bounds: one database per store; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); on one machine several callers share a store directly, the database's write lock serialising their changes, and across containers only through a server, which takes changes one at a time.
+- Bounds: one database per store; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); on one machine several callers share a store directly, the database's write lock serialising their changes, and across containers only through a server, which takes changes one at a time; no store on a read-only filesystem, until what a read-only store means is defined; a store made by an earlier kb in a form this kb cannot read is never read or written, only its files imported into a new store.
 - Performance bounds, at 30,000 artifacts: a summary read and a three-step traversal under 100 ms each; a single change under 50 ms; a set of 100 changes under 1 s. Provisional until the scale targets are set.
 
 ## Composition
@@ -34,14 +34,14 @@ Reading order:
 7. `capabilities/name-what-is-asked-for.md`: names, kinds and places checked and resolved.
 8. `capabilities/sign-a-change.md`: every change carries a role and a reason.
 9. `capabilities/check-a-change.md`: every change checked against its type and the links into it before it lands.
-10. `capabilities/change-the-store.md`: create, replace, add, remove, alone or alongside other writers.
+10. `capabilities/change-the-store.md`: create, replace, add, remove, alone or alongside other writers, refused as busy after waiting too long.
 11. `capabilities/make-several-changes-in-one-go.md`: a set of changes, checked whole, all or nothing.
 12. `capabilities/read-an-artifact.md`: reads at every level, links followed to a depth.
 13. `capabilities/query-the-store.md`: list, follow links, search.
-14. `capabilities/keep-the-history.md`: the history, its sets and its moments.
+14. `capabilities/keep-the-history.md`: the history, its sets, its moments and its order.
 15. `capabilities/snapshot-what-work-read.md`: a piece of work records what it read.
 16. `capabilities/check-the-store.md`: the whole store against its types.
-17. `capabilities/answer-a-damaged-file.md`: a database the store cannot read is a named fault.
+17. `capabilities/answer-a-damaged-file.md`: a store this kb cannot read (its database damaged, missing or on a read-only filesystem, or the store made by an earlier kb) is a named fault.
 18. `capabilities/operate-a-store.md`: the operator's `kb init`, `kb validate`, `kb serve`.
 19. `capabilities/export-and-import-a-store.md`: the operator's `kb export` and `kb import`, the files as people read them.
 

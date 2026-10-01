@@ -2,7 +2,7 @@
 id: capability/operate-a-store
 title: Operate a store
 narrator: the operator
-rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export]
+rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule]
 formulated_as: features/operate-a-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/operate-a-store.feature
 
 ## Purpose
 
-From a shell, without any client, the operator sets a store up, checks the whole store, and serves a store to several callers. The command line changes content only through import into a freshly started store (export-and-import-a-store); every other change to content goes through a client.
+From a shell, without any client, the operator sets a store up, checks the whole store, and serves a store to several callers. The command line changes content only through import into a freshly started store (export-and-import-a-store); every other change to content goes through a client. Checking the store is a read, and is never refused because another change is being written.
 
 ## Behaviour
 
@@ -27,10 +27,12 @@ From a shell, without any client, the operator sets a store up, checks the whole
 - If the operator works inside one store while `KB_ROOT` names a different store, kb validate is refused because `KB_ROOT` names a store other than the one they are standing in, and neither is guessed at.
 - When the operator runs kb serve on a directory holding a store, giving an address, the store is served at that address, on whatever interface it names, all of them included.
 - If the operator runs kb serve without an address, it is refused because no address is assumed.
+- While another change is being written to the store, when the operator runs kb validate, the store is checked and kb validate is not refused because the store was busy with another change.
 
 ## Implementation, may change
 
 - The commands are `kb init <root>`, `kb validate` and `kb serve <root> --listen <host:port>`; the role for `kb init` comes from `KB_ACTOR`. `kb serve` hosts the store at `<root>/kb/` with `grpc.server`. `kb export` and `kb import` are export-and-import-a-store.
+- Reads never wait for the write lock (change-the-store).
 
 ## Not yet
 

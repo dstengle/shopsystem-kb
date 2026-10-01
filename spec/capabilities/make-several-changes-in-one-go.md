@@ -2,7 +2,7 @@
 id: capability/make-several-changes-in-one-go
 title: Make several changes in one go
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine, decision/busy-rule]
 formulated_as: features/make-several-changes-in-one-go.feature
 ---
 
@@ -24,12 +24,14 @@ The client asks for an ordered set of creates, replacements, additions and remov
 - If a set holding no changes also lacks a role or a message, only the faults of the role and the message come back.
 - When a change in a set points at what another change in it makes, earlier or later, its links are checked against the store as the whole set leaves it; each change still acts on the store as the changes before it in the set left it.
 - When two new artifacts in one set point at each other, the set lands.
+- If a set waits longer than the store waits while another change is being written, the set is refused because the store was busy with another change, nothing is written, and the same set may be asked for again.
 
 ## Implementation, may change
 
 - `Apply` takes an ordered list of Create/Write/Append/Delete, actor and message, and returns the batch id minted by kb and per-operation results; the set lands in one database transaction.
 - The batch id is carried by every entry the set writes.
 - An empty set is the fault with rule `operations`, no artifact and no path.
+- A set refused as busy is the fault with rule `busy` (change-the-store).
 
 ## Not yet
 

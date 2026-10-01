@@ -331,3 +331,28 @@ source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md; the formu
 A clock that fails during a change gives the client a fault with rule `clock`, no artifact and no path, and `clock` joins kb's published rule names, since no existing name fits and the list is closed.
 date: 2026-10-01
 source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md; the controller's answer of 2026-10-01
+
+## decision/read-only-store-unreadable
+A store whose database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, is a database that cannot be read, refused with rule `unreadable` and nothing written, as a damaged or missing one is; kb does not read a read-only store until what one means is defined (whether it may be read while nothing may change it, what its history says, how a served store relates to it).
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md
+
+## decision/busy-rule
+A change, a set or the operator's import that waits for the write lock longer than the store waits is refused with a rule of its own, `busy`, which joins kb's published rule names, nothing written and the same change free to be made again; not `unreadable`, whose advice (the store is damaged or missing) is wrong for it; reads never wait for the lock, so none is refused as busy.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md
+
+## decision/earlier-store-told-apart
+The store's marker says which form of store it marks, so a store made by an earlier kb in a form this kb cannot read is told apart: it counts as a store when one is started and when it is found, and every call and command that needs it, the import included, is refused, saying to start a new store and import the old one's files, an earlier kb's store being only ever an import's source; its rule is `unreadable`, since what the client can do about it is the same (this kb cannot read the store), and only the reason differs.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md; the person's answers of 2026-10-01 to the integration's questions 3 and 9
+
+## decision/history-ordered-per-artifact
+Moments order each artifact's history, not the whole store's: one artifact's entries come in the order its changes landed, entries across artifacts in the order of their moments, and a read since a moment gives what is stamped from that moment on as the store holds it when read, so a client following the history reads since a moment a little before the last one it saw and drops the entries it already has.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md
+
+## decision/snapshot-and-reads-under-busy
+A snapshot writes to the store, so it is a call that changes the store and is refused as `busy` like a change; kb export and kb validate are reads and are never refused as busy; where entries for different artifacts carry the same moment they are given in the order they landed, and a read of one artifact's history keeps landing order even where its moments run the other way.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-pr1-review-answers.md; the person's answers of 2026-10-01 to the integration's questions 5 to 8

@@ -2,7 +2,7 @@
 id: capability/change-the-store
 title: Change the store
 narrator: the client
-rests_on: [decision/graph-as-records, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/integrity-checked-both-ways, decision/a-refused-write-changes-nothing, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine, decision/clock-failure-rule, decision/0007-input-safety-at-the-boundary]
+rests_on: [decision/graph-as-records, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/integrity-checked-both-ways, decision/a-refused-write-changes-nothing, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine, decision/busy-rule, decision/clock-failure-rule, decision/0007-input-safety-at-the-boundary]
 formulated_as: features/change-the-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/change-the-store.feature
 
 ## Purpose
 
-The client creates an artifact, replaces an artifact or one node inside it, adds an item to a collection, or removes an artifact. Each change comes back with what it produced: the name the store gave and the new revision. Only a whole artifact is removed. A removal, or a replacement that drops an item, is refused while anything points at what would go, the refusal handing back every link in the way. Clients on one machine changing one store at the same time, in one program or in several, each have their change checked against the store as the one before left it. A change that fails partway leaves the store as it was. This capability does not cover checking (check-a-change), naming (name-artifacts-and-items) or sets of changes (make-several-changes-in-one-go).
+The client creates an artifact, replaces an artifact or one node inside it, adds an item to a collection, or removes an artifact. Each change comes back with what it produced: the name the store gave and the new revision. Only a whole artifact is removed. A removal, or a replacement that drops an item, is refused while anything points at what would go, the refusal handing back every link in the way. Clients on one machine changing one store at the same time, in one program or in several, each have their change checked against the store as the one before left it. A change that waits too long for another to finish is refused as busy and may be made again; a read is never refused as busy. A change that fails partway leaves the store as it was. This capability does not cover checking (check-a-change), naming (name-artifacts-and-items) or sets of changes (make-several-changes-in-one-go).
 
 ## Behaviour
 
@@ -32,6 +32,8 @@ The client creates an artifact, replaces an artifact or one node inside it, adds
 - While several clients on one machine, in one program or in several, change one store at the same time, each change is checked against the store as every earlier change left it, so two items added to one collection at once are both kept.
 - When one client removes an artifact while another adds a link to it, the removal and the new link never both land: whichever lands second is refused, the removal because something still points at it, or the link because a link must land on a node of a kind the type allows.
 - When two clients replace one artifact at the same time, each replacement leaves a revision of its own, both are in the history, and the artifact holds the content of the later one.
+- If a change waits longer than the store waits while another change is being written, the change is refused because the store was busy with another change, nothing is written, and the same change may be made again.
+- No read is refused because the store was busy with another change.
 
 ## Implementation, may change
 
@@ -40,6 +42,7 @@ The client creates an artifact, replaces an artifact or one node inside it, adds
 - A delete is refused while there are inbound references to the artifact or anything beneath it; the only delete rule is `on_delete: refuse`. A part is taken out by rewriting its collection. Every refusal because something still points at what would go (a whole artifact, a dropped item, a type in use) carries the rule `on_delete` and names each link; the port's own name for it, `linked`, is not published.
 - Every change, single or in a set, lands in one database transaction. SQLite's write lock serialises writers across threads and processes on one machine, and readers never wait. When the adapter finds a change's revision moved since kb read it (`conflict`, internal to the port), kb re-drafts the change against the new state and lands it; the client never sees that fault. Every rpc runs inside one fail-closed wrapper, so an exception a clock or the database raises becomes a fault.
 - A clock that fails during a change gives a fault with rule `clock`, no artifact and no path.
+- The store waits for the write lock for 30 seconds today. A change that waits longer is refused with rule `busy`, a published rule name.
 
 ## Not yet
 

@@ -2,7 +2,7 @@
 id: capability/export-and-import-a-store
 title: Export and import a store
 narrator: the operator
-rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git]
+rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git, decision/busy-rule, decision/earlier-store-told-apart]
 formulated_as: features/export-and-import-a-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/export-and-import-a-store.feature
 
 ## Purpose
 
-The operator takes a store out as files people can read and review, checks a directory of such files, and brings them into a freshly started store. Export writes the store at one moment as canonical YAML, the same content always as the same bytes, and never overwrites. The check names every error, file by file, and every file that would be skipped because it links to a broken one, and writes nothing. Import always checks first and lands what it takes as one signed set. Files on disk enter a store only this way. This capability is not committing exported files anywhere (the operator's choice), merging into a store that already holds artifacts, or carrying history across.
+The operator takes a store out as files people can read and review, checks a directory of such files, and brings them into a freshly started store. Export writes the store at one moment as canonical YAML, the same content always as the same bytes, and never overwrites. Export is a read, and is never refused because another change is being written. The check names every error, file by file, and every file that would be skipped because it links to a broken one, and writes nothing. Import always checks first and lands what it takes as one signed set. Files on disk enter a store only this way, and it is how a store made by an earlier kb is moved, its files the import's source. This capability is not committing exported files anywhere (the operator's choice), merging into a store that already holds artifacts, or carrying history across.
 
 ## Behaviour
 
@@ -34,6 +34,8 @@ The operator takes a store out as files people can read and review, checks a dir
 - If, with errors skipped, nothing would land, the import is refused because nothing would land, and nothing is written.
 - When the operator imports a directory whose type that describes types matches the store's, the directory's copy is passed over and the store's is kept.
 - When the operator checks a directory for import whose type that describes types differs from the store's, that file is reported as an error, naming the file.
+- If the import waits longer than the store waits while another change is being written, the import is refused because the store was busy with another change, nothing is written, and the same import may be run again.
+- While another change is being written to the store, when the operator exports the store, the export is written and is not refused because the store was busy with another change.
 
 ## Implementation, may change
 
@@ -45,6 +47,7 @@ The operator takes a store out as files people can read and review, checks a dir
 - The check's skip analysis follows every link a file carries, plus each artifact's implicit link to its type file (`schema/<kind>.yaml`), so artifacts of a kind whose type file is broken are skipped with the chain artifact → type file.
 - A freshly started store holds no artifact besides `schema/schema`. An imported `schema/schema.yaml` is compared with the store's and passed over when it matches; it is not one of the artifacts that land and has no import entry.
 - A store laid out before the database (`<root>/kb/`) already has the export layout; its `journal/` and `store.yaml` are ignored on import.
+- An import refused as busy is the fault with rule `busy` (change-the-store). Reads never wait for the write lock, so an export never meets it.
 
 ## Not yet
 
