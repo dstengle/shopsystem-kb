@@ -162,3 +162,10 @@ def test_a_placed_link_without_kinds_or_reach_breaks_two_rules_at_the_field(clie
     assert _faults(_define(client, _object({"about": {"type": "string", "ref": ref}}))) == [
         ("schema/properties/about", "ref"), ("schema/properties/about", "targets"),
     ]
+
+
+@pytest.mark.parametrize("ref", [True, "tag", ["tag"]], ids=["a boolean", "a string", "a list"])
+def test_a_placed_link_that_is_not_a_mapping_breaks_every_rule_it_leaves_out(client, ref):
+    refused = _define(client, _object({"about": {"type": "string", "ref": ref}}))
+    assert _faults(refused) == [("schema/properties/about", "ref"), ("schema/properties/about", "targets")]
+    assert all(f"'{key}'" in refused.faults[0].message for key in ("cardinality", "parts", "on_delete"))

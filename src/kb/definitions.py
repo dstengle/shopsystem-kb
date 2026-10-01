@@ -39,19 +39,19 @@ def _keyword(type_id: ArtifactId, kept: keywords.Standing) -> list[kb_pb2.Fault]
 
 
 def _link_field(type_id: ArtifactId, kept: keywords.Standing) -> list[kb_pb2.Fault]:
-    """What a link field kb reads leaves out of its shape or says that kb does not know, at the field's place."""
+    """What a link field kb reads leaves out of its shape or says that kb does not know, at the field's place; a `ref`
+    that is not a mapping says nothing, so leaves out everything."""
     field = kept.holder.rsplit("/", 1)[-1]
-    if not isinstance(kept.value, dict):
-        return [type_refusals.no_targets(type_id, kept.holder, field)]
+    ref = kept.value if isinstance(kept.value, dict) else {}
     found = []
-    left_out = _left_out(kept.value)
+    left_out = _left_out(ref)
     if left_out:
         found.append(type_refusals.incomplete_link(type_id, kept.holder, field, left_out))
-    if "cardinality" in kept.value and kept.value["cardinality"] not in ("one", "many"):
-        found.append(type_refusals.unknown_reach(type_id, kept.holder, field, kept.value["cardinality"]))
-    if "on_delete" in kept.value and kept.value["on_delete"] != "refuse":
-        found.append(type_refusals.unknown_removal(type_id, kept.holder, field, kept.value["on_delete"]))
-    if "targets" not in kept.value:
+    if "cardinality" in ref and ref["cardinality"] not in ("one", "many"):
+        found.append(type_refusals.unknown_reach(type_id, kept.holder, field, ref["cardinality"]))
+    if "on_delete" in ref and ref["on_delete"] != "refuse":
+        found.append(type_refusals.unknown_removal(type_id, kept.holder, field, ref["on_delete"]))
+    if "targets" not in ref:
         found.append(type_refusals.no_targets(type_id, kept.holder, field))
     return found
 
