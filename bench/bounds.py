@@ -26,6 +26,7 @@ BOUNDS = {
 RUNS = 20
 SET = 100
 ACTOR = kb_pb2.Actor(role="bench")
+SIGNATURE = kb_pb2.Signature(role="bench", message="bench")
 WORDS = "restocking shelves pricing weekly review supplier till opening closing inventory".split()
 
 TAG = {"title": "Tag", "version": 1,
@@ -55,7 +56,12 @@ WORK_ITEM = {"title": "Work item", "version": 1, "schema": {
 
 
 def answered(response):
-    """The response, which must carry no fault: a figure over a refusal measures nothing."""
+    """What the call gave, which must be no refusal: a figure over a refusal measures nothing. A change's response
+    gives its result; any other, itself."""
+    if "outcome" in response.DESCRIPTOR.oneofs_by_name:
+        if response.WhichOneof("outcome") != "result":
+            raise SystemExit(f"refused: {list(response.refusal.faults)}")
+        return response.result
     if response.faults:
         raise SystemExit(f"refused: {list(response.faults)}")
     return response
@@ -136,9 +142,8 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
     created = []
 
     def create():
-        response = answered(client.Create(kb_pb2.CreateRequest(
-            type="tag", title=f"Loose {next(made)}", content=dumps({}), actor=ACTOR, message="bench")))
-        created.append(response.id)
+        created.append(answered(client.Create(kb_pb2.CreateRequest(
+            kind="tag", title=f"Loose {next(made)}", content=dumps({}), signature=SIGNATURE))).id)
 
     written = iter(created)
     removed = iter(created)
@@ -150,10 +155,10 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
         ("three-step traversal", f"three steps in from {decision}", timed(walk(decision, kb_pb2.RefsRequest.IN))),
         ("", f"three steps in from {tag} (logged only)", timed(walk(tag, kb_pb2.RefsRequest.IN))),
         ("single change", "Create of a tag nothing points at", timed(create)),
-        ("single change", "Write of a tag nothing points at", timed(lambda: answered(client.Write(kb_pb2.WriteRequest(
-            locator=kb_pb2.Locator(id=next(written)), content=dumps({}), actor=ACTOR, message="bench"))))),
-        ("single change", "Delete of a tag nothing points at", timed(lambda: answered(client.Delete(
-            kb_pb2.DeleteRequest(locator=kb_pb2.Locator(id=next(removed)), actor=ACTOR, message="bench"))))),
+        ("single change", "Replace of a tag nothing points at", timed(lambda: answered(client.Replace(
+            kb_pb2.ReplaceRequest(locator=kb_pb2.Locator(id=next(written)), content=dumps({}), signature=SIGNATURE))))),
+        ("single change", "Remove of a tag nothing points at", timed(lambda: answered(client.Remove(
+            kb_pb2.RemoveRequest(locator=kb_pb2.Locator(id=next(removed)), signature=SIGNATURE))))),
     ]
 
     def a_set():
@@ -171,7 +176,7 @@ def main(n: int) -> int:
         answered(client.Init(kb_pb2.InitRequest(root=root, actor=ACTOR)))
         for definition in (TAG, DECISION, WORK_ITEM):
             answered(client.Create(kb_pb2.CreateRequest(
-                type="schema", title=definition["title"], actor=ACTOR, message="bench",
+                kind="schema", title=definition["title"], signature=SIGNATURE,
                 content=dumps({key: value for key, value in definition.items() if key != "title"}))))
         started = time.perf_counter()
         build(client, n)

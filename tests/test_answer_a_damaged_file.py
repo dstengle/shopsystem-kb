@@ -8,8 +8,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, append, apply, create, creation, define, journal, listing, refs,
-    read, remove, request, search, snapshot, write,
+    CLIENT, DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, add, apply, create, creation, define, journal, listing, refs,
+    read, remove, request, search, snapshot, replace,
 )
 from conftest import OPERATOR, _kb
 import held
@@ -91,9 +91,9 @@ CALLS = {
     "reads the decision":
         lambda client: read(client, DECISION),
     "replaces the decision, saying which role and why":
-        lambda client: write(client, DECISION, {"sections": SECTIONS}),
+        lambda client: replace(client, DECISION, {"sections": SECTIONS}),
     "adds an item to a collection of the decision, saying which role and why":
-        lambda client: append(client, DECISION, "options", {"title": "Go monthly"}),
+        lambda client: add(client, DECISION, "options", {"title": "Go monthly"}),
     "removes the decision, saying which role and why":
         lambda client: remove(client, DECISION),
     "asks, in one go, for two decisions to be created, saying which role and why":
@@ -138,7 +138,7 @@ def _unreadable(rule, message):
 def _rejected_as_unreadable(answered):
     if hasattr(answered, "faults"):
         [fault] = answered.faults
-        assert (fault.artifact, fault.path) == ("", "")
+        assert (fault.artifact, fault.place) == ("", "")
         _unreadable(fault.rule, fault.message)
     else:
         [line] = answered.stderr.splitlines()
@@ -154,7 +154,7 @@ def _earlier(rule, message):
 def _rejected_as_earlier(answered):
     if hasattr(answered, "faults"):
         [fault] = answered.faults
-        assert (fault.artifact, fault.path) == ("", "")
+        assert (fault.artifact, fault.place) == ("", "")
         _earlier(fault.rule, fault.message)
     else:
         [line] = answered.stderr.splitlines()
@@ -170,7 +170,7 @@ def _says_how_to_move(answered):
 @then("the fault is given as any other fault is given, never breaking off")
 def _given_as_any_other_fault(answered):
     if hasattr(answered, "faults"):
-        assert type(answered).__module__ == kb_pb2.__name__
+        assert type(getattr(answered, "response", answered)).__module__ == kb_pb2.__name__
         assert answered.faults
     else:
         assert answered.returncode == 2
@@ -294,7 +294,7 @@ def _later(rule, message):
 def _rejected_as_later(answered):
     if hasattr(answered, "faults"):
         [fault] = answered.faults
-        assert (fault.artifact, fault.path) == ("", "")
+        assert (fault.artifact, fault.place) == ("", "")
         _later(fault.rule, fault.message)
     else:
         [line] = answered.stderr.splitlines()

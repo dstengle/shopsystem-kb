@@ -35,5 +35,5 @@ class Operator:
     @boundary(importing.Checked)
     def import_(self, request: Importing, held):
         """A directory checked, then landed in the store as one set signed by the role, with a message naming it."""
-        signed = signatures.signed(kb_pb2.Actor(role=request.role), f"import {request.directory}")
+        signed = signatures.signed(kb_pb2.Signature(role=request.role, message=f"import {request.directory}"))
         return importing.imported(held, values.directory(request.directory), signed, request.skip_errors)

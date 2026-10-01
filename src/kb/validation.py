@@ -73,7 +73,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
     """
     errors = _errors(content, compose(schema, corpus), corpus)
     faults = [
-        kb_pb2.Fault(artifact=artifact_id, path=_place(error), rule=error.validator, message=error.message)
+        kb_pb2.Fault(artifact=artifact_id, place=_place(error), rule=error.validator, message=error.message)
         for error in errors
     ]
     if not _misread("sections", errors):
@@ -135,7 +135,7 @@ def _sections(artifact_id: str, sections: list, required: list, place: str) -> l
             continue
         where = "is out of its place" if wanted["title"] in titles else "is missing"
         faults.append(kb_pb2.Fault(
-            artifact=artifact_id, path=place, rule=rules.SECTIONS,
+            artifact=artifact_id, place=place, rule=rules.SECTIONS,
             message=f"the sections the type requires must all be present, in order; {wanted['title']!r} {where}",
         ))
     return faults

@@ -27,12 +27,12 @@ def client(root):
 
 def _faults(response):
     assert (response.batch, list(response.results)) == ("", [])
-    return [(fault.artifact, fault.path, fault.rule) for fault in response.faults]
+    return [(fault.artifact, fault.place, fault.rule) for fault in response.faults]
 
 
 def _addition(artifact_id, collection, item):
     return kb_pb2.Operation(append=kb_pb2.Addition(
-        locator=kb_pb2.Locator(id=artifact_id, path=collection), content=dumps(item),
+        locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(item),
     ))
 
 

@@ -4,10 +4,9 @@ import sqlite3
 
 import pytest
 
-from calls import CLIENT, TAG_TYPE, create, define, read
+from calls import CLIENT, TAG_TYPE, create, define, read, request
 import held
 from kb import client as kb_client, drafting, sqlite_store
-from kb.content import dumps
 from kb.contract import kb_pb2
 
 
@@ -20,9 +19,7 @@ def _started(root):
 
 
 def _creating(client):
-    return client.Create(kb_pb2.CreateRequest(
-        type="tag", title="New", content=dumps({}), actor=CLIENT, message="Tag something",
-    ))
+    return request(client, "tag", "New", {}, message="Tag something")
 
 
 def test_a_client_given_a_root_that_holds_no_store_is_told_so_and_nothing_is_made_there(root):
@@ -46,7 +43,7 @@ def test_a_clock_that_raises_is_a_clock_fault_naming_no_artifact_and_writing_not
     def clock():
         raise RuntimeError("the clock has stopped")
     answered = _creating(kb_client.connect(root, clock=clock))
-    assert [(fault.rule, fault.artifact, fault.path) for fault in answered.faults] == [("clock", "", "")]
+    assert [(fault.rule, fault.artifact, fault.place) for fault in answered.faults] == [("clock", "", "")]
     assert held.holds(root) == before
     assert held.names(root) == sorted(["schema/schema", "schema/tag", "tag/kept"])
 
@@ -67,7 +64,7 @@ def test_an_exception_escaping_the_domain_becomes_one_fault_and_writes_nothing(r
         raise error
     monkeypatch.setattr(drafting, "drafted", raising)
     answered = _creating(client)
-    assert [(fault.rule, fault.artifact, fault.path) for fault in answered.faults] == [(rule, "", "")]
+    assert [(fault.rule, fault.artifact, fault.place) for fault in answered.faults] == [(rule, "", "")]
     assert str(error) in answered.faults[0].message
     assert held.holds(root) == before
 
@@ -77,5 +74,5 @@ def test_a_database_error_starting_a_store_is_an_unreadable_fault_and_leaves_not
         raise sqlite3.OperationalError("disk I/O error")
     monkeypatch.setattr(sqlite_store, "make", failing)
     answered = kb_client.connect().Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    assert [(fault.rule, fault.artifact, fault.path) for fault in answered.faults] == [("unreadable", "", "")]
+    assert [(fault.rule, fault.artifact, fault.place) for fault in answered.faults] == [("unreadable", "", "")]
     assert list(root.iterdir()) == []

@@ -2,7 +2,7 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, write
+from calls import CLIENT, DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, replace
 import held
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -26,7 +26,7 @@ def _store_with_a_decision_and_a_process(root):
     define(client, PROCESS_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": _sections("Costs move.\n")})
     for rationale in ("Costs move weekly.\n", "Costs move weekly, and the suppliers say so.\n"):
-        changed = write(client, DECISION, {"sections": _sections(rationale)})
+        changed = replace(client, DECISION, {"sections": _sections(rationale)})
         assert not changed.faults, changed.faults
     create(client, "process", {"title": "Open the shop", "steps": [{"title": "Unlock the door"}]})
     return client
@@ -90,7 +90,7 @@ REASONS = {
 @then(parsers.parse("the snapshot is rejected because {reason}"))
 def _snapshot_rejected(snapshotted, reason):
     assert snapshotted.entry == ""
-    assert [(fault.artifact, fault.path, fault.rule) for fault in snapshotted.faults] == REASONS[reason]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in snapshotted.faults] == REASONS[reason]
     if REASONS[reason][0][2] in ("actor", "message", "busy"):
         assert snapshotted.faults[0].message.startswith(reason)
 

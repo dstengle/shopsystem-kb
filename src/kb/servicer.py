@@ -2,14 +2,15 @@
 
 Each rpc, and each of the operator's commands kb.operating holds, runs inside one boundary: the store is opened for
 that call alone and closed when it ends, its request becomes values (kb.requests, kb.values), one call is made into
-the domain, and its response is made from what comes back. A refusal anywhere becomes that rpc's faults, here and only here, and so does any exception that escapes: the
-clock's failure, the database's, or anything else, each with nothing written.
+the domain, and its response is made from what comes back (kb.responses). A refusal anywhere becomes that rpc's
+refusal, here and only here, and so does any exception that escapes: the clock's failure, the database's, or anything
+else, each with nothing written.
 """
 import contextlib
 import functools
 from datetime import datetime
 
-from kb import check, escapes, port, query, read, requests, store, values, write
+from kb import check, escapes, port, query, read, requests, responses, store, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
 
 
@@ -31,20 +32,20 @@ def _guarded(clock):
 
 def boundary(response, opens: bool = True, at_one_moment: bool = False):
     """The rpc or the operator's command, over the store opened for it unless it starts one, every read it makes
-    seeing the store at one moment when it only reads, answered with a response of this type carrying the faults when
-    anything in it is refused or any exception escapes it."""
+    seeing the store at one moment when it only reads, answered with a response of this type: what it gave, or a
+    refusal when anything in it is refused or any exception escapes it."""
     def wrap(rpc):
         @functools.wraps(rpc)
         def run(self, request, context=None):
             try:
                 if not opens:
-                    return rpc(self, request)
+                    return responses.answered(response, rpc(self, request))
                 with store.opened(self._root) as held, _reading(held, at_one_moment):
-                    return rpc(self, request, held)
+                    return responses.answered(response, rpc(self, request, held))
             except values.Refused as refused:
-                return response(faults=refused.faults)
+                return responses.refused(response, refused.faults)
             except Exception as error:
-                return response(faults=[escapes.fault(error)])
+                return responses.refused(response, [escapes.fault(error)])
         return run
     return wrap
 
@@ -69,39 +70,33 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @boundary(kb_pb2.CreateResponse)
     def Create(self, request, held):
-        creation = kb_pb2.Creation(type=request.type, title=request.title, content=request.content)
-        result = self._land(held, [kb_pb2.Operation(create=creation)], request).results[0]
-        return kb_pb2.CreateResponse(id=str(result.artifact_id), revision=result.revision)
+        result = self._land(held, requests.creating(request)).results[0]
+        return kb_pb2.Created(id=str(result.artifact_id), revision=result.revision)
 
-    @boundary(kb_pb2.WriteResponse)
-    def Write(self, request, held):
-        replacement = kb_pb2.Replacement(locator=request.locator, content=request.content)
-        result = self._land(held, [kb_pb2.Operation(write=replacement)], request).results[0]
-        return kb_pb2.WriteResponse(revision=result.revision)
+    @boundary(kb_pb2.ReplaceResponse)
+    def Replace(self, request, held):
+        return kb_pb2.Replaced(revision=self._land(held, requests.replacing(request)).results[0].revision)
 
-    @boundary(kb_pb2.AppendResponse)
-    def Append(self, request, held):
-        addition = kb_pb2.Addition(locator=request.locator, content=request.content)
-        result = self._land(held, [kb_pb2.Operation(append=addition)], request).results[0]
-        return kb_pb2.AppendResponse(id=result.item, revision=result.revision)
+    @boundary(kb_pb2.AddResponse)
+    def Add(self, request, held):
+        result = self._land(held, requests.adding(request)).results[0]
+        return kb_pb2.Added(id=result.item, revision=result.revision)
 
-    @boundary(kb_pb2.DeleteResponse)
-    def Delete(self, request, held):
-        removal = kb_pb2.Removal(locator=request.locator)
-        result = self._land(held, [kb_pb2.Operation(delete=removal)], request).results[0]
-        return kb_pb2.DeleteResponse(revision=result.revision)
+    @boundary(kb_pb2.RemoveResponse)
+    def Remove(self, request, held):
+        return kb_pb2.Removed(revision=self._land(held, requests.removing(request)).results[0].revision)
 
     @boundary(kb_pb2.ApplyResponse)
     def Apply(self, request, held):
-        landed = self._land(held, request.operations, request)
+        landed = self._land(held, requests.change(request.operations, request.actor, request.message))
         return kb_pb2.ApplyResponse(batch=landed.batch, results=[
             kb_pb2.Result(id=str(result.artifact_id), revision=result.revision, item=result.item)
             for result in landed.results
         ])
 
-    def _land(self, held, operations, request) -> write.Landed:
-        """A set of operations landed under the request's actor and message."""
-        return write.land(held, *requests.change(operations, request.actor, request.message), self._clock)
+    def _land(self, held, change) -> write.Landed:
+        """A set of changes landed under its signature."""
+        return write.land(held, *change, self._clock)
 
     @boundary(kb_pb2.ReadResponse, at_one_moment=True)
     def Read(self, request, held):

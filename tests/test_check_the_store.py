@@ -74,7 +74,7 @@ def _store_with_two_faults(root):
 @then("both are reported, each naming the artifact, the place in it and the rule broken")
 def _both_reported(checked):
     assert not checked.faults, checked.faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in checked.violations] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in checked.violations] == [
         (WEEKLY, "sections", "sections"),
         ("work-item/move-the-review-to-mondays", "decisions/0", "ref"),
     ]
@@ -120,7 +120,7 @@ def _not_a_violation(checked):
 
 @then("it is also reported as a violation, naming the artifact, the place in it and the rule broken")
 def _also_a_violation(checked):
-    assert [(fault.artifact, fault.path, fault.rule, fault.message) for fault in checked.violations] == [
+    assert [(fault.artifact, fault.place, fault.rule, fault.message) for fault in checked.violations] == [
         (WEEKLY, "sections", "sections",
          "the sections the type requires must all be present, in order; 'Review' is missing"),
     ]

@@ -91,21 +91,58 @@ def starting(request: kb_pb2.InitRequest) -> tuple[Actor, Root]:
     return signatures.starter(request.actor), values.root(request.root)
 
 
+def _signature(actor: kb_pb2.Actor, message: str) -> kb_pb2.Signature:
+    """An actor and a message, as a request that still carries them apart gives them, read as one signature."""
+    return kb_pb2.Signature(role=actor.role, execution=actor.execution, message=message)
+
+
 def change(requested, actor: kb_pb2.Actor, message: str) -> tuple[list, Signed]:
-    """A change request as the domain takes it: who makes it and why first, refused alone when it does not say; then
+    """A set request as the domain takes it: who makes it and why first, refused alone when it does not say; then
     a set holding nothing is refused; then each operation, converted or standing as its refusal."""
-    signed = signatures.signed(actor, message)
+    signed = signatures.signed(_signature(actor, message))
     if not requested:
         raise Refused([kb_pb2.Fault(rule=rules.OPERATIONS, message="a set must hold at least one change")])
     return operations(requested), signed
 
 
+def creating(request: kb_pb2.CreateRequest) -> tuple[list, Signed]:
+    """A Create as the domain takes it: a set of one, signed."""
+    return _one(request.signature, lambda: _create(request.kind, request.title, request.content))
+
+
+def replacing(request: kb_pb2.ReplaceRequest) -> tuple[list, Signed]:
+    """A Replace as the domain takes it: a set of one, signed."""
+    return _one(request.signature, lambda: _replace(request.locator, request.content))
+
+
+def adding(request: kb_pb2.AddRequest) -> tuple[list, Signed]:
+    """An Add as the domain takes it: a set of one, signed."""
+    return _one(request.signature, lambda: _add(request.locator, request.content))
+
+
+def removing(request: kb_pb2.RemoveRequest) -> tuple[list, Signed]:
+    """A Remove as the domain takes it: a set of one, signed."""
+    return _one(request.signature, lambda: _remove(request.locator))
+
+
+def _one(signature: kb_pb2.Signature, convert) -> tuple[list, Signed]:
+    """One change: who makes it and why first, refused alone when it does not say; then the change, converted or
+    standing as its refusal."""
+    signed = signatures.signed(signature)
+    return _each([convert]), signed
+
+
 def operations(requested) -> list:
     """Every operation of a set, each converted or standing as its refusal."""
+    return _each([lambda operation=operation: _operation(operation) for operation in requested])
+
+
+def _each(conversions) -> list:
+    """Each conversion's change, or its refusal in its place."""
     converted = []
-    for operation in requested:
+    for convert in conversions:
         try:
-            converted.append(_operation(operation))
+            converted.append(convert())
         except Refused as refused:
             converted.append(Refusal(tuple(refused.faults)))
     return converted
@@ -114,19 +151,31 @@ def operations(requested) -> list:
 def _operation(operation: kb_pb2.Operation):
     which = operation.WhichOneof("operation")
     if which == "create":
-        return _create(operation.create)
+        return _create(operation.create.type, operation.create.title, operation.create.content)
     if which == "append":
-        return Add(values.locator(operation.append.locator), values.item(operation.append.content))
+        return _add(operation.append.locator, operation.append.content)
     if which == "delete":
-        return Remove(values.locator(operation.delete.locator))
-    locator = values.locator(operation.write.locator)
-    return Replace(locator, values.content(operation.write.content, at_root=not locator.place))
+        return _remove(operation.delete.locator)
+    return _replace(operation.write.locator, operation.write.content)
 
 
-def _create(creation: kb_pb2.Creation) -> Create:
-    kind = values.kind(creation.type)
-    name, at, title_faults = values.named(kind, creation.title)
-    return Create(kind, creation.title, name, at, title_faults, values.content(creation.content))
+def _create(kind_name: str, title: str, content: str) -> Create:
+    kind = values.kind(kind_name)
+    name, at, title_faults = values.named(kind, title)
+    return Create(kind, title, name, at, title_faults, values.content(content))
+
+
+def _replace(requested: kb_pb2.Locator, content: str) -> Replace:
+    locator = values.locator(requested)
+    return Replace(locator, values.content(content, at_root=not locator.place))
+
+
+def _add(requested: kb_pb2.Locator, content: str) -> Add:
+    return Add(values.locator(requested), values.item(content))
+
+
+def _remove(requested: kb_pb2.Locator) -> Remove:
+    return Remove(values.locator(requested))
 
 
 def reading(request: kb_pb2.ReadRequest) -> Reading:
@@ -179,7 +228,7 @@ def listing(request: kb_pb2.ListRequest) -> Listing:
 def snapshot(request: kb_pb2.SnapshotRequest) -> tuple[list, Signed]:
     """A snapshot request as the domain takes it: the reader's signature first, refused alone when it does not sign;
     then each name, converted or standing as its refusal."""
-    signed = signatures.reader(request.actor, request.message)
+    signed = signatures.reader(_signature(request.actor, request.message))
     return _names(request.artifacts), signed
 
 

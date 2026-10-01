@@ -3,7 +3,7 @@ import re
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, write
+from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace
 import held
 from kb import client as kb_client
 from kb.content import loads
@@ -93,7 +93,7 @@ def _identity_and_summary_fields(summary):
 
 @then("a stub of each thing it points at and of each of its parts")
 def _stubs(summary):
-    assert {(stub.field, stub.id, stub.type, stub.title) for stub in summary.references} == {
+    assert {(stub.field, stub.id, stub.kind, stub.title) for stub in summary.references} == {
         ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
     }
     assert [(stub.collection, stub.id, stub.title) for stub in summary.parts] == [
@@ -104,7 +104,7 @@ def _stubs(summary):
 
 @then("how many things point at it, counted by their kind and by the link they use")
 def _inbound_counts(summary):
-    assert [(count.type, count.field, count.count) for count in summary.inbound] == [
+    assert [(count.kind, count.field, count.count) for count in summary.inbound] == [
         ("work-item", "decisions", 2),
     ]
 
@@ -218,7 +218,7 @@ def asked():
 @when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, PLACES))})"), target_fixture="shown")
 def _read_a_place_inside(client, asked, what):
     asked["what"] = PLACES[what]
-    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, path=PLACES[what])))
+    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, place=PLACES[what])))
 
 
 @when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, SECTIONS_NOT_HELD))})"), target_fixture="shown")
@@ -238,7 +238,7 @@ def _rejected_for_nothing_at_that_place(shown, asked):
     "or a collection and an item in it"
 )
 def _rejected_as_not_a_plain_place(shown):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in shown.faults] == [(DECISION, "sections/../..", "locator")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in shown.faults] == [(DECISION, "sections/../..", "locator")]
     assert "plain alphabet" in shown.faults[0].message
 
 
@@ -397,7 +397,7 @@ COUNTING = [
 def _two_decisions_pointing_at_each_other(client):
     create(client, "decision", {"title": "Stock is counted daily", "sections": COUNTING})
     create(client, "decision", {"title": "Stock is counted nightly", "supersedes": DAILY, "sections": COUNTING})
-    changed = write(client, DAILY, {"supersedes": NIGHTLY, "sections": COUNTING}, message="Point back")
+    changed = replace(client, DAILY, {"supersedes": NIGHTLY, "sections": COUNTING}, message="Point back")
     assert not changed.faults, changed.faults
 
 
@@ -484,7 +484,7 @@ def _older_links_as_names(whole):
 def _older_decision_tagged(client, tag):
     define(client, TAG_TYPE)
     tagged = create(client, "tag", {"title": tag})
-    changed = write(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
+    changed = replace(client, OLDER, {"tags": [tagged.id], "sections": OLDER_SECTIONS}, message="Tag it")
     assert not changed.faults, changed.faults
 
 

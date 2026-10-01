@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from calls import answer
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -86,7 +87,7 @@ class InAnotherProgram:
 
 def landed_second(held, first):
     """`held`'s change drafted and held at its clock, `first` run to its end, then `held` let go to land second.
-    Returns what `held`'s change was answered with."""
+    Returns what `held`'s change was answered with, as a step reads it."""
     held.hold()
     first()
-    return held.release()
+    return answer(held.release())

@@ -109,7 +109,7 @@ def _entry(entry: dict) -> kb_pb2.Entry:
     own, only what was read."""
     return kb_pb2.Entry(
         id=entry["id"], at=entry["at"], actor=kb_pb2.Actor(**entry["actor"]), op=entry["op"],
-        artifact=entry.get("artifact", ""), path=entry.get("path", ""), revision=entry.get("revision", 0),
+        artifact=entry.get("artifact", ""), place=entry.get("path", ""), revision=entry.get("revision", 0),
         schema_version=entry.get("schema_version", 0), digest=entry.get("digest", ""), message=entry["message"],
         batch=entry["batch"], read=[kb_pb2.Snapshotted(**each) for each in entry.get("read", [])],
     )

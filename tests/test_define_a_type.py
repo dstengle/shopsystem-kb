@@ -2,7 +2,7 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, create, define, listing, next_version, read, remove, request, write
+from calls import DECISION_TYPE, create, define, listing, next_version, read, remove, request, replace
 import held
 from kb.content import loads
 
@@ -117,7 +117,7 @@ def _checked_against_the_shared_shape(client):
     assert not fits.faults, fits.faults
     misfit = request(client, "tool-use", "Weigh the sugar", {"bindings": [{"name": "scale"}]})
     assert (misfit.id, misfit.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
+    assert [(fault.place, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
 
 
 BASE_TYPE = {
@@ -166,7 +166,7 @@ def _define_a_decision_on_the_base(client):
 def _rejected_without_an_owner(client):
     refused = request(client, "decision", "Price reviews happen weekly", {"status": "accepted", "sections": BASE_SECTIONS})
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("", "required")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("", "required")]
 
 
 @then("a decision reads back with its purpose before its rationale")
@@ -187,7 +187,7 @@ def _define_a_malformed_type(client):
 @then("the type is rejected because it does not match the type that describes types")
 def _rejected_by_the_metaschema(client, refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("schema/shelf-label", "schema/type", "anyOf"),
     ]
     assert "'label' is not valid" in refused.faults[0].message
@@ -228,7 +228,7 @@ def _define_a_type_never_checkable(root, client, fault):
 def _type_rejected(attempt, rule, path, message):
     faults = attempt["response"].faults
     assert (attempt["response"].id, attempt["response"].revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in faults] == [(path, rule)]
+    assert [(fault.place, fault.rule) for fault in faults] == [(path, rule)]
     assert faults[0].message.startswith(message)
 
 
@@ -299,7 +299,7 @@ def _a_link_through_the_base_refused(client):
     other = create(client, "decision", {"title": "Prices are reviewed monthly", "sections": RATIONALE})
     refused = request(client, "decision", "Price reviews happen weekly", {"about": other.id, "sections": RATIONALE})
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("decision/price-reviews-happen-weekly", "about", "ref"),
     ]
 
@@ -314,12 +314,12 @@ def _a_type_at_its_second_version(client):
 @when("the client changes what that type requires, leaving its version at two", target_fixture="changed")
 def _change_the_type_leaving_its_version(client):
     schema = {**DECISION_TYPE["schema"], "required": ["title", "supersedes"]}
-    return write(client, "schema/decision", {"version": 2, "schema": schema}, message="Revise Decision")
+    return replace(client, "schema/decision", {"version": 2, "schema": schema}, message="Revise Decision")
 
 
 @then("the change is rejected because a type's version goes up whenever the type changes")
 def _rejected_for_the_version_kept(changed):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in changed.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in changed.faults] == [
         ("schema/decision", "version", "version"),
     ]
     assert changed.faults[0].message.startswith("a type's version goes up whenever the type changes")
@@ -352,7 +352,7 @@ def _remove_the_type(root, client):
 @then("the removal is rejected because something still points at it, naming each of those two artifacts")
 def _rejected_naming_each(client, attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [
         (name, "", "on_delete") for name in sorted(TWO_DECISIONS)
     ]
     assert all("'schema/vote'" in fault.message for fault in faults)

@@ -252,7 +252,7 @@ def _create_with_a_title_inside(client):
 )
 def _rejected_for_a_title_inside(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("title", "identity")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("title", "identity")]
     assert "Price reviews, weekly" in refused.faults[0].message
 
 
@@ -283,7 +283,7 @@ def _create_without_a_title(client):
 
 @then("the artifact is rejected because an artifact cannot be created without a title")
 def _rejected_without_a_title(refused):
-    assert [(fault.path, fault.rule, fault.message) for fault in refused.faults] == [
+    assert [(fault.place, fault.rule, fault.message) for fault in refused.faults] == [
         ("title", "title", "an artifact cannot be created without a title"),
     ]
 
@@ -307,8 +307,8 @@ def _create_with_identity_inside(client):
 )
 def _rejected_for_identity_inside(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
-    assert all(fault.path in fault.message for fault in refused.faults)
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
+    assert all(fault.place in fault.message for fault in refused.faults)
 
 
 @then(
@@ -323,7 +323,7 @@ def _plain_name(created):
 @then("the artifact is rejected because a title must leave something to make a name from")
 def _rejected_for_an_empty_name(created):
     assert (created.id, created.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in created.faults] == [("title", "title")]
+    assert [(fault.place, fault.rule) for fault in created.faults] == [("title", "title")]
     assert "leave something to make a name from" in created.faults[0].message
 
 
@@ -336,9 +336,7 @@ def _title_is_text_not_a_bool(root, client, created):
 
 def _raw(client, text):
     """A Create whose content is sent as written, so the text can carry what dumps never writes."""
-    return client.Create(kb_pb2.CreateRequest(
-        type="decision", title="Price reviews happen weekly", content=text, actor=CLIENT, message="Record it",
-    ))
+    return request(client, "decision", "Price reviews happen weekly", text, message="Record it")
 
 
 @when("the client creates a decision whose content carries a tag on one of its values, saying which role and why", target_fixture="refused")
@@ -385,7 +383,7 @@ def _create_with_an_extra_entry_in_a_section(client):
     "and the extra entry is named"
 )
 def _rejected_for_an_extra_entry(refused):
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "additionalProperties")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("sections/0", "additionalProperties")]
     assert "'author'" in refused.faults[0].message
 
 
@@ -465,7 +463,7 @@ def _create_with_a_section_without_a_body(client):
 )
 def _rejected_for_a_section_missing_a_key(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
 
 
 @when(
@@ -533,7 +531,7 @@ def _create_from_that_content(client, written):
 @then("the artifact is rejected because an entry is named once and only once, and the place the second one stands is named")
 def _rejected_for_an_entry_named_twice(created):
     assert (created.id, created.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in created.faults] == [("sections/0/body", "content")]
+    assert [(fault.place, fault.rule) for fault in created.faults] == [("sections/0/body", "content")]
     assert created.faults[0].message.startswith("an entry is named once and only once")
     assert "line 4" in created.faults[0].message
 
@@ -581,7 +579,7 @@ def _rejected_as_an_unknown_kind(attempt):
 
 @then("that fault stands on its own, apart from anything wrong with the content")
 def _the_kind_fault_alone(attempt):
-    assert [(fault.path, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
+    assert [(fault.place, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
 
 
 @then("nothing is written anywhere in the store")
@@ -643,7 +641,7 @@ def _create_with_two_faults(client, tmp_path):
 def _rejected_with_both_faults(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
-    assert sorted((fault.artifact, fault.path, fault.rule) for fault in refused.faults) == [
+    assert sorted((fault.artifact, fault.place, fault.rule) for fault in refused.faults) == [
         ("decision/price-reviews-happen-weekly", path, rule) for path, rule in attempt["faults"]
     ]
 
@@ -697,7 +695,7 @@ def _name_from_the_title(created):
 @then("the client never said what the name should be")
 @then("the client never said what either name should be")
 def _no_name_asked_for():
-    assert set(kb_pb2.CreateRequest.DESCRIPTOR.fields_by_name) == {"type", "title", "content", "actor", "message"}
+    assert set(kb_pb2.CreateRequest.DESCRIPTOR.fields_by_name) == {"kind", "title", "content", "signature"}
     assert all("id" not in part for part in [*SECTIONS, *TWICE])
 
 
@@ -727,7 +725,7 @@ def _create_without_a_purpose(client):
 @then("the artifact is rejected because the sections the type requires must all be present, in order")
 def _rejected_for_the_sections(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("decision/price-reviews-happen-weekly", "sections", "sections"),
     ]
     assert refused.faults[0].message == (
@@ -748,7 +746,7 @@ def _create_superseding_nothing(client):
 @then("the artifact is rejected because a link must land on a node of a kind the type allows")
 def _rejected_for_the_link(refused):
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
     ]
     assert refused.faults[0].message.startswith("a link must land on a node of a kind the type allows")
@@ -813,22 +811,20 @@ REASONS = {
 def _rejected_for_senseless_content(attempt, reason):
     refused, (rule, words) = attempt["response"], REASONS[reason]
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [(attempt["place"], rule)]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [(attempt["place"], rule)]
     assert words in refused.faults[0].message
 
 
 @then("the call comes back with its answer rather than breaking off")
 def _the_call_answers(attempt):
-    assert isinstance(attempt["response"], kb_pb2.CreateResponse)
+    assert isinstance(attempt["response"].response, kb_pb2.CreateResponse)
     assert attempt["response"].faults
 
 
 @when('the client creates a decision carrying a field written "2026-09-24", saying which role and why', target_fixture="created")
 def _create_with_a_bare_date(client):
     text = content.dumps({"sections": SECTIONS}) + "options:\n  - title: Revisit\n    body: 2026-09-24\n"
-    return client.Create(kb_pb2.CreateRequest(
-        type="decision", title="Review prices again", content=text, actor=CLIENT, message="Say when to revisit",
-    ))
+    return request(client, "decision", "Review prices again", text, message="Say when to revisit")
 
 
 @then("that field reads back as the text that was written, not as a date")
@@ -931,5 +927,5 @@ def test_content_holding_half_of_a_character_alone_is_refused():
 def _rejected_as_unreadable_content(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.path, fault.rule) for fault in refused.faults] == [(attempt["place"], "content")]
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [(attempt["place"], "content")]
     assert "it is not YAML that can be read" in refused.faults[0].message

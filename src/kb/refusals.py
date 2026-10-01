@@ -23,7 +23,7 @@ def no_type(kind_name: str) -> kb_pb2.Fault:
 def not_a_collection(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(
-        artifact=str(locator.id), path=place, rule=rules.COLLECTION,
+        artifact=str(locator.id), place=place, rule=rules.COLLECTION,
         message=f"an item is added to a collection, and {place!r} in {str(locator.id)!r} is not one",
     )
 
@@ -31,7 +31,7 @@ def not_a_collection(locator: Locator) -> kb_pb2.Fault:
 def nothing_at(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(
-        artifact=str(locator.id), path=place, rule=rules.NOT_FOUND,
+        artifact=str(locator.id), place=place, rule=rules.NOT_FOUND,
         message=f"{str(locator.id)!r} holds nothing at {place!r}",
     )
 
@@ -39,7 +39,7 @@ def nothing_at(locator: Locator) -> kb_pb2.Fault:
 def settled_place(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(
-        artifact=str(locator.id), path=place, rule=rules.IDENTITY,
+        artifact=str(locator.id), place=place, rule=rules.IDENTITY,
         message=f"a place inside an artifact never names what only the store settles; {place!r} begins at {locator.place[0]!r}",
     )
 
@@ -47,7 +47,7 @@ def settled_place(locator: Locator) -> kb_pb2.Fault:
 def whole_only(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(
-        artifact=str(locator.id), path=place, rule=rules.LOCATOR,
+        artifact=str(locator.id), place=place, rule=rules.LOCATOR,
         message=f"a removal takes out a whole artifact; {place!r} is a place inside {str(locator.id)!r}",
     )
 
@@ -56,7 +56,7 @@ def still_linked(removed: str, other: ArtifactId, place: str) -> kb_pb2.Fault:
     """One link that still points at what would go: a whole artifact, or an item written `<artifact>#<place>`."""
     where = f" at {place!r}" if place else ""
     return kb_pb2.Fault(
-        artifact=str(other), path=place, rule=rules.ON_DELETE,
+        artifact=str(other), place=place, rule=rules.ON_DELETE,
         message=f"{removed!r} cannot be removed while {str(other)!r} points at it{where}",
     )
 
@@ -64,7 +64,7 @@ def still_linked(removed: str, other: ArtifactId, place: str) -> kb_pb2.Fault:
 def unlanded(artifact: str, place: str, target: str) -> kb_pb2.Fault:
     """A link that lands on nothing the store holds, or on a node of a kind its type does not allow."""
     return kb_pb2.Fault(
-        artifact=artifact, path=place, rule=rules.REF,
+        artifact=artifact, place=place, rule=rules.REF,
         message=f"a link must land on a node of a kind the type allows; {target!r} does not",
     )
 
@@ -78,35 +78,35 @@ MISNAMED = {
 
 def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=str(artifact_id), path=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
+        artifact=str(artifact_id), place=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
         message=MISNAMED[found.why].format(name=found.name, collection=found.collection),
     )
 
 
 def no_such_shape(type_id: ArtifactId, place: str, ref: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=str(type_id), path=place, rule=rules.SHAPE,
+        artifact=str(type_id), place=place, rule=rules.SHAPE,
         message=f"a shape a type refers to must belong to a type the store holds; {ref!r} does not",
     )
 
 
 def built_on_itself(type_id: ArtifactId, place: str, ref: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=str(type_id), path=place, rule=rules.BUILT_ON,
+        artifact=str(type_id), place=place, rule=rules.BUILT_ON,
         message=f"a type cannot be built on itself; {str(type_id)!r} names {ref!r}",
     )
 
 
 def no_targets(type_id: ArtifactId, place: str, field: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=str(type_id), path=place, rule=rules.TARGETS,
+        artifact=str(type_id), place=place, rule=rules.TARGETS,
         message=f"a link field says which kinds it may point at; {field!r} does not",
     )
 
 
 def version_kept(type_id: ArtifactId, held: int) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=str(type_id), path="version", rule=rules.VERSION,
+        artifact=str(type_id), place="version", rule=rules.VERSION,
         message=f"a type's version goes up whenever the type changes; {str(type_id)!r} changed at version {held}",
     )
 
@@ -117,7 +117,7 @@ def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
 
 def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
-        artifact=str(artifact_id), path="sections", rule=rules.NOT_FOUND,
+        artifact=str(artifact_id), place="sections", rule=rules.NOT_FOUND,
         message=f"{str(artifact_id)!r} holds no section titled {title!r}",
     )
 

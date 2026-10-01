@@ -4,7 +4,7 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, MovingClock, append, apply, create, creation, define, journal, moment, remove, snapshot, write,
+    CLIENT, DECISION_TYPE, MovingClock, add, apply, create, creation, define, journal, moment, remove, snapshot, replace,
 )
 import held
 from kb import client as kb_client
@@ -112,7 +112,7 @@ def _store_with_a_decision_changed_today(root, clock, written):
     }, message="Review prices weekly", actor=SHOPKEEPER)
     written.append(held.fingerprint(root, DECISION))
     clock.at = clock.today
-    changed = write(client, DECISION, {"sections": [
+    changed = replace(client, DECISION, {"sections": [
         {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
         {"title": "Rationale", "body": "Costs move weekly, and the suppliers say so.\n"},
     ]}, message="Say why weekly", actor=AGENT)
@@ -140,7 +140,7 @@ def _one_entry_for_each_change(entries):
 )
 def _each_entry_says_everything(entries, written):
     assert [
-        (entry.at[:10], entry.actor.role, entry.actor.execution, entry.op, entry.artifact, entry.path,
+        (entry.at[:10], entry.actor.role, entry.actor.execution, entry.op, entry.artifact, entry.place,
          entry.revision, entry.schema_version, entry.message)
         for entry in entries
     ] == [
@@ -260,21 +260,21 @@ def _nothing_and_no_fault(asked):
 
 @then("the read is rejected because since names a moment in time")
 def _rejected_since(asked):
-    assert [(fault.rule, fault.path) for fault in asked.faults] == [("since", "")]
+    assert [(fault.rule, fault.place) for fault in asked.faults] == [("since", "")]
     assert "'last Tuesday'" in asked.faults[0].message
     assert list(asked.entries) == []
 
 
 @given("a store where an agent replaced one section of a decision")
 def _one_section_replaced(client):
-    replaced = write(client, DECISION, {"title": "Rationale", "body": "Costs move every week.\n"},
+    replaced = replace(client, DECISION, {"title": "Rationale", "body": "Costs move every week.\n"},
                      message="Say it plainer", actor=AGENT, path="sections/rationale")
     assert not replaced.faults, replaced.faults
 
 
 @then("the entry for that change names the place inside the decision that was changed")
 def _names_the_place(entries):
-    assert [(entry.op, entry.path, entry.message) for entry in entries][-1] == (
+    assert [(entry.op, entry.place, entry.message) for entry in entries][-1] == (
         "write", "sections/rationale", "Say it plainer",
     )
 
@@ -283,10 +283,10 @@ CHANGES = {
     "creates a second decision": lambda client, message: create(
         client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}, message=message, actor=SHOPKEEPER,
     ),
-    "changes the decision": lambda client, message: write(
+    "changes the decision": lambda client, message: replace(
         client, DECISION, {"sections": SECTIONS}, message=message, actor=SHOPKEEPER,
     ),
-    "adds an item to one of the decision's collections": lambda client, message: append(
+    "adds an item to one of the decision's collections": lambda client, message: add(
         client, DECISION, "options", {"title": "Every week"}, message=message, actor=SHOPKEEPER,
     ),
     "removes the decision": lambda client, message: remove(client, DECISION, message=message, actor=SHOPKEEPER),
@@ -334,7 +334,7 @@ def _every_entry_left_at(client, the_change, reading):
 
 def _changed_five_times(client):
     for turn in range(1, 6):
-        changed = write(client, DECISION, {"sections": [
+        changed = replace(client, DECISION, {"sections": [
             {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
             {"title": "Rationale", "body": f"Costs move weekly; said {turn} times.\n"},
         ]})
@@ -420,7 +420,7 @@ def _in_one_go(client, artifacts):
 def _two_goes_and_one_alone(client):
     """The name the client was given for each go, first and second."""
     first = _in_one_go(client, FIRST_GO)
-    alone = write(client, DECISION, {"sections": SECTIONS})
+    alone = replace(client, DECISION, {"sections": SECTIONS})
     assert not alone.faults, alone.faults
     return [first, _in_one_go(client, SECOND_GO)]
 
@@ -524,7 +524,7 @@ def test_an_entry_stamped_before_a_moment_that_lands_after_a_read_since_it_is_n(
 def _changed_at(root, reading, artifact, body):
     """The artifact changed by a client whose clock stands at the moment the reading gives."""
     stood = moment(reading)
-    changed = write(kb_client.connect(root, clock=lambda: stood), artifact, {"sections": [
+    changed = replace(kb_client.connect(root, clock=lambda: stood), artifact, {"sections": [
         {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
         {"title": "Rationale", "body": body},
     ]}, message=body)
@@ -602,7 +602,7 @@ SAME_MOMENT = ["decision/zebra-crossings", "decision/mango-stalls", "decision/ap
 
 @given("the client has changed one artifact, and then changed a different artifact", target_fixture="landed")
 def _changed_one_then_a_different_one(client):
-    changed = write(client, FIRST_ARTIFACT, {"sections": SECTIONS}, message="Say it plainly")
+    changed = replace(client, FIRST_ARTIFACT, {"sections": SECTIONS}, message="Say it plainly")
     assert not changed.faults, changed.faults
     for artifact in SAME_MOMENT:
         made = create(client, "decision", {"title": artifact.split("/")[1].replace("-", " ").capitalize(),

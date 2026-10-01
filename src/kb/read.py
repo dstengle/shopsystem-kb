@@ -41,7 +41,7 @@ def _shown(store: Port, kind: values.Kind) -> dict:
 
 def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
     return kb_pb2.Stub(
-        field=field, id=target["id"], type=target["type"], title=target["title"],
+        field=field, id=target["id"], kind=target["type"], title=target["title"],
         fields=dumps(_summary_fields(target, shown)),
     )
 
@@ -71,7 +71,7 @@ def _summary(store: Port, locator: Locator) -> kb_pb2.ReadResponse:
         for item in found.get(collection, []):
             response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
     for (type_name, field), count in _inbound(store, locator.id).items():
-        response.inbound.append(kb_pb2.InboundCount(type=type_name, field=field, count=count))
+        response.inbound.append(kb_pb2.InboundCount(kind=type_name, field=field, count=count))
     return response
 
 

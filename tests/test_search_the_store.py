@@ -95,7 +95,7 @@ def _search_the_decisions(client):
 @then("the client is given the two decisions and not the process")
 def _the_two_decisions(found):
     assert {match.stub.id for match in found} == {"decision/restock-on-thursdays", "decision/price-reviews-happen-weekly"}
-    assert all(match.stub.type == "decision" for match in found)
+    assert all(match.stub.kind == "decision" for match in found)
 
 
 @when("the client searches the fields and the prose for restocking", target_fixture="found")

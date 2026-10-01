@@ -4,7 +4,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
     CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, journal, listing, read,
-    removal, replacement, write,
+    removal, replacement, replace,
 )
 import held
 from kb import client as kb_client
@@ -95,7 +95,7 @@ def _neither_change_held(client, attempt):
 
 @then("every fault in the set comes back, not only the first")
 def _every_fault_back(attempt):
-    assert [(fault.path, fault.message) for fault in attempt["response"].faults] == [
+    assert [(fault.place, fault.message) for fault in attempt["response"].faults] == [
         ("sections", "the sections the type requires must all be present, in order; 'Purpose' is missing"),
         ("sections", "the sections the type requires must all be present, in order; 'Rationale' is missing"),
     ]
@@ -145,7 +145,7 @@ def _nothing_by_that_name(root, client):
 
 def _still_pointed_at(root, client):
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
-    assert not write(client, WORK_ITEM, {"decisions": [DECISION]}).faults
+    assert not replace(client, WORK_ITEM, {"decisions": [DECISION]}).faults
     return removal(DECISION)
 
 
@@ -171,7 +171,7 @@ def _ask_for_a_set_stopped(root, client, fault):
 def _refused_with(attempt, faults):
     refused = attempt["response"]
     assert (refused.batch, list(refused.results)) == ("", [])
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == faults
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == faults
     return refused.faults[0].message
 
 
@@ -306,7 +306,7 @@ def _both_held_pointing_at_each_other(client):
 @then("the set is rejected because the store was busy with another change")
 def _set_rejected_as_busy(applied):
     assert (applied.batch, list(applied.results)) == ("", [])
-    assert [(fault.artifact, fault.path, fault.rule) for fault in applied.faults] == [("", "", "busy")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in applied.faults] == [("", "", "busy")]
     assert applied.faults[0].message.startswith("the store was busy with another change")
 
 

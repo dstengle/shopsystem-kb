@@ -70,7 +70,7 @@ def _can_define_a_type(client):
     "with a fingerprint of what was written"
 )
 def _the_entry_is_the_metaschema_write(root, entry):
-    assert (entry.op, entry.artifact, entry.path, entry.revision) == ("create", "schema/schema", "", 1)
+    assert (entry.op, entry.artifact, entry.place, entry.revision) == ("create", "schema/schema", "", 1)
     assert entry.digest == held.fingerprint(root, "schema/schema")
 
 

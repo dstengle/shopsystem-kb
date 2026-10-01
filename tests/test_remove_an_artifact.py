@@ -1,12 +1,12 @@
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, TAG_TYPE, create, define, journal, listing, read, remove, request, tagged_decision_type,
+    CLIENT, TAG_TYPE, answer, create, creating, define, journal, listing, read, remove, removing, request,
+    tagged_decision_type,
 )
 import at_once
 import held
 from kb import client as kb_client
-from kb.content import dumps
 from kb.contract import kb_pb2
 
 
@@ -108,7 +108,7 @@ def _rejected_while_pointed_at(client, attempt):
 
 @then("the client is given every link that blocks it")
 def _every_blocking_link(attempt):
-    assert [(fault.artifact, fault.path) for fault in attempt["response"].faults] == [(DECISION, "tags/0")]
+    assert [(fault.artifact, fault.place) for fault in attempt["response"].faults] == [(DECISION, "tags/0")]
     assert f"'{HELD}'" in attempt["response"].faults[0].message
 
 
@@ -171,7 +171,7 @@ def _remove_the_tag_a_step_points_at(root, client):
 @then("the client is given that link among the links that block it")
 def _the_steps_link_among_them(client, attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path) for fault in faults] == [(PROCESS, "steps/1/about")]
+    assert [(fault.artifact, fault.place) for fault in faults] == [(PROCESS, "steps/1/about")]
     assert f"'{LOOSE}'" in faults[0].message
     assert not read(client, LOOSE).faults
 
@@ -209,18 +209,14 @@ TAGGED = "decision/clearance-runs-monthly"
 )
 def _removing_while_linking(root):
     return {
-        "removing the tag": ("Delete", kb_pb2.DeleteRequest(
-            locator=kb_pb2.Locator(id=LOOSE), actor=CLIENT, message="Nothing is on clearance",
-        )),
-        "creating the decision": ("Create", kb_pb2.CreateRequest(
-            type="decision", title="Clearance runs monthly", actor=CLIENT, message="Say how often", content=dumps({
-                "tags": [LOOSE],
-                "sections": [
-                    {"title": "Purpose", "body": "Clear old stock.\n"},
-                    {"title": "Rationale", "body": "Stock ages monthly.\n"},
-                ],
-            }),
-        )),
+        "removing the tag": ("Remove", removing(LOOSE, message="Nothing is on clearance")),
+        "creating the decision": ("Create", creating("decision", "Clearance runs monthly", message="Say how often", content={
+            "tags": [LOOSE],
+            "sections": [
+                {"title": "Purpose", "body": "Clear old stock.\n"},
+                {"title": "Rationale", "body": "Stock ages monthly.\n"},
+            ],
+        })),
     }
 
 
@@ -234,7 +230,7 @@ def _one_lands_first(root, racing, first):
 
     def landing_first():
         rpc, request_sent = racing[first]
-        response = getattr(kb_client.connect(root), rpc)(request_sent)
+        response = answer(getattr(kb_client.connect(root), rpc)(request_sent))
         assert not response.faults, response.faults
         attempt["before"] = held.holds(root)
 
@@ -245,7 +241,7 @@ def _one_lands_first(root, racing, first):
 
 @then("the new decision is rejected because a link must land on a node of a kind the type allows")
 def _new_decision_rejected_for_its_link(attempt):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in attempt["response"].faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
         (TAGGED, "tags/0", "ref"),
     ]
     assert attempt["response"].faults[0].message.startswith("a link must land on a node of a kind the type allows")

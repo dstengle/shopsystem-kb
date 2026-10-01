@@ -3,12 +3,11 @@ changes the store while an import is under way, after the import found the store
 the import, is refused as busy when the import holds the store longer than the store waits, and is never merged with
 it. The client's change is made from inside the import's reading of the directory, so it falls in that window every
 time. Through the operator's commands beside the contract, and the contract, over stores under the test's tmp_path."""
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, define
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, define, request
 import held
 from kb import client as kb_client
 from kb import offers, sqlite_store
 from kb.contract import kb_pb2
-from kb.content import dumps
 
 
 def _started(root):
@@ -30,10 +29,10 @@ def test_a_change_made_while_an_import_is_under_way_is_never_merged_with_it(tmp_
     reading = offers.offered
 
     def offered_while_a_client_changes_the_store(directory):
-        made.append(client.Create(kb_pb2.CreateRequest(
-            type="schema", title=DECISION_TYPE["title"], actor=CLIENT, message="Define Decision",
-            content=dumps({key: value for key, value in DECISION_TYPE.items() if key != "title"}),
-        )))
+        made.append(request(
+            client, "schema", DECISION_TYPE["title"], message="Define Decision",
+            content={key: value for key, value in DECISION_TYPE.items() if key != "title"},
+        ))
         return reading(directory)
     monkeypatch.setattr(offers, "offered", offered_while_a_client_changes_the_store)
 

@@ -1,7 +1,8 @@
 """Pins what kb publishes to a client through the contract alone (adrs/0018): `kb.content`'s `loads`, `dumps`,
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
-None; `kb.contract.kb_pb2`'s being importable; and the set of kb's own rule names against the spec's list. It does not
-pin the wording of any fault."""
+None; `kb.contract.kb_pb2`'s being importable, as package `kb.v1`; the changes `Create`, `Replace`, `Add` and `Remove`,
+each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
+`place`; and the set of kb's own rule names against the spec's list. It does not pin the wording of any fault."""
 import inspect
 import re
 from pathlib import Path
@@ -77,3 +78,49 @@ def test_a_json_schema_keyword_passes_through_as_a_rule_outside_the_pinned_set(t
     response = request(client, "typed", "Missing detail", {})
     assert [fault.rule for fault in response.faults] == ["required"]
     assert response.faults[0].rule not in rules.ALL
+
+
+CHANGES = {
+    "Create": ("CreateRequest", {"kind", "title", "content", "signature"}, "Created", {"id", "revision"}),
+    "Replace": ("ReplaceRequest", {"locator", "content", "signature"}, "Replaced", {"revision"}),
+    "Add": ("AddRequest", {"locator", "content", "signature"}, "Added", {"id", "revision"}),
+    "Remove": ("RemoveRequest", {"locator", "signature"}, "Removed", {"revision"}),
+}
+
+
+def _fields(name):
+    return set(kb_pb2.DESCRIPTOR.message_types_by_name[name].fields_by_name)
+
+
+def test_the_contract_is_version_one():
+    assert kb_pb2.DESCRIPTOR.package == "kb.v1"
+
+
+@pytest.mark.parametrize("rpc", sorted(CHANGES))
+def test_each_change_takes_one_signature_and_answers_its_result_or_a_refusal(rpc):
+    asked, carries, result, gives = CHANGES[rpc]
+    method = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods_by_name[rpc]
+    assert (method.input_type.name, method.output_type.name) == (asked, f"{rpc}Response")
+    assert _fields(asked) == carries
+    assert _fields(result) == gives
+    outcome = method.output_type.oneofs_by_name["outcome"]
+    assert [(field.name, field.message_type.name) for field in outcome.fields] == [("result", result), ("refusal", "Refusal")]
+    assert _fields(f"{rpc}Response") == {"result", "refusal"}
+
+
+def test_the_small_values_name_kinds_and_places_in_the_specs_words():
+    assert _fields("Signature") == {"role", "execution", "message"}
+    assert _fields("Refusal") == {"faults"}
+    assert _fields("Locator") == {"id", "place"}
+    assert _fields("Fault") == {"artifact", "place", "rule", "message"}
+    assert _fields("Stub") == {"field", "id", "kind", "title", "fields"}
+    assert _fields("InboundCount") == {"kind", "field", "count"}
+    assert "place" in _fields("Entry") and "path" not in _fields("Entry")
+
+
+def test_the_v0_changes_are_gone():
+    methods = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods_by_name
+    assert not {"Write", "Append", "Delete"} & set(methods)
+    assert not {"WriteRequest", "AppendRequest", "DeleteRequest"} & set(kb_pb2.DESCRIPTOR.message_types_by_name)
+    for rpc, (asked, _, _, _) in CHANGES.items():
+        assert "actor" not in _fields(asked)

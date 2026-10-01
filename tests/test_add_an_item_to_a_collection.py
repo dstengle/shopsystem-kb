@@ -3,11 +3,11 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, PROCESS_TYPE, append, create, define, journal, read, write
+from calls import CLIENT, PROCESS_TYPE, add, adding, answer, create, define, journal, read, replace
 import at_once
 import held
 from kb import client as kb_client
-from kb.content import dumps, loads
+from kb.content import loads
 from kb.contract import kb_pb2
 
 
@@ -161,7 +161,7 @@ def _checklist_named_by_place(client):
 @when("the client puts the items of that collection in a different order, saying which role and why", target_fixture="reordered")
 def _reorder_the_checks(client, named):
     reordered = [named["3"], named["1"], named["2"]]
-    response = write(client, CHECKLIST, {"checks": reordered}, message="Lock up before the lights")
+    response = replace(client, CHECKLIST, {"checks": reordered}, message="Lock up before the lights")
     assert not response.faults, response.faults
     return loads(read(client, CHECKLIST, whole=True).content)["checks"]
 
@@ -184,7 +184,7 @@ def _steps(client):
 
 
 def _added(client, content, collection="steps", artifact_id=PROCESS, message="Add a step before opening"):
-    response = append(client, artifact_id, collection, content, message=message)
+    response = add(client, artifact_id, collection, content, message=message)
     assert not response.faults, response.faults
     return {"response": response, "sent": content}
 
@@ -198,7 +198,7 @@ def _add_a_step(client):
 def _given_name_and_version(client, added):
     assert (added["response"].id, added["response"].revision) == ("count-the-float", 2)
     entry = journal(client, PROCESS).entries[-1]
-    assert (entry.op, entry.path, entry.revision, entry.actor.role, entry.message) == (
+    assert (entry.op, entry.place, entry.revision, entry.actor.role, entry.message) == (
         "append", "steps/count-the-float", 2, "client", "Add a step before opening",
     )
 
@@ -212,7 +212,7 @@ def _after_the_others(client):
 
 @when(parsers.parse('the client adds a step titled "{title}" to the process, saying which role and why'), target_fixture="added")
 def _add_a_titled_step(client, title):
-    return {"response": append(client, PROCESS, "steps", {"title": title}), "sent": {"title": title}}
+    return {"response": add(client, PROCESS, "steps", {"title": title}), "sent": {"title": title}}
 
 
 TITLES = {"the number 12 rather than text": 12, "the yes-or-no true rather than text": True}
@@ -236,7 +236,7 @@ def _named_from_its_title(client, added):
 @then("the client never said what the name should be")
 def _never_said(added):
     assert "id" not in added["sent"]
-    assert set(kb_pb2.AppendRequest.DESCRIPTOR.fields_by_name) == {"locator", "content", "actor", "message"}
+    assert set(kb_pb2.AddRequest.DESCRIPTOR.fields_by_name) == {"locator", "content", "signature"}
 
 
 @given("an artifact holding a collection whose items carry no title of their own")
@@ -276,7 +276,7 @@ def _first_keeps_its_name(client):
 
 @when("the client takes the first item out of that collection, saying which role and why", target_fixture="left")
 def _take_the_first_out(client, named):
-    response = write(client, CHECKLIST, {"checks": [named["2"], named["3"]]}, message="Lights are on a timer now")
+    response = replace(client, CHECKLIST, {"checks": [named["2"], named["3"]]}, message="Lights are on a timer now")
     assert not response.faults, response.faults
     return loads(read(client, CHECKLIST, whole=True).content)["checks"]
 
@@ -311,7 +311,7 @@ def _shared_step_unchanged(client):
 @when("the client adds a step whose content carries a name of its own, saying which role and why", target_fixture="attempt")
 def _add_a_step_naming_itself(client):
     before = read(client, PROCESS, whole=True)
-    response = append(client, PROCESS, "steps", {"id": "count-the-float", "title": "Count the float"})
+    response = add(client, PROCESS, "steps", {"id": "count-the-float", "title": "Count the float"})
     return {"response": response, "before": before}
 
 
@@ -320,7 +320,7 @@ def _add_a_step_naming_itself(client):
     "store settles is named back"
 )
 def _rejected_for_its_name(attempt):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in attempt["response"].faults] == [(PROCESS, "id", "identity")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [(PROCESS, "id", "identity")]
     assert "'count-the-float'" in attempt["response"].faults[0].message
 
 
@@ -333,7 +333,7 @@ def _process_as_it_was(client, attempt):
 @when("the client adds a step to a process by a name the store holds nothing under, saying which role and why", target_fixture="attempt")
 def _add_to_nothing(root, client):
     before = held.holds(root)
-    response = append(client, "process/close-the-shop", "steps", {"title": "Lock the door"})
+    response = add(client, "process/close-the-shop", "steps", {"title": "Lock the door"})
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
@@ -351,13 +351,13 @@ def _nothing_written(attempt):
 @when("the client adds a step that points at a shared step the store does not hold, saying which role and why", target_fixture="attempt")
 def _add_a_step_pointing_nowhere(client):
     before = read(client, PROCESS, whole=True)
-    response = append(client, PROCESS, "steps", {"title": "Count the change", "uses": "step/count-the-change"})
+    response = add(client, PROCESS, "steps", {"title": "Count the change", "uses": "step/count-the-change"})
     return {"response": response, "before": before}
 
 
 @then("the item is rejected because a link must land on a node of a kind the type allows")
 def _rejected_for_its_link(attempt):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in attempt["response"].faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
         (PROCESS, "steps/2/uses", "ref"),
     ]
     assert "'step/count-the-change'" in attempt["response"].faults[0].message
@@ -370,23 +370,23 @@ def _steps_must_name_a_role(client):
     step = staffed["parts"]["steps"]["items"]
     step["properties"]["role"] = {"type": "string"}
     step["required"] = ["title", "role"]
-    assert not write(client, "schema/process", {"version": 2, "schema": staffed}, message="Steps name a role").faults
+    assert not replace(client, "schema/process", {"version": 2, "schema": staffed}, message="Steps name a role").faults
     staffed_steps = [{**STEPS[0], "role": "opener"}, {**STEPS[1], "role": "opener"}]
-    assert not write(client, PROCESS, {"steps": staffed_steps}, message="Say who does each step").faults
+    assert not replace(client, PROCESS, {"steps": staffed_steps}, message="Say who does each step").faults
 
 
 @when("the client adds a step with no role named, where a step must name a role, saying which role and why", target_fixture="attempt")
 def _add_a_step_naming_no_role(client):
     _steps_must_name_a_role(client)
     before = read(client, PROCESS, whole=True)
-    response = append(client, PROCESS, "steps", {"title": "Count the float"})
+    response = add(client, PROCESS, "steps", {"title": "Count the float"})
     return {"response": response, "before": before}
 
 
 @then("the item is rejected because the content does not fit the type")
 def _rejected_for_its_type(attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(PROCESS, "steps/2", "required")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(PROCESS, "steps/2", "required")]
     assert "'role'" in faults[0].message
 
 
@@ -396,9 +396,9 @@ def _steps_carry_checks(client):
     checked["parts"]["steps"]["items"]["parts"] = {
         "checks": {"items": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}},
     }
-    assert not write(client, "schema/process", {"version": 2, "schema": checked}, message="Steps carry checks").faults
+    assert not replace(client, "schema/process", {"version": 2, "schema": checked}, message="Steps carry checks").faults
     steps = [{**STEPS[0], "checks": [{"title": "Key turns"}]}, {**STEPS[1], "checks": [{"title": "Every bulb lit"}]}]
-    assert not write(client, PROCESS, {"steps": steps}, message="Give each step its checks").faults
+    assert not replace(client, PROCESS, {"steps": steps}, message="Give each step its checks").faults
     return loads(read(client, PROCESS, whole=True).content)
 
 
@@ -411,7 +411,7 @@ def _add_a_check_to_the_first_step(client):
 def _given_the_checks_name_and_version(client, added):
     assert (added["response"].id, added["response"].revision) == ("door-stays-open", 3)
     entry = journal(client, PROCESS).entries[-1]
-    assert (entry.op, entry.path, entry.revision) == ("append", "steps/unlock-the-door/checks/door-stays-open", 3)
+    assert (entry.op, entry.place, entry.revision) == ("append", "steps/unlock-the-door/checks/door-stays-open", 3)
 
 
 @then("the rest of the process is unchanged")
@@ -425,7 +425,7 @@ def _rest_unchanged(client, before):
 @then("the item is rejected because a title must leave something to make a name from")
 def _rejected_for_an_empty_name(client, added):
     response = added["response"]
-    assert [(fault.artifact, fault.path, fault.rule) for fault in response.faults] == [(PROCESS, "title", "title")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in response.faults] == [(PROCESS, "title", "title")]
     assert "leave something to make a name from" in response.faults[0].message
     assert [step["id"] for step in _steps(client)] == ["unlock-the-door", "turn-on-the-lights"]
 
@@ -439,17 +439,15 @@ def _named_from_the_text(client, added, text):
 OTHER_STEP = {"title": "Count the float", "body": "Every note and coin in the till."}
 DIFFERENT_STEP = {"title": "Check the card reader", "body": "Run a test payment."}
 CLIENTS = {
-    "two clients in one program": lambda root, tmp_path, request: at_once.OnAThread(root, "Append", request),
+    "two clients in one program": lambda root, tmp_path, request: at_once.OnAThread(root, "Add", request),
     "two clients in two separate programs on the same machine": lambda root, tmp_path, request: at_once.InAnotherProgram(
-        root, "Append", request, tmp_path / "gate",
+        root, "Add", request, tmp_path / "gate",
     ),
 }
 
 
 def _adding(content, message):
-    return kb_pb2.AppendRequest(
-        locator=kb_pb2.Locator(id=PROCESS, path="steps"), content=dumps(content), actor=CLIENT, message=message,
-    )
+    return adding(PROCESS, "steps", content, message=message)
 
 
 @given(
@@ -467,7 +465,7 @@ def _clients_adding_steps(root, tmp_path, clients):
 @when("the client adding the different step lands its change second", target_fixture="landed")
 def _different_step_lands_second(racing):
     def first():
-        response = racing["other"].Append(_adding(OTHER_STEP, "Count the float before opening"))
+        response = answer(racing["other"].Add(_adding(OTHER_STEP, "Count the float before opening")))
         assert not response.faults, response.faults
     return at_once.landed_second(racing["held"], first)
 

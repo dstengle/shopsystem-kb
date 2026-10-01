@@ -15,25 +15,41 @@ class Actor(_message.Message):
     execution: str
     def __init__(self, role: _Optional[str] = ..., execution: _Optional[str] = ...) -> None: ...
 
+class Signature(_message.Message):
+    __slots__ = ("role", "execution", "message")
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    EXECUTION_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    role: str
+    execution: str
+    message: str
+    def __init__(self, role: _Optional[str] = ..., execution: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
+
 class Locator(_message.Message):
-    __slots__ = ("id", "path")
+    __slots__ = ("id", "place")
     ID_FIELD_NUMBER: _ClassVar[int]
-    PATH_FIELD_NUMBER: _ClassVar[int]
+    PLACE_FIELD_NUMBER: _ClassVar[int]
     id: str
-    path: str
-    def __init__(self, id: _Optional[str] = ..., path: _Optional[str] = ...) -> None: ...
+    place: str
+    def __init__(self, id: _Optional[str] = ..., place: _Optional[str] = ...) -> None: ...
 
 class Fault(_message.Message):
-    __slots__ = ("artifact", "path", "rule", "message")
+    __slots__ = ("artifact", "place", "rule", "message")
     ARTIFACT_FIELD_NUMBER: _ClassVar[int]
-    PATH_FIELD_NUMBER: _ClassVar[int]
+    PLACE_FIELD_NUMBER: _ClassVar[int]
     RULE_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     artifact: str
-    path: str
+    place: str
     rule: str
     message: str
-    def __init__(self, artifact: _Optional[str] = ..., path: _Optional[str] = ..., rule: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
+    def __init__(self, artifact: _Optional[str] = ..., place: _Optional[str] = ..., rule: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
+
+class Refusal(_message.Message):
+    __slots__ = ("faults",)
+    FAULTS_FIELD_NUMBER: _ClassVar[int]
+    faults: _containers.RepeatedCompositeFieldContainer[Fault]
+    def __init__(self, faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class InitRequest(_message.Message):
     __slots__ = ("root", "actor")
@@ -50,28 +66,32 @@ class InitResponse(_message.Message):
     def __init__(self, faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class CreateRequest(_message.Message):
-    __slots__ = ("type", "content", "actor", "message", "title")
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    CONTENT_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_FIELD_NUMBER: _ClassVar[int]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("kind", "title", "content", "signature")
+    KIND_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
-    type: str
-    content: str
-    actor: Actor
-    message: str
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    kind: str
     title: str
-    def __init__(self, type: _Optional[str] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
+    content: str
+    signature: Signature
+    def __init__(self, kind: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class CreateResponse(_message.Message):
-    __slots__ = ("id", "revision", "faults")
+class Created(_message.Message):
+    __slots__ = ("id", "revision")
     ID_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     id: str
     revision: int
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
+
+class CreateResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Created
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Created, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ReadRequest(_message.Message):
     __slots__ = ("locator", "level", "depth", "section")
@@ -118,18 +138,18 @@ class ReadResponse(_message.Message):
     def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., schema_version: _Optional[int] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class Stub(_message.Message):
-    __slots__ = ("field", "id", "type", "title", "fields")
+    __slots__ = ("field", "id", "kind", "title", "fields")
     FIELD_FIELD_NUMBER: _ClassVar[int]
     ID_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
     field: str
     id: str
-    type: str
+    kind: str
     title: str
     fields: str
-    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., fields: _Optional[str] = ...) -> None: ...
+    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ..., kind: _Optional[str] = ..., title: _Optional[str] = ..., fields: _Optional[str] = ...) -> None: ...
 
 class PartStub(_message.Message):
     __slots__ = ("collection", "id", "title")
@@ -142,14 +162,14 @@ class PartStub(_message.Message):
     def __init__(self, collection: _Optional[str] = ..., id: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
 
 class InboundCount(_message.Message):
-    __slots__ = ("type", "field", "count")
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("kind", "field", "count")
+    KIND_FIELD_NUMBER: _ClassVar[int]
     FIELD_FIELD_NUMBER: _ClassVar[int]
     COUNT_FIELD_NUMBER: _ClassVar[int]
-    type: str
+    kind: str
     field: str
     count: int
-    def __init__(self, type: _Optional[str] = ..., field: _Optional[str] = ..., count: _Optional[int] = ...) -> None: ...
+    def __init__(self, kind: _Optional[str] = ..., field: _Optional[str] = ..., count: _Optional[int] = ...) -> None: ...
 
 class ValidateRequest(_message.Message):
     __slots__ = ()
@@ -175,25 +195,29 @@ class Stale(_message.Message):
     current: int
     def __init__(self, artifact: _Optional[str] = ..., schema_version: _Optional[int] = ..., current: _Optional[int] = ...) -> None: ...
 
-class WriteRequest(_message.Message):
-    __slots__ = ("locator", "content", "actor", "message")
+class ReplaceRequest(_message.Message):
+    __slots__ = ("locator", "content", "signature")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_FIELD_NUMBER: _ClassVar[int]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
-    actor: Actor
-    message: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+    signature: Signature
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class WriteResponse(_message.Message):
-    __slots__ = ("revision", "faults")
+class Replaced(_message.Message):
+    __slots__ = ("revision",)
     REVISION_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     revision: int
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, revision: _Optional[int] = ...) -> None: ...
+
+class ReplaceResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Replaced
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Replaced, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class Operation(_message.Message):
     __slots__ = ("create", "write", "append", "delete")
@@ -284,13 +308,13 @@ class JournalRequest(_message.Message):
     def __init__(self, artifact: _Optional[str] = ..., role: _Optional[str] = ..., execution: _Optional[str] = ..., since: _Optional[str] = ..., batch: _Optional[str] = ...) -> None: ...
 
 class Entry(_message.Message):
-    __slots__ = ("id", "at", "actor", "op", "artifact", "path", "revision", "schema_version", "digest", "message", "batch", "read")
+    __slots__ = ("id", "at", "actor", "op", "artifact", "place", "revision", "schema_version", "digest", "message", "batch", "read")
     ID_FIELD_NUMBER: _ClassVar[int]
     AT_FIELD_NUMBER: _ClassVar[int]
     ACTOR_FIELD_NUMBER: _ClassVar[int]
     OP_FIELD_NUMBER: _ClassVar[int]
     ARTIFACT_FIELD_NUMBER: _ClassVar[int]
-    PATH_FIELD_NUMBER: _ClassVar[int]
+    PLACE_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
     DIGEST_FIELD_NUMBER: _ClassVar[int]
@@ -302,14 +326,14 @@ class Entry(_message.Message):
     actor: Actor
     op: str
     artifact: str
-    path: str
+    place: str
     revision: int
     schema_version: int
     digest: str
     message: str
     batch: str
     read: _containers.RepeatedCompositeFieldContainer[Snapshotted]
-    def __init__(self, id: _Optional[str] = ..., at: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., op: _Optional[str] = ..., artifact: _Optional[str] = ..., path: _Optional[str] = ..., revision: _Optional[int] = ..., schema_version: _Optional[int] = ..., digest: _Optional[str] = ..., message: _Optional[str] = ..., batch: _Optional[str] = ..., read: _Optional[_Iterable[_Union[Snapshotted, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., at: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., op: _Optional[str] = ..., artifact: _Optional[str] = ..., place: _Optional[str] = ..., revision: _Optional[int] = ..., schema_version: _Optional[int] = ..., digest: _Optional[str] = ..., message: _Optional[str] = ..., batch: _Optional[str] = ..., read: _Optional[_Iterable[_Union[Snapshotted, _Mapping]]] = ...) -> None: ...
 
 class Snapshotted(_message.Message):
     __slots__ = ("artifact", "revision", "digest")
@@ -462,42 +486,50 @@ class SnapshotResponse(_message.Message):
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, entry: _Optional[str] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
-class AppendRequest(_message.Message):
-    __slots__ = ("locator", "content", "actor", "message")
+class AddRequest(_message.Message):
+    __slots__ = ("locator", "content", "signature")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_FIELD_NUMBER: _ClassVar[int]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
-    actor: Actor
-    message: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+    signature: Signature
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class AppendResponse(_message.Message):
-    __slots__ = ("id", "revision", "faults")
+class Added(_message.Message):
+    __slots__ = ("id", "revision")
     ID_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     id: str
     revision: int
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
 
-class DeleteRequest(_message.Message):
-    __slots__ = ("locator", "actor", "message")
+class AddResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Added
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Added, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+
+class RemoveRequest(_message.Message):
+    __slots__ = ("locator", "signature")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_FIELD_NUMBER: _ClassVar[int]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
-    actor: Actor
-    message: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., message: _Optional[str] = ...) -> None: ...
+    signature: Signature
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class DeleteResponse(_message.Message):
-    __slots__ = ("revision", "faults")
+class Removed(_message.Message):
+    __slots__ = ("revision",)
     REVISION_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     revision: int
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, revision: _Optional[int] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, revision: _Optional[int] = ...) -> None: ...
+
+class RemoveResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Removed
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Removed, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...

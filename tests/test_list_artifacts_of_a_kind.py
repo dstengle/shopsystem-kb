@@ -62,7 +62,7 @@ def _list_the_decisions(client):
 @then("the client is given a stub of each of the three")
 def _a_stub_of_each(listed):
     assert not listed.faults, listed.faults
-    assert [(stub.id, stub.type, stub.title, loads(stub.fields)) for stub in listed.stubs] == [
+    assert [(stub.id, stub.kind, stub.title, loads(stub.fields)) for stub in listed.stubs] == [
         (WEEKLY, "decision", "Price reviews happen weekly", {"supersedes": MONTHLY, "status": "accepted"}),
         (MONTHLY, "decision", "Prices are reviewed monthly", {"status": "superseded"}),
         (THURSDAYS, "decision", "Restock on Thursdays", {"status": "accepted"}),
@@ -114,6 +114,6 @@ def _ask_by_that_kind(client, call):
 
 @then("the call is rejected because a kind must name a type the store holds, and the kind asked for is given back")
 def _rejected_for_its_kind(answered):
-    assert [(fault.artifact, fault.path, fault.rule) for fault in answered.faults] == [("", "", "kind")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in answered.faults] == [("", "", "kind")]
     assert "a kind must name a type the store holds" in answered.faults[0].message
     assert "'invoice'" in answered.faults[0].message

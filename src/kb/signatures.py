@@ -20,7 +20,7 @@ class Signed:
     message: str
 
 
-def actor(request: kb_pb2.Actor) -> Actor:
+def actor(request: kb_pb2.Actor | kb_pb2.Signature) -> Actor:
     return Actor(request.role, request.execution)
 
 
@@ -28,31 +28,31 @@ def _entry(reason: str) -> str:
     return f"every entry in the history {reason}"
 
 
-def _unsigned(request: kb_pb2.Actor, message: str) -> list[kb_pb2.Fault]:
+def _unsigned(signature: kb_pb2.Signature) -> list[kb_pb2.Fault]:
     faults = []
-    if not request.role.strip():
+    if not signature.role.strip():
         faults.append(kb_pb2.Fault(rule=rules.ACTOR, message=_entry("names the role that made it")))
-    if not message.strip():
+    if not signature.message.strip():
         faults.append(kb_pb2.Fault(rule=rules.MESSAGE, message=_entry("says why it was made")))
     return faults
 
 
-def signed(request: kb_pb2.Actor, message: str) -> Signed:
+def signed(signature: kb_pb2.Signature) -> Signed:
     """Who makes a change and why, who must name a role and a message; both faults when both fail."""
-    faults = _unsigned(request, message)
+    faults = _unsigned(signature)
     if faults:
         raise Refused(faults)
-    return Signed(actor(request), message)
+    return Signed(actor(signature), signature.message)
 
 
-def reader(request: kb_pb2.Actor, message: str) -> Signed:
+def reader(signature: kb_pb2.Signature) -> Signed:
     """Who records what a piece of work read, who must sign and name the piece of work; every fault found."""
-    faults = _unsigned(request, message)
-    if not request.execution:
+    faults = _unsigned(signature)
+    if not signature.execution:
         faults.append(kb_pb2.Fault(rule=rules.ACTOR, message="a snapshot records what a named piece of work read"))
     if faults:
         raise Refused(faults)
-    return Signed(actor(request), message)
+    return Signed(actor(signature), signature.message)
 
 
 def starter(request: kb_pb2.Actor) -> Actor:

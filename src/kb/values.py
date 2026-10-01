@@ -64,7 +64,7 @@ def artifact_id(text: str) -> ArtifactId:
 
 def locator(request: kb_pb2.Locator) -> Locator:
     """A locator's name and its place, each checked; both faults when both fail."""
-    return _located(request.id, request.path)
+    return _located(request.id, request.place)
 
 
 def target(text: str) -> Locator:
@@ -82,7 +82,7 @@ def _located(name: str, path: str) -> Locator:
     place = names.steps(path)
     if not all(names.plain(part) for part in place):
         faults.append(kb_pb2.Fault(
-            artifact=name, path=path, rule=rules.LOCATOR,
+            artifact=name, place=path, rule=rules.LOCATOR,
             message=f"a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it; {path!r} is not",
         ))
     if faults:
@@ -117,7 +117,7 @@ def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
         message = _leaves_nothing(title)
     else:
         return ArtifactId(kind, slug), at, ()
-    return None, at, (kb_pb2.Fault(artifact=at, path="title", rule=rules.TITLE, message=message),)
+    return None, at, (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE, message=message),)
 
 
 def _leaves_nothing(title: str) -> str:
@@ -132,7 +132,7 @@ class Content:
     problems: tuple[tuple[str, str, str], ...] = ()
 
     def refusal(self, artifact: str) -> list[kb_pb2.Fault]:
-        return [kb_pb2.Fault(artifact=artifact, path=path, rule=rule, message=message)
+        return [kb_pb2.Fault(artifact=artifact, place=path, rule=rule, message=message)
                 for path, rule, message in self.problems]
 
 

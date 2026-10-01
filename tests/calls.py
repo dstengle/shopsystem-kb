@@ -105,11 +105,62 @@ def tagged_decision_type():
     return decision_type
 
 
+class Answer:
+    """A change's response as a step reads it: the fields of its result, and the faults of its refusal, none when it
+    gave a result; a field of a refused change reads as unset. The response itself is `response`."""
+
+    def __init__(self, response):
+        self.response = response
+
+    @property
+    def faults(self):
+        return list(self.response.refusal.faults)
+
+    def __getattr__(self, name):
+        return getattr(self.response.result, name)
+
+
+def answer(response):
+    """A change's response, its result or its refusal, as a step reads it; a response that carries its faults beside
+    what it gives, as it is."""
+    return Answer(response) if "outcome" in response.DESCRIPTOR.oneofs_by_name else response
+
+
+def signature(message, actor=CLIENT):
+    """The signature of a change: the actor's role and piece of work, and the message."""
+    return kb_pb2.Signature(role=actor.role, execution=actor.execution, message=message)
+
+
+def creating(type_name, title, content, message="Create an artifact", actor=CLIENT):
+    """A CreateRequest: the title beside the content, which is canonical text already when it is a string."""
+    text = content if isinstance(content, str) else dumps(content)
+    return kb_pb2.CreateRequest(kind=type_name, title=title, content=text, signature=signature(message, actor))
+
+
+def replacing(artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):
+    """A ReplaceRequest for a whole artifact, or for the node at path inside it."""
+    text = content if isinstance(content, str) else dumps(content)
+    return kb_pb2.ReplaceRequest(
+        locator=kb_pb2.Locator(id=artifact_id, place=path), content=text, signature=signature(message, actor),
+    )
+
+
+def adding(artifact_id, collection, content, message="Add an item", actor=CLIENT):
+    """An AddRequest for one item to the collection named inside an artifact."""
+    return kb_pb2.AddRequest(
+        locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(content),
+        signature=signature(message, actor),
+    )
+
+
+def removing(artifact_id, message="Remove an artifact", actor=CLIENT):
+    """A RemoveRequest for a whole artifact."""
+    return kb_pb2.RemoveRequest(locator=kb_pb2.Locator(id=artifact_id), signature=signature(message, actor))
+
+
 def request(client, type_name, title, content, message="Create an artifact", actor=CLIENT):
-    """A Create as the client sends it: the title beside the content. Returns the response, faults and all."""
-    return client.Create(kb_pb2.CreateRequest(
-        type=type_name, title=title, content=dumps(content), actor=actor, message=message,
-    ))
+    """A Create as the client sends it: the title beside the content. Returns the answer, faults and all."""
+    return answer(client.Create(creating(type_name, title, content, message, actor)))
 
 
 def create(client, type_name, content, message="Create an artifact", actor=CLIENT):
@@ -151,7 +202,7 @@ def creation(type_name, title, content):
 
 
 def replacement(artifact_id, content):
-    """A Write of a whole artifact inside a set."""
+    """A replacement of a whole artifact inside a set."""
     return kb_pb2.Operation(write=kb_pb2.Replacement(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content)))
 
 
@@ -160,26 +211,22 @@ def removal(artifact_id):
     return kb_pb2.Operation(delete=kb_pb2.Removal(locator=kb_pb2.Locator(id=artifact_id)))
 
 
-def write(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):
-    """A Write of a whole artifact, or of the node at path inside it, under the client's role unless another actor is
-    given. Returns the response, faults and all."""
-    return client.Write(kb_pb2.WriteRequest(
-        locator=kb_pb2.Locator(id=artifact_id, path=path), content=dumps(content), actor=actor, message=message,
-    ))
+def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):
+    """A Replace of a whole artifact, or of the node at path inside it, under the client's role unless another actor
+    is given. Returns the answer, faults and all."""
+    return answer(client.Replace(replacing(artifact_id, content, message, actor, path)))
 
 
-def append(client, artifact_id, collection, content, message="Add an item", actor=CLIENT):
-    """An Append of one item to the collection named inside an artifact, under the client's role unless another actor
-    is given. Returns the response, faults and all."""
-    return client.Append(kb_pb2.AppendRequest(
-        locator=kb_pb2.Locator(id=artifact_id, path=collection), content=dumps(content), actor=actor, message=message,
-    ))
+def add(client, artifact_id, collection, content, message="Add an item", actor=CLIENT):
+    """An Add of one item to the collection named inside an artifact, under the client's role unless another actor is
+    given. Returns the answer, faults and all."""
+    return answer(client.Add(adding(artifact_id, collection, content, message, actor)))
 
 
 def remove(client, artifact_id, message="Remove an artifact", actor=CLIENT):
-    """A Delete of a whole artifact, under the client's role unless another actor is given. Returns the response,
+    """A Remove of a whole artifact, under the client's role unless another actor is given. Returns the answer,
     faults and all."""
-    return client.Delete(kb_pb2.DeleteRequest(locator=kb_pb2.Locator(id=artifact_id), actor=actor, message=message))
+    return answer(client.Remove(removing(artifact_id, message, actor)))
 
 
 def journal(client, artifact="", role="", execution="", since="", batch=""):
@@ -215,7 +262,7 @@ def refs(client, artifact_id, depth, inward=False, via="", type_name="", place="
     given."""
     direction = kb_pb2.RefsRequest.IN if inward else kb_pb2.RefsRequest.OUT
     return client.Refs(kb_pb2.RefsRequest(
-        locator=kb_pb2.Locator(id=artifact_id, path=place), depth=depth, direction=direction, via=via, type=type_name,
+        locator=kb_pb2.Locator(id=artifact_id, place=place), depth=depth, direction=direction, via=via, type=type_name,
     ))
 
 
@@ -256,11 +303,11 @@ def listing(client, type_name, fields=None, ids_only=False):
 
 def next_version(client, kind, type_content, sections=None):
     """Write the type of a kind back at its next version, the sections it requires replaced when sections are given,
-    so what the store holds of that kind falls behind it. Returns the Write's response."""
+    so what the store holds of that kind falls behind it. Returns the Replace's answer."""
     schema = copy.deepcopy(type_content["schema"])
     if sections is not None:
         schema["sections"] = [{"title": title} for title in sections]
-    return write(client, f"schema/{kind}", {"version": type_content["version"] + 1, "schema": schema},
+    return replace(client, f"schema/{kind}", {"version": type_content["version"] + 1, "schema": schema},
                  message=f"Revise {type_content['title']}")
 
 

@@ -8,7 +8,7 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, write
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, replace
 from conftest import OPERATOR, _kb
 import held
 from kb import canonical, client as kb_client
@@ -603,7 +603,7 @@ def _decision_at_revision_three(client):
     create(client, "decision", content)
     for body in ("Costs move every week.\n", "Costs move weekly, and so do we.\n"):
         content["sections"][1]["body"] = body
-        assert not write(client, WEEKLY, {key: value for key, value in content.items() if key != "title"}).faults
+        assert not replace(client, WEEKLY, {key: value for key, value in content.items() if key != "title"}).faults
 
 
 @given(
@@ -1074,7 +1074,7 @@ def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the
     client = kb_client.connect(source)
     define(client, {"title": "Note", **typed(["a", "b"], 1)})
     create(client, "note", {"title": "X", "b": "second", "a": "first"})
-    write(client, "schema/note", typed(["b", "a"], 2))
+    replace(client, "schema/note", typed(["b", "a"], 2))
     assert list(client.Validate(kb_pb2.ValidateRequest()).violations) == []
     monkeypatch.setenv("KB_ROOT", str(source))
     assert kb_client.export(str(exported)).faults == []

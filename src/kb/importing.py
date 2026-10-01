@@ -157,7 +157,7 @@ def _fit(draft: Draft, each: Offered, content: dict, schema: dict, unread: set) 
     except Refused as refused:
         return list(refused.faults)
     leading = {link.place for link in links.carried(content, schema, draft) if _named(link.target) in unread}
-    return [fault for fault in found if not (fault.rule == rules.REF and fault.path in leading)]
+    return [fault for fault in found if not (fault.rule == rules.REF and fault.place in leading)]
 
 
 def _named(target) -> ArtifactId | None:

@@ -4,13 +4,13 @@ import re
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, NOTE_TYPE, append, apply, creation, define, create, journal, listing, read, refs,
-    remove, replacement, request, write,
+    CLIENT, DECISION_TYPE, NOTE_TYPE, add, apply, creation, define, create, journal, listing, read, refs,
+    remove, replacement, replacing, request, replace, answer,
 )
 import at_once
 import held
 from kb import canonical, client as kb_client
-from kb.content import dumps, loads
+from kb.content import loads
 from kb.contract import kb_pb2
 
 scenarios("sign-a-change.feature")
@@ -110,7 +110,7 @@ def _store_with_a_decision(root):
 @when("the client replaces the decision with content that has no purpose, saying which role and why", target_fixture="attempt")
 def _replace_without_a_purpose(root, client):
     before = held.text(root, DECISION)
-    response = write(client, DECISION, {"sections": SECTIONS[1:]}, message="Drop the purpose")
+    response = replace(client, DECISION, {"sections": SECTIONS[1:]}, message="Drop the purpose")
     return {"response": response, "before": before}
 
 
@@ -118,7 +118,7 @@ def _replace_without_a_purpose(root, client):
 def _rejected_for_the_sections(attempt):
     refused = attempt["response"]
     assert refused.revision == 0
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "sections", "sections")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "sections", "sections")]
     assert refused.faults[0].message.startswith("the sections the type requires must all be present, in order")
 
 
@@ -131,7 +131,7 @@ def _as_it_was(root, client, attempt):
 @when("the client replaces the rationale of the decision, saying which role and why", target_fixture="changed")
 def _replace_the_rationale(client):
     before = read(client, DECISION, whole=True)
-    response = write(
+    response = replace(
         client, DECISION, {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
         message="Say why weekly", path="sections/rationale",
     )
@@ -161,7 +161,7 @@ def _the_rest_as_before(changed):
 
 @when("the client replaces the decision, saying which role and why", target_fixture="changed")
 def _replace_the_decision(client):
-    response = write(client, DECISION, {"sections": [
+    response = replace(client, DECISION, {"sections": [
         SECTIONS[0], {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
     ]}, message="Say why weekly")
     return response
@@ -179,7 +179,7 @@ def _readied_with_a_failing_clock(root, before):
 
 @then("the client is given a fault")
 def _given_a_fault(changed):
-    assert isinstance(changed, kb_pb2.WriteResponse)
+    assert isinstance(changed.response, kb_pb2.ReplaceResponse)
     assert changed.revision == 0
     assert len(changed.faults) == 1, changed.faults
 
@@ -208,7 +208,7 @@ def _stale(client):
 
 def _decision_type_at_version_2(client, schema):
     """The decision type changed to its second version, so the decision, checked against the first, is behind it."""
-    changed = write(client, "schema/decision", {"version": 2, "schema": schema}, message="Decision type, version 2")
+    changed = replace(client, "schema/decision", {"version": 2, "schema": schema}, message="Decision type, version 2")
     assert not changed.faults, changed.faults
     assert read(client, DECISION).schema_version == 1
     assert _stale(client) == [DECISION]
@@ -232,7 +232,7 @@ def _behind_a_type_that_now_wants_an_owner(client):
     target_fixture="changed",
 )
 def _replace_with_content_that_fits(client):
-    response = write(client, DECISION, {"sections": SECTIONS}, message="Bring it up to date")
+    response = replace(client, DECISION, {"sections": SECTIONS}, message="Bring it up to date")
     assert not response.faults, response.faults
     return response
 
@@ -254,7 +254,7 @@ def _no_longer_stale(client):
 )
 def _replace_with_content_that_does_not_fit(root, client):
     before = held.text(root, DECISION)
-    return {"response": write(client, DECISION, {"sections": SECTIONS}, message="No owner"), "before": before}
+    return {"response": replace(client, DECISION, {"sections": SECTIONS}, message="No owner"), "before": before}
 
 
 @then(
@@ -264,7 +264,7 @@ def _replace_with_content_that_does_not_fit(root, client):
 def _rejected_by_the_current_version(attempt):
     refused = attempt["response"]
     assert refused.revision == 0
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "", "required")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "", "required")]
 
 
 @then("it is still listed as behind its type")
@@ -278,7 +278,7 @@ def _still_stale(client):
 )
 def _replace_with_a_version_of_its_own(root, client):
     before = held.text(root, DECISION)
-    response = write(client, DECISION, {"revision": 7, "sections": SECTIONS}, message="Set the version")
+    response = replace(client, DECISION, {"revision": 7, "sections": SECTIONS}, message="Set the version")
     return {"response": response, "before": before}
 
 
@@ -289,7 +289,7 @@ def _replace_with_a_version_of_its_own(root, client):
 def _rejected_for_a_version_inside(attempt):
     refused = attempt["response"]
     assert refused.revision == 0
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [(DECISION, "revision", "identity")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "revision", "identity")]
     assert "revision: 7" in refused.faults[0].message
 
 
@@ -299,7 +299,7 @@ def _rejected_for_a_version_inside(attempt):
 )
 def _replace_a_name_the_store_lacks(root, client):
     before = held.holds(root)
-    response = write(client, "decision/nothing-of-the-sort", {"sections": SECTIONS}, message="Change it")
+    response = replace(client, "decision/nothing-of-the-sort", {"sections": SECTIONS}, message="Change it")
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
@@ -319,7 +319,7 @@ def _nothing_written_in_the_store(attempt):
 @when(parsers.parse('the client replaces an artifact named "{name}", saying which role and why'), target_fixture="attempt")
 def _replace_by_a_name(client, tmp_path, name):
     before = held.everything_in(tmp_path)
-    response = write(client, name, {"sections": SECTIONS}, message="Change it")
+    response = replace(client, name, {"sections": SECTIONS}, message="Change it")
     return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
 
 
@@ -339,13 +339,13 @@ def _nothing_written_anywhere(attempt):
 PURPOSE = {"title": "Purpose", "body": "Keep prices in step with what they cost us.\n"}
 MISPLACED = {
     "replaces a place inside the decision the decision holds nothing under":
-        lambda client: write(client, DECISION, PURPOSE, path="sections/nowhere"),
+        lambda client: replace(client, DECISION, PURPOSE, path="sections/nowhere"),
     "replaces a place inside the decision that runs on past a piece of prose":
-        lambda client: write(client, DECISION, PURPOSE, path="sections/purpose/body/first"),
+        lambda client: replace(client, DECISION, PURPOSE, path="sections/purpose/body/first"),
     "replaces a place inside the decision beginning at the decision's own version":
-        lambda client: write(client, DECISION, PURPOSE, path="revision"),
+        lambda client: replace(client, DECISION, PURPOSE, path="revision"),
     "adds an item at a place inside the decision that is not a collection":
-        lambda client: append(client, DECISION, "sections/purpose", {"title": "Go monthly"}),
+        lambda client: add(client, DECISION, "sections/purpose", {"title": "Go monthly"}),
 }
 
 
@@ -362,20 +362,20 @@ def _aim_at_a_wrong_place(root, client, call):
 def _rejected_for_nothing_there(attempt):
     faults = attempt["response"].faults
     assert [(fault.artifact, fault.rule) for fault in faults] == [(DECISION, "not-found")]
-    assert f"holds nothing at {faults[0].path!r}" in faults[0].message
+    assert f"holds nothing at {faults[0].place!r}" in faults[0].message
 
 
 @then("the change is rejected because a place inside an artifact never names what only the store settles")
 def _rejected_for_a_settled_place(attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "revision", "identity")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(DECISION, "revision", "identity")]
     assert faults[0].message.startswith("a place inside an artifact never names what only the store settles")
 
 
 @then("the change is rejected because an item is added to a collection, and that place is not one")
 def _rejected_for_no_collection(attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "sections/purpose", "collection")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(DECISION, "sections/purpose", "collection")]
     assert faults[0].message.startswith("an item is added to a collection")
 
 
@@ -384,7 +384,7 @@ OPTIONS = [{"title": "Keep weekly", "body": "Review every Monday."}, {"title": "
 
 @given("the decision carries two options")
 def _two_options(client):
-    response = write(client, DECISION, {"sections": SECTIONS, "options": OPTIONS}, message="Weigh two options")
+    response = replace(client, DECISION, {"sections": SECTIONS, "options": OPTIONS}, message="Weigh two options")
     assert not response.faults, response.faults
     assert [option["id"] for option in loads(read(client, DECISION, whole=True).content)["options"]] == [
         "keep-weekly", "go-monthly",
@@ -405,13 +405,13 @@ HANDED_BACK = {
 def _replace_with_misnamed_options(root, client, items):
     before = held.text(root, DECISION)
     options = [{"id": name, **option} for name, option in zip(HANDED_BACK[items], OPTIONS)]
-    response = write(client, DECISION, {"sections": SECTIONS, "options": options}, message="Rename the options")
+    response = replace(client, DECISION, {"sections": SECTIONS, "options": options}, message="Rename the options")
     return {"response": response, "before": before}
 
 
 def _misnamed(attempt, message):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path, fault.rule) for fault in faults] == [(DECISION, "options/1/id", "item-name")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(DECISION, "options/1/id", "item-name")]
     assert faults[0].message.startswith(message)
 
 
@@ -438,7 +438,7 @@ def _replace_one_option(client):
     define(client, NOTE_TYPE)
     create(client, "note", {"title": "Why monthly", "about": f"{DECISION}#options/go-monthly"})
     before = read(client, DECISION, whole=True)
-    response = write(client, DECISION, MONTHLY, message="Say when monthly", path="options/go-monthly")
+    response = replace(client, DECISION, MONTHLY, message="Say when monthly", path="options/go-monthly")
     assert not response.faults, response.faults
     return {"response": response, "before": before, "after": read(client, DECISION, whole=True)}
 
@@ -473,7 +473,7 @@ def _still_lands(client):
 )
 def _send_both_back_and_a_third(client):
     options = [{"id": "keep-weekly", **OPTIONS[0]}, {"id": "go-monthly", **OPTIONS[1]}, {"title": "Go fortnightly"}]
-    response = write(client, DECISION, {"sections": SECTIONS, "options": options}, message="Add a third option")
+    response = replace(client, DECISION, {"sections": SECTIONS, "options": options}, message="Add a third option")
     assert not response.faults, response.faults
     return {"response": response, "after": loads(read(client, DECISION, whole=True).content)}
 
@@ -494,9 +494,9 @@ BLANK = " \t "
 
 UNSIGNED = {
     "creates another decision": lambda client, actor, message: request(client, *ANOTHER, message=message, actor=actor),
-    "replaces the decision": lambda client, actor, message: write(
+    "replaces the decision": lambda client, actor, message: replace(
         client, DECISION, {"sections": SECTIONS}, message=message, actor=actor),
-    "adds an option to the decision": lambda client, actor, message: append(
+    "adds an option to the decision": lambda client, actor, message: add(
         client, DECISION, "options", {"title": "Go fortnightly"}, message=message, actor=actor),
     "removes the decision": lambda client, actor, message: remove(client, DECISION, message=message, actor=actor),
     "asks, in one go, for another decision to be created and the decision to be replaced":
@@ -542,7 +542,7 @@ UNSIGNED_REASONS = {
 @then(parsers.re("the change is rejected because (?P<reason>" + "|".join(map(re.escape, UNSIGNED_REASONS)) + ")"))
 def _rejected_for_its_signature(attempt, reason):
     refused = attempt["response"]
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [("", "", UNSIGNED_REASONS[reason])]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [("", "", UNSIGNED_REASONS[reason])]
     assert refused.faults[0].message.startswith(reason)
     if "revision" in refused.DESCRIPTOR.fields_by_name:
         assert refused.revision == 0
@@ -551,9 +551,9 @@ def _rejected_for_its_signature(attempt, reason):
 LINKED_OPTION = f"{DECISION}#options/keep-weekly"
 LEAVING_IT_OUT = {
     "replaces the decision with content that leaves that option out":
-        lambda client: write(client, DECISION, {"sections": SECTIONS, "options": OPTIONS[1:]}, message="Drop weekly"),
+        lambda client: replace(client, DECISION, {"sections": SECTIONS, "options": OPTIONS[1:]}, message="Drop weekly"),
     "replaces the decision's collection of options with one that leaves it out":
-        lambda client: write(client, DECISION, OPTIONS[1:], message="Drop weekly", path="options"),
+        lambda client: replace(client, DECISION, OPTIONS[1:], message="Drop weekly", path="options"),
 }
 
 
@@ -581,7 +581,7 @@ def _rejected_while_pointed_at(root, attempt):
 @then("the client is given each link into that option")
 def _each_link_into_the_option(attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.path) for fault in faults] == [("note/why-weekly", "about")]
+    assert [(fault.artifact, fault.place) for fault in faults] == [("note/why-weekly", "about")]
     assert f"'{LINKED_OPTION}'" in faults[0].message
 
 
@@ -590,10 +590,7 @@ DIFFERENT_RATIONALE = {"title": "Rationale", "body": "Customers compare prices e
 
 
 def _replacing(rationale, message):
-    return kb_pb2.WriteRequest(
-        locator=kb_pb2.Locator(id=DECISION), content=dumps({"sections": [SECTIONS[0], rationale]}), actor=CLIENT,
-        message=message,
-    )
+    return replacing(DECISION, {"sections": [SECTIONS[0], rationale]}, message=message)
 
 
 @given(
@@ -613,9 +610,9 @@ def _different_rationale_lands_second(root, racing):
     landed = {}
 
     def first():
-        landed["one"] = kb_client.connect(root).Write(racing["one"])
+        landed["one"] = answer(kb_client.connect(root).Replace(racing["one"]))
         assert not landed["one"].faults, landed["one"].faults
-    landed["different"] = at_once.landed_second(at_once.OnAThread(root, "Write", racing["different"]), first)
+    landed["different"] = at_once.landed_second(at_once.OnAThread(root, "Replace", racing["different"]), first)
     return landed
 
 
@@ -661,7 +658,7 @@ BUSY = "the store was busy with another change"
 @then("the change is rejected because the store was busy with another change")
 def _rejected_as_busy(changed):
     assert changed.revision == 0
-    assert [(fault.artifact, fault.path, fault.rule) for fault in changed.faults] == [("", "", "busy")]
+    assert [(fault.artifact, fault.place, fault.rule) for fault in changed.faults] == [("", "", "busy")]
     assert changed.faults[0].message.startswith(BUSY)
 
 

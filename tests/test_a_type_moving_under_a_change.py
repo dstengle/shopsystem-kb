@@ -6,9 +6,8 @@ import copy
 import pytest
 
 import at_once
-from calls import CLIENT, TAG_TYPE, create, define, refs, remove
+from calls import CLIENT, TAG_TYPE, create, creating, define, refs, remove, replace, replacing
 from kb import client as kb_client
-from kb.content import dumps
 from kb.contract import kb_pb2
 
 ABOUT = {"type": "string"}
@@ -39,18 +38,14 @@ def test_a_change_drafted_before_a_type_it_reads_moved_lands_with_the_links_the_
     for type_content in [TAG_TYPE, *held_types]:
         define(client, type_content)
     create(client, "tag", {"title": "A"})
-    creating = kb_pb2.CreateRequest(
-        type="note", title="X", content=dumps({"about": "tag/a"}), actor=CLIENT, message="Note what it is about",
-    )
+    made = creating("note", "X", {"about": "tag/a"}, message="Note what it is about")
     moved_id = f"schema/{next_type.pop('title').lower()}"
 
     def first():
-        written = client.Write(kb_pb2.WriteRequest(
-            locator=kb_pb2.Locator(id=moved_id), content=dumps(next_type), actor=CLIENT, message="Make it a link",
-        ))
+        written = replace(client, moved_id, next_type, message="Make it a link")
         assert not written.faults, written.faults
 
-    landed = at_once.landed_second(at_once.OnAThread(root, "Create", creating), first)
+    landed = at_once.landed_second(at_once.OnAThread(root, "Create", made), first)
     assert not landed.faults, landed.faults
     assert [each.stub.id for each in refs(client, "tag/a", 1, inward=True).reached] == ["note/x"]
     assert [fault.rule for fault in remove(client, "tag/a").faults] == ["on_delete"]
@@ -68,15 +63,13 @@ def test_an_artifact_made_while_a_type_it_reads_is_drafted_anew_is_held_to_its_l
     create(client, "tag", {"title": "A"})
     create(client, "note", {"title": "Before", "about": "tag/a"})
     moved_id = f"schema/{next_type.pop('title').lower()}"
-    writing = kb_pb2.WriteRequest(
-        locator=kb_pb2.Locator(id=moved_id), content=dumps(next_type), actor=CLIENT, message="Make it a link",
-    )
+    writing = replacing(moved_id, next_type, message="Make it a link")
 
     def first():
         made = create(client, "note", {"title": "Meanwhile", "about": "tag/a"})
         assert not made.faults, made.faults
 
-    landed = at_once.landed_second(at_once.OnAThread(root, "Write", writing), first)
+    landed = at_once.landed_second(at_once.OnAThread(root, "Replace", writing), first)
     assert not landed.faults, landed.faults
     assert [each.stub.id for each in refs(client, "tag/a", 1, inward=True).reached] == ["note/before", "note/meanwhile"]
     refused = remove(client, "tag/a")
@@ -92,20 +85,15 @@ def test_a_type_changed_while_a_type_built_on_it_moved_relinks_through_the_types
     create(client, "note", {"title": "X", "about": "tag/a"})
     linked_base = _typed("Base", {"about": LINKED}, version=2)
     del linked_base["title"]
-    writing = kb_pb2.WriteRequest(
-        locator=kb_pb2.Locator(id="schema/base"), content=dumps(linked_base), actor=CLIENT, message="Make it a link",
-    )
+    writing = replacing("schema/base", linked_base, message="Make it a link")
     standing_alone = _typed("Note", {"about": ABOUT}, version=2)
     del standing_alone["title"]
 
     def first():
-        written = client.Write(kb_pb2.WriteRequest(
-            locator=kb_pb2.Locator(id="schema/note"), content=dumps(standing_alone), actor=CLIENT,
-            message="Stand alone",
-        ))
+        written = replace(client, "schema/note", standing_alone, message="Stand alone")
         assert not written.faults, written.faults
 
-    landed = at_once.landed_second(at_once.OnAThread(root, "Write", writing), first)
+    landed = at_once.landed_second(at_once.OnAThread(root, "Replace", writing), first)
     assert not landed.faults, landed.faults
     assert refs(client, "tag/a", 1, inward=True).reached == []
     assert not remove(client, "tag/a").faults

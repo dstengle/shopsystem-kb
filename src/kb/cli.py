@@ -59,7 +59,7 @@ def _validate() -> int:
     if checked.faults:
         return _refused("validate", checked.faults)
     for fault in checked.violations:
-        print("\t".join(("violation", fault.artifact, fault.path, fault.rule, fault.message)))
+        print("\t".join(("violation", fault.artifact, fault.place, fault.rule, fault.message)))
     for stale in checked.stale:
         print(f"stale\t{stale.artifact}\tchecked against version {stale.schema_version} of its type, "
               f"which is at {stale.current}")

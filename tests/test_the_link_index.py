@@ -5,7 +5,7 @@ import copy
 
 import pytest
 
-from calls import CLIENT
+from calls import CLIENT, remove, replace, request
 from kb import client as kb_client
 from kb.content import dumps
 from kb.contract import kb_pb2
@@ -20,22 +20,19 @@ TAG = {"title": "Tag", "version": 1, "schema": {"type": "object", "properties": 
 
 
 def _create(client, kind, title, content):
-    made = client.Create(kb_pb2.CreateRequest(type=kind, title=title, content=dumps(content), actor=CLIENT, message="m"))
+    made = request(client, kind, title, content, message="m")
     assert not made.faults, made.faults
     return made.id
 
 
 def _retype(client, defined, version):
     content = {key: value for key, value in defined.items() if key != "title"}
-    written = client.Write(kb_pb2.WriteRequest(
-        locator=kb_pb2.Locator(id="schema/note"), content=dumps({**content, "version": version}), actor=CLIENT,
-        message="m",
-    ))
+    written = replace(client, "schema/note", {**content, "version": version}, message="m")
     assert not written.faults, written.faults
 
 
 def _delete(client, name):
-    return client.Delete(kb_pb2.DeleteRequest(locator=kb_pb2.Locator(id=name), actor=CLIENT, message="m"))
+    return remove(client, name, message="m")
 
 
 @pytest.fixture
@@ -56,7 +53,7 @@ def _with_a_note_about_a_tag(client, note_type):
 
 def _inbound(client, name):
     summary = client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=name)))
-    return [(each.type, each.field, each.count) for each in summary.inbound]
+    return [(each.kind, each.field, each.count) for each in summary.inbound]
 
 
 def _inward(client, name):
@@ -70,7 +67,7 @@ def test_a_type_changed_to_make_a_field_a_link_blocks_removing_what_it_points_at
     assert _inbound(client, "tag/pricing") == [("note", "about", 1)]
     assert _inward(client, "tag/pricing") == ["note/weekly"]
     refused = _delete(client, "tag/pricing")
-    assert [(fault.artifact, fault.path, fault.rule) for fault in refused.faults] == [
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
         ("note/weekly", "about", "on_delete"),
     ]
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from kb import store
+from kb import responses, store
 from kb.export import Exported
 from kb.importing import Checked
 from kb.contract import kb_pb2
@@ -47,7 +47,7 @@ class InProcessClient:
         """The rpc on the store this call finds, or the response carrying the fault that says none was found."""
         servicer, refusal = self._servicer()
         if refusal is not None:
-            return response(faults=[refusal])
+            return responses.refused(response, [refusal])
         return getattr(servicer, rpc)(request, None)
 
     def Create(self, request, timeout=None):
@@ -59,8 +59,8 @@ class InProcessClient:
     def Validate(self, request, timeout=None):
         return self._call("Validate", request, kb_pb2.ValidateResponse)
 
-    def Write(self, request, timeout=None):
-        return self._call("Write", request, kb_pb2.WriteResponse)
+    def Replace(self, request, timeout=None):
+        return self._call("Replace", request, kb_pb2.ReplaceResponse)
 
     def Apply(self, request, timeout=None):
         return self._call("Apply", request, kb_pb2.ApplyResponse)
@@ -80,11 +80,11 @@ class InProcessClient:
     def Snapshot(self, request, timeout=None):
         return self._call("Snapshot", request, kb_pb2.SnapshotResponse)
 
-    def Append(self, request, timeout=None):
-        return self._call("Append", request, kb_pb2.AppendResponse)
+    def Add(self, request, timeout=None):
+        return self._call("Add", request, kb_pb2.AddResponse)
 
-    def Delete(self, request, timeout=None):
-        return self._call("Delete", request, kb_pb2.DeleteResponse)
+    def Remove(self, request, timeout=None):
+        return self._call("Remove", request, kb_pb2.RemoveResponse)
 
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:
@@ -117,5 +117,5 @@ def _operated(command: str, request, response):
     found."""
     root, refusal = _found(None)
     if refusal is not None:
-        return response(faults=[refusal])
+        return responses.refused(response, [refusal])
     return getattr(Operator(root), command)(request)
