@@ -12,10 +12,10 @@ def not_found(artifact_id: ArtifactId) -> kb_pb2.Fault:
     )
 
 
-def no_type(kind_name: str, artifact: str = "") -> kb_pb2.Fault:
-    """A kind the store holds no type for: asked for, or claimed by the artifact named."""
+def no_type(kind_name: str) -> kb_pb2.Fault:
+    """A kind the store holds no type for."""
     return kb_pb2.Fault(
-        artifact=artifact, rule=rules.KIND,
+        rule=rules.KIND,
         message=f"a kind must name a type the store holds; the store holds no type called {kind_name!r}",
     )
 

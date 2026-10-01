@@ -14,7 +14,7 @@ a change that breaks one is refactored into place first, then made.
 | `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
 | `names.py` | the grammar of artifact and item names; how an artifact's name, a link's place inside one and a type's `kb:` reference are written and read; the one order names are given in (`order`); minting, uniqueness and reuse of item names | I/O |
 | `validation.py` | the composed effective schema and the checks JSON Schema cannot express | file access |
-| `check.py` | the check of the whole store, read through the port: every artifact against the current version of its type, the stale listed beside the violations, an artifact of a kind with no type reported and passed over | checks of its own, writes |
+| `check.py` | the check of the whole store, read through the port: every artifact against the current version of its type, the stale listed beside the violations | checks of its own, writes |
 | `composition.py` | a type read through what it is built on: its composition, base first, the type a `kb:` reference names, and which kinds' types read a given type | checks, file access |
 | `links.py` | the one reading of links: every link an artifact carries, wherever it sits, and those links as the port takes them | checks, store access |
 | `definitions.py` | a type checked as it is written: what it refers to is held, it is not built on itself, its link fields say what they may point at | file access, checking artifacts against a type |
