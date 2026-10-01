@@ -67,6 +67,7 @@ Feature: Define a type
     Then the change is rejected because a type's version goes up whenever the type changes
     And the type reads back as it was
 
+  @slice-106
   Scenario: Removing a type while the store holds artifacts of its kind is refused
     Pins that a type cannot be taken away from under the artifacts it checks, and that the client is told exactly which artifacts stand in the way.
     Given a type the store holds, and two artifacts of its kind

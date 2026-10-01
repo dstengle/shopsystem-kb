@@ -2,6 +2,7 @@
 Feature: Answer a damaged file
   Narrator: the client
 
+  @slice-104
   Scenario Outline: A store whose database cannot be read, because it is damaged or missing beside its marker, refuses every call and command that needs it
     Pins that a database the store cannot read always gives the same named fault, naming the database, never a crash, with nothing served and nothing written in the store or in a directory an export was aimed at.
     Given a store holding a decision, a process and a tag, each of a kind the store holds a type for

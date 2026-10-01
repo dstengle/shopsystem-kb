@@ -42,7 +42,7 @@ Feature: Operate a store
     Then the operator is told of everything in the store that does not fit its type, and where
     And of everything that is behind the type it was last checked against
 
-  @slice-46
+  @slice-113
   Scenario: The command line changes content only by importing into a freshly started store
     Pins the limit of the command line: it sets stores up, checks, serves and exports them, and imports into a freshly started one, and nothing else, because every other change to content goes through a client.
     Given a store
