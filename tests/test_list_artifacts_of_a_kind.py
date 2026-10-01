@@ -3,10 +3,9 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, listing, read, refs, search
+from calls import DECISION_TYPE, create, define, listing, read, refs, search, start_a_store
 from kb import client as kb_client
 from kb.content import loads
-from kb.contract import kb_pb2
 
 
 @scenario("name-what-is-asked-for.feature", "Asking by a kind the store holds no type for is refused")
@@ -41,7 +40,7 @@ THURSDAYS = "decision/restock-on-thursdays"
 @given("a store holding three decisions, one of them superseded", target_fixture="client")
 def _store_with_three_decisions(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     decision_type = copy.deepcopy(DECISION_TYPE)
     decision_type["schema"]["properties"]["status"] = {"type": "string"}
     decision_type["schema"]["summary"] = ["supersedes", "status"]

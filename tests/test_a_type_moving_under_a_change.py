@@ -6,9 +6,8 @@ import copy
 import pytest
 
 import at_once
-from calls import CLIENT, TAG_TYPE, create, creating, define, refs, remove, replace, replacing
+from calls import TAG_TYPE, create, creating, define, refs, remove, replace, replacing, start_a_store, check
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 ABOUT = {"type": "string"}
 LINKED = {"type": "string", "ref": {"targets": ["tag"], "cardinality": "one", "parts": False, "on_delete": "refuse"}}
@@ -33,7 +32,7 @@ TYPES = {
 @pytest.mark.parametrize("moved", sorted(TYPES))
 def test_a_change_drafted_before_a_type_it_reads_moved_lands_with_the_links_the_type_now_makes(root, moved):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     held_types, next_type = copy.deepcopy(TYPES[moved])
     for type_content in [TAG_TYPE, *held_types]:
         define(client, type_content)
@@ -49,14 +48,14 @@ def test_a_change_drafted_before_a_type_it_reads_moved_lands_with_the_links_the_
     assert not landed.faults, landed.faults
     assert [each.stub.id for each in refs(client, "tag/a", 1, inward=True).reached] == ["note/x"]
     assert [fault.rule for fault in remove(client, "tag/a").faults] == ["on_delete"]
-    validated = client.Validate(kb_pb2.ValidateRequest())
+    validated = check(client)
     assert (list(validated.violations), list(validated.stale)) == ([], [])
 
 
 @pytest.mark.parametrize("moved", sorted(TYPES))
 def test_an_artifact_made_while_a_type_it_reads_is_drafted_anew_is_held_to_its_links(root, moved):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     held_types, next_type = copy.deepcopy(TYPES[moved])
     for type_content in [TAG_TYPE, *held_types]:
         define(client, type_content)
@@ -78,7 +77,7 @@ def test_an_artifact_made_while_a_type_it_reads_is_drafted_anew_is_held_to_its_l
 
 def test_a_type_changed_while_a_type_built_on_it_moved_relinks_through_the_types_as_they_now_stand(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     for type_content in [TAG_TYPE, _typed("Base", {"about": ABOUT}), _typed("Note", {}, built_on="base")]:
         define(client, type_content)
     create(client, "tag", {"title": "A"})

@@ -8,11 +8,10 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, replace
+from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, replace, start_a_store, check
 from conftest import OPERATOR, _kb
 import held
 from kb import canonical, client as kb_client
-from kb.contract import kb_pb2
 
 FEATURE = "export-and-import-a-store.feature"
 IDENTITY = ["id", "type", "schema_version", "revision", "title"]
@@ -70,7 +69,7 @@ def test_a_differing_type_of_types_is_an_error():
 
 def _started(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     return client
 
 
@@ -1070,12 +1069,12 @@ def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the
     source, target, exported = (tmp_path / each for each in ("source", "target", "exported"))
     for root in (source, target):
         root.mkdir()
-        kb_client.connect(root).Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+        start_a_store(root)
     client = kb_client.connect(source)
     define(client, {"title": "Note", **typed(["a", "b"], 1)})
     create(client, "note", {"title": "X", "b": "second", "a": "first"})
     replace(client, "schema/note", typed(["b", "a"], 2))
-    assert list(client.Validate(kb_pb2.ValidateRequest()).violations) == []
+    assert list(check(client).violations) == []
     monkeypatch.setenv("KB_ROOT", str(source))
     assert kb_client.export(str(exported)).faults == []
     text = (exported / "note" / "x.yaml").read_text(encoding="utf-8")

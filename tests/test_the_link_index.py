@@ -6,10 +6,9 @@ import copy
 
 import pytest
 
-from calls import CLIENT, remove, replace, request
+from calls import remove, replace, request, start_a_store, read, refs
 from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps
-from kb.contract import kb_pb2
 from kb.signatures import Signed
 
 PLAIN = {"title": "Note", "version": 1, "schema": {
@@ -48,7 +47,7 @@ def where(tmp_path):
 def client(where):
     root = where
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     return client
 
 
@@ -60,12 +59,12 @@ def _with_a_note_about_a_tag(client, note_type):
 
 
 def _inbound(client, name):
-    summary = client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=name)))
+    summary = read(client, name)
     return [(each.kind, each.field, each.count) for each in summary.inbound]
 
 
 def _inward(client, name):
-    walked = client.Refs(kb_pb2.RefsRequest(locator=kb_pb2.Locator(id=name), direction=kb_pb2.RefsRequest.IN, depth=1))
+    walked = refs(client, name, 1, inward=True)
     return [each.stub.id for each in walked.reached]
 
 

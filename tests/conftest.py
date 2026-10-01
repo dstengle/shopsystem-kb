@@ -9,10 +9,9 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version
+from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version, start_a_store, check
 import held
 from kb import client as kb_client, store
-from kb.contract import kb_pb2
 
 
 def pytest_configure(config):
@@ -72,15 +71,24 @@ def root(tmp_path):
 @given("a store", target_fixture="client")
 def _a_store(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     return client
 
 
+@pytest.fixture
+def readied_clock():
+    """The clock the client was readied with, under `clock`, for a step that starts a store with it; none until a
+    Given readies one."""
+    return {}
+
+
 @given(parsers.parse("the client was readied with a clock that reads {reading}"), target_fixture="client")
-def _readied_with_a_clock(root, reading):
-    """A client over the store at root whose clock stands still at that moment, given in the zone the step names."""
+def _readied_with_a_clock(root, reading, readied_clock):
+    """A client over the store at root whose clock stands still at that moment, given in the zone the step names; a
+    store it starts takes the same clock."""
     stood = moment(reading)
-    return kb_client.connect(root, clock=lambda: stood)
+    readied_clock["clock"] = lambda: stood
+    return kb_client.connect(root, clock=readied_clock["clock"])
 
 
 @pytest.fixture
@@ -93,7 +101,7 @@ def before():
 def _store_with_content(root):
     """A store started in root, holding the decision type and a decision."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     create(client, "decision", {
         "title": "Price reviews happen weekly",
@@ -128,7 +136,7 @@ def _store_holds_what_it_held(before):
 
 @when("the client checks the store", target_fixture="checked")
 def _check_the_store(client):
-    return client.Validate(kb_pb2.ValidateRequest())
+    return check(client)
 
 
 @then("the store holds no artifact it did not hold before")
@@ -189,7 +197,7 @@ def _store_needing_attention(root):
     """A store a client filled: two decisions behind the decision type, and one of them, edited by hand, missing the
     body of its purpose."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
         create(client, "decision", {"title": title, "sections": [
@@ -239,5 +247,5 @@ def _outside_with_kb_root_naming_no_store(tmp_path):
 def _inside_one_naming_another(root, tmp_path):
     other = tmp_path / "other"
     other.mkdir()
-    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
+    start_a_store(other)
     return {"cwd": _store_needing_attention(root), "env": {"KB_ROOT": str(other)}}

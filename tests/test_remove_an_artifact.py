@@ -1,13 +1,12 @@
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, TAG_TYPE, answer, create, creating, define, journal, listing, read, remove, removing, request,
-    tagged_decision_type,
+    TAG_TYPE, answer, create, creating, define, journal, listing, read, remove, removing, request,
+    tagged_decision_type, start_a_store,
 )
 import at_once
 import held
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 
 @scenario("change-the-store.feature", "The client removes an artifact nothing points at")
@@ -48,7 +47,7 @@ DECISION = "decision/price-reviews-happen-weekly"
 @given("a store holding a tag nothing points at", target_fixture="client")
 def _store_with_a_loose_tag(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, TAG_TYPE)
     define(client, tagged_decision_type())
     create(client, "tag", {"title": "Clearance"})

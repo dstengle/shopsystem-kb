@@ -8,7 +8,7 @@ from kb.port import Port
 from kb.values import ArtifactId, Locator, Refused
 
 
-def artifact(store: Port, reading: Reading) -> kb_pb2.ReadResponse:
+def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     """The artifact at the level asked. Raises Refused for a name the store lacks, a place or a section it holds
     nothing at."""
     locator = reading.locator
@@ -46,12 +46,12 @@ def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
     )
 
 
-def _whole(store: Port, locator: Locator, depth: int) -> kb_pb2.ReadResponse:
+def _whole(store: Port, locator: Locator, depth: int) -> kb_pb2.Artifact:
     found = _resolved(store, locator.id, depth, {str(locator.id)})
     return _response(found, dumps(settled.content(found)))
 
 
-def _section(store: Port, locator: Locator, title: str) -> kb_pb2.ReadResponse:
+def _section(store: Port, locator: Locator, title: str) -> kb_pb2.Artifact:
     """The first section with that title, at any depth, in the order the artifact holds them, and nothing else."""
     found = store.artifact(locator.id)
     section = _find_section(found.get("sections", []), title)
@@ -60,7 +60,7 @@ def _section(store: Port, locator: Locator, title: str) -> kb_pb2.ReadResponse:
     return _response(found, dumps(section))
 
 
-def _summary(store: Port, locator: Locator) -> kb_pb2.ReadResponse:
+def _summary(store: Port, locator: Locator) -> kb_pb2.Artifact:
     found = store.artifact(locator.id)
     schema = composition.kind_schema(locator.id.kind, store)["schema"]
     declared = composition.declared(schema, store)
@@ -75,9 +75,9 @@ def _summary(store: Port, locator: Locator) -> kb_pb2.ReadResponse:
     return response
 
 
-def _response(found: dict, content: str) -> kb_pb2.ReadResponse:
-    return kb_pb2.ReadResponse(
-        id=found["id"], type=found["type"], schema_version=found["schema_version"], revision=found["revision"],
+def _response(found: dict, content: str) -> kb_pb2.Artifact:
+    return kb_pb2.Artifact(
+        id=found["id"], kind=found["type"], schema_version=found["schema_version"], revision=found["revision"],
         title=found["title"], content=content,
     )
 

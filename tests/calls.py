@@ -3,7 +3,9 @@ moment a step names."""
 import copy
 import re
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
+import kb
 from kb.content import dumps
 from kb.contract import kb_pb2
 
@@ -105,9 +107,26 @@ def tagged_decision_type():
     return decision_type
 
 
+def start_a_store(root, clock=None):
+    """A store started at root through `kb.init`, under the client's role, its first entry stamped by the clock when
+    one is given."""
+    kb.init(root, CLIENT.role, clock=clock)
+
+
+def starting(root, role=CLIENT.role, clock=None):
+    """A store asked to be started at root through `kb.init`, under the client's role unless another is given,
+    stamped by the clock when one is given, answered as a step reads it: `faults`, every fault `kb.NotStarted`
+    carried, none when the store was started."""
+    try:
+        kb.init(root, role, clock=clock)
+    except kb.NotStarted as refused:
+        return SimpleNamespace(faults=refused.faults)
+    return SimpleNamespace(faults=[])
+
+
 class Answer:
-    """A change's response as a step reads it: whether it is a refusal, the fields of its result, and the faults of its
-    refusal, none when it gave a result; a field of a refused change reads as unset. The response itself is
+    """A response as a step reads it: whether it is a refusal, the fields of its result, and the faults of its
+    refusal, none when it gave a result; a field of a refused call reads as unset. The response itself is
     `response`. A response that is neither a result nor a refusal is never read as either."""
 
     def __init__(self, response):
@@ -125,11 +144,16 @@ class Answer:
     def __getattr__(self, name):
         return getattr(self.response.result, name)
 
+    def __eq__(self, other):
+        """Two answers are equal when their responses are."""
+        return isinstance(other, Answer) and self.response == other.response
+
+    __hash__ = None
+
 
 def answer(response):
-    """A change's response, its result or its refusal, as a step reads it; a response that carries its faults beside
-    what it gives, as it is."""
-    return Answer(response) if "outcome" in response.DESCRIPTOR.oneofs_by_name else response
+    """A response, its result or its refusal, as a step reads it."""
+    return Answer(response)
 
 
 def signature(message, actor=CLIENT):
@@ -191,14 +215,12 @@ def define(client, type_content):
 def read(client, artifact_id, whole=False, depth=0, section=""):
     """A summary read, a whole read following the links as many steps as depth says, or a read of the section
     with the title given."""
-    level = kb_pb2.ReadRequest.SUMMARY
+    asked = kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=artifact_id), summary=kb_pb2.ReadRequest.Summary())
     if whole:
-        level = kb_pb2.ReadRequest.WHOLE
+        asked.whole.depth = depth
     if section:
-        level = kb_pb2.ReadRequest.SECTION
-    return client.Read(kb_pb2.ReadRequest(
-        locator=kb_pb2.Locator(id=artifact_id), level=level, depth=depth, section=section,
-    ))
+        asked.section.title = section
+    return answer(client.Read(asked))
 
 
 def created(type_name, title, content, key=""):
@@ -271,19 +293,20 @@ def remove(client, artifact_id, message="Remove an artifact", actor=CLIENT, revi
 
 
 def journal(client, artifact="", role="", execution="", since="", batch=""):
-    """The journal's entries, narrowed to those about one artifact, made by one role, for one piece of work, at or
+    """The history's entries, narrowed to those about one artifact, made by one role, for one piece of work, at or
     after a time, or landed in one set, by whichever are given."""
-    request = kb_pb2.JournalRequest(artifact=artifact)
+    request = kb_pb2.HistoryRequest(artifact=artifact)
     for name, value in (("role", role), ("execution", execution), ("since", since), ("batch", batch)):
         if value:
             setattr(request, name, value)
-    return client.Journal(request)
+    return answer(client.History(request))
+
 
 def snapshot(client, execution, artifacts, message="Say what was read", role="agent"):
     """A snapshot of the artifacts named, as they stand now, for the piece of work named, under the role given."""
-    return client.Snapshot(kb_pb2.SnapshotRequest(
-        actor=kb_pb2.Actor(role=role, execution=execution), artifacts=artifacts, message=message,
-    ))
+    return answer(client.Snapshot(kb_pb2.SnapshotRequest(
+        signature=kb_pb2.Signature(role=role, execution=execution, message=message), artifacts=artifacts,
+    )))
 
 
 def search(client, text, type_name="", everywhere=False):
@@ -291,20 +314,20 @@ def search(client, text, type_name="", everywhere=False):
     when type_name is given."""
     request = kb_pb2.SearchRequest(text=text)
     if type_name:
-        request.type = type_name
+        request.kind = type_name
     if everywhere:
         request.scope = kb_pb2.SearchRequest.ALL
-    return client.Search(request)
+    return answer(client.Search(request))
 
 
 def refs(client, artifact_id, depth, inward=False, via="", type_name="", place=""):
     """The links out of an artifact, or out of the place inside it place names, or into it when inward, followed as
     many steps as depth says, through the field via names and to artifacts of the kind type_name names when either is
     given."""
-    direction = kb_pb2.RefsRequest.IN if inward else kb_pb2.RefsRequest.OUT
-    return client.Refs(kb_pb2.RefsRequest(
-        locator=kb_pb2.Locator(id=artifact_id, place=place), depth=depth, direction=direction, via=via, type=type_name,
-    ))
+    direction = kb_pb2.FollowRequest.IN if inward else kb_pb2.FollowRequest.OUT
+    return answer(client.Follow(kb_pb2.FollowRequest(
+        locator=kb_pb2.Locator(id=artifact_id, place=place), depth=depth, direction=direction, via=via, kind=type_name,
+    )))
 
 
 PROCESS_TYPE = {
@@ -339,7 +362,12 @@ PROCESS_TYPE = {
 def listing(client, type_name, fields=None, ids_only=False):
     """The artifacts of a kind, those whose fields hold the values given, as stubs or as names only."""
     form = kb_pb2.ListRequest.IDS if ids_only else kb_pb2.ListRequest.STUBS
-    return client.List(kb_pb2.ListRequest(type=type_name, fields=fields or {}, form=form))
+    return answer(client.List(kb_pb2.ListRequest(kind=type_name, fields=fields or {}, form=form)))
+
+
+def check(client):
+    """The check of the whole store: its violations and the stale, or the refusal."""
+    return answer(client.Check(kb_pb2.CheckRequest()))
 
 
 def next_version(client, kind, type_content, sections=None):

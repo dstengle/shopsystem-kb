@@ -3,7 +3,7 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, PROCESS_TYPE, add, adding, answer, create, define, journal, read, replace
+from calls import PROCESS_TYPE, add, adding, answer, create, define, journal, read, replace, start_a_store, check
 import at_once
 import held
 from kb import client as kb_client
@@ -136,7 +136,7 @@ STEPS = [
 @given("a store holding a process with two steps and a shared step other processes use", target_fixture="client")
 def _store_with_a_process(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, STEP_TYPE)
     define(client, PROCESS_TYPE)
     create(client, "step", {"title": "Count the till", "body": "Count every note and coin.\n"})
@@ -179,7 +179,7 @@ def _names_kept(named, reordered):
 def _link_still_lands(client, named, reordered):
     assert loads(read(client, FINDING, whole=True).content)["check"] == f"{CHECKLIST}#checks/2"
     assert next(check for check in reordered if check["id"] == "2") == {"id": "2", "says": "Till counted"}
-    assert not client.Validate(kb_pb2.ValidateRequest()).violations
+    assert not check(client).violations
 
 
 def _steps(client):

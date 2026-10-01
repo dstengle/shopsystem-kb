@@ -1,8 +1,7 @@
 from pytest_bdd import given, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, search
+from calls import DECISION_TYPE, create, define, search, start_a_store
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 
 @scenario("query-the-store.feature", "The client searches the prose")
@@ -30,7 +29,7 @@ PROCESS_TYPE = {
 @given("a store where two decisions and a process mention restocking in their prose", target_fixture="client")
 def _store_mentioning_restocking(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     define(client, PROCESS_TYPE)
     create(client, "decision", {

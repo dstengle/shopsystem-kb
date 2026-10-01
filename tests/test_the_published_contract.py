@@ -2,7 +2,9 @@
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
 None; `kb.contract.kb_pb2`'s being importable, as package `kb.v1`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
-`place`; that each item an `AddMany` adds names the artifact it went to; and the set of kb's own rule names against
+`place`; the reads `Read`, `List`, `Follow`, `Search` and `History`, the signed `Snapshot` and the `Check`, each
+answering its result or a refusal; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
+faults; that each item an `AddMany` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
 import inspect
 import re
@@ -10,13 +12,12 @@ from pathlib import Path
 
 import pytest
 
+import kb
 from calls import DECISION_TYPE, add_many, added, create, define, request
 from kb import client as kb_client, rules
 from kb import content as kb_content
 from kb.content import NotCanonical, dumps, loads, text
 from kb.contract import kb_pb2
-
-CLIENT = kb_pb2.Actor(role="client")
 
 SPEC = Path(__file__).resolve().parent.parent / "spec" / "index.md"
 
@@ -53,10 +54,35 @@ def test_content_round_trips_and_refuses_what_it_cannot_keep():
 def test_the_in_process_client_and_contract_are_reachable(tmp_path):
     root = tmp_path / "store"
     root.mkdir()
-    client = kb_client.connect(root)
-    response = client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    assert isinstance(response, kb_pb2.InitResponse)
-    assert not response.faults
+    assert kb.init(root, "client") is None
+    response = kb_client.connect(root).Check(kb_pb2.CheckRequest())
+    assert isinstance(response, kb_pb2.CheckResponse)
+    assert response.WhichOneof("outcome") == "result"
+
+
+def test_kb_init_takes_a_root_and_a_role_and_the_clock_connect_takes():
+    parameters = inspect.signature(kb.init).parameters
+    assert list(parameters) == ["root", "role", "execution", "clock"]
+    assert parameters["execution"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["execution"].default == ""
+    assert parameters["clock"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["clock"].default is None
+
+
+def test_kb_init_refuses_by_raising_not_started_with_the_faults(tmp_path):
+    with pytest.raises(kb.NotStarted) as refused:
+        kb.init(tmp_path / "nowhere", "client")
+    assert [fault.rule for fault in refused.value.faults] == ["root"]
+    assert issubclass(kb.NotStarted, Exception)
+
+
+def test_no_rpc_starts_a_store_and_no_request_names_an_actor():
+    methods = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods_by_name
+    assert "Init" not in methods
+    messages = kb_pb2.DESCRIPTOR.message_types_by_name
+    assert not {"InitRequest", "InitResponse"} & set(messages)
+    for method in methods.values():
+        assert "actor" not in method.input_type.fields_by_name
 
 
 def test_connects_clock_is_a_keyword_defaulting_to_none():
@@ -73,8 +99,8 @@ def test_the_rule_names_kb_gives_are_exactly_the_spec_lists():
 def test_a_json_schema_keyword_passes_through_as_a_rule_outside_the_pinned_set(tmp_path):
     root = tmp_path / "store"
     root.mkdir()
+    kb.init(root, "client")
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, TYPED)
     response = request(client, "typed", "Missing detail", {})
     assert [fault.rule for fault in response.faults] == ["required"]
@@ -119,6 +145,48 @@ def test_the_small_values_name_kinds_and_places_in_the_specs_words():
     assert "place" in _fields("Entry") and "path" not in _fields("Entry")
 
 
+READS = {
+    "Read": ("ReadRequest", {"locator", "summary", "whole", "section"}, "Artifact", {
+        "id", "kind", "schema_version", "revision", "title", "content", "references", "parts", "inbound",
+    }),
+    "List": ("ListRequest", {"kind", "fields", "form"}, "Listed", {"stubs", "ids"}),
+    "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind"}, "Followed", {"reached"}),
+    "Search": ("SearchRequest", {"text", "kind", "scope"}, "Found", {"matches"}),
+    "History": ("HistoryRequest", {"artifact", "role", "execution", "since", "batch"}, "Entries", {"entries"}),
+    "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
+    "Check": ("CheckRequest", set(), "Checked", {"violations", "stale"}),
+}
+
+
+@pytest.mark.parametrize("rpc", sorted(READS))
+def test_each_read_the_snapshot_and_the_check_answer_their_result_or_a_refusal(rpc):
+    asked, carries, result, gives = READS[rpc]
+    method = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods_by_name[rpc]
+    assert (method.input_type.name, method.output_type.name) == (asked, f"{rpc}Response")
+    assert _fields(asked) == carries
+    assert _fields(result) == gives
+    outcome = method.output_type.oneofs_by_name["outcome"]
+    assert [(field.name, field.message_type.name) for field in outcome.fields] == [("result", result), ("refusal", "Refusal")]
+    assert _fields(f"{rpc}Response") == {"result", "refusal"}
+
+
+def test_a_read_asks_for_one_level():
+    read = kb_pb2.DESCRIPTOR.message_types_by_name["ReadRequest"]
+    level = read.oneofs_by_name["level"]
+    assert [(field.name, field.message_type.name) for field in level.fields] == [
+        ("summary", "Summary"), ("whole", "Whole"), ("section", "Section"),
+    ]
+    assert set(read.nested_types_by_name["Summary"].fields_by_name) == set()
+    assert set(read.nested_types_by_name["Whole"].fields_by_name) == {"depth"}
+    assert set(read.nested_types_by_name["Section"].fields_by_name) == {"title"}
+
+
+def test_the_v0_reads_are_gone():
+    methods = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods_by_name
+    assert not {"Refs", "Journal", "Validate"} & set(methods)
+    assert _fields("Entry") >= {"actor"} and _fields("Actor") == {"role", "execution"}
+
+
 def test_the_v0_changes_are_gone():
     methods = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods_by_name
     assert not {"Write", "Append", "Delete"} & set(methods)
@@ -130,8 +198,8 @@ def test_the_v0_changes_are_gone():
 def test_each_item_an_add_many_adds_names_the_artifact_it_went_to(tmp_path):
     root = tmp_path / "store"
     root.mkdir()
+    kb.init(root, "client")
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     define(client, DECISION_TYPE)
     for title in ("Weekly", "Daily"):
         sections = [{"title": "Purpose", "body": "Why.\n"}, {"title": "Rationale", "body": "Because.\n"}]

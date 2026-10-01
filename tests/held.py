@@ -54,8 +54,8 @@ def names(root):
 
 
 def history(client):
-    """The store's history, oldest first, as the `Journal` rpc gives it."""
-    return list(client.Journal(kb_pb2.JournalRequest()).entries)
+    """The store's history, oldest first, as the `History` rpc gives it."""
+    return list(client.History(kb_pb2.HistoryRequest()).result.entries)
 
 
 def holds(root):

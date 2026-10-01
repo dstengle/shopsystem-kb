@@ -2,24 +2,22 @@
 //
 // Artifact content crosses as canonical YAML text beside the fixed
 // identity fields, since content shape is schema-defined at runtime.
-// A change's response is its result or a refusal holding every fault,
-// never both; a refusal means nothing was written. The other responses
-// carry their faults beside what they give, and a response that carries
-// faults is a refusal.
+// Every response is its result or a refusal holding every fault, never
+// both; a refusal means nothing was written. A store is started off the
+// wire, by `kb.init` in the client's own process; no rpc starts one.
 syntax = "proto3";
 
 package kb.v1;
 
 
 service Kb {
-  rpc Init(InitRequest) returns (InitResponse);
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Read(ReadRequest) returns (ReadResponse);
-  rpc Validate(ValidateRequest) returns (ValidateResponse);
+  rpc Check(CheckRequest) returns (CheckResponse);
   rpc Replace(ReplaceRequest) returns (ReplaceResponse);
-  rpc Journal(JournalRequest) returns (JournalResponse);
+  rpc History(HistoryRequest) returns (HistoryResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
-  rpc Refs(RefsRequest) returns (RefsResponse);
+  rpc Follow(FollowRequest) returns (FollowResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
   rpc Add(AddRequest) returns (AddResponse);
@@ -30,7 +28,8 @@ service Kb {
   rpc RemoveMany(RemoveManyRequest) returns (RemoveManyResponse);
 }
 
-// Who made an entry in the history: the role, and the piece of work.
+// Who made an entry in the history: the role, and the piece of work. The
+// history's record alone; a request says who makes it with a Signature.
 message Actor {
   string role = 1;
   string execution = 2;
@@ -61,16 +60,6 @@ message Refusal {
   repeated Fault faults = 1;
 }
 
-message InitRequest {
-  string root = 1;
-  Actor actor = 2;
-}
-
-// With faults, a refusal: no role.
-message InitResponse {
-  repeated Fault faults = 1;
-}
-
 // A new artifact of a kind. The title travels here, never inside the
 // content.
 message CreateRequest {
@@ -93,28 +82,35 @@ message CreateResponse {
   }
 }
 
-// A summary by default. A whole read gives the artifact's content with
-// each link followed as many steps as depth says, the target in place of
-// its name; a target already filled in on the way is left as its name.
-// A section read gives the section with the title named, and nothing else.
+// One level of an artifact, a summary when none is asked for. A whole
+// read gives the artifact's content with each link followed as many steps
+// as depth says, the target in place of its name; a target already filled
+// in on the way is left as its name. A section read gives the section
+// with the title named, and nothing else.
 message ReadRequest {
-  enum Level {
-    SUMMARY = 0;
-    WHOLE = 1;
-    SECTION = 2;
+  message Summary {
+  }
+  message Whole {
+    int32 depth = 1;
+  }
+  message Section {
+    string title = 1;
   }
   Locator locator = 1;
-  Level level = 2;
-  int32 depth = 3;
-  string section = 4;
+  oneof level {
+    Summary summary = 2;
+    Whole whole = 3;
+    Section section = 4;
+  }
 }
 
-// A summary: identity, the fields the type shows at a glance, a stub of
-// each reference target and of each part, and inbound counts. With faults,
-// a refusal: a bad locator, a name the store lacks, or no store found.
-message ReadResponse {
+// An artifact at the level read: its identity and its content at that
+// level; a summary's content is the fields the type shows at a glance,
+// with a stub of each reference target and of each part, and inbound
+// counts.
+message Artifact {
   string id = 1;
-  string type = 2;
+  string kind = 2;
   int32 schema_version = 3;
   int32 revision = 4;
   string title = 5;
@@ -122,7 +118,15 @@ message ReadResponse {
   repeated Stub references = 7;
   repeated PartStub parts = 8;
   repeated InboundCount inbound = 9;
-  repeated Fault faults = 10;
+}
+
+// A refusal: a bad locator, a name the store lacks, a place or a section
+// it holds nothing at, or no store found.
+message ReadResponse {
+  oneof outcome {
+    Artifact result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 message Stub {
@@ -145,18 +149,24 @@ message InboundCount {
   int32 count = 3;
 }
 
-message ValidateRequest {
+message CheckRequest {
 }
 
 // Every violation the store holds, each a fault naming the artifact, the
-// place and the rule; a stored file that cannot be read is one of them.
-// Every artifact last checked against an older version of its type is
-// listed as stale, whether or not it still fits. With faults, a refusal:
-// no store found.
-message ValidateResponse {
+// place and the rule; they are what the store holds, not a refusal. Every
+// artifact last checked against an older version of its type is listed as
+// stale, whether or not it still fits.
+message Checked {
   repeated Fault violations = 1;
-  repeated Fault faults = 2;
-  repeated Stale stale = 3;
+  repeated Stale stale = 2;
+}
+
+// A refusal: no store found, or one that cannot be read.
+message CheckResponse {
+  oneof outcome {
+    Checked result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // An artifact behind its type: the version it was last checked against,
@@ -193,12 +203,12 @@ message ReplaceResponse {
   }
 }
 
-// Narrows the journal to the entries about one artifact, made under one
+// Narrows the history to the entries about one artifact, made under one
 // role, for one piece of work, at or after a time (ISO 8601, a date alone
 // meaning its midnight, UTC unless it says otherwise), or landed in one
 // set, named by the batch a *Many gave, by each one given; with none, every
 // entry.
-message JournalRequest {
+message HistoryRequest {
   string artifact = 1;
   string role = 2;
   string execution = 3;
@@ -206,7 +216,7 @@ message JournalRequest {
   string batch = 5;
 }
 
-// One journal entry, as the store holds it. `at` is ISO 8601 in UTC; a
+// One entry in the history, as the store holds it. `at` is ISO 8601 in UTC; a
 // change made alone names itself as its batch. A snapshot's entry has op
 // `snapshot`, lists what was read, and names no artifact of its own.
 message Entry {
@@ -232,15 +242,22 @@ message Snapshotted {
   string digest = 3;
 }
 
-// The entries, oldest first. With faults, a refusal: a name that is not a
-// plain name, a time that cannot be read, or no store found.
-message JournalResponse {
+// The entries, oldest first.
+message Entries {
   repeated Entry entries = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: a name that is not a plain name, a time that cannot be read,
+// or no store found.
+message HistoryResponse {
+  oneof outcome {
+    Entries result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // The words to look for in the prose, the fields, or both, among the
-// artifacts of one kind when a type is given.
+// artifacts of one kind when a kind is given.
 message SearchRequest {
   enum Scope {
     SECTIONS = 0;
@@ -248,7 +265,7 @@ message SearchRequest {
     ALL = 2;
   }
   string text = 1;
-  string type = 2;
+  string kind = 2;
   Scope scope = 3;
 }
 
@@ -262,17 +279,24 @@ message Match {
   string field = 4;
 }
 
-// The matches, the one holding the words most often first. With faults, a
-// refusal: a type that is not a plain name, or no store found.
-message SearchResponse {
+// The matches, the one holding the words most often first.
+message Found {
   repeated Match matches = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: a kind that is not a plain name, a kind the store holds no
+// type for, or no store found.
+message SearchResponse {
+  oneof outcome {
+    Found result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // The links out of an artifact, or into it, followed as many steps as
-// depth says. A via names the one field a link may be; a type, the one
+// depth says. A via names the one field a link may be; a kind, the one
 // kind an artifact reached may be. Either narrows every step.
-message RefsRequest {
+message FollowRequest {
   enum Direction {
     OUT = 0;
     IN = 1;
@@ -281,7 +305,7 @@ message RefsRequest {
   int32 depth = 2;
   Direction direction = 3;
   string via = 4;
-  string type = 5;
+  string kind = 5;
 }
 
 // One step of a route: the link taken and the name it landed on. Going
@@ -298,12 +322,18 @@ message Reached {
   repeated Hop route = 2;
 }
 
-// Each artifact reached once, by the shortest route, nearest first. With
-// faults, a refusal: a bad locator, a name the store lacks, a type that is
-// not a plain name, or no store found.
-message RefsResponse {
+// Each artifact reached once, by the shortest route, nearest first.
+message Followed {
   repeated Reached reached = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: a bad locator, a name the store lacks, a kind that is not a
+// plain name, or no store found.
+message FollowResponse {
+  oneof outcome {
+    Followed result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // The artifacts of one kind, narrowed to those whose fields hold the
@@ -314,34 +344,47 @@ message ListRequest {
     STUBS = 0;
     IDS = 1;
   }
-  string type = 1;
+  string kind = 1;
   map<string, string> fields = 2;
   Form form = 3;
 }
 
 // The matches in the order the store holds them, as stubs or as names.
-// With faults, a refusal: a kind that is not a plain name, or no store
-// found.
-message ListResponse {
+message Listed {
   repeated Stub stubs = 1;
   repeated string ids = 2;
-  repeated Fault faults = 3;
 }
 
-// What a piece of work read, as the store holds it now: the actor names
-// the role and the piece of work, the message says why.
+// A refusal: a kind that is not a plain name, a kind the store holds no
+// type for, or no store found.
+message ListResponse {
+  oneof outcome {
+    Listed result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// What a piece of work read, as the store holds it now: the signature
+// names the role and the piece of work, which the snapshot is of, and says
+// why.
 message SnapshotRequest {
-  Actor actor = 1;
+  Signature signature = 1;
   repeated string artifacts = 2;
-  string message = 3;
 }
 
-// The name of the journal entry that records the snapshot. With faults, a
-// refusal: a name that is not a plain name, a name the store lacks, or no
-// store found, and nothing was written.
-message SnapshotResponse {
+// The name of the entry in the history that records the snapshot.
+message Recorded {
   string entry = 1;
-  repeated Fault faults = 2;
+}
+
+// A refusal: an unsigned snapshot, or one naming no piece of work, a name
+// that is not a plain name, a name the store lacks, or no store found;
+// nothing was written.
+message SnapshotResponse {
+  oneof outcome {
+    Recorded result = 1;
+    Refusal refusal = 2;
+  }
 }
 
 // One item added at the end of a collection inside an artifact the store

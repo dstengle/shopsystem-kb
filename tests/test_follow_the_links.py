@@ -3,10 +3,10 @@ import copy
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, refs, remove, tagged_decision_type, replace,
+    PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, refs, remove, tagged_decision_type, replace,
+    start_a_store,
 )
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 
 @scenario("query-the-store.feature", "The client follows the links out of an artifact")
@@ -50,7 +50,7 @@ OLDER_SECTIONS = [
 @given("a store where a decision supersedes an older decision", target_fixture="client")
 def _store_with_a_superseded_decision(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, TAG_TYPE)
     define(client, tagged_decision_type())
     define(client, WORK_ITEM_TYPE)

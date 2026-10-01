@@ -4,15 +4,14 @@ import sqlite3
 
 import pytest
 
-from calls import CLIENT, TAG_TYPE, create, define, read, request
+from calls import TAG_TYPE, create, define, read, request, start_a_store, starting
 import held
 from kb import client as kb_client, drafting, sqlite_store
-from kb.contract import kb_pb2
 
 
 def _started(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, TAG_TYPE)
     create(client, "tag", {"title": "Kept"})
     return client
@@ -73,6 +72,6 @@ def test_a_database_error_starting_a_store_is_an_unreadable_fault_and_leaves_not
     def failing(path):
         raise sqlite3.OperationalError("disk I/O error")
     monkeypatch.setattr(sqlite_store, "make", failing)
-    answered = kb_client.connect().Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    answered = starting(root)
     assert [(fault.rule, fault.artifact, fault.place) for fault in answered.faults] == [("unreadable", "", "")]
     assert list(root.iterdir()) == []

@@ -25,9 +25,9 @@ def _found(root: Path | None) -> tuple[Path | None, kb_pb2.Fault | None]:
 class InProcessClient:
     """Same method names, requests and responses as kb_pb2_grpc.KbStub, with no channel between.
 
-    Readied without finding a store. Each call but Init finds its store as it is made, from the root the client
-    was given or, with none, the way git finds a repository; a call that finds none answers with that fault and
-    touches nothing. Init takes its root from the request and finds nothing.
+    Readied without finding a store. Each call finds its store as it is made, from the root the client was given
+    or, with none, the way git finds a repository; a call that finds none answers with that fault and touches
+    nothing. A store is started by `kb.init`, never through a client.
     """
 
     def __init__(self, root: Path | None = None, clock: Callable[[], datetime] | None = None):
@@ -39,9 +39,6 @@ class InProcessClient:
         if refusal is not None:
             return None, refusal
         return KbServicer(root, self._clock), None
-
-    def Init(self, request, timeout=None):
-        return KbServicer(clock=self._clock).Init(request, None)
 
     def _call(self, rpc: str, request, response):
         """The rpc on the store this call finds, or the response carrying the fault that says none was found."""
@@ -56,20 +53,20 @@ class InProcessClient:
     def Read(self, request, timeout=None):
         return self._call("Read", request, kb_pb2.ReadResponse)
 
-    def Validate(self, request, timeout=None):
-        return self._call("Validate", request, kb_pb2.ValidateResponse)
+    def Check(self, request, timeout=None):
+        return self._call("Check", request, kb_pb2.CheckResponse)
 
     def Replace(self, request, timeout=None):
         return self._call("Replace", request, kb_pb2.ReplaceResponse)
 
-    def Journal(self, request, timeout=None):
-        return self._call("Journal", request, kb_pb2.JournalResponse)
+    def History(self, request, timeout=None):
+        return self._call("History", request, kb_pb2.HistoryResponse)
 
     def Search(self, request, timeout=None):
         return self._call("Search", request, kb_pb2.SearchResponse)
 
-    def Refs(self, request, timeout=None):
-        return self._call("Refs", request, kb_pb2.RefsResponse)
+    def Follow(self, request, timeout=None):
+        return self._call("Follow", request, kb_pb2.FollowResponse)
 
     def List(self, request, timeout=None):
         return self._call("List", request, kb_pb2.ListResponse)
@@ -98,9 +95,9 @@ class InProcessClient:
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds.
-    Each change it makes, Init's included, is stamped in the journal with the moment the clock gives, read at each
-    stamp; with no clock, with the machine's. A clock returns a `datetime`, read as UTC when it has no zone; the
-    journal gives every moment in UTC."""
+    Each change it makes is stamped in the history with the moment the clock gives, read at each stamp; with no
+    clock, with the machine's. A clock returns a `datetime`, read as UTC when it has no zone; the history gives every
+    moment in UTC. `kb.init` takes the same clock."""
     return InProcessClient(Path(root) if root is not None else None, clock)
 
 

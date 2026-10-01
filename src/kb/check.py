@@ -5,7 +5,7 @@ from kb.contract import kb_pb2
 from kb.port import Port
 
 
-def everything(store: Port) -> kb_pb2.ValidateResponse:
+def everything(store: Port) -> kb_pb2.Checked:
     """Every artifact checked against the current version of its type, and listed as stale when it was last
     checked against an older one; each kind's type composed once."""
     violations, stale, schemas = [], [], {}
@@ -19,4 +19,4 @@ def everything(store: Port) -> kb_pb2.ValidateResponse:
                 artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
             ))
         violations += validation.validate(str(artifact_id), settled.checked(artifact), schema["schema"], store)
-    return kb_pb2.ValidateResponse(violations=violations, stale=stale)
+    return kb_pb2.Checked(violations=violations, stale=stale)

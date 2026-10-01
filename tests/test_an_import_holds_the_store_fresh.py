@@ -3,17 +3,16 @@ changes the store while an import is under way, after the import found the store
 the import, is refused as busy when the import holds the store longer than the store waits, and is never merged with
 it. The client's change is made from inside the import's reading of the directory, so it falls in that window every
 time. Through the operator's commands beside the contract, and the contract, over stores under the test's tmp_path."""
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, define, request
+from calls import DECISION_TYPE, WORK_ITEM_TYPE, define, request, start_a_store
 import held
 from kb import client as kb_client
 from kb import offers, sqlite_store
-from kb.contract import kb_pb2
 
 
 def _started(root):
     root.mkdir()
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     return client
 
 

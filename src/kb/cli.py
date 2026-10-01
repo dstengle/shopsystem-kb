@@ -8,6 +8,7 @@ import argparse
 import os
 import sys
 
+import kb
 from kb import client as kb_client
 from kb import rules
 from kb.contract import kb_pb2
@@ -47,17 +48,19 @@ def _init(root: str) -> int:
         return _refused("init", [kb_pb2.Fault(
             rule=rules.ACTOR, message="a store can only be started under a role, named through KB_ACTOR",
         )])
-    started = kb_client.connect().Init(kb_pb2.InitRequest(root=root, actor=kb_pb2.Actor(role=role)))
-    if started.faults:
-        return _refused("init", started.faults)
+    try:
+        kb.init(root, role)
+    except kb.NotStarted as refused:
+        return _refused("init", refused.faults)
     return 0
 
 
 def _validate() -> int:
     """Check the store this directory finds: every violation, then every artifact behind its type, one to a line."""
-    checked = kb_client.connect().Validate(kb_pb2.ValidateRequest())
-    if checked.faults:
-        return _refused("validate", checked.faults)
+    answered = kb_client.connect().Check(kb_pb2.CheckRequest())
+    if answered.WhichOneof("outcome") == "refusal":
+        return _refused("validate", answered.refusal.faults)
+    checked = answered.result
     for fault in checked.violations:
         print("\t".join(("violation", fault.artifact, fault.place, fault.rule, fault.message)))
     for stale in checked.stale:

@@ -50,7 +50,7 @@ def _define_note(client):
 def _read_back_like_any_other(client, defined):
     assert defined.id == "schema/note"
     note_type = read(client, defined.id)
-    assert (note_type.id, note_type.type, note_type.title) == ("schema/note", "schema", "Note")
+    assert (note_type.id, note_type.kind, note_type.title) == ("schema/note", "schema", "Note")
     assert note_type.revision == 1
 
 

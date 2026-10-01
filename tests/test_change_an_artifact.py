@@ -5,7 +5,7 @@ from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
     CLIENT, DECISION_TYPE, NOTE_TYPE, add, define, create, create_many, created, journal, listing, read, refs, remove,
-    replacing, request, replace, answer,
+    replacing, request, replace, answer, start_a_store, check,
 )
 import at_once
 import held
@@ -101,7 +101,7 @@ SECTIONS = [
 @given("a store holding a decision with a purpose and a rationale, at its first version", target_fixture="client")
 def _store_with_a_decision(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
     return client
@@ -154,7 +154,7 @@ def _the_rest_as_before(changed):
     assert {key: value for key, value in after.items() if key != "sections"} == {
         key: value for key, value in before.items() if key != "sections"
     }
-    assert [(seen.id, seen.type, seen.title, seen.schema_version) for seen in (changed["before"], changed["after"])] == [
+    assert [(seen.id, seen.kind, seen.title, seen.schema_version) for seen in (changed["before"], changed["after"])] == [
         (DECISION, "decision", "Price reviews happen weekly", 1),
     ] * 2
 
@@ -203,7 +203,7 @@ def _records_the_current_version(root, client):
 
 def _stale(client):
     """The names the store's check lists as behind their type."""
-    return [stale.artifact for stale in client.Validate(kb_pb2.ValidateRequest()).stale]
+    return [stale.artifact for stale in check(client).stale]
 
 
 def _decision_type_at_version_2(client, schema):
@@ -461,7 +461,7 @@ def _keeps_its_name(changed):
 
 @then("anything pointing at it still lands on it")
 def _still_lands(client):
-    assert list(client.Validate(kb_pb2.ValidateRequest()).violations) == []
+    assert list(check(client).violations) == []
     inward = refs(client, DECISION, 1, inward=True)
     assert [(reached.stub.id, reached.route[0].field) for reached in inward.reached] == [("note/why-monthly", "about")]
 

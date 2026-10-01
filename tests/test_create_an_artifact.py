@@ -2,7 +2,7 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, read, request
+from calls import DECISION_TYPE, create, define, read, request, start_a_store
 import held
 from kb import content, client as kb_client
 from kb.contract import kb_pb2
@@ -190,7 +190,7 @@ OPTIONS = [
 )
 def _store_with_decision_type(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     return client
 

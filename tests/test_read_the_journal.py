@@ -4,8 +4,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, MovingClock, add, create, create_many, created, define, journal, moment, remove, snapshot,
-    replace,
+    DECISION_TYPE, MovingClock, add, create, create_many, created, define, journal, moment, remove, snapshot,
+    replace, start_a_store,
 )
 import held
 from kb import client as kb_client
@@ -102,7 +102,7 @@ def written():
 def _store_with_a_decision_changed_today(root, clock, written):
     clock.at = datetime.fromisoformat("2026-09-21T09:00:00+00:00")
     client = kb_client.connect(root, clock=clock)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root, clock)
     define(client, DECISION_TYPE)
     create(client, "decision", {
         "title": "Price reviews happen weekly",

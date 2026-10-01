@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, add_many, added, create, create_many, created, define, journal, listing,
-    read, refs, remove_many, removed, replace, replace_many, replaced,
+    DECISION_TYPE, WORK_ITEM_TYPE, add_many, added, create, create_many, created, define, journal, listing,
+    read, refs, remove_many, removed, replace, replace_many, replaced, start_a_store,
 )
 import held
 from kb import client as kb_client
@@ -25,7 +25,7 @@ SECTIONS = [
 @given("a store holding a decision type and a work item", target_fixture="client")
 def _store_with_a_decision_type_and_a_work_item(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     define(client, WORK_ITEM_TYPE)
     create(client, "work-item", {"title": "Move the review to Mondays"})

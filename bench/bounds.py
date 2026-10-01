@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 
+import kb
 from kb.client import connect
 from kb.content import dumps
 from kb.contract import kb_pb2
@@ -25,7 +26,6 @@ BOUNDS = {
 }
 RUNS = 20
 SET = 100
-ACTOR = kb_pb2.Actor(role="bench")
 SIGNATURE = kb_pb2.Signature(role="bench", message="bench")
 WORDS = "restocking shelves pricing weekly review supplier till opening closing inventory".split()
 
@@ -56,15 +56,10 @@ WORK_ITEM = {"title": "Work item", "version": 1, "schema": {
 
 
 def answered(response):
-    """What the call gave, which must be no refusal: a figure over a refusal measures nothing. A change's response
-    gives its result; any other, itself."""
-    if "outcome" in response.DESCRIPTOR.oneofs_by_name:
-        if response.WhichOneof("outcome") != "result":
-            raise SystemExit(f"refused: {list(response.refusal.faults)}")
-        return response.result
-    if response.faults:
-        raise SystemExit(f"refused: {list(response.faults)}")
-    return response
+    """What the call gave, its result, which must be no refusal: a figure over a refusal measures nothing."""
+    if response.WhichOneof("outcome") != "result":
+        raise SystemExit(f"refused: {list(response.refusal.faults)}")
+    return response.result
 
 
 def creation(kind: str, title: str, content: dict) -> kb_pb2.CreateItem:
@@ -135,7 +130,7 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
         return lambda: answered(client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=name))))
 
     def walk(name, direction):
-        return lambda: answered(client.Refs(kb_pb2.RefsRequest(
+        return lambda: answered(client.Follow(kb_pb2.FollowRequest(
             locator=kb_pb2.Locator(id=name), depth=3, direction=direction)))
 
     made = iter(range(10**6))
@@ -151,9 +146,9 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
     measured = [
         ("summary read", f"summary read of {decision}", timed(summary(decision))),
         ("summary read", f"summary read of {tag}", timed(summary(tag))),
-        ("three-step traversal", f"three steps out from {item}", timed(walk(item, kb_pb2.RefsRequest.OUT))),
-        ("three-step traversal", f"three steps in from {decision}", timed(walk(decision, kb_pb2.RefsRequest.IN))),
-        ("", f"three steps in from {tag} (logged only)", timed(walk(tag, kb_pb2.RefsRequest.IN))),
+        ("three-step traversal", f"three steps out from {item}", timed(walk(item, kb_pb2.FollowRequest.OUT))),
+        ("three-step traversal", f"three steps in from {decision}", timed(walk(decision, kb_pb2.FollowRequest.IN))),
+        ("", f"three steps in from {tag} (logged only)", timed(walk(tag, kb_pb2.FollowRequest.IN))),
         ("single change", "Create of a tag nothing points at", timed(create)),
         ("single change", "Replace of a tag nothing points at", timed(lambda: answered(client.Replace(
             kb_pb2.ReplaceRequest(locator=kb_pb2.Locator(id=next(written)), content=dumps({}), signature=SIGNATURE))))),
@@ -172,8 +167,8 @@ def main(n: int) -> int:
     if n < SET:
         raise SystemExit(f"a store of at least {SET} artifacts holds the graph measured; {n} is too few")
     with tempfile.TemporaryDirectory(prefix="kb-bench-") as root:
+        kb.init(root, "bench")
         client = connect(root)
-        answered(client.Init(kb_pb2.InitRequest(root=root, actor=ACTOR)))
         for definition in (TAG, DECISION, WORK_ITEM):
             answered(client.Create(kb_pb2.CreateRequest(
                 kind="schema", title=definition["title"], signature=SIGNATURE,

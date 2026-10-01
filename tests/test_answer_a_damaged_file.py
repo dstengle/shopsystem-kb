@@ -8,8 +8,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, add, create, create_many, created, define, journal, listing, refs,
-    read, remove, request, search, snapshot, replace,
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, add, create, create_many, created, define, journal, listing, refs,
+    read, remove, request, search, snapshot, replace, start_a_store, check,
 )
 from conftest import OPERATOR, _kb
 import held
@@ -40,7 +40,7 @@ SECTIONS = [
        target_fixture="client")
 def _store_with_a_decision_a_process_and_a_tag(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     for type_content in (DECISION_TYPE, PROCESS_TYPE, TAG_TYPE):
         define(client, type_content)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
@@ -114,7 +114,7 @@ CALLS = {
     "snapshots the decision and the process for a piece of work":
         lambda client: snapshot(client, "restock-2026-10-01", [DECISION, PROCESS]),
     "checks the store":
-        lambda client: client.Validate(kb_pb2.ValidateRequest()),
+        lambda client: check(client),
 }
 
 
@@ -188,7 +188,7 @@ def _exported_from_another_store(tmp_path):
     other = tmp_path / "other"
     other.mkdir()
     client = kb_client.connect(other)
-    client.Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
+    start_a_store(other)
     define(client, DECISION_TYPE)
     create(client, "decision", {"title": "Prices are reviewed monthly", "sections": SECTIONS})
     exported = tmp_path / "exported"

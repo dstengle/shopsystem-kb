@@ -4,10 +4,9 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, define, journal, moment, read
+from calls import DECISION_TYPE, check, define, journal, moment, read, start_a_store, starting
 import held
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 scenarios("start-a-store.feature")
 
@@ -38,15 +37,16 @@ def _one_entry_at(client, reading):
 
 
 @when("the client starts a store there, saying which role it is", target_fixture="started")
-def _start_a_store(client, root):
-    return client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+def _start_a_store(root, readied_clock):
+    """Started through `kb.init`, with the clock the client was readied with, if it was."""
+    return starting(root, clock=readied_clock.get("clock"))
 
 
 @then("the store holds the one type that describes what a type is")
 def _holds_the_metaschema(client):
     schema = read(client, "schema/schema")
     assert schema.id == "schema/schema"
-    assert schema.type == "schema"
+    assert schema.kind == "schema"
 
 
 @then("the store holds no other type and no content")
@@ -76,7 +76,7 @@ def _the_entry_is_the_metaschema_write(root, entry):
 
 @when("the client starts a store there without saying which role it is", target_fixture="refused")
 def _start_a_store_without_a_role(root):
-    return kb_client.connect(root).Init(kb_pb2.InitRequest(root=str(root)))
+    return starting(root, role="")
 
 
 @then("starting the store is rejected because a store can only be started under a role")
@@ -96,7 +96,7 @@ def _no_store_there(root):
 def _working_inside_a_store(tmp_path, monkeypatch):
     working_in = tmp_path / "shop"
     working_in.mkdir()
-    kb_client.connect(working_in).Init(kb_pb2.InitRequest(root=str(working_in), actor=CLIENT))
+    start_a_store(working_in)
     monkeypatch.chdir(working_in)
     monkeypatch.delenv("KB_ROOT", raising=False)
     return {"root": working_in, "held": held.everything_in(working_in)}
@@ -117,8 +117,8 @@ def readied():
 
 
 @when("the client starts a store in that empty directory, saying which role it is", target_fixture="started")
-def _start_a_store_in_the_named_directory(readied, root):
-    return readied.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+def _start_a_store_in_the_named_directory(root):
+    return starting(root)
 
 
 @then("the store is made in the directory the client named")
@@ -145,7 +145,7 @@ def _nothing_to_name(tmp_path, monkeypatch):
 
 @when("the client starts a store naming nothing, saying which role it is", target_fixture="started")
 def _start_a_store_naming_nothing():
-    return kb_client.connect().Init(kb_pb2.InitRequest(root="", actor=CLIENT))
+    return starting("")
 
 
 @then("starting the store is rejected because a store is started in a directory that was named and that exists")
@@ -223,8 +223,8 @@ def _other_files_left_alone(client, root):
     for name, data in UNRELATED.items():
         assert apart[Path(name)] == data
     assert held.names(root) == ["schema/schema"]
-    checked = client.Validate(kb_pb2.ValidateRequest())
-    assert (list(checked.faults), list(checked.violations), list(checked.stale)) == ([], [], [])
+    checked = check(client)
+    assert (checked.faults, list(checked.violations), list(checked.stale)) == ([], [], [])
 
 
 @then("starting the store is rejected because that directory already has a store inside it")
@@ -243,7 +243,7 @@ def _directory_with_an_earlier_kbs_store(root, before):
 
 @given("a directory that already has a store inside it, made by a later kb", target_fixture="root")
 def _directory_with_a_later_kbs_store(root, before):
-    kb_client.connect(root).Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     held.made_by_a_later_kb(root)
     before.update(held=held.bytes_held(root))
     return root
@@ -314,7 +314,7 @@ def test_a_relative_root_from_a_removed_working_directory_is_refused_not_raised(
     monkeypatch.chdir(working_in)
     working_in.rmdir()
 
-    started = kb_client.connect().Init(kb_pb2.InitRequest(root=".", actor=CLIENT))
+    started = starting(".")
 
     assert [(fault.rule, fault.message) for fault in started.faults] == [
         ("root", "a store is started in a directory that exists; whether '.' does depends on the working "
@@ -326,7 +326,7 @@ def test_a_relative_root_that_is_simply_missing_is_still_refused_as_before(tmp_p
     """The fix above must not change the ordinary refusal for a relative root that just is not there."""
     monkeypatch.chdir(tmp_path)
 
-    started = kb_client.connect().Init(kb_pb2.InitRequest(root="sub", actor=CLIENT))
+    started = starting("sub")
 
     assert [(fault.rule, fault.message) for fault in started.faults] == [
         ("root", "a store is started in a directory that exists; 'sub' does not"),
@@ -337,10 +337,8 @@ def test_a_relative_root_that_is_simply_missing_is_still_refused_as_before(tmp_p
        target_fixture="client")
 def _started_with_a_clock(root, reading):
     stood = moment(reading)
-    client = kb_client.connect(root, clock=lambda: stood)
-    started = client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
-    assert not started.faults, started.faults
-    return client
+    start_a_store(root, lambda: stood)
+    return kb_client.connect(root, clock=lambda: stood)
 
 
 @when("the client defines its own type")

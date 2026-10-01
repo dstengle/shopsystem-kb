@@ -2,10 +2,9 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import CLIENT, DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, replace
+from calls import DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, replace, start_a_store
 import held
 from kb import client as kb_client
-from kb.contract import kb_pb2
 
 scenarios("snapshot-what-work-read.feature")
 
@@ -21,7 +20,7 @@ def _sections(rationale):
 @given("a store holding a decision at its third version and a process at its first", target_fixture="client")
 def _store_with_a_decision_and_a_process(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     define(client, PROCESS_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": _sections("Costs move.\n")})

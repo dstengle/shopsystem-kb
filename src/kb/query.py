@@ -7,20 +7,20 @@ from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
 from kb.values import ArtifactId, Locator, Refused
 
 
-def listing(store: Port, asked: Listing) -> kb_pb2.ListResponse:
+def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
     """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names. Raises
     Refused for a kind the store holds no type for."""
     composition.kind_type(asked.kind, store)
     matched = store.ids(asked.kind, asked.fields)
     if asked.ids:
-        return kb_pb2.ListResponse(ids=[str(artifact_id) for artifact_id in matched])
-    return kb_pb2.ListResponse(stubs=read.stubs(store, asked.kind, matched))
+        return kb_pb2.Listed(ids=[str(artifact_id) for artifact_id in matched])
+    return kb_pb2.Listed(stubs=read.stubs(store, asked.kind, matched))
 
 
-def walk(store: Port, asked: Walk) -> kb_pb2.RefsResponse:
+def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
     """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
     a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via or a
-    type narrows every step. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
+    kind narrows every step. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
     out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
@@ -42,12 +42,12 @@ def walk(store: Port, asked: Walk) -> kb_pb2.RefsResponse:
                 reached.append(kb_pb2.Reached(stub=read.stub(store, field, other_id), route=taken))
                 following.append((Locator(other_id, ()), taken))
         frontier = following
-    return kb_pb2.RefsResponse(reached=reached)
+    return kb_pb2.Followed(reached=reached)
 
 
-def found(store: Port, asked: Searching) -> kb_pb2.SearchResponse:
+def found(store: Port, asked: Searching) -> kb_pb2.Found:
     """Every section whose prose, or field whose value, holds a word searched for, as the scope asks, among the
-    artifacts of one kind when a type is given, with a stub of its artifact, most often first. Raises Refused for a
+    artifacts of one kind when a kind is given, with a stub of its artifact, most often first. Raises Refused for a
     kind the store holds no type for."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
@@ -55,7 +55,7 @@ def found(store: Port, asked: Searching) -> kb_pb2.SearchResponse:
     named = sorted({candidate.artifact for candidate in candidates}, key=names.order)
     artifacts = (store.artifact(artifact_id) for artifact_id in named)
     hits = search.rank(artifacts, asked.text, sections=asked.sections, fields=asked.fields)
-    return kb_pb2.SearchResponse(matches=[
+    return kb_pb2.Found(matches=[
         kb_pb2.Match(
             stub=read.stub(store, "", values.artifact_id(hit.artifact)), section=hit.section, field=hit.field,
             snippet=hit.snippet,
@@ -64,10 +64,10 @@ def found(store: Port, asked: Searching) -> kb_pb2.SearchResponse:
     ])
 
 
-def entries(store: Port, asked: JournalFilter) -> kb_pb2.JournalResponse:
+def entries(store: Port, asked: JournalFilter) -> kb_pb2.Entries:
     """The history's entries, oldest first, narrowed by each of artifact, role, piece of work, time and set given."""
     found = store.history(asked.artifact, asked.role, asked.execution, asked.since, asked.batch)
-    return kb_pb2.JournalResponse(entries=[_entry(entry) for entry in found])
+    return kb_pb2.Entries(entries=[_entry(entry) for entry in found])
 
 
 def snapshotted(store: Port, named: list) -> list[dict]:

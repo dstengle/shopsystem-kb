@@ -3,7 +3,7 @@ import re
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import CLIENT, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace
+from calls import PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
 import held
 from kb import client as kb_client
 from kb.content import loads
@@ -59,7 +59,7 @@ def _store_with_a_linked_decision(root):
 def _start_with_a_linked_decision(root):
     """Start a store at root holding the decision, what it supersedes, and two work items pointing at it."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, tagged_decision_type())
     define(client, WORK_ITEM_TYPE)
     create(client, "decision", {"title": "Prices are reviewed monthly", "sections": OLDER_SECTIONS})
@@ -87,7 +87,7 @@ def _read_at_a_glance(client):
 
 @then("the client is given its name, its kind, its title and the few fields the type shows at a glance")
 def _identity_and_summary_fields(summary):
-    assert (summary.id, summary.type, summary.title) == (DECISION, "decision", "Price reviews happen weekly")
+    assert (summary.id, summary.kind, summary.title) == (DECISION, "decision", "Price reviews happen weekly")
     assert loads(summary.content) == {"supersedes": OLDER}
 
 
@@ -133,7 +133,7 @@ def _another_store(tmp_path):
     """A second store, started beside the one the scenario reads from."""
     other = tmp_path / "other"
     other.mkdir()
-    kb_client.connect(other).Init(kb_pb2.InitRequest(root=str(other), actor=CLIENT))
+    start_a_store(other)
     return other
 
 
@@ -218,7 +218,7 @@ def asked():
 @when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, PLACES))})"), target_fixture="shown")
 def _read_a_place_inside(client, asked, what):
     asked["what"] = PLACES[what]
-    return client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, place=PLACES[what])))
+    return answer(client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION, place=PLACES[what]))))
 
 
 @when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, SECTIONS_NOT_HELD))})"), target_fixture="shown")
@@ -346,7 +346,7 @@ def _removed_outside_with_nothing_naming_one(root, tmp_path, monkeypatch):
 
 @then("the client is given that refusal as it is given any other fault, the call never breaking off")
 def _given_the_refusal_as_an_answer(shown):
-    assert isinstance(shown, kb_pb2.ReadResponse)
+    assert isinstance(shown.response, kb_pb2.ReadResponse)
     assert [fault.rule for fault in shown.faults] == ["store"]
 
 
@@ -443,7 +443,7 @@ def _read_the_whole_decision(client):
 
 @then("the client is given every field, every section and every part, in the order the type declares")
 def _everything_in_declared_order(whole):
-    assert (whole.id, whole.type, whole.schema_version, whole.revision, whole.title) == (
+    assert (whole.id, whole.kind, whole.schema_version, whole.revision, whole.title) == (
         DECISION, "decision", 1, 1, "Price reviews happen weekly",
     )
     content = loads(whole.content)

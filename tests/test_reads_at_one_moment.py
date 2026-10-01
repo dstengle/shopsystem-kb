@@ -7,10 +7,9 @@ to land before the reader reads on: the window a read made one statement at a ti
 import threading
 import time
 
-from calls import CLIENT, TAG_TYPE, define, read, remove, request, snapshot
+from calls import TAG_TYPE, define, read, remove, request, snapshot, start_a_store
 from kb import client as kb_client
 from kb import sqlite_reads
-from kb.contract import kb_pb2
 
 ROUNDS = 300
 LINGER = 0.002  # seconds the reader waits after finding the artifact held
@@ -30,7 +29,7 @@ def _lingering(monkeypatch, reader: threading.Thread):
 
 def test_a_read_and_a_snapshot_beside_a_create_and_remove_loop_are_never_a_store_fault(root, monkeypatch):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, TAG_TYPE)
     done, faults, failed = threading.Event(), [], []
 

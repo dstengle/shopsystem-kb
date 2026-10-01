@@ -7,10 +7,9 @@ import copy
 
 import pytest
 
-from calls import CLIENT, DECISION_TYPE, create, create_many, created, define, read, replace_many, replaced
+from calls import DECISION_TYPE, create, create_many, created, define, read, replace_many, replaced, start_a_store
 from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps
-from kb.contract import kb_pb2
 from kb.signatures import Signed
 
 DECISION = "decision/price-reviews-happen-weekly"
@@ -23,7 +22,7 @@ SECTIONS = [
 @pytest.fixture
 def client(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     return client
 

@@ -1,7 +1,7 @@
 """The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later.
 
-Each rpc, and each of the operator's commands kb.operating holds, runs inside one boundary: the store is opened for
-that call alone and closed when it ends, its request becomes values (kb.requests, kb.values), one call is made into
+Each rpc, each of the operator's commands kb.operating holds, and kb.init (kb.starting), runs inside one boundary:
+the store is opened for that call alone and closed when it ends, unless the call starts one, its request becomes values (kb.requests, kb.values), one call is made into
 the domain, and its response is made from what comes back (kb.responses). A refusal anywhere becomes that rpc's
 refusal, here and only here, and so does any exception that escapes: the clock's failure, the database's, or anything
 else, each with nothing written.
@@ -14,7 +14,7 @@ from kb import changes, check, escapes, port, query, read, requests, responses, 
 from kb.contract import kb_pb2, kb_pb2_grpc
 
 
-def _guarded(clock):
+def guarded(clock):
     """The client's clock, read so that any failure of it surfaces as ClockFailed; None, the machine's, as it is."""
     if clock is None:
         return None
@@ -56,17 +56,10 @@ def _reading(held: port.Port, at_one_moment: bool):
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
-    def __init__(self, root=None, clock=None):
-        """Over the store at root; with none, a servicer that can only start a store, taking its root from the request.
-        Each change it makes is stamped by the clock, or the machine's with none."""
+    def __init__(self, root, clock=None):
+        """Over the store at root. Each change it makes is stamped by the clock, or the machine's with none."""
         self._root = root
-        self._clock = _guarded(clock)
-
-    @boundary(kb_pb2.InitResponse, opens=False)
-    def Init(self, request):
-        actor, root = requests.starting(request)
-        write.start(root, actor, self._clock)
-        return kb_pb2.InitResponse()
+        self._clock = guarded(clock)
 
     @boundary(kb_pb2.CreateResponse)
     def Create(self, request, held):
@@ -108,21 +101,21 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def Read(self, request, held):
         return read.artifact(held, requests.reading(request))
 
-    @boundary(kb_pb2.ValidateResponse, at_one_moment=True)
-    def Validate(self, request, held):
+    @boundary(kb_pb2.CheckResponse, at_one_moment=True)
+    def Check(self, request, held):
         return check.everything(held)
 
-    @boundary(kb_pb2.JournalResponse, at_one_moment=True)
-    def Journal(self, request, held):
-        return query.entries(held, requests.journal(request))
+    @boundary(kb_pb2.HistoryResponse, at_one_moment=True)
+    def History(self, request, held):
+        return query.entries(held, requests.history(request))
 
     @boundary(kb_pb2.SearchResponse, at_one_moment=True)
     def Search(self, request, held):
         return query.found(held, requests.searching(request))
 
-    @boundary(kb_pb2.RefsResponse, at_one_moment=True)
-    def Refs(self, request, held):
-        return query.walk(held, requests.walk(request))
+    @boundary(kb_pb2.FollowResponse, at_one_moment=True)
+    def Follow(self, request, held):
+        return query.walk(held, requests.following(request))
 
     @boundary(kb_pb2.ListResponse, at_one_moment=True)
     def List(self, request, held):
@@ -130,4 +123,4 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @boundary(kb_pb2.SnapshotResponse)
     def Snapshot(self, request, held):
-        return kb_pb2.SnapshotResponse(entry=write.record(held, *requests.snapshot(request), self._clock))
+        return kb_pb2.Recorded(entry=write.record(held, *requests.snapshot(request), self._clock))

@@ -34,11 +34,6 @@ class KbStub:
         Args:
             channel: A grpc.Channel.
         """
-        self.Init = channel.unary_unary(
-                '/kb.v1.Kb/Init',
-                request_serializer=kb_dot_contract_dot_kb__pb2.InitRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.InitResponse.FromString,
-                _registered_method=True)
         self.Create = channel.unary_unary(
                 '/kb.v1.Kb/Create',
                 request_serializer=kb_dot_contract_dot_kb__pb2.CreateRequest.SerializeToString,
@@ -49,30 +44,30 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
                 _registered_method=True)
-        self.Validate = channel.unary_unary(
-                '/kb.v1.Kb/Validate',
-                request_serializer=kb_dot_contract_dot_kb__pb2.ValidateRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.ValidateResponse.FromString,
+        self.Check = channel.unary_unary(
+                '/kb.v1.Kb/Check',
+                request_serializer=kb_dot_contract_dot_kb__pb2.CheckRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.CheckResponse.FromString,
                 _registered_method=True)
         self.Replace = channel.unary_unary(
                 '/kb.v1.Kb/Replace',
                 request_serializer=kb_dot_contract_dot_kb__pb2.ReplaceRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceResponse.FromString,
                 _registered_method=True)
-        self.Journal = channel.unary_unary(
-                '/kb.v1.Kb/Journal',
-                request_serializer=kb_dot_contract_dot_kb__pb2.JournalRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.JournalResponse.FromString,
+        self.History = channel.unary_unary(
+                '/kb.v1.Kb/History',
+                request_serializer=kb_dot_contract_dot_kb__pb2.HistoryRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.HistoryResponse.FromString,
                 _registered_method=True)
         self.Search = channel.unary_unary(
                 '/kb.v1.Kb/Search',
                 request_serializer=kb_dot_contract_dot_kb__pb2.SearchRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.SearchResponse.FromString,
                 _registered_method=True)
-        self.Refs = channel.unary_unary(
-                '/kb.v1.Kb/Refs',
-                request_serializer=kb_dot_contract_dot_kb__pb2.RefsRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.RefsResponse.FromString,
+        self.Follow = channel.unary_unary(
+                '/kb.v1.Kb/Follow',
+                request_serializer=kb_dot_contract_dot_kb__pb2.FollowRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.FollowResponse.FromString,
                 _registered_method=True)
         self.List = channel.unary_unary(
                 '/kb.v1.Kb/List',
@@ -119,12 +114,6 @@ class KbStub:
 class KbServicer:
     """Missing associated documentation comment in .proto file."""
 
-    def Init(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def Create(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -137,7 +126,7 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def Validate(self, request, context):
+    def Check(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -149,7 +138,7 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def Journal(self, request, context):
+    def History(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -161,7 +150,7 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def Refs(self, request, context):
+    def Follow(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -218,11 +207,6 @@ class KbServicer:
 
 def add_KbServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Init': grpc.unary_unary_rpc_method_handler(
-                    servicer.Init,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.InitRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.InitResponse.SerializeToString,
-            ),
             'Create': grpc.unary_unary_rpc_method_handler(
                     servicer.Create,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.CreateRequest.FromString,
@@ -233,30 +217,30 @@ def add_KbServicer_to_server(servicer, server):
                     request_deserializer=kb_dot_contract_dot_kb__pb2.ReadRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.ReadResponse.SerializeToString,
             ),
-            'Validate': grpc.unary_unary_rpc_method_handler(
-                    servicer.Validate,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.ValidateRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.ValidateResponse.SerializeToString,
+            'Check': grpc.unary_unary_rpc_method_handler(
+                    servicer.Check,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.CheckRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.CheckResponse.SerializeToString,
             ),
             'Replace': grpc.unary_unary_rpc_method_handler(
                     servicer.Replace,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.ReplaceResponse.SerializeToString,
             ),
-            'Journal': grpc.unary_unary_rpc_method_handler(
-                    servicer.Journal,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.JournalRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.JournalResponse.SerializeToString,
+            'History': grpc.unary_unary_rpc_method_handler(
+                    servicer.History,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.HistoryRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.HistoryResponse.SerializeToString,
             ),
             'Search': grpc.unary_unary_rpc_method_handler(
                     servicer.Search,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.SearchRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.SearchResponse.SerializeToString,
             ),
-            'Refs': grpc.unary_unary_rpc_method_handler(
-                    servicer.Refs,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.RefsRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.RefsResponse.SerializeToString,
+            'Follow': grpc.unary_unary_rpc_method_handler(
+                    servicer.Follow,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.FollowRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.FollowResponse.SerializeToString,
             ),
             'List': grpc.unary_unary_rpc_method_handler(
                     servicer.List,
@@ -308,33 +292,6 @@ def add_KbServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Kb:
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def Init(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/kb.v1.Kb/Init',
-            kb_dot_contract_dot_kb__pb2.InitRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.InitResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
 
     @staticmethod
     def Create(request,
@@ -391,7 +348,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def Validate(request,
+    def Check(request,
             target,
             options=(),
             channel_credentials=None,
@@ -404,9 +361,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Validate',
-            kb_dot_contract_dot_kb__pb2.ValidateRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.ValidateResponse.FromString,
+            '/kb.v1.Kb/Check',
+            kb_dot_contract_dot_kb__pb2.CheckRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.CheckResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -445,7 +402,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def Journal(request,
+    def History(request,
             target,
             options=(),
             channel_credentials=None,
@@ -458,9 +415,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Journal',
-            kb_dot_contract_dot_kb__pb2.JournalRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.JournalResponse.FromString,
+            '/kb.v1.Kb/History',
+            kb_dot_contract_dot_kb__pb2.HistoryRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.HistoryResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -499,7 +456,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def Refs(request,
+    def Follow(request,
             target,
             options=(),
             channel_credentials=None,
@@ -512,9 +469,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Refs',
-            kb_dot_contract_dot_kb__pb2.RefsRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.RefsResponse.FromString,
+            '/kb.v1.Kb/Follow',
+            kb_dot_contract_dot_kb__pb2.FollowRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.FollowResponse.FromString,
             options,
             channel_credentials,
             insecure,

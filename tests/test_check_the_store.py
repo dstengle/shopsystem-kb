@@ -1,6 +1,6 @@
 from pytest_bdd import given, scenario, then
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, next_version
+from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, next_version, start_a_store
 import held
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -38,7 +38,7 @@ WEEKLY = "decision/price-reviews-happen-weekly"
 def _store_with_a_decision(root):
     """A client over a new store holding the decision type and one decision that fits it."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
     return client
@@ -128,5 +128,5 @@ def _also_a_violation(checked):
 
 @then("the check itself does not fail")
 def _the_check_does_not_fail(checked):
-    assert isinstance(checked, kb_pb2.ValidateResponse)
+    assert isinstance(checked.response, kb_pb2.CheckResponse)
     assert not checked.faults, checked.faults

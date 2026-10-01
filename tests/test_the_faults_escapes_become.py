@@ -25,12 +25,11 @@ def test_a_database_that_cannot_be_read_is_named():
 
 
 def test_a_marker_whose_form_only_equals_this_kbs_as_a_number_is_a_later_kbs(root):
-    from calls import CLIENT
+    from calls import listing, start_a_store
     from kb import client as kb_client
-    from kb.contract import kb_pb2
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     for written in ("store: true\n", "store: 1.0\n"):
         (root / "kb" / "store.yaml").write_text(written, encoding="utf-8")
-        listed = client.List(kb_pb2.ListRequest(type="schema"))
+        listed = listing(client, "schema")
         assert [fault.rule for fault in listed.faults] == ["unreadable"], written

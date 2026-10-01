@@ -20,8 +20,8 @@ class Signed:
     message: str
 
 
-def actor(request: kb_pb2.Actor | kb_pb2.Signature) -> Actor:
-    return Actor(request.role, request.execution)
+def actor(signature: kb_pb2.Signature) -> Actor:
+    return Actor(signature.role, signature.execution)
 
 
 def _entry(reason: str) -> str:
@@ -55,8 +55,8 @@ def reader(signature: kb_pb2.Signature) -> Signed:
     return Signed(actor(signature), signature.message)
 
 
-def starter(request: kb_pb2.Actor) -> Actor:
-    """The actor who starts a store, who must name a role."""
-    if not request.role:
+def starter(role: str, execution: str) -> Actor:
+    """The actor who starts a store, as `kb.init` is given it, who must name a role."""
+    if not role:
         raise Refused([kb_pb2.Fault(rule=rules.ACTOR, message="a store can only be started under a role")])
-    return actor(request)
+    return Actor(role, execution)

@@ -8,7 +8,7 @@ import pytest
 
 import at_once
 from calls import (
-    CLIENT, DECISION_TYPE, add, adding, create, define, journal, read, removing, replace, replaced, replacing,
+    DECISION_TYPE, add, adding, create, define, journal, read, removing, replace, replaced, replacing, start_a_store,
 )
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -23,7 +23,7 @@ LOG_TYPE = {"title": "Log", "version": 1, "schema": {
 
 def test_every_change_of_many_writers_to_one_artifact_lands_and_the_history_keeps_their_order(root):
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, LOG_TYPE)
     create(client, "log", {"title": "Daily"})
     faults, start = [], threading.Barrier(WRITERS)
@@ -67,7 +67,7 @@ def test_a_change_saying_a_revision_drafted_before_another_lands_is_refused_not_
     another client replaces the decision; let go, the port finds the decision moved, and the change, drafted again
     under the write lock, is refused with rule `revision` naming where the decision stands, nothing of it written."""
     client = kb_client.connect(root)
-    client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    start_a_store(root)
     define(client, DECISION_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
 

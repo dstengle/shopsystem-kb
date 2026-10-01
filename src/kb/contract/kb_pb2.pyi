@@ -51,20 +51,6 @@ class Refusal(_message.Message):
     faults: _containers.RepeatedCompositeFieldContainer[Fault]
     def __init__(self, faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
-class InitRequest(_message.Message):
-    __slots__ = ("root", "actor")
-    ROOT_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_FIELD_NUMBER: _ClassVar[int]
-    root: str
-    actor: Actor
-    def __init__(self, root: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ...) -> None: ...
-
-class InitResponse(_message.Message):
-    __slots__ = ("faults",)
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
-
 class CreateRequest(_message.Message):
     __slots__ = ("kind", "title", "content", "signature")
     KIND_FIELD_NUMBER: _ClassVar[int]
@@ -94,29 +80,34 @@ class CreateResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Created, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ReadRequest(_message.Message):
-    __slots__ = ("locator", "level", "depth", "section")
-    class Level(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ("locator", "summary", "whole", "section")
+    class Summary(_message.Message):
         __slots__ = ()
-        SUMMARY: _ClassVar[ReadRequest.Level]
-        WHOLE: _ClassVar[ReadRequest.Level]
-        SECTION: _ClassVar[ReadRequest.Level]
-    SUMMARY: ReadRequest.Level
-    WHOLE: ReadRequest.Level
-    SECTION: ReadRequest.Level
+        def __init__(self) -> None: ...
+    class Whole(_message.Message):
+        __slots__ = ("depth",)
+        DEPTH_FIELD_NUMBER: _ClassVar[int]
+        depth: int
+        def __init__(self, depth: _Optional[int] = ...) -> None: ...
+    class Section(_message.Message):
+        __slots__ = ("title",)
+        TITLE_FIELD_NUMBER: _ClassVar[int]
+        title: str
+        def __init__(self, title: _Optional[str] = ...) -> None: ...
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
-    LEVEL_FIELD_NUMBER: _ClassVar[int]
-    DEPTH_FIELD_NUMBER: _ClassVar[int]
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    WHOLE_FIELD_NUMBER: _ClassVar[int]
     SECTION_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
-    level: ReadRequest.Level
-    depth: int
-    section: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., level: _Optional[_Union[ReadRequest.Level, str]] = ..., depth: _Optional[int] = ..., section: _Optional[str] = ...) -> None: ...
+    summary: ReadRequest.Summary
+    whole: ReadRequest.Whole
+    section: ReadRequest.Section
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., summary: _Optional[_Union[ReadRequest.Summary, _Mapping]] = ..., whole: _Optional[_Union[ReadRequest.Whole, _Mapping]] = ..., section: _Optional[_Union[ReadRequest.Section, _Mapping]] = ...) -> None: ...
 
-class ReadResponse(_message.Message):
-    __slots__ = ("id", "type", "schema_version", "revision", "title", "content", "references", "parts", "inbound", "faults")
+class Artifact(_message.Message):
+    __slots__ = ("id", "kind", "schema_version", "revision", "title", "content", "references", "parts", "inbound")
     ID_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
@@ -124,9 +115,8 @@ class ReadResponse(_message.Message):
     REFERENCES_FIELD_NUMBER: _ClassVar[int]
     PARTS_FIELD_NUMBER: _ClassVar[int]
     INBOUND_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     id: str
-    type: str
+    kind: str
     schema_version: int
     revision: int
     title: str
@@ -134,8 +124,15 @@ class ReadResponse(_message.Message):
     references: _containers.RepeatedCompositeFieldContainer[Stub]
     parts: _containers.RepeatedCompositeFieldContainer[PartStub]
     inbound: _containers.RepeatedCompositeFieldContainer[InboundCount]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., schema_version: _Optional[int] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., kind: _Optional[str] = ..., schema_version: _Optional[int] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ...) -> None: ...
+
+class ReadResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Artifact
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Artifact, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class Stub(_message.Message):
     __slots__ = ("field", "id", "kind", "title", "fields")
@@ -171,19 +168,25 @@ class InboundCount(_message.Message):
     count: int
     def __init__(self, kind: _Optional[str] = ..., field: _Optional[str] = ..., count: _Optional[int] = ...) -> None: ...
 
-class ValidateRequest(_message.Message):
+class CheckRequest(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 
-class ValidateResponse(_message.Message):
-    __slots__ = ("violations", "faults", "stale")
+class Checked(_message.Message):
+    __slots__ = ("violations", "stale")
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     STALE_FIELD_NUMBER: _ClassVar[int]
     violations: _containers.RepeatedCompositeFieldContainer[Fault]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
     stale: _containers.RepeatedCompositeFieldContainer[Stale]
-    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., stale: _Optional[_Iterable[_Union[Stale, _Mapping]]] = ...) -> None: ...
+    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., stale: _Optional[_Iterable[_Union[Stale, _Mapping]]] = ...) -> None: ...
+
+class CheckResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Checked
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Checked, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class Stale(_message.Message):
     __slots__ = ("artifact", "schema_version", "current")
@@ -223,7 +226,7 @@ class ReplaceResponse(_message.Message):
     refusal: Refusal
     def __init__(self, result: _Optional[_Union[Replaced, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
-class JournalRequest(_message.Message):
+class HistoryRequest(_message.Message):
     __slots__ = ("artifact", "role", "execution", "since", "batch")
     ARTIFACT_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
@@ -275,16 +278,22 @@ class Snapshotted(_message.Message):
     digest: str
     def __init__(self, artifact: _Optional[str] = ..., revision: _Optional[int] = ..., digest: _Optional[str] = ...) -> None: ...
 
-class JournalResponse(_message.Message):
-    __slots__ = ("entries", "faults")
+class Entries(_message.Message):
+    __slots__ = ("entries",)
     ENTRIES_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     entries: _containers.RepeatedCompositeFieldContainer[Entry]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, entries: _Optional[_Iterable[_Union[Entry, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, entries: _Optional[_Iterable[_Union[Entry, _Mapping]]] = ...) -> None: ...
+
+class HistoryResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Entries
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Entries, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class SearchRequest(_message.Message):
-    __slots__ = ("text", "type", "scope")
+    __slots__ = ("text", "kind", "scope")
     class Scope(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         SECTIONS: _ClassVar[SearchRequest.Scope]
@@ -294,12 +303,12 @@ class SearchRequest(_message.Message):
     FIELDS: SearchRequest.Scope
     ALL: SearchRequest.Scope
     TEXT_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
     SCOPE_FIELD_NUMBER: _ClassVar[int]
     text: str
-    type: str
+    kind: str
     scope: SearchRequest.Scope
-    def __init__(self, text: _Optional[str] = ..., type: _Optional[str] = ..., scope: _Optional[_Union[SearchRequest.Scope, str]] = ...) -> None: ...
+    def __init__(self, text: _Optional[str] = ..., kind: _Optional[str] = ..., scope: _Optional[_Union[SearchRequest.Scope, str]] = ...) -> None: ...
 
 class Match(_message.Message):
     __slots__ = ("stub", "section", "snippet", "field")
@@ -313,33 +322,39 @@ class Match(_message.Message):
     field: str
     def __init__(self, stub: _Optional[_Union[Stub, _Mapping]] = ..., section: _Optional[str] = ..., snippet: _Optional[str] = ..., field: _Optional[str] = ...) -> None: ...
 
-class SearchResponse(_message.Message):
-    __slots__ = ("matches", "faults")
+class Found(_message.Message):
+    __slots__ = ("matches",)
     MATCHES_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     matches: _containers.RepeatedCompositeFieldContainer[Match]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, matches: _Optional[_Iterable[_Union[Match, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, matches: _Optional[_Iterable[_Union[Match, _Mapping]]] = ...) -> None: ...
 
-class RefsRequest(_message.Message):
-    __slots__ = ("locator", "depth", "direction", "via", "type")
+class SearchResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Found
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Found, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+
+class FollowRequest(_message.Message):
+    __slots__ = ("locator", "depth", "direction", "via", "kind")
     class Direction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
-        OUT: _ClassVar[RefsRequest.Direction]
-        IN: _ClassVar[RefsRequest.Direction]
-    OUT: RefsRequest.Direction
-    IN: RefsRequest.Direction
+        OUT: _ClassVar[FollowRequest.Direction]
+        IN: _ClassVar[FollowRequest.Direction]
+    OUT: FollowRequest.Direction
+    IN: FollowRequest.Direction
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
     DIRECTION_FIELD_NUMBER: _ClassVar[int]
     VIA_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     depth: int
-    direction: RefsRequest.Direction
+    direction: FollowRequest.Direction
     via: str
-    type: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ..., direction: _Optional[_Union[RefsRequest.Direction, str]] = ..., via: _Optional[str] = ..., type: _Optional[str] = ...) -> None: ...
+    kind: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ..., direction: _Optional[_Union[FollowRequest.Direction, str]] = ..., via: _Optional[str] = ..., kind: _Optional[str] = ...) -> None: ...
 
 class Hop(_message.Message):
     __slots__ = ("field", "id")
@@ -357,16 +372,22 @@ class Reached(_message.Message):
     route: _containers.RepeatedCompositeFieldContainer[Hop]
     def __init__(self, stub: _Optional[_Union[Stub, _Mapping]] = ..., route: _Optional[_Iterable[_Union[Hop, _Mapping]]] = ...) -> None: ...
 
-class RefsResponse(_message.Message):
-    __slots__ = ("reached", "faults")
+class Followed(_message.Message):
+    __slots__ = ("reached",)
     REACHED_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     reached: _containers.RepeatedCompositeFieldContainer[Reached]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, reached: _Optional[_Iterable[_Union[Reached, _Mapping]]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, reached: _Optional[_Iterable[_Union[Reached, _Mapping]]] = ...) -> None: ...
+
+class FollowResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Followed
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Followed, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ListRequest(_message.Message):
-    __slots__ = ("type", "fields", "form")
+    __slots__ = ("kind", "fields", "form")
     class Form(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STUBS: _ClassVar[ListRequest.Form]
@@ -380,41 +401,51 @@ class ListRequest(_message.Message):
         key: str
         value: str
         def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
     FORM_FIELD_NUMBER: _ClassVar[int]
-    type: str
+    kind: str
     fields: _containers.ScalarMap[str, str]
     form: ListRequest.Form
-    def __init__(self, type: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ..., form: _Optional[_Union[ListRequest.Form, str]] = ...) -> None: ...
+    def __init__(self, kind: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ..., form: _Optional[_Union[ListRequest.Form, str]] = ...) -> None: ...
 
-class ListResponse(_message.Message):
-    __slots__ = ("stubs", "ids", "faults")
+class Listed(_message.Message):
+    __slots__ = ("stubs", "ids")
     STUBS_FIELD_NUMBER: _ClassVar[int]
     IDS_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
     stubs: _containers.RepeatedCompositeFieldContainer[Stub]
     ids: _containers.RepeatedScalarFieldContainer[str]
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, stubs: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., ids: _Optional[_Iterable[str]] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    def __init__(self, stubs: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., ids: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class ListResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Listed
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Listed, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class SnapshotRequest(_message.Message):
-    __slots__ = ("actor", "artifacts", "message")
-    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("signature", "artifacts")
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     ARTIFACTS_FIELD_NUMBER: _ClassVar[int]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
-    actor: Actor
+    signature: Signature
     artifacts: _containers.RepeatedScalarFieldContainer[str]
-    message: str
-    def __init__(self, actor: _Optional[_Union[Actor, _Mapping]] = ..., artifacts: _Optional[_Iterable[str]] = ..., message: _Optional[str] = ...) -> None: ...
+    def __init__(self, signature: _Optional[_Union[Signature, _Mapping]] = ..., artifacts: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class Recorded(_message.Message):
+    __slots__ = ("entry",)
+    ENTRY_FIELD_NUMBER: _ClassVar[int]
+    entry: str
+    def __init__(self, entry: _Optional[str] = ...) -> None: ...
 
 class SnapshotResponse(_message.Message):
-    __slots__ = ("entry", "faults")
-    ENTRY_FIELD_NUMBER: _ClassVar[int]
-    FAULTS_FIELD_NUMBER: _ClassVar[int]
-    entry: str
-    faults: _containers.RepeatedCompositeFieldContainer[Fault]
-    def __init__(self, entry: _Optional[str] = ..., faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Recorded
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Recorded, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class AddRequest(_message.Message):
     __slots__ = ("locator", "content", "signature", "revision")
