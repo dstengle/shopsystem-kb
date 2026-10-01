@@ -10,7 +10,7 @@ from typing import Callable, Mapping
 
 from kb import canonical, rules, sqlite_store
 from kb.contract import kb_pb2
-from kb.port import Port
+from kb.port import Port, Unreadable
 from kb.values import Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
@@ -25,8 +25,9 @@ def opened(root) -> contextlib.AbstractContextManager[Port]:
 
 def start(root: Root, fill: Callable[[Port], None]) -> None:
     """The store's place made, then its database, filled by `fill`, then its marker, last, so a store is marked only
-    once it is whole. When making the database or the marker raises, the place is removed and the error raised: a
-    failed start leaves nothing."""
+    once it is whole. A SQLite that cannot keep a store is refused before anything is made; when making the
+    database or the marker raises, the place is removed and the error raised: a failed start leaves nothing."""
+    sqlite_store.supported()
     place = root.path / MARKER.parent
     place.mkdir()
     try:
@@ -34,7 +35,7 @@ def start(root: Root, fill: Callable[[Port], None]) -> None:
         with opened(root.path) as made:
             fill(made)
         (root.path / MARKER).write_text(canonical.dump({"contract": CONTRACT_VERSION}), encoding="utf-8")
-    except (sqlite3.Error, OSError):
+    except (sqlite3.Error, OSError, Unreadable):
         shutil.rmtree(place)
         raise
 

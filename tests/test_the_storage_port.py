@@ -335,3 +335,18 @@ def test_content_as_of_an_earlier_set(store):
     for missing in (lambda: store.artifact(a), lambda: store.artifact(a, as_of=gone)):
         with pytest.raises(KeyError):
             missing()
+
+
+def test_links_restated_without_a_new_revision_at_the_revision_read(store):
+    land(store, put("tag/t", {}), put("note/n", {"about": "tag/t"}))
+    store.land([], [entry("restated")], [port.Relink(name("note/n"), (link("about", "about", "tag/t", ["tag"]),), 1)])
+    assert [str(each.source) for each in store.links_in(name("tag/t"))] == ["note/n"]
+    with pytest.raises(port.Linked):
+        land(store, removal("tag/t", 1))
+    unlanded = port.Relink(name("note/n"), (link("about", "about", "tag/gone", ["tag"]),), 1)
+    store.land([], [entry("dangling")], [unlanded])
+    assert [str(each.target) for each in store.links_out(name("note/n"))] == ["tag/gone"]
+    with pytest.raises(port.Conflict):
+        store.land([], [entry("moved")], [port.Relink(name("note/n"), (), 2)])
+    assert store.artifact(name("note/n")) == {"about": "tag/t"} and store.history(batch="moved") == []
+    assert [str(each) for each in store.ids()] == ["note/n", "tag/t"]

@@ -53,7 +53,12 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
     draft = Draft(held)
     changes = _drafted(draft, operations)
     texts = _serialised(changes)
-    handed = [_handed(draft, change) for change in changes]
+    last = {change.artifact_id: index for index, change in enumerate(changes)}
+    handed = [_handed(draft, change, last[change.artifact_id] == index) for index, change in enumerate(changes)]
+    relinks = [
+        port.Relink(each, tuple(links.handed(each, draft.artifact(each), draft)), draft.artifact(each)["revision"])
+        for each in draft.stale()
+    ]
     stamps = journal.stamps(held, len(changes), clock)
     batch = stamps[0].id
     entries = [
@@ -63,7 +68,7 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
         )
         for change, text, stamp in zip(changes, texts, stamps, strict=True)
     ]
-    held.land(handed, entries)
+    held.land(handed, entries, relinks)
     return Landed(batch, [Result(change.artifact_id, change.revision, change.item) for change in changes])
 
 
@@ -108,11 +113,12 @@ def _serialised(changes: list[Change]) -> list[str | None]:
     return texts
 
 
-def _handed(draft: Draft, change: Change) -> port.Change:
-    """A change as the port takes it: its content, its links and the places of its parts as it left the artifact,
-    read at the revision before the one it leaves."""
-    if change.left is None:
-        return port.Change(change.artifact_id, None, read=change.revision - 1, revision=change.revision)
+def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
+    """A change as the port takes it, read at the revision before the one it leaves: its content as it left the
+    artifact, and, for the last change the set makes to that artifact, its links and the places of its parts as the
+    set leaves them, read through the types as the set leaves them."""
+    if change.left is None or not last:
+        return port.Change(change.artifact_id, change.left, read=change.revision - 1, revision=change.revision)
     return port.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
         tuple(places.parts(change.left)), change.revision - 1, change.revision,

@@ -87,3 +87,28 @@ def named_type(kind: values.Kind, corpus, artifact: str = "") -> values.Artifact
     if not corpus.holds(type_id):
         return refusals.no_type(kind.name, artifact=artifact)
     return type_id
+
+
+def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], corpus) -> list[values.Kind]:
+    """The kinds whose type, of those given, reads a changed type: is one, or refers by a kb: reference anywhere in
+    its schema to a type that reads one. What an artifact's links are read through can change only for these."""
+    def reads(type_id: values.ArtifactId, seen: frozenset) -> bool:
+        if type_id in changed:
+            return True
+        if type_id in seen or not corpus.holds(type_id):
+            return False
+        return any(reads(referred, seen | {type_id}) for referred in _referred(corpus.artifact(type_id).get("schema")))
+    return [values.Kind(type_id.slug) for type_id in types if reads(type_id, frozenset())]
+
+
+def _referred(node):
+    """Every type a kb: reference anywhere in a schema names."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            named = reference(value) if key == "$ref" and isinstance(value, str) else None
+            if named is not None and named.type_id is not None:
+                yield named.type_id
+            yield from _referred(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _referred(value)

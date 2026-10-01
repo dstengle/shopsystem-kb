@@ -56,6 +56,16 @@ class Change:
 
 
 @dataclass(frozen=True)
+class Relink:
+    """The links of an artifact a set leaves as it is, read again because a type they are read through changed: the
+    artifact, its links now, and the revision they were read at. It leaves no new revision, and its links are not
+    held to landing, since what the artifact holds was not checked again."""
+    artifact: ArtifactId
+    links: tuple[Link, ...]
+    read: int
+
+
+@dataclass(frozen=True)
 class Entry:
     """One entry of the history, as journal.py names it: its id, its moment and its seq among the entries stamped at
     that moment, what it is filtered by, and the record itself."""
@@ -150,5 +160,6 @@ class Port(Protocol):
     def entry_ids(self, at: datetime) -> list[str]:
         """The ids of the entries stamped at a moment."""
 
-    def land(self, changes: list[Change], entries: list[Entry]) -> None:
-        """The changes, in order, and the entries, as one set, or nothing. Raises Conflict, Linked or Unlanded."""
+    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = ()) -> None:
+        """The changes, in order, the links restated, and the entries, as one set, or nothing. Raises Conflict,
+        Linked or Unlanded."""

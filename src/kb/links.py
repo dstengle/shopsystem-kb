@@ -30,12 +30,23 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
 
 def handed(artifact_id: values.ArtifactId, artifact: dict, corpus) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
-    the kinds its field allows, read through the artifact's type as the corpus holds it."""
+    the kinds its field allows, read through the artifact's type as the corpus holds it; none when the corpus holds
+    no such type. A value that could name nothing, which a type changed after it was written can leave in a link
+    field, is not handed."""
+    if not corpus.holds(values.type_of(artifact_id.kind)):
+        return []
     schema = composition.kind_schema(artifact_id.kind, corpus)["schema"]
     found = []
     for link in carried(artifact, schema, corpus):
-        target, part = names.linked(link.target)
-        found.append(port.Link(link.field, link.place, values.artifact_id(target), part, tuple(link.ref["targets"])))
+        if not isinstance(link.target, str):
+            continue
+        try:
+            target = values.target(link.target)
+        except values.Refused:
+            continue
+        found.append(port.Link(
+            link.field, link.place, target.id, names.placed(target.place), tuple(link.ref["targets"]),
+        ))
     return found
 
 

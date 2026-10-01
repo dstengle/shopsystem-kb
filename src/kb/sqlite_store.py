@@ -7,12 +7,13 @@ must land, and nothing outside the set may link into what the set removes or dro
 back. Opening checks the SQLite this process runs has FTS5 and is at least FLOOR.
 """
 import contextlib
+import functools
 import sqlite3
 from pathlib import Path
 from typing import Iterator
 
 from kb import search
-from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded, Unreadable
+from kb.port import Change, Conflict, Entry, Linked, Linking, Relink, Unlanded, Unreadable
 from kb.sqlite_reads import Reads, encoded, moment
 
 FLOOR = (3, 9, 0)  # FTS5 and its ascii tokenizer; the suite has run on the SQLite Python 3.11 ships
@@ -46,8 +47,8 @@ CREATE VIRTUAL TABLE search USING fts5 (
 
 def make(path: Path) -> None:
     """A new database at path, its tables made and WAL mode set, once. Raises FileExistsError when anything is
-    there, and sqlite3.Error when it cannot be made."""
-    _supported()
+    there, sqlite3.Error when it cannot be made, and Unreadable as `supported` does."""
+    supported()
     if path.exists() or path.is_symlink():
         raise FileExistsError(f"a database is made only where nothing is: {path}")
     db = sqlite3.connect(_uri(path, "rwc"), uri=True)
@@ -62,7 +63,7 @@ def make(path: Path) -> None:
 def opened(path: Path) -> Iterator["SqliteStore"]:
     """The database at path, open read-write until the block ends. Raises Unreadable when it cannot be opened,
     and creates nothing."""
-    _supported()
+    supported()
     try:
         db = sqlite3.connect(_uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None)
     except sqlite3.OperationalError as error:
@@ -77,23 +78,32 @@ def _uri(path: Path, mode: str) -> str:
     return f"{Path(path).resolve().as_uri()}?mode={mode}"
 
 
-def _supported() -> None:
+def supported() -> None:
     """Raises Unreadable when the SQLite this process runs is older than FLOOR or has no FTS5."""
+    lacking = _lacking()
+    if lacking:
+        raise Unreadable(lacking)
+
+
+@functools.cache
+def _lacking() -> str:
+    """What the SQLite this process runs lacks for a store, empty when nothing; found once a process."""
     if sqlite3.sqlite_version_info < FLOOR:
-        raise Unreadable(f"a store needs SQLite {'.'.join(map(str, FLOOR))} or later; this is {sqlite3.sqlite_version}")
+        return f"a store needs SQLite {'.'.join(map(str, FLOOR))} or later; this is {sqlite3.sqlite_version}"
     probe = sqlite3.connect(":memory:")
     try:
         probe.execute("CREATE VIRTUAL TABLE probe USING fts5 (words)")
     except sqlite3.OperationalError:
-        raise Unreadable(f"a store needs SQLite with full-text search (FTS5); {sqlite3.sqlite_version} has none") from None
+        return f"a store needs SQLite with full-text search (FTS5); {sqlite3.sqlite_version} has none"
     finally:
         probe.close()
+    return ""
 
 
 class SqliteStore(Reads):
     """The port over one open connection."""
 
-    def land(self, changes: list[Change], entries: list[Entry]) -> None:
+    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = ()) -> None:
         with self._db:
             self._db.execute("BEGIN IMMEDIATE")
             self._unheld(entries)
@@ -105,10 +115,13 @@ class SqliteStore(Reads):
                 held = self._compared(change)
                 before.setdefault(change.artifact, (held, set(self._parts(change.artifact))))
                 self._written(change, landed, step)
+            for relink in relinks:
+                self._compared(relink)
+                self._linked(relink.artifact, relink.links)
             self._integral(changes, before)
             self._recorded(entries)
 
-    def _compared(self, change: Change) -> int:
+    def _compared(self, change: Change | Relink) -> int:
         """The revision the artifact stands at; Conflict when the change read it at another."""
         rows = self._rows("SELECT revision FROM artifacts WHERE id = ?", str(change.artifact))
         held = rows[0][0] if rows else 0
@@ -121,8 +134,9 @@ class SqliteStore(Reads):
 
     def _written(self, change: Change, landed: int, step: int) -> None:
         name = str(change.artifact)
-        for table, column in (("links", "source"), ("parts", "artifact"), ("search", "artifact"), ("artifacts", "id")):
+        for table, column in (("parts", "artifact"), ("search", "artifact"), ("artifacts", "id")):
             self._db.execute(f"DELETE FROM {table} WHERE {column} = ?", (name,))
+        self._linked(change.artifact, () if change.content is None else change.links)
         stored = None if change.content is None else encoded(change.content)
         self._db.execute(
             "INSERT INTO versions (artifact, landed, step, revision, content) VALUES (?, ?, ?, ?, ?)",
@@ -134,14 +148,18 @@ class SqliteStore(Reads):
         self._db.execute(
             "INSERT INTO artifacts (id, kind, revision, content) VALUES (?, ?, ?, ?)", (name, kind, change.revision, stored),
         )
-        self._db.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?)", [
-            (name, ordinal, link.field, link.place, str(link.target), link.part)
-            for ordinal, link in enumerate(change.links)
-        ])
         self._db.executemany("INSERT INTO parts VALUES (?, ?)", [(name, place) for place in set(change.parts)])
         self._db.executemany("INSERT INTO search VALUES (?, ?, ?, ?, ?, ?)", [
             (" ".join(search.tokens(words)), name, kind, what, label, ordinal)
             for ordinal, (what, label, words) in enumerate(_searched(change.content))
+        ])
+
+    def _linked(self, artifact, links) -> None:
+        """The links an artifact holds, in place of those it held."""
+        self._db.execute("DELETE FROM links WHERE source = ?", (str(artifact),))
+        self._db.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?)", [
+            (str(artifact), ordinal, link.field, link.place, str(link.target), link.part)
+            for ordinal, link in enumerate(links)
         ])
 
     def _integral(self, changes: list[Change], before: dict) -> None:
