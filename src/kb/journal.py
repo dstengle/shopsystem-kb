@@ -19,13 +19,22 @@ class Stamp(NamedTuple):
 
 
 def stamps(store: Port, count: int, clock: Clock | None = None) -> list[Stamp]:
-    """The stamps of a set's `count` entries, in order, each read from the clock and given the next id free at its
-    moment, after every id the history holds there and every one settled before it in the set. Settled before the
-    set lands, so a clock that raises leaves nothing written."""
+    """The stamps of a set's `count` entries, in order: each moment read from the clock, then given its id. Settled
+    before the set lands, so a clock that raises leaves nothing written."""
+    return minted(store, moments(count, clock))
+
+
+def moments(count: int, clock: Clock | None = None) -> list[datetime]:
+    """The moments of a set's `count` entries, in order, each read from the clock once."""
+    return [_stamp(clock) for _ in range(count)]
+
+
+def minted(store: Port, moments: list[datetime]) -> list[Stamp]:
+    """Each moment given the next id free at it, after every id the history holds there and every one minted before
+    it in the set; minted again, from the same moments, when a set is drafted again."""
     last: dict[str, int] = {}
     settled: list[Stamp] = []
-    for _ in range(count):
-        at = _stamp(clock)
+    for at in moments:
         moment = _moment(at)
         last[moment] = (last[moment] if moment in last else _last_seq(store, at)) + 1
         settled.append(Stamp(at, _entry_id(at, last[moment])))

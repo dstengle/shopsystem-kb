@@ -9,7 +9,7 @@ from referencing import Registry
 from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
-from kb import links, places, rules, values
+from kb import links, places, refusals, rules, values
 from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
 
@@ -82,10 +82,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_p
         faults += _sections(artifact_id, content.get("sections", []), required, "sections")
     for link in links.carried(content, schema, corpus):
         if not _misread(link.place, errors) and not _lands(link.target, link.ref, corpus):
-            faults.append(kb_pb2.Fault(
-                artifact=artifact_id, path=link.place, rule=rules.REF,
-                message=f"a link must land on a node of a kind the type allows; {link.target!r} does not",
-            ))
+            faults.append(refusals.unlanded(artifact_id, link.place, link.target))
     return faults
 
 

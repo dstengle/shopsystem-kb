@@ -1,7 +1,8 @@
 """What each operation of a set does to the draft: a new artifact, a whole or placed replacement, an item added to a
-collection, an artifact removed. Each acts on the draft as the operations before it left it, and is refused there with
-every fault it finds in what it names, the revisions it makes and the names of its items; what its content and links
-come to is checked once the whole set has acted (kb.write)."""
+collection, an artifact removed. Each acts on the draft as the operations before it left it, on a copy of what it was
+asked to put there, so the same set can act again on another draft, and is refused there with every fault it finds in
+what it names, the revisions it makes and the names of its items; what its content and links come to is checked once
+the whole set has acted (kb.write)."""
 import copy
 from typing import NamedTuple
 
@@ -57,7 +58,7 @@ def _create(draft: Draft, creation: requests.Create) -> ArtifactId:
     faults += creation.content.refusal(at)
     if faults:
         raise Refused(faults)
-    content = creation.content.tree
+    content = copy.deepcopy(creation.content.tree)
     schema = draft.artifact(type_id)
     declared = composition.declared(schema["schema"], draft)
     names.items(declared["parts"], content, False, _item_parts(draft))
@@ -72,7 +73,7 @@ def _replace(draft: Draft, replacement: requests.Replace) -> Change:
         raise Refused([refusals.not_found(locator.id)])
     if replacement.content.problems:
         raise Refused(replacement.content.refusal(str(locator.id)))
-    content, current = replacement.content.tree, draft.artifact(locator.id)
+    content, current = copy.deepcopy(replacement.content.tree), draft.artifact(locator.id)
     if locator.place:
         content = _placed(current, locator, content)
     faults = _revise(draft, locator.id, current, content)
@@ -95,7 +96,7 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
         raise Refused([refusals.not_a_collection(locator)])
     if not isinstance(spot.holder.get(spot.key, []), list):
         raise Refused([refusals.not_a_collection(locator)])
-    item = addition.item.tree
+    item = copy.deepcopy(addition.item.tree)
     spot.holder.setdefault(spot.key, []).append(item)
     faults = _revise(draft, locator.id, current, content)
     return Change("append", locator.id, names.placed((*locator.place, item["id"])), item["id"], faults=faults)

@@ -61,6 +61,14 @@ def still_linked(removed: str, other: ArtifactId, place: str) -> kb_pb2.Fault:
     )
 
 
+def unlanded(artifact: str, place: str, target: str) -> kb_pb2.Fault:
+    """A link that lands on nothing the store holds, or on a node of a kind its type does not allow."""
+    return kb_pb2.Fault(
+        artifact=artifact, path=place, rule=rules.REF,
+        message=f"a link must land on a node of a kind the type allows; {target!r} does not",
+    )
+
+
 MISNAMED = {
     "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
     "repeated": "the items of a collection each have a name of their own; {name!r} is on more than one",

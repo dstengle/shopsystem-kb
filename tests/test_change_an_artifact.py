@@ -7,9 +7,10 @@ from calls import (
     CLIENT, DECISION_TYPE, NOTE_TYPE, append, apply, creation, define, create, journal, listing, read, refs,
     remove, replacement, request, write,
 )
+import at_once
 import held
 from kb import canonical, client as kb_client
-from kb.content import loads
+from kb.content import dumps, loads
 from kb.contract import kb_pb2
 
 scenarios("sign-a-change.feature")
@@ -37,6 +38,11 @@ def test_a_replacement_that_leaves_out_an_item_something_links_into_is_refused()
 
 @scenario("change-the-store.feature", "The clock fails during a change")
 def test_the_clock_fails_during_a_change():
+    pass
+
+
+@scenario("change-the-store.feature", "Two clients replace one artifact at the same time")
+def test_two_clients_replace_one_artifact_at_the_same_time():
     pass
 
 
@@ -578,3 +584,57 @@ def _each_link_into_the_option(attempt):
     faults = attempt["response"].faults
     assert [(fault.artifact, fault.path) for fault in faults] == [("note/why-weekly", "about")]
     assert f"'{LINKED_OPTION}'" in faults[0].message
+
+
+ONE_RATIONALE = {"title": "Rationale", "body": "Suppliers change their prices every week.\n"}
+DIFFERENT_RATIONALE = {"title": "Rationale", "body": "Customers compare prices every week.\n"}
+
+
+def _replacing(rationale, message):
+    return kb_pb2.WriteRequest(
+        locator=kb_pb2.Locator(id=DECISION), content=dumps({"sections": [SECTIONS[0], rationale]}), actor=CLIENT,
+        message=message,
+    )
+
+
+@given(
+    "one client is replacing the decision with one rationale while another replaces it with a different rationale, "
+    "each saying which role and why",
+    target_fixture="racing",
+)
+def _replacing_at_once():
+    return {
+        "one": _replacing(ONE_RATIONALE, "Say it is the suppliers"),
+        "different": _replacing(DIFFERENT_RATIONALE, "Say it is the customers"),
+    }
+
+
+@when("the client with the different rationale lands its change second", target_fixture="landed")
+def _different_rationale_lands_second(root, racing):
+    landed = {}
+
+    def first():
+        landed["one"] = kb_client.connect(root).Write(racing["one"])
+        assert not landed["one"].faults, landed["one"].faults
+    landed["different"] = at_once.landed_second(at_once.OnAThread(root, "Write", racing["different"]), first)
+    return landed
+
+
+@then("each replacement left a version of its own, and the decision's version has gone up by two")
+def _a_version_each(client, landed):
+    assert not landed["different"].faults, landed["different"].faults
+    assert (landed["one"].revision, landed["different"].revision) == (2, 3)
+    assert read(client, DECISION).revision == 3
+
+
+@then("both replacements are in the history")
+def _both_in_the_history(client):
+    entries = journal(client, DECISION).entries
+    assert [(entry.op, entry.revision, entry.message) for entry in entries[-2:]] == [
+        ("write", 2, "Say it is the suppliers"), ("write", 3, "Say it is the customers"),
+    ]
+
+
+@then("the decision holds the different rationale")
+def _holds_the_different_rationale(client):
+    assert loads(read(client, DECISION, whole=True).content)["sections"] == [SECTIONS[0], DIFFERENT_RATIONALE]

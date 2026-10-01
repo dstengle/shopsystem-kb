@@ -17,6 +17,7 @@ from kb.signatures import Actor, Signed
 from kb.values import ArtifactId, Refused, Root
 
 METASCHEMA_ID = values.type_of(values.TYPE_KIND)
+ROUNDS = 10  # times a set is drafted and landed while other changes keep landing first
 
 
 class Result(NamedTuple):
@@ -24,6 +25,16 @@ class Result(NamedTuple):
     artifact_id: ArtifactId
     revision: int
     item: str
+
+
+class Drafted(NamedTuple):
+    """A set drafted against the store as it stood: the draft, its changes, their texts, the changes as the port takes
+    them, and the links read again of what the set leaves as it is."""
+    draft: Draft
+    changes: list[Change]
+    texts: list[str | None]
+    handed: list[port.Change]
+    relinks: list[port.Relink]
 
 
 class Landed(NamedTuple):
@@ -52,8 +63,24 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
 
 
 def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock | None = None) -> Landed:
-    """The set drafted and serialised, each entry's stamp settled by the clock, then landed. Raises Refused with
-    every fault, having written nothing."""
+    """The set drafted against the store as it stands, each entry's moment read once from the clock, then landed. When
+    another change lands between the draft and the landing, the set is drafted again against what that change left,
+    its moments kept and its entries' ids minted again, up to ROUNDS times. Raises Refused with every fault, having
+    written nothing."""
+    moments = None
+    for round_ in range(1, ROUNDS + 1):
+        drafted = _drafting(held, operations)
+        moments = journal.moments(len(drafted.changes), clock) if moments is None else moments
+        try:
+            return _landing(held, drafted, signed, moments)
+        except port.Conflict:
+            if round_ == ROUNDS:
+                raise
+
+
+def _drafting(held: port.Port, operations: list) -> Drafted:
+    """The set drafted and serialised against the store as it stands, each change as the port takes it, and the
+    links of what it leaves as it is read again."""
     draft = Draft(held)
     changes = _drafted(draft, operations)
     texts = _serialised(changes)
@@ -63,32 +90,49 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
         port.Relink(each, tuple(links.handed(each, draft.artifact(each), draft)), draft.artifact(each)["revision"])
         for each in draft.stale()
     ]
-    stamps = journal.stamps(held, len(changes), clock)
+    return Drafted(draft, changes, texts, handed, relinks)
+
+
+def _landing(held: port.Port, drafted: Drafted, signed: Signed, moments: list) -> Landed:
+    """The drafted set landed, one entry per change, under ids minted at its moments now."""
+    stamps = journal.minted(held, moments)
     batch = stamps[0].id
     entries = [
         journal.change(
             signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path, revision=change.revision,
             schema_version=change.schema_version, text=text, stamp=stamp, batch=batch,
         )
-        for change, text, stamp in zip(changes, texts, stamps, strict=True)
+        for change, text, stamp in zip(drafted.changes, drafted.texts, stamps, strict=True)
     ]
-    _landed(held, draft, handed, entries, relinks)
-    return Landed(batch, [Result(change.artifact_id, change.revision, change.item) for change in changes])
+    _landed(held, drafted.draft, drafted.handed, entries, drafted.relinks)
+    return Landed(batch, [Result(change.artifact_id, change.revision, change.item) for change in drafted.changes])
 
 
 def _landed(held: port.Port, draft: Draft, handed: list[port.Change], entries: list, relinks: list) -> None:
     """The set handed to the port; a link the port finds into what the set takes out is refused, one fault for each,
-    the item named for a part dropped and the artifact for one removed."""
+    the item named for a part dropped and the artifact for one removed; a link the set hands that the port finds
+    landing on nothing it may land on is refused as validation refuses it."""
     try:
         held.land(handed, entries, relinks)
     except port.Linked as linked:
         raise Refused([
-            refusals.still_linked(
-                f"{each.target}#{each.part}" if each.part and draft.holds(each.target) else str(each.target),
-                each.source, each.place,
-            )
-            for each in linked.links
+            refusals.still_linked(_named(draft, each), each.source, each.place) for each in linked.links
         ]) from linked
+    except port.Unlanded as unlanded:
+        raise Refused([
+            refusals.unlanded(str(each.source), each.place, _landing_on(each)) for each in unlanded.links
+        ]) from unlanded
+
+
+def _named(draft: Draft, link: port.Linking) -> str:
+    """What a link into what a set takes out lands on: the item, for a part of an artifact the set keeps, or the
+    artifact."""
+    return _landing_on(link) if draft.holds(link.target) else str(link.target)
+
+
+def _landing_on(link: port.Linking) -> str:
+    """Where a link lands, as it is written: the artifact, and the place of the part inside it after `#`."""
+    return f"{link.target}#{link.part}" if link.part else str(link.target)
 
 
 def record(held: port.Port, named: list, signed: Signed, clock: journal.Clock | None = None) -> str:

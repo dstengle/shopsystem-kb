@@ -4,9 +4,10 @@ import re
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import CLIENT, PROCESS_TYPE, append, create, define, journal, read, write
+import at_once
 import held
 from kb import client as kb_client
-from kb.content import loads
+from kb.content import dumps, loads
 from kb.contract import kb_pb2
 
 
@@ -22,6 +23,11 @@ def test_an_item_that_uses_another_artifact_keeps_its_settings_on_itself():
 
 @scenario("change-the-store.feature", "The client adds an item to a collection inside an item")
 def test_the_client_adds_an_item_to_a_collection_inside_an_item():
+    pass
+
+
+@scenario("change-the-store.feature", "Several clients on one machine change one store at the same time")
+def test_several_clients_on_one_machine_change_one_store_at_the_same_time():
     pass
 
 
@@ -428,3 +434,53 @@ def _rejected_for_an_empty_name(client, added):
 def _named_from_the_text(client, added, text):
     assert added["response"].id == text
     assert _steps(client)[-1] == {"id": text, "title": text}
+
+
+OTHER_STEP = {"title": "Count the float", "body": "Every note and coin in the till."}
+DIFFERENT_STEP = {"title": "Check the card reader", "body": "Run a test payment."}
+CLIENTS = {
+    "two clients in one program": lambda root, tmp_path, request: at_once.OnAThread(root, "Append", request),
+    "two clients in two separate programs on the same machine": lambda root, tmp_path, request: at_once.InAnotherProgram(
+        root, "Append", request, tmp_path / "gate",
+    ),
+}
+
+
+def _adding(content, message):
+    return kb_pb2.AppendRequest(
+        locator=kb_pb2.Locator(id=PROCESS, path="steps"), content=dumps(content), actor=CLIENT, message=message,
+    )
+
+
+@given(
+    parsers.re(f"(?P<clients>{'|'.join(map(re.escape, CLIENTS))}), one adding a step to the process while the other "
+               "adds a different step, each saying which role and why"),
+    target_fixture="racing",
+)
+def _clients_adding_steps(root, tmp_path, clients):
+    return {
+        "held": CLIENTS[clients](root, tmp_path, _adding(DIFFERENT_STEP, "Check the reader before opening")),
+        "other": kb_client.connect(root),
+    }
+
+
+@when("the client adding the different step lands its change second", target_fixture="landed")
+def _different_step_lands_second(racing):
+    def first():
+        response = racing["other"].Append(_adding(OTHER_STEP, "Count the float before opening"))
+        assert not response.faults, response.faults
+    return at_once.landed_second(racing["held"], first)
+
+
+@then("the process holds both new steps")
+def _both_new_steps(client, landed):
+    assert not landed.faults, landed.faults
+    assert {"count-the-float", "check-the-card-reader"} <= {step["id"] for step in _steps(client)}
+
+
+@then("the different step comes after the other new step, and both come after the steps already there")
+def _in_the_order_they_landed(client, landed):
+    assert landed.revision == 3
+    assert _steps(client) == [
+        *STEPS, {"id": "count-the-float", **OTHER_STEP}, {"id": "check-the-card-reader", **DIFFERENT_STEP},
+    ]

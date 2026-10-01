@@ -1,10 +1,12 @@
-from pytest_bdd import given, scenario, then, when
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     CLIENT, TAG_TYPE, create, define, journal, listing, read, remove, request, tagged_decision_type,
 )
+import at_once
 import held
 from kb import client as kb_client
+from kb.content import dumps
 from kb.contract import kb_pb2
 
 
@@ -20,6 +22,11 @@ def test_a_removal_something_points_at_is_refused():
 
 @scenario("change-the-store.feature", "A link from inside a part blocks a removal like any other")
 def test_a_link_from_inside_a_part_blocks_a_removal_like_any_other():
+    pass
+
+
+@scenario("change-the-store.feature", "A removal and a new link to the same artifact made at once never both land")
+def test_a_removal_and_a_new_link_to_the_same_artifact_made_at_once_never_both_land():
     pass
 
 
@@ -88,7 +95,7 @@ def _recorded(client, removed):
 def _remove_the_held_tag(root, client):
     before = held.holds(root)
     response = remove(client, HELD, message="Pricing is everywhere anyway")
-    return {"response": response, "before": before, "after": held.holds(root)}
+    return {"response": response, "before": before, "after": held.holds(root), "removed": HELD}
 
 
 @then("the removal is rejected because something still points at it")
@@ -96,7 +103,7 @@ def _rejected_while_pointed_at(client, attempt):
     assert attempt["response"].faults
     assert {fault.rule for fault in attempt["response"].faults} == {"on_delete"}
     assert attempt["after"] == attempt["before"]
-    assert not read(client, HELD).faults
+    assert not read(client, attempt["removed"]).faults
 
 
 @then("the client is given every link that blocks it")
@@ -158,7 +165,7 @@ def _a_step_pointing_at_the_loose_tag(client):
 def _remove_the_tag_a_step_points_at(root, client):
     before = held.holds(root)
     response = remove(client, LOOSE, message="Nothing is on clearance")
-    return {"response": response, "before": before, "after": held.holds(root)}
+    return {"response": response, "before": before, "after": held.holds(root), "removed": LOOSE}
 
 
 @then("the client is given that link among the links that block it")
@@ -190,3 +197,70 @@ def _the_same_name(created):
 def _at_its_first_version(client, created):
     assert created.revision == 1
     assert read(client, LOOSE).revision == 1
+
+
+TAGGED = "decision/clearance-runs-monthly"
+
+
+@given(
+    "one client is removing the tag while another is creating a decision that points at it, each saying which role "
+    "and why",
+    target_fixture="racing",
+)
+def _removing_while_linking(root):
+    return {
+        "removing the tag": ("Delete", kb_pb2.DeleteRequest(
+            locator=kb_pb2.Locator(id=LOOSE), actor=CLIENT, message="Nothing is on clearance",
+        )),
+        "creating the decision": ("Create", kb_pb2.CreateRequest(
+            type="decision", title="Clearance runs monthly", actor=CLIENT, message="Say how often", content=dumps({
+                "tags": [LOOSE],
+                "sections": [
+                    {"title": "Purpose", "body": "Clear old stock.\n"},
+                    {"title": "Rationale", "body": "Stock ages monthly.\n"},
+                ],
+            }),
+        )),
+    }
+
+
+@when(
+    parsers.re("the client (?P<first>removing the tag|creating the decision) lands its change first"),
+    target_fixture="attempt",
+)
+def _one_lands_first(root, racing, first):
+    [second] = set(racing) - {first}
+    attempt = {"removed": LOOSE}
+
+    def landing_first():
+        rpc, request_sent = racing[first]
+        response = getattr(kb_client.connect(root), rpc)(request_sent)
+        assert not response.faults, response.faults
+        attempt["before"] = held.holds(root)
+
+    attempt["response"] = at_once.landed_second(at_once.OnAThread(root, *racing[second]), landing_first)
+    attempt["after"] = held.holds(root)
+    return attempt
+
+
+@then("the new decision is rejected because a link must land on a node of a kind the type allows")
+def _new_decision_rejected_for_its_link(attempt):
+    assert [(fault.artifact, fault.path, fault.rule) for fault in attempt["response"].faults] == [
+        (TAGGED, "tags/0", "ref"),
+    ]
+    assert attempt["response"].faults[0].message.startswith("a link must land on a node of a kind the type allows")
+    assert f"'{LOOSE}'" in attempt["response"].faults[0].message
+    assert attempt["after"] == attempt["before"]
+
+
+@then("the store holds the tag and the decision that points at it")
+def _tag_and_decision_held(client):
+    assert not read(client, LOOSE).faults
+    assert read(client, TAGGED).faults == []
+    assert [fault.rule for fault in remove(client, LOOSE).faults] == ["on_delete"]
+
+
+@then("the store holds neither the tag nor the new decision")
+def _neither_held(client):
+    assert [fault.rule for fault in read(client, LOOSE).faults] == ["not-found"]
+    assert [fault.rule for fault in read(client, TAGGED).faults] == ["not-found"]
