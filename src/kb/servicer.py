@@ -6,7 +6,7 @@ here.
 """
 import functools
 
-from kb import check, query, read, requests, signatures, values, write
+from kb import check, query, read, requests, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.store import Store
 
@@ -99,5 +99,4 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @_boundary(kb_pb2.SnapshotResponse)
     def Snapshot(self, request):
-        named, signed = requests.snapshotted(request.artifacts), signatures.reader(request.actor, request.message)
-        return kb_pb2.SnapshotResponse(entry=write.record(self._store, named, signed, self._clock))
+        return kb_pb2.SnapshotResponse(entry=write.record(self._store, *requests.snapshot(request), self._clock))

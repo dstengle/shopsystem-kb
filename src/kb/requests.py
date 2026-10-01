@@ -176,7 +176,14 @@ def listing(request: kb_pb2.ListRequest) -> Listing:
     return Listing(values.kind(request.type), dict(request.fields), request.form == kb_pb2.ListRequest.IDS)
 
 
-def snapshotted(requested) -> list:
+def snapshot(request: kb_pb2.SnapshotRequest) -> tuple[list, Signed]:
+    """A snapshot request as the domain takes it: the reader's signature first, refused alone when it does not sign;
+    then each name, converted or standing as its refusal."""
+    signed = signatures.reader(request.actor, request.message)
+    return _names(request.artifacts), signed
+
+
+def _names(requested) -> list:
     """Each name a snapshot is given, converted or standing as its refusal."""
     converted = []
     for name in requested:
