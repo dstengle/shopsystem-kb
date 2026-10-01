@@ -91,3 +91,20 @@ def test_a_check_gives_an_artifacts_violations_in_reading_order(root, client, ca
     identity = {key: stored[key] for key in ("id", "type", "schema_version", "revision", "title")}
     held.plant(root, made.id, {**identity, **content})
     assert _faults(check(client).violations) == expected
+
+
+def test_a_types_faults_come_in_the_order_it_is_written_whatever_order_they_are_found_in(client):
+    """The misplaced keyword under `properties` is written before the `allOf` member naming no type, and another after
+    it: the faults come in that order, neither the order they are found in (every reference before every keyword)
+    nor its reverse."""
+    schema = {
+        "type": "object",
+        "properties": {**TITLE, "about": {"type": "object", "sections": [{"title": "Context"}]}},
+        "allOf": [{"$ref": "kb:schema/nothing"}],
+        "not": {"summary": ["title"]},
+    }
+    refused = request(client, "schema", "Memo", {"version": 1, "schema": schema}, message="Define Memo")
+    assert _faults(refused.faults) == [
+        ("schema/properties/about/sections", "placement"), ("schema/allOf/0/$ref", "shape"),
+        ("schema/not/summary", "placement"),
+    ]

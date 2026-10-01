@@ -490,8 +490,9 @@ WRITTEN_ORDER = [
     target_fixture="attempt",
 )
 def _define_a_type_with_several_faults(root, client):
-    """Written so the order its places stand in differs from the order a walk of its keywords finds them in: the
-    field with nested sections before the link field, the collection last."""
+    """Written the field with nested sections first, then the link field, the collection last: the order a walk of its
+    keywords finds them in too, so this scenario alone does not pin the order; tests/test_the_order_of_faults.py
+    does, with a type whose faults are found in an order other than the one it is written in."""
     before = held.holds(root)
     schema = {
         "type": "object",
