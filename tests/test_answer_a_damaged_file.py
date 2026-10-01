@@ -60,6 +60,15 @@ def _database_damaged(root, damage):
     DAMAGES[damage](root)
 
 
+READ_ONLY = {"lies in a directory that is read-only": "directory", "is a file that is read-only": "file"}
+
+
+@given(parsers.re(f"the store's database (?P<what>{'|'.join(map(re.escape, READ_ONLY))})"))
+def _database_read_only(root, request, what):
+    assert os.geteuid() != 0, "the suite runs as root, so chmod would not make anything read-only"
+    request.addfinalizer(held.make_read_only(root, READ_ONLY[what]))
+
+
 @pytest.fixture
 def where(root):
     """Where the operator works and what it is told: inside the store with nothing set, or, when a Given has set KB_ROOT

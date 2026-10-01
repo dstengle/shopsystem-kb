@@ -7,6 +7,7 @@ Inside the transaction the set is checked (kb.sqlite_checks); any refusal rolls 
 """
 import contextlib
 import functools
+import os
 import sqlite3
 from pathlib import Path
 from typing import Iterator
@@ -68,6 +69,7 @@ def opened(path: Path) -> Iterator["SqliteStore"]:
     opened, which creates nothing, or when any statement finds it damaged, which shows only once one is made; Busy
     when a writer waited BUSY seconds for the write lock and another connection still held it."""
     supported()
+    _writable(path)
     try:
         db = sqlite3.connect(_uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None)
     except sqlite3.OperationalError as error:
@@ -78,6 +80,14 @@ def opened(path: Path) -> Iterator["SqliteStore"]:
         raise (Busy if _busy(error) else Unreadable)(f"{path}: {error}") from error
     finally:
         db.close()
+
+
+def _writable(path: Path) -> None:
+    """Raises Unreadable, naming the database, when it is there but it or its directory cannot be written: SQLite
+    would open a read-only file without a word, and make nothing it needs beside it, so this is asked before any
+    statement."""
+    if path.exists() and not (os.access(path, os.W_OK) and os.access(path.parent, os.W_OK)):
+        raise Unreadable(f"{path}: the database cannot be opened for writing, its file or its directory is read-only")
 
 
 def _busy(error: sqlite3.DatabaseError) -> bool:

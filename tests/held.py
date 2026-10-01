@@ -157,6 +157,15 @@ def take_away_the_database(root):
     (_place(root) / _DATABASE).unlink()
 
 
+def make_read_only(root, what):
+    """Make the store's place (`what` is "directory") or its database file (`what` is "file") read-only, and give back
+    the call that restores it, so the directory can be cleaned up."""
+    target = _place(root) if what == "directory" else _place(root) / _DATABASE
+    mode = target.stat().st_mode
+    target.chmod(0o555 if what == "directory" else 0o444)
+    return lambda: target.chmod(mode)
+
+
 def made_by_an_earlier_kb(root):
     """Make the store in `root` the way kb 0.3.0 kept one: its marker holding the contract, every artifact a canonical
     file at kb/<kind>/<slug>.yaml, the history in kb/journal/, a git repository in kb/.git/, and no database. A
