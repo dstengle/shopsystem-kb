@@ -300,6 +300,15 @@ def test_search_candidates_per_section_and_per_field_keeping_the_section_title(s
     assert store.search(search.terms("foo")) == []
 
 
+
+def test_search_finds_an_artifact_by_what_it_holds_now_and_nothing_once_it_is_removed(store):
+    land(store, put("note/a", {"summary": "zebra"}))
+    land(store, put("note/a", {"summary": "okapi"}, read=1))
+    found = [port.Candidate(name("note/a"), "", "summary")]
+    assert (store.search(search.terms("zebra")), store.search(search.terms("okapi"))) == ([], found)
+    land(store, removal("note/a", read=2))
+    assert (store.search(search.terms("zebra")), store.search(search.terms("okapi"))) == ([], [])
+
 def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_first(store):
     later, half = T0 + timedelta(hours=2), T0 + timedelta(milliseconds=500)
     store.land([], [entry("late", at=later, artifact="note/a", role="writer")])

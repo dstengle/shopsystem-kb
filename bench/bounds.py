@@ -105,7 +105,7 @@ def operations(n: int):
 
 def build(client, n: int) -> None:
     """The store landed in sets of 100, printing at every tenth of n the cost of the set that reached it."""
-    pending, held, mark = [], 0, n // 10
+    pending, held, mark = [], 0, max(SET, n // 10)
     for operation in operations(n):
         pending.append(operation)
         if len(pending) == SET:
@@ -164,6 +164,8 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
 
 
 def main(n: int) -> int:
+    if n < SET:
+        raise SystemExit(f"a store of at least {SET} artifacts holds the graph measured; {n} is too few")
     with tempfile.TemporaryDirectory(prefix="kb-bench-") as root:
         client = connect(root)
         answered(client.Init(kb_pb2.InitRequest(root=root, actor=ACTOR)))
