@@ -29,6 +29,15 @@ def order(artifact_id) -> tuple[str, str]:
     return kind, f"{slug}.yaml"
 
 
+def filed(steps: tuple[str, ...]) -> str | None:
+    """The written name of the artifact the export layout puts at a file's place, `<kind>/<slug>.yaml`, given the
+    place's steps below the directory; None for a place where the layout puts no artifact."""
+    if len(steps) != 2 or not steps[1].endswith(".yaml"):
+        return None
+    kind, slug = steps[0], steps[1].removesuffix(".yaml")
+    return written(kind, slug) if plain(kind) and plain(slug) else None
+
+
 def linked(text: str) -> tuple[str, str]:
     """A link as a field holds it read as the name it points at and, after `#`, the place inside that artifact."""
     name, _, place = text.partition("#")

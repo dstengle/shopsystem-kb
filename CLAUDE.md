@@ -9,11 +9,11 @@ a change that breaks one is refactored into place first, then made.
 |---|---|---|
 | `contract/` | `kb.proto` and generated code | hand-written logic |
 | `servicer.py` | the rpc adapter: request in, one call into the domain, response out, inside the one fail-closed wrapper | domain logic, file paths, git |
-| `operating.py` | the operator's commands that are not rpcs (export), each one call into the domain inside `servicer.py`'s one wrapper | domain logic, finding the store |
+| `operating.py` | the operator's commands that are not rpcs (export, the import check), each one call into the domain inside `servicer.py`'s one wrapper | domain logic, finding the store |
 | `values.py` | conversion of single request fields into validated values: ids, locators, kinds, roots, the directory an export is written to, content trees; the one reading of a moment in UTC, "UTC unless it says otherwise", which `in_utc` provides for both `since` and the clock | anything that touches the store or the filesystem |
 | `signatures.py` | who makes a change and why: the actor, the signature, and the conversions of a writer's, a reader's and a starter's; refuses one that does not sign | I/O, other request values |
 | `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
-| `names.py` | the grammar of artifact and item names; how an artifact's name, a link's place inside one and a type's `kb:` reference are written and read; the one order names are given in (`order`); minting, uniqueness and reuse of item names | I/O |
+| `names.py` | the grammar of artifact and item names; how an artifact's name, a link's place inside one and a type's `kb:` reference are written and read; the name the export layout's place for a file gives (`filed`); the one order names are given in (`order`); minting, uniqueness and reuse of item names | I/O |
 | `validation.py` | the composed effective schema and the checks JSON Schema cannot express | file access |
 | `check.py` | the check of the whole store, read through the port: every artifact against the current version of its type, the stale listed beside the violations | checks of its own, writes |
 | `composition.py` | a type read through what it is built on: its composition, base first, the type a `kb:` reference names, and which kinds' types read a given type | checks, file access |
@@ -38,7 +38,8 @@ a change that breaks one is refactored into place first, then made.
 | `journal.py` | history entries, their ids and stamps, and fingerprints of canonical text; it writes nothing, its entries ride with the set handed to the port | anything else |
 | `metaschema.py` | the one type a new store holds | logic |
 | `export.py` | the store written out as canonical files at one moment, never over anything: `<dir>/<kind>/<slug>.yaml`, every artifact read in one view of the store before the directory is touched; refuses what is not a directory, or a directory that holds anything | checks, rpc types, the store's own files |
-| `client.py`, `cli.py` | the in-process transport, and beside it, never on it, the operator's export over the store it finds, not part of the contract; the operator's init, validate and export commands | domain logic |
+| `importing.py` | a directory read as a set for import: each file's errors (unreadable, not in canonical form or not at its place in the export layout, a kind with no type, content and links against its type, a differing type of types), and the files that would be skipped because they lead to one, with their chains; an old store's `.git/`, `journal/` and `store.yaml` passed over; files drafted over the store, nothing written | writes, rpc types, the store's own files |
+| `client.py`, `cli.py` | the in-process transport, and beside it, never on it, the operator's export and import check over the store they find, not part of the contract; the operator's init, validate, export and `import --check` commands | domain logic |
 
 A new concern gets a new module. Nothing is added "beside" existing code in a
 module that does not own it.

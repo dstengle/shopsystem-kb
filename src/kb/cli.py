@@ -1,5 +1,5 @@
-"""kb's own command line, for the operator: set a store up, check one, and export one. Nothing else; every change to
-content goes through a client.
+"""kb's own command line, for the operator: set a store up, check one, export one, and check a directory for import.
+Nothing else; every change to content goes through a client.
 
 Each command is one call on the in-process client, or on one of the operator's commands beside it. A refusal is
 printed to stderr and exits 2; a check that finds a violation exits 1.
@@ -23,11 +23,17 @@ def main(argv=None) -> int:
     commands.add_parser("validate", help="check the store found here, or the one KB_ROOT names")
     exporting = commands.add_parser("export", help="write the store found here, or the one KB_ROOT names, out as files")
     exporting.add_argument("directory", help="an empty directory, or one that does not exist, for the files")
+    importing = commands.add_parser("import", help="bring a directory of files into the store found here")
+    importing.add_argument("directory", help="the directory of files, laid out as an export lays them out")
+    how = importing.add_mutually_exclusive_group(required=True)
+    how.add_argument("--check", action="store_true", help="only check the directory, writing nothing")
     args = parser.parse_args(argv)
     if args.command == "init":
         return _init(args.root)
     if args.command == "export":
         return _export(args.directory)
+    if args.command == "import":
+        return _import_check(args.directory)
     return _validate()
 
 
@@ -62,6 +68,22 @@ def _export(directory: str) -> int:
     exported = kb_client.export(directory)
     if exported.faults:
         return _refused("export", exported.faults)
+    return 0
+
+
+def _import_check(directory: str) -> int:
+    """Check the directory named for import into the store this directory finds: every error, then every file that
+    would be skipped with the chain of files leading to a broken one, one to a line; or a line saying it is clean."""
+    checked = kb_client.import_check(directory)
+    if checked.faults:
+        return _refused("import", checked.faults)
+    for fault in checked.errors:
+        print("\t".join(("error", fault.artifact, fault.rule, fault.message)))
+    for skipped in checked.skipped:
+        print("\t".join(("skipped", skipped.file, " -> ".join(skipped.chain))))
+    if checked.errors:
+        return VIOLATED
+    print(f"clean\t{directory} checks clean for import")
     return 0
 
 

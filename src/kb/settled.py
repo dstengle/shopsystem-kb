@@ -6,6 +6,15 @@ SETTLED = {"id": str, "type": str, "schema_version": int, "revision": int, "titl
 IDENTITY = tuple(SETTLED)
 
 
+def identified(artifact: dict) -> bool:
+    """Whether an artifact as written opens with the keys naming it, in their order, each what it must be."""
+    if list(artifact)[:len(IDENTITY)] != list(IDENTITY):
+        return False
+    return all(
+        isinstance(artifact[key], kind) and not isinstance(artifact[key], bool) for key, kind in SETTLED.items()
+    )
+
+
 def given(content: dict, artifact_id: str, kind: str, schema_version: int, revision: int, title: str) -> dict:
     """The content as an artifact: with its name, its kind, the version of its type it was checked against, its own
     version and its title."""

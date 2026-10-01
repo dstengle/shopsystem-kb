@@ -7,6 +7,7 @@ from typing import Callable
 
 from kb import store
 from kb.export import Exported
+from kb.importing import Checked
 from kb.contract import kb_pb2
 from kb.operating import Operator
 from kb.servicer import KbServicer
@@ -95,7 +96,19 @@ def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProc
 
 def export(directory: str) -> Exported:
     """The operator's export of the store this call finds to the directory named; not part of the contract."""
+    return _operated("export", directory, Exported)
+
+
+def import_check(directory: str) -> Checked:
+    """The operator's check of the directory named for import into the store this call finds; not part of the
+    contract."""
+    return _operated("import_check", directory, Checked)
+
+
+def _operated(command: str, directory: str, response):
+    """The operator's command on the store this call finds, or the response carrying the fault that says none was
+    found."""
     root, refusal = _found(None)
     if refusal is not None:
-        return Exported(faults=[refusal])
-    return Operator(root).export(directory)
+        return response(faults=[refusal])
+    return getattr(Operator(root), command)(directory)

@@ -3,13 +3,15 @@ output, read here as files; the store behind them is read through `held`."""
 import re
 from pathlib import Path
 
+import pytest
+
 from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
 from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define
 from conftest import _kb
 import held
-from kb import client as kb_client
+from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
 
 FEATURE = "export-and-import-a-store.feature"
@@ -33,6 +35,36 @@ def test_two_stores_given_the_same_content_are_exported():
 
 @scenario(FEATURE, "Exporting to a directory that holds anything is refused")
 def test_exporting_to_a_directory_that_holds_anything_is_refused():
+    pass
+
+
+@scenario(FEATURE, "The operator checks a directory for import and each error is reported by file and reason")
+def test_each_error_is_reported_by_file_and_reason():
+    pass
+
+
+@scenario(FEATURE, "The operator checks a directory for import that holds a file with an error, and files link to it")
+def test_files_linking_to_a_broken_file_would_be_skipped():
+    pass
+
+
+@scenario(FEATURE, "The operator checks a directory for import that holds no error")
+def test_a_clean_directory_is_said_to_be_clean():
+    pass
+
+
+@scenario(FEATURE, "A directory checked for import holds an error")
+def test_a_directory_holding_an_error_fails_the_check():
+    pass
+
+
+@scenario(FEATURE, "The operator checks a directory for import and the store is left as it was")
+def test_checking_leaves_the_store_as_it_was():
+    pass
+
+
+@scenario(FEATURE, "The operator checks a directory for import whose type that describes types differs from the store's")
+def test_a_differing_type_of_types_is_an_error():
     pass
 
 
@@ -241,3 +273,298 @@ def _rejected_as_never_overwriting(ran, target):
 @then("what the directory holds is left as it was")
 def _directory_as_it_was(target, before):
     assert held.everything_in(target) == before["target"]
+
+
+# The operator's check of a directory for import. Each directory is a real export of a store of its own, then broken
+# in the one way a step names; the files are the operator's input, written and read here as files.
+
+WEEKLY = "decision/price-reviews-happen-weekly"
+MONTHLY = "decision/prices-are-reviewed-monthly"
+MONDAYS = "work-item/move-the-review-to-mondays"
+
+
+def _for_import(tmp_path, fill=None):
+    """A directory for import: the export of a store holding the types for decisions and work items, two decisions and
+    a work item linking to the first; or holding what `fill` gives a started store."""
+    source = tmp_path / "source"
+    source.mkdir()
+    if fill is None:
+        _store_with_decisions_and_a_work_item(source)
+    else:
+        fill(_started(source))
+    target = tmp_path / "for-import"
+    ran = _kb("export", str(target), cwd=source)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    return target
+
+
+def _file(name):
+    """The file the export layout gives an artifact's name."""
+    return f"{name}.yaml"
+
+
+def _read(target, name):
+    return canonical.entries((Path(target) / _file(name)).read_text(encoding="utf-8"))
+
+
+def _put(target, artifact):
+    """An artifact written as an export writes it, in canonical form, at its place in the layout."""
+    path = Path(target) / _file(artifact["id"])
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(canonical.dump(artifact), encoding="utf-8")
+
+
+def _artifact(name, title, **content):
+    kind = name.partition("/")[0]
+    return {"id": name, "type": kind, "schema_version": 1, "revision": 1, "title": title, **content}
+
+
+def _unreadable(target):
+    for name in (WEEKLY, MONTHLY):
+        (Path(target) / _file(name)).write_text(f"id: {name}\ntitle: [never closed\n", encoding="utf-8")
+    return {_file(WEEKLY): "unreadable", _file(MONTHLY): "unreadable"}
+
+
+def _not_canonical(target):
+    """One file with a comment in it; the other with its title ahead of its name."""
+    weekly = Path(target) / _file(WEEKLY)
+    weekly.write_text("# reviewed by hand\n" + weekly.read_text(encoding="utf-8"), encoding="utf-8")
+    monthly = Path(target) / _file(MONTHLY)
+    lines = monthly.read_text(encoding="utf-8").splitlines(keepends=True)
+    titled = [line for line in lines if line.startswith("title: ")]
+    monthly.write_text("".join(titled + [line for line in lines if line not in titled]), encoding="utf-8")
+    return {_file(WEEKLY): "content", _file(MONTHLY): "content"}
+
+
+def _no_type_for_the_kind(target):
+    for name in ("memo/first-memo", "memo/second-memo"):
+        _put(target, _artifact(name, name.partition("/")[2].replace("-", " ").capitalize()))
+    return {"memo/first-memo.yaml": "kind", "memo/second-memo.yaml": "kind"}
+
+
+def _not_fitting(target):
+    """One decision without the section its type requires second; the other pointing at a number."""
+    weekly = _read(target, WEEKLY)
+    weekly["sections"] = weekly["sections"][:1]
+    _put(target, weekly)
+    monthly = _read(target, MONTHLY)
+    _put(target, {**{key: monthly[key] for key in IDENTITY}, "supersedes": 5, "sections": monthly["sections"]})
+    return {_file(WEEKLY): "sections", _file(MONTHLY): "type"}
+
+
+def _linking_to_nothing(target):
+    mondays = _read(target, MONDAYS)
+    _put(target, {**mondays, "decisions": [WEEKLY, "decision/nothing-by-this-name"]})
+    _put(target, _artifact("work-item/review-on-fridays", "Review on Fridays", decisions=["decision/nor-this"]))
+    return {_file(MONDAYS): "ref", "work-item/review-on-fridays.yaml": "ref"}
+
+
+FAULTS = {
+    "cannot be read as YAML 1.2": _unreadable,
+    "is not in canonical form": _not_canonical,
+    "claims a kind neither the directory nor the store holds a type for": _no_type_for_the_kind,
+    "has content that does not fit its type": _not_fitting,
+    "carries a link that lands on nothing in the directory or the store": _linking_to_nothing,
+}
+
+
+@given(
+    parsers.parse("a directory for import holding well-formed files and two files that each {fault}"),
+    target_fixture="target",
+)
+def _for_import_with_two_faults(tmp_path, fault, broken):
+    target = _for_import(tmp_path)
+    broken.update(FAULTS[fault](target))
+    return target
+
+
+@pytest.fixture
+def broken():
+    """The files a Given broke, each with the rule it breaks."""
+    return {}
+
+
+@when("the operator checks the directory for import", target_fixture="ran")
+def _kb_import_check(root, target):
+    return _kb("import", str(target), "--check", cwd=root)
+
+
+def _report(ran):
+    """The check's report, one line at a time, each split into its fields."""
+    return [line.split("\t") for line in ran.stdout.splitlines()]
+
+
+@then(parsers.parse("each of the two files is reported as an error, naming the file, with the reason that {reason}"))
+def _each_reported_with_its_reason(ran, broken):
+    errors = {(line[1], line[2]) for line in _report(ran) if line[0] == "error"}
+    assert ran.stderr == ""
+    for file, rule in broken.items():
+        assert (file, rule) in errors, (file, rule, ran.stdout)
+
+
+def _the_two_types(client):
+    define(client, DECISION_TYPE)
+    define(client, WORK_ITEM_TYPE)
+
+
+def _decision(name, **fields):
+    """A decision that fits its type, carrying the fields given."""
+    return _artifact(name, name.partition("/")[2].replace("-", " ").capitalize(), **fields, sections=[
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": "Costs move weekly.\n"},
+    ])
+
+
+def _a_file_with_an_error(target):
+    """A decision missing the section its type requires second."""
+    broken = _decision("decision/broken")
+    broken["sections"] = broken["sections"][:1]
+    _put(target, broken)
+    return "decision/broken"
+
+
+def _a_broken_decision_type(target):
+    """The type for decisions with a version that is not a number, which the type that describes types refuses."""
+    _put(target, {**_read(target, "schema/decision"), "version": "one"})
+    return "schema/decision"
+
+
+def _linking_directly(target, broken):
+    _put(target, _decision("decision/linking", supersedes=broken))
+    return {"linking": "decision/linking"}
+
+
+def _linking_through_a_second(target, broken):
+    _put(target, _decision("decision/second", supersedes=broken))
+    _put(target, _artifact("work-item/first", "First", decisions=["decision/second"]))
+    return {"second": "decision/second", "first": "work-item/first"}
+
+
+def _a_decision_of_the_broken_type(target, broken):
+    _put(target, _decision("decision/of-the-type"))
+    return {"decision": "decision/of-the-type"}
+
+
+def _a_work_item_to_a_decision_of_the_broken_type(target, broken):
+    _put(target, _decision("decision/of-the-type"))
+    _put(target, _artifact("work-item/to-the-decision", "To the decision", decisions=["decision/of-the-type"]))
+    return {"decision": "decision/of-the-type", "work item": "work-item/to-the-decision"}
+
+
+BROKEN = {
+    "a file with an error": _a_file_with_an_error,
+    "a type for decisions whose content does not fit the type that describes types": _a_broken_decision_type,
+}
+LINKING = {
+    "a file that links to the broken file directly": _linking_directly,
+    "a file that links to a second file, which links to the broken file": _linking_through_a_second,
+    "a decision, whose link to its own type leads to the broken file": _a_decision_of_the_broken_type,
+    "a work item that links to a decision, whose link to its own type leads to the broken file":
+        _a_work_item_to_a_decision_of_the_broken_type,
+}
+
+
+@given(
+    parsers.re(
+        r"a directory for import holding (?P<broken>a file with an error|a type for decisions whose content does not "
+        r"fit the type that describes types), and (?P<linking>.+)"
+    ),
+    target_fixture="target",
+)
+def _for_import_with_a_broken_file_and_links_to_it(tmp_path, broken, linking, files):
+    target = _for_import(tmp_path, _the_two_types)
+    files["broken"] = BROKEN[broken](target)
+    files.update(LINKING[linking](target, files["broken"]))
+    return target
+
+
+@pytest.fixture
+def files():
+    """The names of the files a Given put in a directory, by the part each plays."""
+    return {}
+
+
+SKIPPED = {
+    "the file that links to it is": [("linking", "broken")],
+    "the second file and the first file are": [("second", "broken"), ("first", "second", "broken")],
+    "the decision is": [("decision", "broken")],
+    "the decision and the work item are": [("decision", "broken"), ("work item", "decision", "broken")],
+}
+
+
+@then(parsers.parse(
+    "{skipped} reported as a file that would be skipped, each with the chain of links that leads from it to the "
+    "broken file"
+))
+def _reported_as_skipped(ran, files, skipped):
+    reported = {(line[1], line[2]) for line in _report(ran) if line[0] == "skipped"}
+    expected = {
+        (_file(files[chain[0]]), " -> ".join(_file(files[part]) for part in chain)) for chain in SKIPPED[skipped]
+    }
+    assert reported == expected, ran.stdout
+
+
+@given(
+    "a directory for import in which every file is well formed, fits its type and links only to what is there",
+    target_fixture="target",
+)
+def _for_import_clean(tmp_path):
+    return _for_import(tmp_path)
+
+
+@given("a directory for import holding one file whose content does not fit its type", target_fixture="target")
+def _for_import_with_one_unfit_file(tmp_path):
+    target = _for_import(tmp_path)
+    weekly = _read(target, WEEKLY)
+    weekly["sections"] = weekly["sections"][:1]
+    _put(target, weekly)
+    return target
+
+
+@then("the check reports success")
+def _check_reports_success(ran, target):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert _report(ran) == [["clean", f"{target} checks clean for import"]]
+
+
+@then("the check reports failure")
+def _check_reports_failure(ran):
+    assert (ran.returncode, ran.stderr) == (1, "")
+    assert "clean" not in [line[0] for line in _report(ran)], ran.stdout
+
+
+@given("a directory for import", target_fixture="target")
+def _a_directory_for_import(tmp_path, root, before):
+    target = _for_import(tmp_path)
+    before.update(held=held.holds(root))
+    return target
+
+
+@then("the store holds what it held before")
+def _store_as_before(ran, root, before):
+    assert ran.returncode in (0, 1), ran.stderr
+    assert held.holds(root) == before["held"]
+
+
+@given("a freshly started store")
+def _a_freshly_started_store(root):
+    _started(root)
+
+
+@given(
+    "a directory for import holding a copy of the type that describes types that differs from the store's",
+    target_fixture="target",
+)
+def _for_import_with_a_differing_type_of_types(tmp_path):
+    """A clean export whose copy of the type that describes types has a field of its own added."""
+    target = _for_import(tmp_path)
+    copy = _read(target, "schema/schema")
+    copy["schema"]["properties"]["owner"] = {"type": "string"}
+    _put(target, copy)
+    return target
+
+
+@then("the file holding that copy is reported as an error, naming the file")
+def _the_copy_is_an_error(ran):
+    assert ran.returncode == 1, ran.stderr
+    assert [line[1] for line in _report(ran) if line[0] == "error"] == ["schema/schema.yaml"], ran.stdout

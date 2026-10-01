@@ -122,6 +122,24 @@ def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
     )
 
 
+def unreadable_file(file: str, problem: str) -> kb_pb2.Fault:
+    """A file offered for import that cannot be read as YAML 1.2."""
+    return kb_pb2.Fault(artifact=file, rule=rules.UNREADABLE, message=f"it cannot be read as YAML 1.2: {problem}")
+
+
+def not_canonical(file: str, problem: str) -> kb_pb2.Fault:
+    """A file offered for import that is not in canonical form, its place in the directory included."""
+    return kb_pb2.Fault(artifact=file, rule=rules.CONTENT, message=f"it is not in canonical form: {problem}")
+
+
+def no_type_offered(file: str, kind_name: str) -> kb_pb2.Fault:
+    """A file offered for import of a kind neither the directory nor the store holds a type for."""
+    return kb_pb2.Fault(
+        artifact=file, rule=rules.KIND,
+        message=f"a kind must name a type the directory or the store holds; neither holds a type called {kind_name!r}",
+    )
+
+
 def clock_failed(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.CLOCK, message=f"the clock failed when it was asked the time: {problem}")
 
