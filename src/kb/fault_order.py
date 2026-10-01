@@ -3,8 +3,8 @@ it, then, at one place, by the names of the rules broken. It never makes or chec
 from kb import settled
 from kb.contract import kb_pb2
 
-_TOP, _ITEM, _SECTION, _SECTIONS, _ITEMS, _PLAIN = "top", "item", "section", "sections", "items", "plain"
-_ENTRIES = {_ITEM: ("id",), _SECTION: ("title", "body", "sections")}
+_TOP, _ITEM, _SECTION = settled.TOP, settled.ITEM, settled.SECTION
+_SECTIONS, _ITEMS, _PLAIN = "section list", "item list", "plain"
 
 
 def ordered(faults: list[kb_pb2.Fault], artifact: dict, declared: dict) -> list[kb_pb2.Fault]:
@@ -39,16 +39,10 @@ def _rank(step: str, node, level: str, schema: dict) -> tuple:
 
 
 def _sequence(node, level: str, schema: dict) -> list[str]:
-    """The names of a level's entries in the order they stand: those the level declares, then the others as the node
-    holds them."""
+    """The names of a level's entries in the order they stand: at a level of an artifact, as `settled.sequence` gives
+    them; elsewhere as the node holds them."""
     held = list(node) if isinstance(node, dict) else []
-    if level == _TOP:
-        fields = [name for name in schema["properties"] if name not in settled.IDENTITY]
-        others = [name for name in held if name not in (*settled.IDENTITY, *fields, "sections", *schema["parts"])]
-        return [*settled.IDENTITY, *fields, *others, "sections", *schema["parts"]]
-    if level == _ITEM:
-        return list(dict.fromkeys([*_ENTRIES[_ITEM], *schema.get("properties", {}), *held]))
-    return list(dict.fromkeys([*_ENTRIES.get(level, ()), *held]))
+    return settled.sequence(level, held, schema) if level in settled.LEVELS else held
 
 
 def _inside(step: str, node, level: str, schema: dict) -> tuple:
@@ -60,7 +54,7 @@ def _inside(step: str, node, level: str, schema: dict) -> tuple:
     child = node.get(step) if isinstance(node, dict) else _entry(step, node)
     if level in (_TOP, _ITEM) and step in schema.get("parts", {}):
         return child, _ITEMS, schema["parts"][step].get("items", {})
-    if level in (_TOP, _SECTION) and step == "sections":
+    if level in (_TOP, _SECTION) and step == settled.SECTIONS:
         return child, _SECTIONS, {}
     return child, _PLAIN, {}
 

@@ -34,24 +34,43 @@ def checked(artifact: dict) -> dict:
     return {key: value for key, value in artifact.items() if key not in IDENTITY or key == "title"}
 
 
+TOP, ITEM, SECTION = "top", "item", "section"
+LEVELS = (TOP, ITEM, SECTION)
+SECTIONS = "sections"
+
+
+def sequence(level: str, held, schema: dict) -> list[str]:
+    """The names at one level of an artifact (its top, an item of a collection, a section) in the order they are
+    written, given the schema declared there and the names the level holds: at the top, the identity keys, the fields
+    in schema order, what else it holds as it holds it, the sections, the collections in schema order; in an item, its
+    id, its fields in the item schema's order, then what else it holds; in a section, its title, body and sections,
+    then what else it holds. The names declared there stand in it whether it holds them or not."""
+    if level == TOP:
+        fields = [name for name in schema.get("properties", {}) if name not in IDENTITY]
+        parts = list(schema.get("parts", {}))
+        others = [name for name in held if name not in (*IDENTITY, *fields, SECTIONS, *parts)]
+        return list(dict.fromkeys([*IDENTITY, *fields, *others, SECTIONS, *parts]))
+    leading = ("id", *schema.get("properties", {})) if level == ITEM else ("title", "body", SECTIONS)
+    return list(dict.fromkeys([*leading, *held]))
+
+
 def order(artifact: dict, schema: dict) -> dict:
-    """Identity keys first, then fields in schema order, then sections, then part collections in schema order. What
-    is not written in the shape its type gives it, which a set may leave before a later change in it fixes it, is
-    left as it was written."""
+    """An artifact's entries in the order `sequence` gives its top, each section's and each item's. What is not
+    written in the shape its type gives it, which a set may leave before a later change in it fixes it, is left as it
+    was written."""
     parts = schema.get("parts", {})
-    ordered = {key: artifact[key] for key in IDENTITY if key in artifact}
-    for name in schema.get("properties", {}):
-        if name in artifact and name not in ordered:
-            ordered[name] = artifact[name]
-    for name, value in artifact.items():
-        if name not in ordered and name != "sections" and name not in parts:
-            ordered[name] = value
-    if "sections" in artifact:
-        ordered["sections"] = _listed(artifact["sections"], _section)
+    ordered = _arranged(artifact, TOP, schema)
+    if SECTIONS in artifact:
+        ordered[SECTIONS] = _listed(artifact[SECTIONS], _section)
     for name in parts:
         if name in artifact:
             ordered[name] = _listed(artifact[name], lambda item, name=name: _item(item, parts[name]["items"]))
     return ordered
+
+
+def _arranged(node: dict, level: str, schema: dict) -> dict:
+    """A level's entries in the order `sequence` gives them."""
+    return {name: node[name] for name in sequence(level, node, schema) if name in node}
 
 
 def _listed(found, each):
@@ -60,25 +79,15 @@ def _listed(found, each):
 
 
 def _section(section) -> dict:
-    """A section's title, body and sections first, then anything else it carries as it was written."""
+    """A section in order, and each of its sections; a section that is not a set of named entries as it was."""
     if not isinstance(section, dict):
         return section
-    ordered = {key: section[key] for key in ("title", "body") if key in section}
-    if "sections" in section:
-        ordered["sections"] = _listed(section["sections"], _section)
-    return {**ordered, **{key: value for key, value in section.items() if key not in ordered}}
+    ordered = _arranged(section, SECTION, {})
+    if SECTIONS in section:
+        ordered[SECTIONS] = _listed(section[SECTIONS], _section)
+    return ordered
 
 
 def _item(item, item_schema: dict) -> dict:
-    """An item's id first, then its fields in the item schema's order; an item that is not a set of named entries as
-    it was written."""
-    if not isinstance(item, dict):
-        return item
-    ordered = {"id": item["id"]} if "id" in item else {}
-    for name in item_schema.get("properties", {}):
-        if name in item and name not in ordered:
-            ordered[name] = item[name]
-    for name, value in item.items():
-        if name not in ordered:
-            ordered[name] = value
-    return ordered
+    """An item in order; an item that is not a set of named entries as it was written."""
+    return _arranged(item, ITEM, item_schema) if isinstance(item, dict) else item
