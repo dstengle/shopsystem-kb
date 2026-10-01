@@ -2,7 +2,7 @@
 store holds, it is not built on itself, every link field says which kinds it may point at; and, for each change to it,
 that its version moves on from the version it changed. What a type could never check an artifact against is refused
 here, once, rather than by every create that uses it."""
-from kb import composition, refusals
+from kb import composition, type_refusals
 from kb.contract import kb_pb2
 from kb.values import ArtifactId
 
@@ -16,12 +16,12 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
         if named is None:
             continue
         if named.type_id == type_id and named.whole:
-            found.append(refusals.built_on_itself(type_id, place, ref))
+            found.append(type_refusals.built_on_itself(type_id, place, ref))
         elif named.type_id is None or not draft.holds(named.type_id):
-            found.append(refusals.no_such_shape(type_id, place, ref))
+            found.append(type_refusals.no_such_shape(type_id, place, ref))
     for place, name, field in _link_fields(schema, "schema"):
         if not isinstance(field["ref"], dict) or "targets" not in field["ref"]:
-            found.append(refusals.no_targets(type_id, place, name))
+            found.append(type_refusals.no_targets(type_id, place, name))
     return found
 
 
@@ -33,7 +33,7 @@ def version_kept(type_id: ArtifactId, content: dict, held: dict) -> list[kb_pb2.
         return []
     if content.get("schema") == held.get("schema") or version > before:
         return []
-    return [refusals.version_kept(type_id, before)]
+    return [type_refusals.version_kept(type_id, before)]
 
 
 def _number(version) -> bool:
