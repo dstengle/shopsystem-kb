@@ -11,12 +11,31 @@ from typing import Callable, Mapping
 
 from kb import canonical, rules, sqlite_store
 from kb.contract import kb_pb2
-from kb.port import EarlierKb, LaterKb, Port, Unreadable
+from kb.port import Port, Unreadable
 from kb.values import Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
 STORE_FORM = 1
+
+
+class EarlierKb(Exception):
+    """The store was made by an earlier version of kb, in a form this kb cannot read: where it is, and the directory
+    holding its files, which are imported into a new store to move it."""
+
+    def __init__(self, root: Path):
+        super().__init__(str(root))
+        self.root = root
+        self.files = root / MARKER.parent
+
+
+class LaterKb(Exception):
+    """The store's marker names a form of store this kb does not know, or cannot be read at all: a later version of kb
+    is needed to read it. It carries where the store is."""
+
+    def __init__(self, root: Path):
+        super().__init__(str(root))
+        self.root = root
 
 
 def opened(root) -> contextlib.AbstractContextManager[Port]:
@@ -33,12 +52,12 @@ def _told_apart(root: Path) -> None:
     try:
         marker = canonical.load((root / MARKER).read_text(encoding="utf-8"))
     except (canonical.NotCanonical, UnicodeDecodeError, OSError):
-        raise LaterKb(str(root)) from None
+        raise LaterKb(root) from None
     if marker == {"store": STORE_FORM}:
         return
     if isinstance(marker, dict) and "contract" in marker:
-        raise EarlierKb(str(root))
-    raise LaterKb(str(root))
+        raise EarlierKb(root)
+    raise LaterKb(root)
 
 
 def start(root: Root, fill: Callable[[Port], None]) -> None:

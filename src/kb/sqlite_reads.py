@@ -65,12 +65,17 @@ class Reads:
 
     @contextlib.contextmanager
     def at_one_moment(self):
-        """One read transaction around the block: in WAL mode its first read fixes the view every later one sees."""
+        """One read transaction around the block: in WAL mode its first read fixes the view every later one sees. A
+        block opened inside a transaction already open, one holding the write lock among them, runs within it."""
+        if self._db.in_transaction:
+            yield
+            return
         self._db.execute("BEGIN")
         try:
             yield
         finally:
-            self._db.execute("COMMIT")
+            if self._db.in_transaction:
+                self._db.execute("COMMIT")
 
     def holds(self, artifact_id: ArtifactId) -> bool:
         return bool(self._rows("SELECT 1 FROM artifacts WHERE id = ?", str(artifact_id)))
@@ -135,7 +140,7 @@ class Reads:
         }
         clauses = [clause for clause, value in asked.items() if value is not None]
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        order = "rowid" if artifact is not None else "moment, rowid"
+        order = "landing" if artifact is not None else "moment, landing"
         rows = self._rows(
             f"SELECT record FROM entries{where} ORDER BY {order}", *(value for value in asked.values() if value is not None),
         )

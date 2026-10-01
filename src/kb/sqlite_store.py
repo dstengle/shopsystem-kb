@@ -36,8 +36,8 @@ CREATE TABLE versions (
     PRIMARY KEY (artifact, landed, step)
 );
 CREATE TABLE entries (
-    id TEXT PRIMARY KEY, moment INTEGER NOT NULL, seq INTEGER NOT NULL, artifact TEXT NOT NULL, role TEXT NOT NULL,
-    execution TEXT NOT NULL, batch TEXT NOT NULL, record TEXT NOT NULL
+    landing INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, moment INTEGER NOT NULL, seq INTEGER NOT NULL,
+    artifact TEXT NOT NULL, role TEXT NOT NULL, execution TEXT NOT NULL, batch TEXT NOT NULL, record TEXT NOT NULL
 );
 CREATE INDEX entries_in_order ON entries (moment);
 CREATE VIRTUAL TABLE search USING fts5 (
@@ -135,6 +135,7 @@ class SqliteStore(Checks):
         if self._locked:
             yield
             return
+        assert not self._db.in_transaction, "the write lock is never taken inside reads at one moment"
         self._db.execute("BEGIN IMMEDIATE")
         self._locked = True
         committed = False
@@ -149,7 +150,7 @@ class SqliteStore(Checks):
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
              kinds: tuple[Kind, ...] = ()) -> None:
-        with contextlib.nullcontext() if self._locked else self.exclusive(), self._saved():
+        with self.exclusive(), self._saved():
             self._unheld(entries)
             landed = self._db.execute(
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
@@ -210,9 +211,10 @@ class SqliteStore(Checks):
         ])
 
     def _recorded(self, entries: list[Entry]) -> None:
-        self._db.executemany("INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
-            (entry.id, moment(entry.at), entry.seq, entry.artifact, entry.role, entry.execution, entry.batch,
-             encoded(entry.record))
-            for entry in entries
-        ])
+        """The entries, each given the next landing number, the order history reads them in."""
+        self._db.executemany(
+            "INSERT INTO entries (id, moment, seq, artifact, role, execution, batch, record) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [(entry.id, moment(entry.at), entry.seq, entry.artifact, entry.role, entry.execution, entry.batch,
+              encoded(entry.record)) for entry in entries],
+        )
 

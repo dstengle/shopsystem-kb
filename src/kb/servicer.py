@@ -7,15 +7,10 @@ clock's failure, the database's, or anything else, each with nothing written.
 """
 import contextlib
 import functools
-import sqlite3
 from datetime import datetime
 
-from kb import check, port, query, read, refusals, requests, store, values, write
+from kb import check, escapes, port, query, read, requests, store, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
-
-
-class ClockFailed(Exception):
-    """The client's clock raised, or gave something other than a moment, when it was asked the time."""
 
 
 def _guarded(clock):
@@ -27,22 +22,11 @@ def _guarded(clock):
         try:
             moment = clock()
         except Exception as error:
-            raise ClockFailed(str(error)) from error
+            raise escapes.ClockFailed(str(error)) from error
         if not isinstance(moment, datetime):
-            raise ClockFailed(f"it gave {moment!r}, which is not a moment")
+            raise escapes.ClockFailed(f"it gave {moment!r}, which is not a moment")
         return moment
     return read_it
-
-
-def _escaped(error: Exception) -> kb_pb2.Fault:
-    """The fault an exception that escaped the domain becomes."""
-    if isinstance(error, ClockFailed):
-        return refusals.clock_failed(str(error))
-    if isinstance(error, port.Busy):
-        return refusals.busy()
-    if isinstance(error, (port.Unreadable, sqlite3.Error)):
-        return refusals.unreadable(error)
-    return refusals.escaped(f"{type(error).__name__}: {error}")
 
 
 def boundary(response, opens: bool = True, at_one_moment: bool = False):
@@ -60,7 +44,7 @@ def boundary(response, opens: bool = True, at_one_moment: bool = False):
             except values.Refused as refused:
                 return response(faults=refused.faults)
             except Exception as error:
-                return response(faults=[_escaped(error)])
+                return response(faults=[escapes.fault(error)])
         return run
     return wrap
 

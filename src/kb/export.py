@@ -17,11 +17,11 @@ class Exported:
 
 def written(store: Port, into: Directory) -> None:
     """Every artifact the store holds, all read at one moment, then written as canonical text into the directory,
-    which is made, with any directory above it, when it does not exist. Raises Refused, writing nothing, when it is not a
-    directory or holds anything."""
+    which is made, with any directory above it, when it does not exist. Raises Refused, before the store is read and
+    writing nothing, when it is not a directory or holds anything."""
+    _empty(into)
     with store.at_one_moment():
         artifacts = {name: _ordered(store, name, store.artifact(name)) for name in store.ids()}
-    _empty(into)
     into.path.mkdir(parents=True, exist_ok=True)
     for name, artifact in artifacts.items():
         folder, filename = names.place(name)

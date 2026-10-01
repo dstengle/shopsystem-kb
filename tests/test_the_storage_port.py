@@ -418,3 +418,25 @@ def test_reads_at_one_moment_see_the_store_as_it_stood_whatever_lands_meanwhile(
             land(other, put("note/a", {"title": "A", "v": 2}, read=1), put("note/b", {"title": "B"}))
         assert (store.ids(), store.artifact(name("note/a"))) == (first, {"title": "A"})
     assert [str(each) for each in store.ids()] == ["note/a", "note/b"]
+
+
+def test_reads_at_one_moment_inside_a_block_holding_the_write_lock_run_within_it(opener, store):
+    with store.exclusive():
+        land(store, put("note/a", {"title": "A"}))
+        with store.at_one_moment():
+            assert [str(each) for each in store.ids()] == ["note/a"]
+        land(store, put("note/b", {"title": "B"}))
+        with opener() as other:
+            assert other.ids() == []
+    with opener() as other:
+        assert [str(each) for each in other.ids()] == ["note/a", "note/b"]
+
+
+def test_a_block_holding_the_write_lock_is_never_opened_inside_reads_at_one_moment(store):
+    land(store, put("note/a", {"title": "A"}))
+    with store.at_one_moment():
+        store.ids()
+        with pytest.raises(AssertionError):
+            with store.exclusive():
+                pass
+        assert [str(each) for each in store.ids()] == ["note/a"]

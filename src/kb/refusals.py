@@ -1,11 +1,8 @@
 """The refusals the domain makes of what a store holds, each with its rule and its message. Conversions refuse in
 kb.values and type checks in kb.validation; what neither owns is made here, so no domain module names a contract type."""
-import sqlite3
-
 from kb import names, rules
 from kb.contract import kb_pb2
 from kb.names import Misnamed
-from kb.port import EarlierKb, LaterKb, Unreadable
 from kb.values import ArtifactId, Locator
 
 
@@ -185,20 +182,25 @@ def clock_failed(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.CLOCK, message=f"the clock failed when it was asked the time: {problem}")
 
 
-def unreadable(error: Unreadable | sqlite3.Error) -> kb_pb2.Fault:
-    """The fault for a store that cannot be read: the database named, or, for one an earlier kb made, how to move it,
-    or, for one a later kb made, that a later kb is needed."""
-    if isinstance(error, LaterKb):
-        return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
-            f"the store at {error} was made by a later version of kb, which is needed to read it; this kb does not "
-            f"know the form of store its marker names"
-        ))
-    if isinstance(error, EarlierKb):
-        return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
-            f"the store at {error} was made by an earlier version of kb, in a form this kb cannot read; "
-            f"start a new store and import the old one's files"
-        ))
-    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {error}")
+def unreadable(problem: str) -> kb_pb2.Fault:
+    """A store whose database cannot be read, the problem naming the database."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {problem}")
+
+
+def earlier_kb(root: str, files: str) -> kb_pb2.Fault:
+    """A store an earlier kb made, and how to move it: the directory holding its files imported into a new store."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
+        f"the store at {root} was made by an earlier version of kb, in a form this kb cannot read; start a new store "
+        f"and import the old one's files, from {files}"
+    ))
+
+
+def later_kb(root: str) -> kb_pb2.Fault:
+    """A store whose marker names a form of store this kb does not know, or cannot be read at all."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
+        f"the store at {root} was made by a later version of kb, which is needed to read it; this kb does not know "
+        f"the form of store its marker names"
+    ))
 
 
 def busy() -> kb_pb2.Fault:
