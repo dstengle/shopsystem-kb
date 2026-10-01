@@ -5,7 +5,7 @@ import sqlite3
 from kb import names, rules
 from kb.contract import kb_pb2
 from kb.names import Misnamed
-from kb.port import EarlierKb, Unreadable
+from kb.port import EarlierKb, LaterKb, Unreadable
 from kb.values import ArtifactId, Locator
 
 
@@ -186,7 +186,13 @@ def clock_failed(problem: str) -> kb_pb2.Fault:
 
 
 def unreadable(error: Unreadable | sqlite3.Error) -> kb_pb2.Fault:
-    """The fault for a store that cannot be read: the database named, or, for one an earlier kb made, how to move it."""
+    """The fault for a store that cannot be read: the database named, or, for one an earlier kb made, how to move it,
+    or, for one a later kb made, that a later kb is needed."""
+    if isinstance(error, LaterKb):
+        return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
+            f"the store at {error} was made by a later version of kb, which is needed to read it; this kb does not "
+            f"know the form of store its marker names"
+        ))
     if isinstance(error, EarlierKb):
         return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
             f"the store at {error} was made by an earlier version of kb, in a form this kb cannot read; "

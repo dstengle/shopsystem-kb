@@ -263,3 +263,60 @@ def test_a_store_whose_database_cannot_be_opened_for_writing_because_the_direct(
 )
 def test_a_store_found_that_was_made_by_an_earlier_kb_in_a_form_this_kb_cannot():
     pass
+
+
+@scenario(
+    FEATURE,
+    "A store found whose marker names a form of store this kb does not know, one a later kb made, refuses every call "
+    "and command that needs it",
+)
+def test_a_store_found_whose_marker_names_a_form_a_later_kb_made_refuses_every_call():
+    pass
+
+
+@given(
+    "a store holding a decision, a process and a tag, whose marker names a form of store this kb does not know, one a "
+    "later kb made",
+    target_fixture="client",
+)
+def _store_made_by_a_later_kb(root):
+    client = _store_with_a_decision_a_process_and_a_tag(root)
+    held.made_by_a_later_kb(root)
+    return client
+
+
+def _later(rule, message):
+    assert rule == "unreadable"
+    assert "made by a later version of kb, which is needed to read it" in message
+
+
+@then("what was asked is rejected because the store was made by a later version of kb, which is needed to read it")
+def _rejected_as_later(answered):
+    if hasattr(answered, "faults"):
+        [fault] = answered.faults
+        assert (fault.artifact, fault.path) == ("", "")
+        _later(fault.rule, fault.message)
+    else:
+        [line] = answered.stderr.splitlines()
+        _later(*line.split(": ", 3)[2:4])
+
+
+@then("the store is not opened")
+def _not_opened(root, before):
+    assert sorted(held.bytes_held(root)) == sorted(before["held"])
+
+
+@scenario(
+    FEATURE,
+    "A store found whose marker cannot be read at all refuses every call and command that needs it, as for a later "
+    "kb's store",
+)
+def test_a_store_found_whose_marker_cannot_be_read_at_all_refuses_every_call():
+    pass
+
+
+@given("a store holding a decision, a process and a tag, whose marker cannot be read at all", target_fixture="client")
+def _store_whose_marker_cannot_be_read(root):
+    client = _store_with_a_decision_a_process_and_a_tag(root)
+    held.with_a_marker_that_cannot_be_read(root)
+    return client

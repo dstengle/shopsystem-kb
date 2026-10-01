@@ -184,6 +184,17 @@ def made_by_an_earlier_kb(root):
     (place / _MARKER).write_text(canonical.dump({"contract": "0.1"}), encoding="utf-8")
 
 
+def made_by_a_later_kb(root):
+    """Make the store in `root` look as a later kb would keep it: its marker naming a form of store this kb does not
+    know, the database beside it left as this kb wrote it, so that opening it would succeed."""
+    (_place(root) / _MARKER).write_text(canonical.dump({"store": store.STORE_FORM + 1}), encoding="utf-8")
+
+
+def with_a_marker_that_cannot_be_read(root):
+    """Overwrite the store's marker with bytes that are neither UTF-8 nor YAML, the database beside it left as it was."""
+    (_place(root) / _MARKER).write_bytes(b"\xff\xfe\x00 not a marker \x9c\n")
+
+
 def bytes_held(root):
     """Everything in the place of the store started in `root`, each path with its bytes: what a store whose database
     cannot be read holds, compared byte for byte, since no read of it can be made."""

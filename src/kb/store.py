@@ -11,7 +11,7 @@ from typing import Callable, Mapping
 
 from kb import canonical, rules, sqlite_store
 from kb.contract import kb_pb2
-from kb.port import EarlierKb, Port, Unreadable
+from kb.port import EarlierKb, LaterKb, Port, Unreadable
 from kb.values import Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
@@ -20,20 +20,25 @@ STORE_FORM = 1
 
 
 def opened(root) -> contextlib.AbstractContextManager[Port]:
-    """The store at root, open until the block ends: the database beside its marker, handed to the adapter. Raises
-    EarlierKb, opening nothing, when the marker is the one an earlier kb wrote."""
+    """The store at root, open until the block ends: the database beside its marker, handed to the adapter. Raises,
+    opening nothing, EarlierKb when the marker is the one an earlier kb wrote, and LaterKb when it is any other but
+    this kb's own or cannot be read at all."""
     _told_apart(Path(root))
     return sqlite_store.opened(Path(root) / DATABASE)
 
 
 def _told_apart(root: Path) -> None:
-    """Refuse a store whose marker holds `contract`, the one an earlier kb wrote."""
+    """Refuse a store whose marker is not exactly this kb's: one holding `contract`, which an earlier kb wrote, as an
+    earlier kb's; any other, and one that cannot be read at all, whatever its bytes, as a later kb's."""
     try:
         marker = canonical.load((root / MARKER).read_text(encoding="utf-8"))
-    except (canonical.NotCanonical, OSError):
+    except (canonical.NotCanonical, UnicodeDecodeError, OSError):
+        raise LaterKb(str(root)) from None
+    if marker == {"store": STORE_FORM}:
         return
     if isinstance(marker, dict) and "contract" in marker:
         raise EarlierKb(str(root))
+    raise LaterKb(str(root))
 
 
 def start(root: Root, fill: Callable[[Port], None]) -> None:
@@ -45,7 +50,7 @@ def start(root: Root, fill: Callable[[Port], None]) -> None:
     place.mkdir()
     try:
         sqlite_store.make(root.path / DATABASE)
-        with opened(root.path) as made:
+        with sqlite_store.opened(root.path / DATABASE) as made:
             fill(made)
         (root.path / MARKER).write_text(canonical.dump({"store": STORE_FORM}), encoding="utf-8")
     except (sqlite3.Error, OSError, Unreadable):

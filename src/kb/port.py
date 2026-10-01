@@ -137,6 +137,11 @@ class EarlierKb(Unreadable):
     """The store was made by an earlier version of kb, in a form this kb cannot read; it carries where the store is."""
 
 
+class LaterKb(Unreadable):
+    """The store's marker names a form of store this kb does not know, or cannot be read at all: a later version of kb
+    is needed to read it; it carries where the store is."""
+
+
 class Port(Protocol):
     """Reads answer from the store as it stands; `land` changes it. Names come back in `names.order`."""
 

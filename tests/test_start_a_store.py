@@ -241,6 +241,14 @@ def _directory_with_an_earlier_kbs_store(root, before):
     return root
 
 
+@given("a directory that already has a store inside it, made by a later kb", target_fixture="root")
+def _directory_with_a_later_kbs_store(root, before):
+    kb_client.connect(root).Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
+    held.made_by_a_later_kb(root)
+    before.update(held=held.bytes_held(root))
+    return root
+
+
 @then("the store that is there is left as it was")
 def _earlier_store_left_as_it_was(root, before):
     assert held.bytes_held(root) == before["held"]
