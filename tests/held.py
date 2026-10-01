@@ -170,7 +170,11 @@ class Holding:
     def __init__(self, root):
         self.held = holds(root)
         self._db = sqlite3.connect(_connected(_place(root))._uri, uri=True, isolation_level=None)
-        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            self._db.execute("BEGIN IMMEDIATE")
+        except sqlite3.Error:
+            self._db.close()
+            raise
 
     def let_go(self):
         """The lock let go, the change taken back, nothing of it written; once only, however often asked."""

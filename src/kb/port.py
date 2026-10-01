@@ -168,7 +168,8 @@ class Port(Protocol):
     def exclusive(self) -> ContextManager[None]:
         """A block holding the store's write lock from its start to its end: its reads see every set landed before it,
         no other set lands until it ends, and what `land` lands in it is kept when the block ends without raising.
-        A refusal of `land` inside it takes back only that set, and the lock is still held. Raises Busy, nothing
+        A refusal of `land` inside it takes back only that set, and the lock is still held. A block opened inside one
+        that holds the lock runs within it. Raises Busy, nothing
         written, when another change holds the write lock longer than the store waits for it."""
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),

@@ -120,7 +120,11 @@ class SqliteStore(Checks):
 
     @contextlib.contextmanager
     def exclusive(self):
-        """The write lock taken by BEGIN IMMEDIATE for the block, committed when it ends, rolled back when it raises."""
+        """The write lock taken by BEGIN IMMEDIATE for the block, committed when it ends, rolled back when it raises; a
+        block inside one that already holds it runs within the outer block."""
+        if self._locked:
+            yield
+            return
         self._db.execute("BEGIN IMMEDIATE")
         self._locked = True
         committed = False
