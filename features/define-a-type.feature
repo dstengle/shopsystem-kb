@@ -110,10 +110,10 @@ Feature: Define a type
 
   @slice-126
   Scenario: A type refused with several faults has them given in the order its places stand when it reads back
-    Pins that a refused type's faults follow the order the type would read back in, which is the order the type that describes types declares, not the order the client wrote the type in, and that faults at one place are told apart by a fixed order of their rules.
-    When the client defines a type written with its collection of parts first, then its required sections, then its fields, where one field breaks two of kb's rules for a link field, a field's nested schema declares required sections, and a collection's items declare required sections
+    Pins that a refused type's faults follow the order the type reads back in, which is the order the client wrote it in, and that faults at one place are told apart by a fixed order of their rules.
+    When the client defines a type where one field breaks two of kb's rules for a link field, a field's nested schema declares required sections, and a collection's items declare required sections
     Then the type is rejected with every fault, each naming the place
-    And the faults come in the order the places stand in the type as it would read back
+    And the faults come in the order the places stand in the type as it reads back, which is the order the client wrote it in
     And the two faults at the link field come in the alphabetical order of the names of the rules they break
     And nothing is written anywhere in the store
 

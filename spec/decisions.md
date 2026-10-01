@@ -461,3 +461,15 @@ A type the store held before kb read its keywords only where it reads them is no
 date: 2026-10-01
 supersedes: decision/kb-keywords-read-where-written (its clause on a type the store already holds)
 source: the person, 2026-10-01: "Don't worry about migration. This is all new code so migration is not needed at this point"
+
+## decision/links-read-only-where-kb-reads-them-today
+A link field is read only directly among the fields of a type, of a base it is built on, or of the items of any of its collections at any depth; one in a named shape another field uses is refused like any other misplaced link field, because kb has never read links there and reading them would be new behaviour the type-language note does not ask for.
+date: 2026-10-01
+supersedes: decision/kb-keywords-read-where-written (its clause on a named shape another field uses)
+source: the batch 26 planning question, decided by the controller under the person's delegation of 2026-10-01
+
+## decision/a-types-faults-in-the-order-it-was-written
+A type reads back exactly as it was written, so a type refused with several faults has them in the order its places stand as it was written, then by rule name; there is no declared order for a type's own entries.
+date: 2026-10-01
+supersedes: decision/faults-ordered-by-reading-order-then-rule-name (its clause on a type's places)
+source: the batch 26 planning question, decided by the controller under the person's delegation of 2026-10-01
