@@ -1,11 +1,12 @@
 import copy
 import re
 
+import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, NOTE_TYPE, add, apply, creation, define, create, journal, listing, read, refs,
-    remove, replacement, replacing, request, replace, answer,
+    CLIENT, DECISION_TYPE, NOTE_TYPE, add, define, create, journal, listing, read, refs, remove, replacing, request,
+    replace, answer,
 )
 import at_once
 import held
@@ -500,8 +501,9 @@ UNSIGNED = {
         client, DECISION, "options", {"title": "Go fortnightly"}, message=message, actor=actor),
     "removes the decision": lambda client, actor, message: remove(client, DECISION, message=message, actor=actor),
     "asks, in one go, for another decision to be created and the decision to be replaced":
-        lambda client, actor, message: apply(
-            client, [creation(*ANOTHER), replacement(DECISION, {"sections": SECTIONS})], message=message, actor=actor),
+        lambda client, actor, message: pytest.fail(
+            "contract v1 takes one kind of change in a set (decision/sets-one-kind-at-a-time): no call asks for a "
+            "create and a replacement in one go, so this example cannot be made as it is written"),
 }
 
 SAYING = {

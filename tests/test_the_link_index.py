@@ -1,14 +1,16 @@
 """The links the store keeps follow the types as they stand: a type changed to make a field a link, or to stop it being
 one, changes what blocks a removal, what is counted as pointing in and what an inward walk reaches; and a set reads
-each artifact's links as the set leaves it. Through the contract, each store under its own tmp_path."""
+each artifact's links as the set leaves it. Through the contract, and, for a set of more than one kind of change, which
+the contract does not take, through kb.write's own `land`; each store under its own tmp_path."""
 import copy
 
 import pytest
 
 from calls import CLIENT, remove, replace, request
-from kb import client as kb_client
+from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps
 from kb.contract import kb_pb2
+from kb.signatures import Signed
 
 PLAIN = {"title": "Note", "version": 1, "schema": {
     "type": "object", "properties": {"title": {"type": "string"}, "about": {"type": "string"}}, "required": ["title"],
@@ -36,9 +38,15 @@ def _delete(client, name):
 
 
 @pytest.fixture
-def client(tmp_path):
+def where(tmp_path):
     root = tmp_path / "store"
     root.mkdir()
+    return root
+
+
+@pytest.fixture
+def client(where):
+    root = where
     client = kb_client.connect(root)
     client.Init(kb_pb2.InitRequest(root=str(root), actor=CLIENT))
     return client
@@ -72,15 +80,28 @@ def test_a_type_changed_to_make_a_field_a_link_blocks_removing_what_it_points_at
     ]
 
 
-def test_a_type_changed_in_the_same_set_as_a_removal_blocks_it(client):
+def _landed(root, operations) -> list:
+    """A set of changes of more than one kind landed through kb.write; the faults it was refused for."""
+    with store.opened(root) as held:
+        try:
+            write.land(held, operations, Signed(signatures.Actor("client", ""), "m"))
+        except values.Refused as refused:
+            return [(fault.artifact, fault.rule) for fault in refused.faults]
+    return []
+
+
+def _whole(name):
+    return values.Locator(values.artifact_id(name), ())
+
+
+def test_a_type_changed_in_the_same_set_as_a_removal_blocks_it(where, client):
     _with_a_note_about_a_tag(client, PLAIN)
     content = {key: value for key, value in LINKING.items() if key != "title"}
-    applied = client.Apply(kb_pb2.ApplyRequest(operations=[
-        kb_pb2.Operation(write=kb_pb2.Replacement(
-            locator=kb_pb2.Locator(id="schema/note"), content=dumps({**content, "version": 2}))),
-        kb_pb2.Operation(delete=kb_pb2.Removal(locator=kb_pb2.Locator(id="tag/pricing"))),
-    ], actor=CLIENT, message="m"))
-    assert [(fault.artifact, fault.rule) for fault in applied.faults] == [("note/weekly", "on_delete")]
+    faults = _landed(where, [
+        changes.Replace(_whole("schema/note"), values.content(dumps({**content, "version": 2}))),
+        changes.Remove(_whole("tag/pricing")),
+    ])
+    assert faults == [("note/weekly", "on_delete")]
 
 
 def test_a_type_changed_to_stop_a_field_being_a_link_no_longer_blocks_removing_what_it_named(client):
@@ -91,11 +112,12 @@ def test_a_type_changed_to_stop_a_field_being_a_link_no_longer_blocks_removing_w
     assert not _delete(client, "tag/pricing").faults
 
 
-def test_an_artifact_made_and_removed_in_one_set_does_not_hold_up_removing_its_type(client):
+def test_an_artifact_made_and_removed_in_one_set_does_not_hold_up_removing_its_type(where, client):
     _create(client, "schema", PLAIN["title"], {key: value for key, value in PLAIN.items() if key != "title"})
-    applied = client.Apply(kb_pb2.ApplyRequest(operations=[
-        kb_pb2.Operation(create=kb_pb2.Creation(type="note", title="Passing", content=dumps({}))),
-        kb_pb2.Operation(delete=kb_pb2.Removal(locator=kb_pb2.Locator(id="note/passing"))),
-        kb_pb2.Operation(delete=kb_pb2.Removal(locator=kb_pb2.Locator(id="schema/note"))),
-    ], actor=CLIENT, message="m"))
-    assert not applied.faults, applied.faults
+    note = values.kind("note")
+    name, at, faults = values.named(note, "Passing")
+    assert _landed(where, [
+        changes.Create(note, "Passing", name, at, faults, values.content(dumps({}))),
+        changes.Remove(_whole("note/passing")),
+        changes.Remove(_whole("schema/note")),
+    ]) == []

@@ -8,7 +8,7 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, add, apply, create, creation, define, journal, listing, refs,
+    CLIENT, DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, add, create, create_many, created, define, journal, listing, refs,
     read, remove, request, search, snapshot, replace,
 )
 from conftest import OPERATOR, _kb
@@ -97,9 +97,9 @@ CALLS = {
     "removes the decision, saying which role and why":
         lambda client: remove(client, DECISION),
     "asks, in one go, for two decisions to be created, saying which role and why":
-        lambda client: apply(client, [
-            creation("decision", "Close early on Sundays", {"sections": SECTIONS}),
-            creation("decision", "Open late on Fridays", {"sections": SECTIONS}),
+        lambda client: create_many(client, [
+            created("decision", "Close early on Sundays", {"sections": SECTIONS}),
+            created("decision", "Open late on Fridays", {"sections": SECTIONS}),
         ]),
     "lists the decisions":
         lambda client: listing(client, "decision"),

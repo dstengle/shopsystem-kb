@@ -59,11 +59,6 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.ReplaceRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceResponse.FromString,
                 _registered_method=True)
-        self.Apply = channel.unary_unary(
-                '/kb.v1.Kb/Apply',
-                request_serializer=kb_dot_contract_dot_kb__pb2.ApplyRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.ApplyResponse.FromString,
-                _registered_method=True)
         self.Journal = channel.unary_unary(
                 '/kb.v1.Kb/Journal',
                 request_serializer=kb_dot_contract_dot_kb__pb2.JournalRequest.SerializeToString,
@@ -99,6 +94,26 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.RemoveRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.RemoveResponse.FromString,
                 _registered_method=True)
+        self.CreateMany = channel.unary_unary(
+                '/kb.v1.Kb/CreateMany',
+                request_serializer=kb_dot_contract_dot_kb__pb2.CreateManyRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.CreateManyResponse.FromString,
+                _registered_method=True)
+        self.ReplaceMany = channel.unary_unary(
+                '/kb.v1.Kb/ReplaceMany',
+                request_serializer=kb_dot_contract_dot_kb__pb2.ReplaceManyRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceManyResponse.FromString,
+                _registered_method=True)
+        self.AddMany = channel.unary_unary(
+                '/kb.v1.Kb/AddMany',
+                request_serializer=kb_dot_contract_dot_kb__pb2.AddManyRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.AddManyResponse.FromString,
+                _registered_method=True)
+        self.RemoveMany = channel.unary_unary(
+                '/kb.v1.Kb/RemoveMany',
+                request_serializer=kb_dot_contract_dot_kb__pb2.RemoveManyRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.RemoveManyResponse.FromString,
+                _registered_method=True)
 
 
 class KbServicer:
@@ -129,12 +144,6 @@ class KbServicer:
         raise NotImplementedError('Method not implemented!')
 
     def Replace(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Apply(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -182,6 +191,30 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateMany(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReplaceMany(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddMany(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveMany(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_KbServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -209,11 +242,6 @@ def add_KbServicer_to_server(servicer, server):
                     servicer.Replace,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.ReplaceResponse.SerializeToString,
-            ),
-            'Apply': grpc.unary_unary_rpc_method_handler(
-                    servicer.Apply,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.ApplyRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.ApplyResponse.SerializeToString,
             ),
             'Journal': grpc.unary_unary_rpc_method_handler(
                     servicer.Journal,
@@ -249,6 +277,26 @@ def add_KbServicer_to_server(servicer, server):
                     servicer.Remove,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.RemoveRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.RemoveResponse.SerializeToString,
+            ),
+            'CreateMany': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateMany,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.CreateManyRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.CreateManyResponse.SerializeToString,
+            ),
+            'ReplaceMany': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReplaceMany,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceManyRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.ReplaceManyResponse.SerializeToString,
+            ),
+            'AddMany': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddMany,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.AddManyRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.AddManyResponse.SerializeToString,
+            ),
+            'RemoveMany': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveMany,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.RemoveManyRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.RemoveManyResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -386,33 +434,6 @@ class Kb:
             '/kb.v1.Kb/Replace',
             kb_dot_contract_dot_kb__pb2.ReplaceRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.ReplaceResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Apply(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/kb.v1.Kb/Apply',
-            kb_dot_contract_dot_kb__pb2.ApplyRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.ApplyResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -602,6 +623,114 @@ class Kb:
             '/kb.v1.Kb/Remove',
             kb_dot_contract_dot_kb__pb2.RemoveRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.RemoveResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateMany(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.v1.Kb/CreateMany',
+            kb_dot_contract_dot_kb__pb2.CreateManyRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.CreateManyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReplaceMany(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.v1.Kb/ReplaceMany',
+            kb_dot_contract_dot_kb__pb2.ReplaceManyRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.ReplaceManyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddMany(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.v1.Kb/AddMany',
+            kb_dot_contract_dot_kb__pb2.AddManyRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.AddManyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveMany(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/kb.v1.Kb/RemoveMany',
+            kb_dot_contract_dot_kb__pb2.RemoveManyRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.RemoveManyResponse.FromString,
             options,
             channel_credentials,
             insecure,

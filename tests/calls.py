@@ -196,25 +196,48 @@ def read(client, artifact_id, whole=False, depth=0, section=""):
     ))
 
 
-def apply(client, operations, message="Make several changes", actor=CLIENT):
-    """An Apply of the operations in order, under the client's role unless another actor is given. Returns the
-    response, faults and all."""
-    return client.Apply(kb_pb2.ApplyRequest(operations=operations, actor=actor, message=message))
+def created(type_name, title, content, key=""):
+    """A create inside a CreateMany: the title beside the content, and the key it carries, if any."""
+    return kb_pb2.CreateItem(kind=type_name, title=title, content=dumps(content), key=key)
 
 
-def creation(type_name, title, content):
-    """A Create inside a set: the title beside the content, the role and message the set's."""
-    return kb_pb2.Operation(create=kb_pb2.Creation(type=type_name, title=title, content=dumps(content)))
+def replaced(artifact_id, content):
+    """A replacement of a whole artifact inside a ReplaceMany."""
+    return kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content))
 
 
-def replacement(artifact_id, content):
-    """A replacement of a whole artifact inside a set."""
-    return kb_pb2.Operation(write=kb_pb2.Replacement(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content)))
+def create_many(client, items, message="Make several changes", actor=CLIENT):
+    """A CreateMany of the creates in order, under the client's role unless another actor is given. Returns the
+    answer, faults and all."""
+    return answer(client.CreateMany(kb_pb2.CreateManyRequest(items=items, signature=signature(message, actor))))
 
 
-def removal(artifact_id):
-    """A removal of a whole artifact inside a set."""
-    return kb_pb2.Operation(delete=kb_pb2.Removal(locator=kb_pb2.Locator(id=artifact_id)))
+def replace_many(client, items, message="Make several changes", actor=CLIENT):
+    """A ReplaceMany of the replacements in order, under the client's role unless another actor is given. Returns the
+    answer, faults and all."""
+    return answer(client.ReplaceMany(kb_pb2.ReplaceManyRequest(items=items, signature=signature(message, actor))))
+
+
+def added(artifact_id, collection, content):
+    """One item for the collection named inside an artifact, inside an AddMany."""
+    return kb_pb2.AddItem(locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(content))
+
+
+def removed(artifact_id):
+    """A removal of a whole artifact inside a RemoveMany."""
+    return kb_pb2.RemoveItem(locator=kb_pb2.Locator(id=artifact_id))
+
+
+def add_many(client, items, message="Make several changes", actor=CLIENT):
+    """An AddMany of the additions in order, under the client's role unless another actor is given. Returns the
+    answer, faults and all."""
+    return answer(client.AddMany(kb_pb2.AddManyRequest(items=items, signature=signature(message, actor))))
+
+
+def remove_many(client, items, message="Make several changes", actor=CLIENT):
+    """A RemoveMany of the removals in order, under the client's role unless another actor is given. Returns the
+    answer, faults and all."""
+    return answer(client.RemoveMany(kb_pb2.RemoveManyRequest(items=items, signature=signature(message, actor))))
 
 
 def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path=""):

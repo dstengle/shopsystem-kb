@@ -120,6 +120,16 @@ def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
     return None, at, (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE, message=message),)
 
 
+def key(text: str) -> str:
+    """The key a create in a set carries, a plain name; none when it carries none."""
+    if text and not names.plain(text):
+        raise Refused([kb_pb2.Fault(
+            rule=rules.REF,
+            message=f"a key is a plain name of lower-case letters, digits and single hyphens; {text!r} is not",
+        )])
+    return text
+
+
 def _leaves_nothing(title: str) -> str:
     return f"a title must leave something to make a name from; {title!r} leaves nothing"
 

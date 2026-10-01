@@ -4,7 +4,7 @@
 The store is built in a fresh directory under the system's temp, removed after, and reached only through
 `kb.client.connect`, as a client reaches it. The graph has about three links per artifact: a few hundred tags;
 decisions, each linking to two tags and most to the decision before; work items, each linking to two decisions. It
-is landed through Apply in sets of 100, and what a set cost to land is printed as the store grows. Every figure is
+is landed through CreateMany in sets of 100, and what a set cost to land is printed as the store grows. Every figure is
 the median of 20 calls."""
 import statistics
 import sys
@@ -67,12 +67,12 @@ def answered(response):
     return response
 
 
-def creation(kind: str, title: str, content: dict) -> kb_pb2.Operation:
-    return kb_pb2.Operation(create=kb_pb2.Creation(type=kind, title=title, content=dumps(content)))
+def creation(kind: str, title: str, content: dict) -> kb_pb2.CreateItem:
+    return kb_pb2.CreateItem(kind=kind, title=title, content=dumps(content))
 
 
-def applied(client, operations) -> kb_pb2.ApplyResponse:
-    return answered(client.Apply(kb_pb2.ApplyRequest(operations=operations, actor=ACTOR, message="bench")))
+def applied(client, creates) -> kb_pb2.CreatedMany:
+    return answered(client.CreateMany(kb_pb2.CreateManyRequest(items=creates, signature=SIGNATURE)))
 
 
 def timed(call, runs: int = RUNS) -> float:
@@ -164,7 +164,7 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
     def a_set():
         start = next(sets) * SET
         applied(client, [creation("tag", f"Batch {start + i}", {}) for i in range(SET)])
-    measured.append(("set of 100 changes", f"Apply of {SET} creates", timed(a_set)))
+    measured.append(("set of 100 changes", f"CreateMany of {SET} creates", timed(a_set)))
     return measured
 
 

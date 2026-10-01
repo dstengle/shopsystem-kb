@@ -5,8 +5,8 @@ the types it was read through. A fault anywhere refuses the whole set with every
 from typing import NamedTuple
 
 from kb import (
-    canonical, composition, definitions, edits, links, places, port, refusals, requests, search, settled, validation,
-    values,
+    canonical, composition, definitions, edits, keys, links, places, port, refusals, requests, search, settled,
+    validation, values,
 )
 from kb.draft import Draft
 from kb.edits import Change
@@ -49,7 +49,7 @@ def _relinked(draft: Draft, artifact_id: values.ArtifactId) -> port.Relink:
 def _drafted(draft: Draft, operations: list) -> list[Change]:
     """Every operation applied in order to a draft, then what the set leaves checked once; refused with every fault,
     in the order of the operations they belong to."""
-    outcomes = [_acted(draft, operation) for operation in operations]
+    outcomes = keys.resolved(draft, operations, [_acted(draft, operation) for operation in operations])
     changes = [each for each in outcomes if isinstance(each, Change)]
     last = {change.artifact_id: change for change in changes}
     faults = [fault for outcome in outcomes for fault in _faults(draft, outcome, last)]

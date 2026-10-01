@@ -17,7 +17,6 @@ service Kb {
   rpc Read(ReadRequest) returns (ReadResponse);
   rpc Validate(ValidateRequest) returns (ValidateResponse);
   rpc Replace(ReplaceRequest) returns (ReplaceResponse);
-  rpc Apply(ApplyRequest) returns (ApplyResponse);
   rpc Journal(JournalRequest) returns (JournalResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
   rpc Refs(RefsRequest) returns (RefsResponse);
@@ -25,6 +24,10 @@ service Kb {
   rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
   rpc Add(AddRequest) returns (AddResponse);
   rpc Remove(RemoveRequest) returns (RemoveResponse);
+  rpc CreateMany(CreateManyRequest) returns (CreateManyResponse);
+  rpc ReplaceMany(ReplaceManyRequest) returns (ReplaceManyResponse);
+  rpc AddMany(AddManyRequest) returns (AddManyResponse);
+  rpc RemoveMany(RemoveManyRequest) returns (RemoveManyResponse);
 }
 
 // Who made an entry in the history: the role, and the piece of work.
@@ -172,9 +175,10 @@ message ReplaceRequest {
   Signature signature = 3;
 }
 
-// The artifact's version now.
+// The artifact replaced, and its version now.
 message Replaced {
   int32 revision = 1;
+  string id = 2;
 }
 
 message ReplaceResponse {
@@ -184,70 +188,10 @@ message ReplaceResponse {
   }
 }
 
-// One change in a set: a create, a replacement, an item added, or a
-// removal, with no role or message of its own, since the set carries those.
-message Operation {
-  oneof operation {
-    Creation create = 1;
-    Replacement write = 2;
-    Addition append = 3;
-    Removal delete = 4;
-  }
-}
-
-// What a Create carries but the role and the message.
-message Creation {
-  string type = 1;
-  string title = 2;
-  string content = 3;  // canonical YAML: fields, sections, parts
-}
-
-// A new content for an artifact the store holds; its title is kept.
-message Replacement {
-  Locator locator = 1;
-  string content = 2;  // canonical YAML: fields, sections, parts
-}
-
-// One item for a collection inside an artifact the store holds: the
-// locator's place is the collection's name. kb names the item.
-message Addition {
-  Locator locator = 1;
-  string content = 2;  // canonical YAML: the item's fields, never its id
-}
-
-// A whole artifact the store holds, to be taken out.
-message Removal {
-  Locator locator = 1;
-}
-
-// Every operation lands, in order, as one change, or none does.
-message ApplyRequest {
-  repeated Operation operations = 1;
-  Actor actor = 2;
-  string message = 3;
-}
-
-// The set's name, minted by kb, and one result per operation in order.
-// With faults, a refusal: every fault of every operation, and nothing
-// was written.
-message ApplyResponse {
-  string batch = 1;
-  repeated Result results = 2;
-  repeated Fault faults = 3;
-}
-
-// The artifact changed and its version now; for an item added, the name
-// kb gave it.
-message Result {
-  string id = 1;
-  int32 revision = 2;
-  string item = 3;
-}
-
 // Narrows the journal to the entries about one artifact, made under one
 // role, for one piece of work, at or after a time (ISO 8601, a date alone
 // meaning its midnight, UTC unless it says otherwise), or landed in one
-// set, named by the batch Apply gave, by each one given; with none, every
+// set, named by the batch a *Many gave, by each one given; with none, every
 // entry.
 message JournalRequest {
   string artifact = 1;
@@ -424,9 +368,10 @@ message RemoveRequest {
   Signature signature = 2;
 }
 
-// The version the removal left behind.
+// The artifact removed, and the version the removal left behind.
 message Removed {
   int32 revision = 1;
+  string id = 2;
 }
 
 // A refusal: a bad locator, a name the store lacks, or, one fault each,
@@ -435,6 +380,112 @@ message Removed {
 message RemoveResponse {
   oneof outcome {
     Removed result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of creates, landing in order as one change, or none does. A
+// create may carry a key of the client's choosing, unique in the set; a
+// link written `@` and the key, anywhere in the set, names the artifact
+// that create makes, and kb puts the name it gives that artifact in its
+// place before anything is checked. A key names a whole artifact, never
+// a place inside one.
+message CreateItem {
+  string kind = 1;
+  string title = 2;
+  string content = 3;  // canonical YAML: fields, sections, parts
+  string key = 4;
+}
+
+message CreateManyRequest {
+  repeated CreateItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each create's result in the order of
+// the set.
+message CreatedMany {
+  string batch = 1;
+  repeated Created results = 2;
+}
+
+message CreateManyResponse {
+  oneof outcome {
+    CreatedMany result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of replacements, landing in order as one change, or none does.
+message ReplaceItem {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: fields, sections, parts
+}
+
+message ReplaceManyRequest {
+  repeated ReplaceItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each replacement's result, naming the
+// artifact it replaced, in the order of the set.
+message ReplacedMany {
+  string batch = 1;
+  repeated Replaced results = 2;
+}
+
+message ReplaceManyResponse {
+  oneof outcome {
+    ReplacedMany result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of items added, landing in order as one change, or none does.
+message AddItem {
+  Locator locator = 1;
+  string content = 2;  // canonical YAML: the item's fields, never its id
+}
+
+message AddManyRequest {
+  repeated AddItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each addition's result, in the order
+// of the set.
+message AddedMany {
+  string batch = 1;
+  repeated Added results = 2;
+}
+
+message AddManyResponse {
+  oneof outcome {
+    AddedMany result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// A set of removals, landing in order as one change, or none does.
+message RemoveItem {
+  Locator locator = 1;
+}
+
+message RemoveManyRequest {
+  repeated RemoveItem items = 1;
+  Signature signature = 2;
+}
+
+// The set's name, minted by kb, and each removal's result, naming the
+// artifact it removed, in the order of the set.
+message RemovedMany {
+  string batch = 1;
+  repeated Removed results = 2;
+}
+
+message RemoveManyResponse {
+  oneof outcome {
+    RemovedMany result = 1;
     Refusal refusal = 2;
   }
 }

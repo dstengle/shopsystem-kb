@@ -1,10 +1,11 @@
+import copy
 import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, apply, create, creation, define, journal, listing, read,
-    removal, replacement, replace,
+    CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, create_many, created, define, journal, listing, read, refs,
+    remove_many, removed, replace, replace_many, replaced,
 )
 import held
 from kb import client as kb_client
@@ -31,35 +32,64 @@ def _store_with_a_decision_type_and_a_work_item(root):
     return client
 
 
+NEW_WORK_ITEM = "work-item/review-prices-on-mondays"
+
+
 @when(
-    "the client asks, in one go, for a decision to be created and the work item to point at it, in that order, "
-    "saying which role and why",
+    "the client asks, in one go, for a decision and a work item to be created, in that order, saying which role and why",
     target_fixture="applied",
 )
-def _create_and_point_at_it(client):
-    return apply(client, [
-        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-        replacement(WORK_ITEM, {"decisions": [DECISION]}),
+def _create_a_decision_and_a_work_item(client):
+    return create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+        created("work-item", "Review prices on Mondays", {}),
     ], message="Move price reviews to weekly")
+
+
+@when("the client asks, in one go, for a decision to be created, saying which role and why", target_fixture="sets")
+def _create_a_decision_in_one_go(client):
+    return [create_many(client, [created("decision", "Price reviews happen weekly", {"sections": SECTIONS})],
+                        message="Record a decision")]
+
+
+@when(
+    "the client then asks, in one go, for the work item to be replaced so that it points at that decision, "
+    "saying which role and why"
+)
+def _then_replace_the_work_item_in_one_go(client, sets):
+    sets.append(replace_many(client, [replaced(WORK_ITEM, {"decisions": [DECISION]})], message="Point at it"))
+
+
+@then("both sets land")
+def _both_sets_land(sets):
+    assert [(each.refused, bool(each.batch)) for each in sets] == [(False, True), (False, True)], sets
+
+
+@then("the history shows two sets, the create's and the replacement's")
+def _two_sets_in_the_history(client, sets):
+    shown = [[(entry.op, entry.artifact, entry.revision) for entry in held.history(client) if entry.batch == each.batch]
+             for each in sets]
+    assert shown == [[("create", DECISION, 1)], [("write", WORK_ITEM, 2)]]
+    assert sets[0].batch != sets[1].batch
 
 
 @then("the client is given one name for the set, which the client never asked for")
 def _given_a_name_for_the_set(applied):
-    assert not applied.faults, applied.faults
+    assert not applied.refused, applied.faults
     assert applied.batch
-    assert "batch" not in kb_pb2.ApplyRequest.DESCRIPTOR.fields_by_name
+    assert "batch" not in kb_pb2.CreateManyRequest.DESCRIPTOR.fields_by_name
 
 
 @then("each change also comes back with its own result")
 def _a_result_for_each_change(applied):
-    assert [(result.id, result.revision) for result in applied.results] == [(DECISION, 1), (WORK_ITEM, 2)]
+    assert [(result.id, result.revision) for result in applied.results] == [(DECISION, 1), (NEW_WORK_ITEM, 1)]
 
 
 @then("the store's history shows the set as one change")
 def _one_change_in_the_history(client, applied):
     in_set = [entry for entry in held.history(client) if entry.batch == applied.batch]
     assert [(entry.op, entry.artifact, entry.revision) for entry in in_set] == [
-        ("create", DECISION, 1), ("write", WORK_ITEM, 2),
+        ("create", DECISION, 1), ("create", NEW_WORK_ITEM, 1),
     ]
     assert {(entry.actor.role, entry.message) for entry in in_set} == {("client", "Move price reviews to weekly")}
 
@@ -67,22 +97,22 @@ def _one_change_in_the_history(client, applied):
 @given("a set whose second change is missing a section its type requires", target_fixture="bad_set")
 def _a_set_with_a_bad_second_change():
     return [
-        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-        creation("decision", "Prices are reviewed monthly", {"sections": []}),
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+        created("decision", "Prices are reviewed monthly", {"sections": []}),
     ]
 
 
 @when("the client asks for the set, saying which role and why", target_fixture="attempt")
 def _ask_for_the_set(root, client, bad_set):
     before = held.holds(root)
-    response = apply(client, bad_set, message="Record two decisions")
+    response = create_many(client, bad_set, message="Record two decisions")
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the set is rejected because a change in it does not fit its type")
 def _set_rejected(attempt):
     refused = attempt["response"]
-    assert (refused.batch, list(refused.results)) == ("", [])
+    assert refused.refused
     assert {(fault.artifact, fault.rule) for fault in refused.faults} == {("decision/prices-are-reviewed-monthly", "sections")}
 
 
@@ -103,23 +133,23 @@ def _every_fault_back(attempt):
 
 @then("the changes the history shows under the name the client was given for the set are exactly those two")
 def _the_set_in_the_history(client, applied):
-    assert not applied.faults, applied.faults
+    assert not applied.refused, applied.faults
     shown = journal(client, batch=applied.batch)
     assert not shown.faults, shown.faults
     assert [(entry.op, entry.artifact, entry.revision, entry.batch) for entry in shown.entries] == [
-        ("create", DECISION, 1, applied.batch), ("write", WORK_ITEM, 2, applied.batch),
+        ("create", DECISION, 1, applied.batch), ("create", NEW_WORK_ITEM, 1, applied.batch),
     ]
 
 
 @when("the client asks, in one go, for the work item to be changed twice, saying which role and why", target_fixture="applied")
 def _change_the_work_item_twice(client):
-    return apply(client, [replacement(WORK_ITEM, {"decisions": []}), replacement(WORK_ITEM, {})],
-                 message="Change the work item twice")
+    return replace_many(client, [replaced(WORK_ITEM, {"decisions": []}), replaced(WORK_ITEM, {})],
+                        message="Change the work item twice")
 
 
 @then("the store's history holds an entry for each of the two changes")
 def _an_entry_for_each_change(client, applied):
-    assert not applied.faults, applied.faults
+    assert not applied.refused, applied.faults
     in_set = [entry for entry in held.history(client) if entry.batch == applied.batch]
     assert [(entry.op, entry.artifact) for entry in in_set] == [("write", WORK_ITEM), ("write", WORK_ITEM)]
 
@@ -139,14 +169,19 @@ def _two_versions_on(client):
 MONTHLY = "decision/prices-are-reviewed-monthly"
 
 
-def _nothing_by_that_name(root, client):
-    return replacement(DECISION, {"sections": SECTIONS})
+def _nothing_by_that_name(client):
+    """A set of replacements whose second names a decision the store does not hold."""
+    return lambda message: replace_many(client, [
+        replaced(WORK_ITEM, {"decisions": []}), replaced(DECISION, {"sections": SECTIONS}),
+    ], message=message)
 
 
-def _still_pointed_at(root, client):
+def _still_pointed_at(client):
+    """A set of removals whose second removes the decision the work item points at."""
+    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": SECTIONS})
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
     assert not replace(client, WORK_ITEM, {"decisions": [DECISION]}).faults
-    return removal(DECISION)
+    return lambda message: remove_many(client, [removed(MONTHLY), removed(DECISION)], message=message)
 
 
 SECOND_CHANGES = {
@@ -161,16 +196,13 @@ SECOND_CHANGES = {
     target_fixture="attempt",
 )
 def _ask_for_a_set_stopped(root, client, fault):
-    second = SECOND_CHANGES[fault](root, client)
-    before, history = held.holds(root), held.history(client)
-    response = apply(client, [creation("decision", "Prices are reviewed monthly", {"sections": SECTIONS}), second],
-                     message="Record a decision and change another")
-    return {"response": response, "before": before, "after": held.holds(root), "history": history}
+    ask = SECOND_CHANGES[fault](client)
+    return _attempted(root, client, lambda: ask("Change two artifacts"))
 
 
 def _refused_with(attempt, faults):
     refused = attempt["response"]
-    assert (refused.batch, list(refused.results)) == ("", [])
+    assert refused.refused
     assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == faults
     return refused.faults[0].message
 
@@ -186,15 +218,13 @@ def _rejected_for_a_link_in_the_way(attempt):
 
 
 @then("the store holds none of the changes in the set")
-def _none_of_the_set_held(client, attempt):
+def _none_of_the_set_held(attempt):
     assert attempt["after"] == attempt["before"]
-    assert [fault.rule for fault in read(client, MONTHLY).faults] == ["not-found"]
 
 
 @then("the store's history holds no entry for any of them")
 def _no_entry_for_the_set(client, attempt):
     assert held.history(client) == attempt["history"]
-    assert not [entry for entry in attempt["history"] if entry.artifact == MONTHLY]
 
 
 @when("the client asks, in one go, for a set holding no changes at all, saying which role and why", target_fixture="attempt")
@@ -204,7 +234,7 @@ def _ask_for_an_empty_set(root, client):
         "files": held.holds(root),
         "entries": len(journal(client).entries),
     }
-    return {**before, "response": apply(client, [], message="Change nothing")}
+    return {**before, "response": create_many(client, [], message="Change nothing")}
 
 
 @then("the set is rejected because a set must hold at least one change")
@@ -212,63 +242,33 @@ def _rejected_for_being_empty(attempt):
     assert _refused_with(attempt, [("", "", "operations")]).startswith("a set must hold at least one change")
 
 
-REPLACED = [
-    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-    {"title": "Rationale", "body": "Costs now move daily.\n"},
-]
+KEYED_CREATES = {
+    "a decision to be created carrying a key and a work item to be created pointing at it by that key": lambda: [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
+        created("work-item", "Review prices on Mondays", {"decisions": ["@weekly"]}),
+    ],
+    "a work item to be created pointing at a decision by the key its create carries and that decision to be created "
+    "with it": lambda: [
+        created("work-item", "Review prices on Mondays", {"decisions": ["@weekly"]}),
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
+    ],
+}
 
 
 @when(
-    "the client asks, in one go, for the work item to point at a decision and that decision to be created, in that "
-    "order, saying which role and why",
+    parsers.re(f"the client asks, in one go, for (?P<creates>{'|'.join(map(re.escape, KEYED_CREATES))}), in that "
+               "order, saying which role and why"),
     target_fixture="applied",
 )
-def _point_at_it_and_create(client):
-    return apply(client, [
-        replacement(WORK_ITEM, {"decisions": [DECISION]}),
-        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-    ], message="Move price reviews to weekly")
+def _create_pointing_by_key(client, creates):
+    return create_many(client, KEYED_CREATES[creates](), message="Move price reviews to weekly")
 
 
-@when(
-    "the client asks, in one go, for a decision to be created and that decision to be replaced, in that order, "
-    "saying which role and why",
-    target_fixture="applied",
-)
-def _create_and_replace(client):
-    return apply(client, [
-        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-        replacement(DECISION, {"sections": REPLACED}),
-    ], message="Record a decision and revise it")
-
-
-@when(
-    "the client asks, in one go, for a decision to be replaced and that decision to be created, in that order, "
-    "saying which role and why",
-    target_fixture="attempt",
-)
-def _replace_and_create(root, client):
-    before, history = held.holds(root), held.history(client)
-    response = apply(client, [
-        replacement(DECISION, {"sections": REPLACED}),
-        creation("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-    ], message="Revise a decision and record it")
-    return {"response": response, "before": before, "after": held.holds(root), "history": history}
-
-
-@then("the set lands, and the work item points at the new decision")
-def _lands_pointing_at_the_new_decision(client, applied):
-    assert not applied.faults, applied.faults
-    assert applied.batch
-    assert loads(read(client, WORK_ITEM, whole=True).content)["decisions"] == [DECISION]
+@then("the set lands, and the new work item points at the new decision")
+def _lands_pointing_by_key(client, applied):
+    assert not applied.refused, applied.faults
+    assert loads(read(client, NEW_WORK_ITEM, whole=True).content)["decisions"] == [DECISION]
     assert not read(client, DECISION).faults
-
-
-@then("the set lands, and the decision holds the replacement")
-def _lands_holding_the_replacement(client, applied):
-    assert not applied.faults, applied.faults
-    assert applied.batch
-    assert loads(read(client, DECISION, whole=True).content)["sections"] == REPLACED
 
 
 WEEKLY, DAILY = DECISION, "decision/price-reviews-happen-daily"
@@ -280,20 +280,20 @@ def _decisions_may_point_at_decisions():
 
 
 @when(
-    "the client asks, in one go, for two decisions to be created, each pointing at the other, "
-    "saying which role and why",
+    "the client asks, in one go, for two decisions to be created, each carrying a key and pointing at the other by "
+    "the key the other's create carries, saying which role and why",
     target_fixture="applied",
 )
 def _create_two_pointing_at_each_other(client):
-    return apply(client, [
-        creation("decision", "Price reviews happen weekly", {"supersedes": DAILY, "sections": SECTIONS}),
-        creation("decision", "Price reviews happen daily", {"supersedes": WEEKLY, "sections": SECTIONS}),
+    return create_many(client, [
+        created("decision", "Price reviews happen weekly", {"supersedes": "@daily", "sections": SECTIONS}, key="weekly"),
+        created("decision", "Price reviews happen daily", {"supersedes": "@weekly", "sections": SECTIONS}, key="daily"),
     ], message="Record two decisions that point at each other")
 
 
 @then("the set lands")
 def _the_set_lands(applied):
-    assert not applied.faults, applied.faults
+    assert not applied.refused, applied.faults
     assert [(result.id, result.revision) for result in applied.results] == [(WEEKLY, 1), (DAILY, 1)]
 
 
@@ -305,7 +305,7 @@ def _both_held_pointing_at_each_other(client):
 
 @then("the set is rejected because the store was busy with another change")
 def _set_rejected_as_busy(applied):
-    assert (applied.batch, list(applied.results)) == ("", [])
+    assert applied.refused
     assert [(fault.artifact, fault.place, fault.rule) for fault in applied.faults] == [("", "", "busy")]
     assert applied.faults[0].message.startswith("the store was busy with another change")
 
@@ -313,6 +313,148 @@ def _set_rejected_as_busy(applied):
 @then("the same set may be asked for again")
 def _asked_for_again(client, holding):
     holding.let_go()
-    again = _create_and_point_at_it(client)
-    assert not again.faults, again.faults
-    assert [(result.id, result.revision) for result in again.results] == [(DECISION, 1), (WORK_ITEM, 2)]
+    again = _create_a_decision_and_a_work_item(client)
+    assert not again.refused, again.faults
+    assert [(result.id, result.revision) for result in again.results] == [(DECISION, 1), (NEW_WORK_ITEM, 1)]
+
+
+@given("work items may carry a collection of tasks, each of which may point at a decision")
+def _work_items_carry_tasks(client):
+    schema = copy.deepcopy(WORK_ITEM_TYPE["schema"])
+    schema["parts"] = {"tasks": {"items": {
+        "type": "object",
+        "properties": {"title": {"type": "string"}, "decision": DECISION_TYPE["schema"]["properties"]["supersedes"]},
+        "required": ["title"],
+    }}}
+    assert not replace(client, "schema/work-item", {"version": 2, "schema": schema}).faults
+
+
+LINKED_TO_THE_KEY = {
+    "in its content": ({"decisions": ["@weekly"]}, lambda content: content["decisions"][0]),
+    "inside one of its tasks": (
+        {"tasks": [{"title": "Move the meeting", "decision": "@weekly"}]}, lambda content: content["tasks"][0]["decision"],
+    ),
+}
+
+
+@when(
+    parsers.re(
+        "the client asks, in one go, for a decision to be created carrying a key of the client's choosing and a work "
+        f"item to be created with a link to that key (?P<where>{'|'.join(map(re.escape, LINKED_TO_THE_KEY))}), saying "
+        "which role and why"
+    ),
+    target_fixture="applied",
+)
+def _create_linking_to_a_key(client, where):
+    return create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
+        created("work-item", "Review prices on Mondays", LINKED_TO_THE_KEY[where][0]),
+    ], message="Move price reviews to weekly")
+
+
+@then(parsers.re(
+    f"the new work item points, (?P<where>{'|'.join(map(re.escape, LINKED_TO_THE_KEY))}), at the decision that create "
+    "made"
+))
+def _points_at_the_decision_made(client, applied, where):
+    assert not applied.refused, applied.faults
+    made = applied.results[0].id
+    assert [found.stub.id for found in refs(client, made, 1, inward=True).reached] == [NEW_WORK_ITEM]
+    assert LINKED_TO_THE_KEY[where][1](loads(read(client, NEW_WORK_ITEM, whole=True).content)) == made
+
+
+@then("the link holds the name the store gave the decision, not the key")
+def _holds_the_name_not_the_key(root, applied):
+    assert applied.results[0].id == DECISION
+    assert "@weekly" not in held.text(root, NEW_WORK_ITEM)
+    assert DECISION in held.text(root, NEW_WORK_ITEM)
+
+
+THREE_TITLES = ["Price reviews happen weekly", "Prices are rounded to the cent", "Discounts end on Sundays"]
+
+
+@when("the client asks, in one go, for three decisions with titles of their own to be created, saying which role and why",
+      target_fixture="applied")
+def _create_three_decisions(client):
+    return create_many(client, [created("decision", title, {"sections": SECTIONS}) for title in THREE_TITLES],
+                       message="Record three decisions")
+
+
+@then("the client is given a result for each create, in the order of the set")
+def _a_result_for_each_create(applied):
+    assert not applied.refused, applied.faults
+    assert [result.revision for result in applied.results] == [1, 1, 1]
+
+
+@then("each result gives the name the store gave the decision made by the create in that place")
+def _each_result_names_its_decision(client, applied):
+    assert [read(client, result.id).title for result in applied.results] == THREE_TITLES
+    assert [result.id for result in applied.results] == [
+        "decision/price-reviews-happen-weekly", "decision/prices-are-rounded-to-the-cent", "decision/discounts-end-on-sundays",
+    ]
+
+
+def _attempted(root, client, ask):
+    """What a set the store may refuse did: its answer, and the store and its history before and after."""
+    before, history = held.holds(root), held.history(client)
+    response = ask()
+    return {"response": response, "before": before, "after": held.holds(root), "history": history}
+
+
+@when(
+    "the client asks, in one go, for a decision and a work item to be created, the work item pointing at a key no "
+    "create in the set carries, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_pointing_at_a_key_nothing_carries(root, client):
+    return _attempted(root, client, lambda: create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
+        created("work-item", "Review prices on Mondays", {"decisions": ["@monthly"]}),
+    ], message="Move price reviews to weekly")) | {"key": "'@monthly'"}
+
+
+@then("the set is rejected because the link lands on nothing")
+def _rejected_landing_on_nothing(attempt):
+    assert attempt["response"].refused
+    assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
+        (NEW_WORK_ITEM, "decisions/0", "ref"),
+    ]
+
+
+@then("the key is given back")
+def _the_key_given_back(attempt):
+    assert attempt["key"] in attempt["response"].faults[0].message
+
+
+@when("the client asks, in one go, for two decisions to be created, both carrying the same key, saying which role and why",
+      target_fixture="attempt")
+def _create_two_with_one_key(root, client):
+    return {**_attempted(root, client, lambda: create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing"),
+    ], message="Record two decisions")), "key": "'pricing'"}
+
+
+@then("the set is rejected because a key names one create in the set")
+def _rejected_for_a_key_carried_twice(attempt):
+    assert attempt["response"].refused
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [("", "", "ref")]
+    assert faults[0].message.startswith("a key names one create in the set")
+
+
+@when(
+    "the client asks, in one go, for a decision to be created carrying a key and a work item to be created pointing "
+    "at that key together with a place inside the decision, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_pointing_at_a_place_by_key(root, client):
+    return {**_attempted(root, client, lambda: create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
+        created("work-item", "Review prices on Mondays", {"decisions": ["@weekly#purpose"]}),
+    ], message="Move price reviews to weekly")), "reference": "'@weekly#purpose'"}
+
+
+@then("the reference is given back")
+def _the_reference_given_back(attempt):
+    assert attempt["reference"] in attempt["response"].faults[0].message

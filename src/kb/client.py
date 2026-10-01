@@ -62,9 +62,6 @@ class InProcessClient:
     def Replace(self, request, timeout=None):
         return self._call("Replace", request, kb_pb2.ReplaceResponse)
 
-    def Apply(self, request, timeout=None):
-        return self._call("Apply", request, kb_pb2.ApplyResponse)
-
     def Journal(self, request, timeout=None):
         return self._call("Journal", request, kb_pb2.JournalResponse)
 
@@ -85,6 +82,18 @@ class InProcessClient:
 
     def Remove(self, request, timeout=None):
         return self._call("Remove", request, kb_pb2.RemoveResponse)
+
+    def CreateMany(self, request, timeout=None):
+        return self._call("CreateMany", request, kb_pb2.CreateManyResponse)
+
+    def ReplaceMany(self, request, timeout=None):
+        return self._call("ReplaceMany", request, kb_pb2.ReplaceManyResponse)
+
+    def AddMany(self, request, timeout=None):
+        return self._call("AddMany", request, kb_pb2.AddManyResponse)
+
+    def RemoveMany(self, request, timeout=None):
+        return self._call("RemoveMany", request, kb_pb2.RemoveManyResponse)
 
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:

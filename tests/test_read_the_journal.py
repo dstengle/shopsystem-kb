@@ -4,7 +4,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, MovingClock, add, apply, create, creation, define, journal, moment, remove, snapshot, replace,
+    CLIENT, DECISION_TYPE, MovingClock, add, create, create_many, created, define, journal, moment, remove, snapshot,
+    replace,
 )
 import held
 from kb import client as kb_client
@@ -161,9 +162,9 @@ ALONE = "decision/close-early-on-sundays"
 
 @given("a store where two artifacts were changed in one go and a third was changed on its own")
 def _two_together_and_one_alone(client):
-    applied = apply(client, [
-        creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
-        creation("decision", "Count the till nightly", {"sections": SECTIONS}),
+    applied = create_many(client, [
+        created("decision", "Restock on Thursdays", {"sections": SECTIONS}),
+        created("decision", "Count the till nightly", {"sections": SECTIONS}),
     ], message="Two decisions at once")
     assert not applied.faults, applied.faults
     create(client, "decision", {"title": "Close early on Sundays", "sections": SECTIONS}, message="One on its own")
@@ -290,9 +291,9 @@ CHANGES = {
         client, DECISION, "options", {"title": "Every week"}, message=message, actor=SHOPKEEPER,
     ),
     "removes the decision": lambda client, message: remove(client, DECISION, message=message, actor=SHOPKEEPER),
-    "makes several changes in one go": lambda client, message: apply(client, [
-        creation("decision", "Restock on Thursdays", {"sections": SECTIONS}),
-        creation("decision", "Count the till nightly", {"sections": SECTIONS}),
+    "makes several changes in one go": lambda client, message: create_many(client, [
+        created("decision", "Restock on Thursdays", {"sections": SECTIONS}),
+        created("decision", "Count the till nightly", {"sections": SECTIONS}),
     ], message=message, actor=SHOPKEEPER),
     "snapshots what a piece of work read": lambda client, message: snapshot(
         client, "restock-run-12", [DECISION], message=message, role=SHOPKEEPER.role,
@@ -407,8 +408,8 @@ SECOND_GO = ["decision/close-early-on-sundays", "decision/order-flour-monthly"]
 
 
 def _in_one_go(client, artifacts):
-    applied = apply(client, [
-        creation("decision", artifact.split("/")[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
+    applied = create_many(client, [
+        created("decision", artifact.split("/")[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
         for artifact in artifacts
     ])
     assert not applied.faults, applied.faults
