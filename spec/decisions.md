@@ -418,3 +418,13 @@ source: docs/superpowers/specs/2026-10-01-kb-contract-v1-design.md
 Export aimed at a file, and a check for import or an import aimed at something that is not a directory, are refused with rule `root`, because export writes into a directory and files for import are read from one; the export leaves the file as it was and the check and import write nothing.
 date: 2026-10-01
 source: docs/superpowers/specs/2026-10-01-kb-eleventh-review-answers.md
+
+## decision/later-store-told-apart
+A store whose marker names a form of store this kb does not know, one a later kb made, and a store whose marker cannot be read at all, whatever its bytes, are told apart from a damaged database: every call and command that needs the store, the import included, is refused because the store was made by a later version of kb, which is needed to read it, nothing is written, and the store is not opened; starting a store over one is refused as over any store. The rule is `unreadable`, as for an earlier kb's store, since what the client can do is the same (this kb cannot read the store).
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-batch24-review-answers.md; the controller's answer to the integration's question 1, under the person's delegation
+
+## decision/paired-escapes-are-one-character
+Content may write a character beyond the first 65,536 as two escapes, one for each half, as JSON does, and reads back holding that one character; half of a character alone, in either order, is still refused because the content cannot be read as written.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-batch24-review-answers.md

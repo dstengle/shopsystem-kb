@@ -2,7 +2,7 @@
 id: capability/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/starting-leaves-the-wire]
+rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/starting-leaves-the-wire]
 formulated_as: features/start-a-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/start-a-store.feature
 
 ## Purpose
 
-The client starts a store in a directory it names, in its own process and never through a server. The store takes a place of its own inside that directory, holds only the type that describes types, and its history begins with that write. Starting a store is the one act that does not look for a store first. A store made by an earlier kb counts as a store here. This capability is not the operator's `kb init` (operate-a-store), and it never teaches the store any domain.
+The client starts a store in a directory it names, in its own process and never through a server. The store takes a place of its own inside that directory, holds only the type that describes types, and its history begins with that write. Starting a store is the one act that does not look for a store first. A store made by an earlier kb or by a later kb counts as a store here. This capability is not the operator's `kb init` (operate-a-store), and it never teaches the store any domain.
 
 ## Behaviour
 
@@ -21,6 +21,7 @@ The client starts a store in a directory it names, in its own process and never 
 - When the client starts a store in a directory holding other files, the store is made inside that directory in a place of its own, and the files already there are left as they were.
 - If the directory named already has a store inside it, starting is refused because that directory already has a store inside it, and that store holds what it held before.
 - If the directory named already has a store inside it made by an earlier kb, starting is refused because that directory already has a store inside it, and that store is left as it was.
+- If the directory named already has a store inside it made by a later kb, starting is refused because that directory already has a store inside it, and that store is left as it was.
 - If the directory named sits inside a store, starting is refused because that directory is inside a store, and that store holds what it held before.
 - While the client is working inside a store, when it starts a store in a directory elsewhere that sits inside no store, the store is made in the directory named and the store it was working in is left as it was.
 - If the client names no directory, starting is refused because a store is started in a directory that was named and that exists, and no store is made anywhere.

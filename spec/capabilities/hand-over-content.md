@@ -2,7 +2,7 @@
 id: capability/hand-over-content
 title: Hand over content
 narrator: the client
-rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action]
+rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action, decision/paired-escapes-are-one-character]
 formulated_as: features/hand-over-content.feature
 ---
 
@@ -26,6 +26,8 @@ When the client creates, changes or adds, it hands the store content as text. Th
 - If content names the same entry twice in one place, it is refused because an entry is named once and only once, naming the place the second one stands.
 - When content carries a field written "true", one left as nothing and one written "12.5", they read back as a yes-or-no, as nothing and as a number, and none as text.
 - If content cannot be read as written, is not a set of named entries (a list, a single bare value, or nothing at all), or holds sections or collections of a shape the type does not declare, it is refused naming the reason and the place it went wrong, the call comes back with its answer rather than breaking off, and nothing is written.
+- When content writes a character beyond the first 65,536 as two escapes, one for each half, as JSON does, the two halves read together as that one character, and the content reads back holding it.
+- If content holds half of a character alone, with no other half beside it, it is refused because the content cannot be read as written.
 - When content carries a field written as a bare date, it reads back as the text written, not as a date.
 - If a line of prose ends in a space, so the store could not write it back as a block, the content is refused because every piece of prose is written as a block, and nothing is written.
 

@@ -19,7 +19,7 @@ kb knows nothing about any domain. It ships no type beyond the one that describe
 - Every response is either the call's result or a refusal holding every fault, never both.
 - A fault's `rule` is one of kb's own rule names, or, for content that breaks a type's JSON Schema, the JSON Schema keyword it breaks. kb's own rule names: `not-found`, `kind`, `locator`, `collection`, `identity`, `on_delete`, `unreadable`, `item-name`, `shape`, `built-on`, `targets`, `version`, `content`, `sections`, `ref`, `actor`, `message`, `operations`, `since`, `title`, `root`, `store`, `clock`, `busy`, `revision`.
 - Errors are a typed list of `{ artifact, place, rule, message }`.
-- Bounds: one database per store; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); on one machine several callers share a store directly, the database's write lock serialising their changes, and across containers only through a server, which takes changes one at a time; no store on a read-only filesystem, until what a read-only store means is defined; a store made by an earlier kb in a form this kb cannot read is never read or written, only its files imported into a new store; a set holds one kind of change.
+- Bounds: one database per store; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); on one machine several callers share a store directly, the database's write lock serialising their changes, and across containers only through a server, which takes changes one at a time; no store on a read-only filesystem, until what a read-only store means is defined; a store made by an earlier kb in a form this kb cannot read is never read or written, only its files imported into a new store; a store made by a later kb, in a form this kb does not know, is never opened, a later version of kb being needed to read it; a set holds one kind of change.
 - Performance bounds, at 30,000 artifacts: a summary read and a three-step traversal under 100 ms each; a single change under 50 ms; a set of 100 changes under 1 s. Provisional until the scale targets are set.
 
 ## Composition
@@ -42,7 +42,7 @@ Reading order:
 14. `capabilities/keep-the-history.md`: the history, its sets, its moments and its order.
 15. `capabilities/snapshot-what-work-read.md`: a piece of work records what it read.
 16. `capabilities/check-the-store.md`: the whole store against its types.
-17. `capabilities/answer-a-damaged-file.md`: a store this kb cannot read (its database damaged, missing or on a read-only filesystem, or the store made by an earlier kb) is a named fault.
+17. `capabilities/answer-a-damaged-file.md`: a store this kb cannot read (its database damaged, missing or on a read-only filesystem, or the store made by an earlier or a later kb) is a named fault.
 18. `capabilities/operate-a-store.md`: the operator's `kb init`, `kb validate`, `kb serve`.
 19. `capabilities/export-and-import-a-store.md`: the operator's `kb export` and `kb import`, the files as people read them.
 
