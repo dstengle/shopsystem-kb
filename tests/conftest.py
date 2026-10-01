@@ -159,6 +159,16 @@ def _one_entry_under_the_role(client, starter, message):
     return entry
 
 
+@given("another change is being written and holds the store longer than the store waits", target_fixture="holding")
+def _another_change_holds_the_store(root, request, monkeypatch):
+    return held.another_change_holds(root, request, monkeypatch)
+
+
+@then("nothing is written")
+def _nothing_written_while_held(root, holding):
+    assert held.holds(root) == holding.held
+
+
 # The operator's command line, and the Givens that set where the operator works and which store, if any, is named.
 
 KB = Path(sys.executable).with_name("kb")
@@ -169,7 +179,7 @@ def _kb(*args, cwd, env=None):
     """kb's own console command, run as the operator runs it: in a directory, with KB_ROOT and KB_ACTOR set only when
     a step sets them."""
     clean = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
-    return subprocess.run([str(KB), *args], cwd=cwd, env={**clean, **(env or {})}, capture_output=True, text=True)
+    return subprocess.run([*held.operator(KB), *args], cwd=cwd, env={**clean, **(env or {})}, capture_output=True, text=True)
 
 
 def _store_needing_attention(root):

@@ -653,3 +653,20 @@ def test_a_change_that_waits_longer_than_the_store_waits_for_another_change_is()
 )
 def test_a_read_while_another_change_is_being_written_is_not_refused_as_busy():
     pass
+
+
+BUSY = "the store was busy with another change"
+
+
+@then("the change is rejected because the store was busy with another change")
+def _rejected_as_busy(changed):
+    assert changed.revision == 0
+    assert [(fault.artifact, fault.path, fault.rule) for fault in changed.faults] == [("", "", "busy")]
+    assert changed.faults[0].message.startswith(BUSY)
+
+
+@then("the same change may be made again")
+def _made_again(client, holding):
+    holding.let_go()
+    again = _replace_the_decision(client)
+    assert (list(again.faults), again.revision) == ([], 2)

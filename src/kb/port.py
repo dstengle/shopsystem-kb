@@ -124,6 +124,11 @@ class Unlanded(Refusal):
         self.links = links
 
 
+class Busy(Exception):
+    """Another change held the store's write lock longer than the store waits for it; nothing is written, and the same
+    change may be made again."""
+
+
 class Unreadable(Exception):
     """The database cannot be opened or read, or the SQLite this process runs cannot keep a store."""
 
@@ -163,10 +168,12 @@ class Port(Protocol):
     def exclusive(self) -> ContextManager[None]:
         """A block holding the store's write lock from its start to its end: its reads see every set landed before it,
         no other set lands until it ends, and what `land` lands in it is kept when the block ends without raising.
-        A refusal of `land` inside it takes back only that set, and the lock is still held."""
+        A refusal of `land` inside it takes back only that set, and the lock is still held. Raises Busy, nothing
+        written, when another change holds the write lock longer than the store waits for it."""
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
              kinds: tuple[Kind, ...] = ()) -> None:
         """The changes, in order, the links restated, and the entries, as one set, or nothing. `kinds` are those whose
         every artifact's links the set reads anew: an artifact of one held that the set neither changes nor restates
-        is Conflict. Raises Conflict, Linked or Unlanded."""
+        is Conflict. Raises Conflict, Linked or Unlanded; and Busy, as `exclusive` does, when another change holds the
+        write lock longer than the store waits for it."""

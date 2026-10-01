@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from kb import sqlite_search
-from kb.port import Change, Entry, Relink, Unreadable
+from kb.port import Busy, Change, Entry, Relink, Unreadable
 from kb.sqlite_checks import Checks
 from kb.values import Kind
 from kb.sqlite_reads import encoded, moment
@@ -65,7 +65,8 @@ def make(path: Path) -> None:
 @contextlib.contextmanager
 def opened(path: Path) -> Iterator["SqliteStore"]:
     """The database at path, open read-write until the block ends. Raises Unreadable, naming it, when it cannot be
-    opened, which creates nothing, or when any statement finds it damaged, which shows only once one is made."""
+    opened, which creates nothing, or when any statement finds it damaged, which shows only once one is made; Busy
+    when a writer waited BUSY seconds for the write lock and another connection still held it."""
     supported()
     try:
         db = sqlite3.connect(_uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None)
@@ -74,9 +75,14 @@ def opened(path: Path) -> Iterator["SqliteStore"]:
     try:
         yield SqliteStore(db)
     except sqlite3.DatabaseError as error:
-        raise Unreadable(f"{path}: {error}") from error
+        raise (Busy if _busy(error) else Unreadable)(f"{path}: {error}") from error
     finally:
         db.close()
+
+
+def _busy(error: sqlite3.DatabaseError) -> bool:
+    """Whether SQLite gave up waiting for a lock another connection held: its primary result code, never its message."""
+    return getattr(error, "sqlite_errorcode", 0) & 0xFF == sqlite3.SQLITE_BUSY
 
 
 def _uri(path: Path, mode: str) -> str:

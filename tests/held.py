@@ -4,9 +4,10 @@ What the store holds comes back through the port's public reads, or as an opaque
 with another taken at another time."""
 import hashlib
 import sqlite3
+import sys
 from pathlib import Path
 
-from kb import canonical, store
+from kb import canonical, sqlite_store, store
 from kb.contract import kb_pb2
 from kb.sqlite_reads import encoded
 from kb.values import artifact_id
@@ -14,6 +15,9 @@ from kb.values import artifact_id
 _PLACE = "kb"
 _MARKER = "store.yaml"
 _DATABASE = "store.sqlite3"
+_STORE_WAITS = sqlite_store.BUSY
+WAIT = 0.2  # seconds the store waits for the write lock while a test holds it
+_OPERATOR_PROGRAM = Path(__file__).with_name("operator_program.py")
 
 
 def _place(root):
@@ -157,3 +161,40 @@ def bytes_held(root):
     """Everything in the place of the store started in `root`, each path with its bytes: what a store whose database
     cannot be read holds, compared byte for byte, since no read of it can be made."""
     return _apart(_place(root), [])
+
+
+class Holding:
+    """Another change being written: the store's write lock taken by BEGIN IMMEDIATE on a connection of its own, and
+    held until it is let go; what the store held as it was taken, to compare with what it holds later."""
+
+    def __init__(self, root):
+        self.held = holds(root)
+        self._db = sqlite3.connect(_connected(_place(root))._uri, uri=True, isolation_level=None)
+        self._db.execute("BEGIN IMMEDIATE")
+
+    def let_go(self):
+        """The lock let go, the change taken back, nothing of it written; once only, however often asked."""
+        if self._db is None:
+            return
+        db, self._db = self._db, None
+        try:
+            db.execute("ROLLBACK")
+        finally:
+            db.close()
+
+
+def another_change_holds(root, request, monkeypatch):
+    """The store's write lock held by another change for the rest of the test, let go at its end whatever happens,
+    and the store's wait for the lock, in this process and in the operator's, shortened to WAIT."""
+    monkeypatch.setattr(sqlite_store, "BUSY", WAIT)
+    holding = Holding(root)
+    request.addfinalizer(holding.let_go)
+    return holding
+
+
+def operator(kb):
+    """How the operator's kb is run: the console command itself, or, while a test has shortened the store's wait,
+    kb's command line in a program that waits as long as the store does here."""
+    if sqlite_store.BUSY == _STORE_WAITS:
+        return [str(kb)]
+    return [sys.executable, str(_OPERATOR_PROGRAM), str(sqlite_store.BUSY)]

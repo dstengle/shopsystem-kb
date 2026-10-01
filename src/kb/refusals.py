@@ -186,5 +186,12 @@ def unreadable(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {problem}")
 
 
+def busy() -> kb_pb2.Fault:
+    return kb_pb2.Fault(rule=rules.BUSY, message=(
+        "the store was busy with another change for longer than it waits, and nothing was written; the same change "
+        "may be made again"
+    ))
+
+
 def escaped(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.STORE, message=f"the store could not answer, and nothing was written: {problem}")
