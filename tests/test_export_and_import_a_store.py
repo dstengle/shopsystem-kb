@@ -1164,3 +1164,56 @@ def _the_export_is_written(root, ran):
 @then("the export is not refused because the store was busy with another change")
 def _export_not_busy(ran):
     assert (ran["ran"].returncode, ran["ran"].stdout, ran["ran"].stderr) == (0, "", "")
+
+
+# The operator's directory is refused by its shape: a file where a directory is wanted.
+
+FILE_TEXT = "a file the operator named where a directory was wanted\n"
+
+
+@given("a file where the export is to go, and no directory", target_fixture="target")
+def _a_file_where_the_export_is_to_go(tmp_path, before):
+    target = tmp_path / "exported"
+    target.write_text(FILE_TEXT)
+    before.update(target=held.everything_in(target))
+    return target
+
+
+@given("a file where a directory for import should be", target_fixture="target")
+def _a_file_where_a_directory_for_import_should_be(tmp_path, root, before):
+    target = tmp_path / "for-import"
+    target.write_text(FILE_TEXT)
+    before.update(started=held.holds(root), target=held.everything_in(target))
+    return target
+
+
+@when("the operator exports the store to that file", target_fixture="ran")
+def _kb_export_to_a_file(root, target):
+    return _kb("export", str(target), cwd=root)
+
+
+@when("the operator checks that file for import", target_fixture="ran")
+def _kb_check_a_file(root, target):
+    return _kb("import", str(target), "--check", cwd=root)
+
+
+@when("the operator imports that file, saying which role they are", target_fixture="ran")
+def _kb_import_a_file(root, target):
+    return _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+
+@then("the export is rejected because export writes into a directory")
+def _rejected_as_writing_into_a_directory(ran, target):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == f"kb export: refused: root: an export is written into a directory; {str(target)!r} is not a directory\n"
+
+
+@then("the file is left as it was")
+def _the_file_as_it_was(target, before):
+    assert target.is_file() and held.everything_in(target) == before["target"]
+
+
+@then(parsers.parse("the {command} is rejected because files for import are read from a directory"))
+def _rejected_as_read_from_a_directory(ran, target, command):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == f"kb import: refused: root: an import is read from a directory; {str(target)!r} is not one\n"
