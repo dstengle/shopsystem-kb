@@ -2,17 +2,49 @@
 
 Each rpc runs inside one boundary: the store is opened for that call alone and closed when it ends, its request
 becomes values (kb.requests, kb.values), one call is made into the domain, and its response is made from what comes
-back. A refusal anywhere becomes that rpc's faults, here and only here.
+back. A refusal anywhere becomes that rpc's faults, here and only here, and so does any exception that escapes: the
+clock's failure, the database's, or anything else, each with nothing written.
 """
 import functools
+import sqlite3
+from datetime import datetime
 
-from kb import check, query, read, requests, store, values, write
+from kb import check, port, query, read, refusals, requests, store, values, write
 from kb.contract import kb_pb2, kb_pb2_grpc
+
+
+class ClockFailed(Exception):
+    """The client's clock raised, or gave something other than a moment, when it was asked the time."""
+
+
+def _guarded(clock):
+    """The client's clock, read so that any failure of it surfaces as ClockFailed; None, the machine's, as it is."""
+    if clock is None:
+        return None
+
+    def read_it() -> datetime:
+        try:
+            moment = clock()
+        except Exception as error:
+            raise ClockFailed(str(error)) from error
+        if not isinstance(moment, datetime):
+            raise ClockFailed(f"it gave {moment!r}, which is not a moment")
+        return moment
+    return read_it
+
+
+def _escaped(error: Exception) -> kb_pb2.Fault:
+    """The fault an exception that escaped the domain becomes."""
+    if isinstance(error, ClockFailed):
+        return refusals.clock_failed(str(error))
+    if isinstance(error, (port.Unreadable, sqlite3.Error)):
+        return refusals.unreadable(str(error))
+    return refusals.escaped(f"{type(error).__name__}: {error}")
 
 
 def _boundary(response, opens: bool = True):
     """The rpc, over the store opened for it unless it starts one, answered with a response of this type carrying
-    the faults when anything in it is refused."""
+    the faults when anything in it is refused or any exception escapes it."""
     def wrap(rpc):
         @functools.wraps(rpc)
         def run(self, request, context=None):
@@ -23,6 +55,8 @@ def _boundary(response, opens: bool = True):
                     return rpc(self, request, held)
             except values.Refused as refused:
                 return response(faults=refused.faults)
+            except Exception as error:
+                return response(faults=[_escaped(error)])
         return run
     return wrap
 
@@ -32,7 +66,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
         """Over the store at root; with none, a servicer that can only start a store, taking its root from the request.
         Each change it makes is stamped by the clock, or the machine's with none."""
         self._root = root
-        self._clock = clock
+        self._clock = _guarded(clock)
 
     @_boundary(kb_pb2.InitResponse, opens=False)
     def Init(self, request):

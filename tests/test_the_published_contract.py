@@ -16,7 +16,7 @@ from kb.contract import kb_pb2
 
 CLIENT = kb_pb2.Actor(role="client")
 
-SPEC = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "specs" / "2026-09-23-kb-design.md"
+SPEC = Path(__file__).resolve().parent.parent / "spec" / "index.md"
 
 TYPED = {
     "title": "Typed",
@@ -64,7 +64,7 @@ def test_connects_clock_is_a_keyword_defaulting_to_none():
 
 
 def test_the_rule_names_kb_gives_are_exactly_the_spec_lists():
-    sentence = re.search(r"kb's own rule names are:\s*(.*?)\.", SPEC.read_text(encoding="utf-8"), re.DOTALL)
+    sentence = re.search(r"kb's own rule names:\s*(.*?)\.", SPEC.read_text(encoding="utf-8"), re.DOTALL)
     assert set(re.findall(r"`([a-z_-]+)`", sentence.group(1))) == set(rules.ALL)
 
 

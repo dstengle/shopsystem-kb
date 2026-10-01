@@ -30,6 +30,11 @@ def test_the_client_changes_one_item_of_a_collection():
     pass
 
 
+@scenario("change-the-store.feature", "The clock fails during a change")
+def test_the_clock_fails_during_a_change():
+    pass
+
+
 @scenario("check-a-change.feature", "Changing an artifact that is behind its type brings it up to date")
 def test_changing_an_artifact_that_is_behind_its_type_brings_it_up_to_date():
     pass
@@ -148,8 +153,29 @@ def _replace_the_decision(client):
     response = write(client, DECISION, {"sections": [
         SECTIONS[0], {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
     ]}, message="Say why weekly")
-    assert not response.faults, response.faults
     return response
+
+
+@given("the client was readied with a clock that fails when it is asked the time", target_fixture="client")
+def _readied_with_a_failing_clock(root, before):
+    """A client over the store at root whose clock raises whenever it is read; what the store holds is taken first."""
+    def fails():
+        raise RuntimeError("the clock has stopped")
+
+    before.update(held=held.holds(root))
+    return kb_client.connect(root, clock=fails)
+
+
+@then("the client is given a fault")
+def _given_a_fault(changed):
+    assert isinstance(changed, kb_pb2.WriteResponse)
+    assert changed.revision == 0
+    assert len(changed.faults) == 1, changed.faults
+
+
+@then("the store holds what it held before")
+def _holds_what_it_held(root, before):
+    assert held.holds(root) == before["held"]
 
 
 @then("the version goes up by one")

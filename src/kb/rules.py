@@ -22,5 +22,6 @@ SINCE = "since"
 TITLE = "title"
 ROOT = "root"
 STORE = "store"
+CLOCK = "clock"
 
 ALL = tuple(value for name, value in sorted(globals().items()) if name.isupper() and name != "ALL")

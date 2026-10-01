@@ -110,3 +110,15 @@ def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
         artifact=str(artifact_id), path="sections", rule=rules.NOT_FOUND,
         message=f"{str(artifact_id)!r} holds no section titled {title!r}",
     )
+
+
+def clock_failed(problem: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(rule=rules.CLOCK, message=f"the clock failed when it was asked the time: {problem}")
+
+
+def unreadable(problem: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {problem}")
+
+
+def escaped(problem: str) -> kb_pb2.Fault:
+    return kb_pb2.Fault(rule=rules.STORE, message=f"the store could not answer, and nothing was written: {problem}")
