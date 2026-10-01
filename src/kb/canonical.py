@@ -96,7 +96,9 @@ def check(text: str) -> None:
         )
     if sum(isinstance(event, events.DocumentStartEvent) for event in parsed) > 1:
         raise NotCanonical("content holds exactly one document")
-    _named_once(_yaml().compose(text), ())
+    composed = _yaml().compose(text)
+    _named_once(composed, ())
+    _held_as_text(composed, ())
 
 
 def _no_directive(text: str) -> None:
@@ -127,6 +129,26 @@ def _named_once(node, place: tuple) -> None:
     elif isinstance(node, nodes.SequenceNode):
         for index, item in enumerate(node.value):
             _named_once(item, (*place, str(index)))
+
+
+def _held_as_text(node, place: tuple) -> None:
+    """Every scalar is text that encodes as UTF-8: an escape for half of a character (\\ud800) reads as a value no text
+    can hold, and nothing downstream could write or fingerprint it. Raises NotCanonical naming the place."""
+    if isinstance(node, nodes.ScalarNode):
+        try:
+            node.value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise NotCanonical(
+                "it is not YAML that can be read: it holds an escape for half of a character, which no text can hold",
+                "/".join(place),
+            ) from None
+    elif isinstance(node, nodes.MappingNode):
+        for key, value in node.value:
+            _held_as_text(key, place)
+            _held_as_text(value, (*place, str(key.value)))
+    elif isinstance(node, nodes.SequenceNode):
+        for index, item in enumerate(node.value):
+            _held_as_text(item, (*place, str(index)))
 
 
 def dump(artifact: dict) -> str:

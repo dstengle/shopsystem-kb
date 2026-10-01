@@ -771,6 +771,8 @@ def _create_with_two_kinds_of_fault(root, client):
 WHOLE = "sections:\n  - title: Purpose\n    body: Why.\n  - title: Rationale\n    body: Because.\n"
 SENSELESS = {
     "content that cannot be read as written at all": (WHOLE + "options: [Keep weekly\n", ""),
+    "content holding text written with an escape for half of a character, which no text can hold":
+        (WHOLE + 'options:\n  - title: "\\ud800"\n', "options/0/title"),
     "content that is a list rather than a set of named entries": ("- Purpose\n- Rationale\n", ""),
     "content that is a single bare value": ("Keep prices in step with costs.\n", ""),
     "content with nothing in it at all": ("", ""),
