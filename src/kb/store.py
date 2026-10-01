@@ -89,6 +89,16 @@ class Store:
         """The artifact as stored, for a reader that cannot go on without it. Raises Refused for a damaged file."""
         return readable(self.load(artifact_id))
 
+    def history(self) -> list[dict]:
+        """Every journal entry, oldest first. Raises Refused for an entry that cannot be read."""
+        from kb import journal  # journal reads Damaged from here, so it is imported where it is used
+        return readable(journal.entries(self.dir))
+
+    def digest(self, artifact_id: ArtifactId) -> str:
+        """The fingerprint of an artifact as stored."""
+        from kb import journal
+        return journal.digest(self.path(artifact_id))
+
     def commit(self, paths: list, signed: Signed) -> None:
         """One commit of the given files, under the message and the actor's role."""
         role = signed.actor.role
@@ -150,34 +160,24 @@ def vacant(root: Root) -> None:
     """Refuse a root a store cannot be started in: one that is not there, is not a directory, has a store inside it or
     anything else in the place a store goes, or is inside a store. A relative root cannot be resolved once the
     working directory it is read against is itself gone; that is refused too, never raised."""
+    def refuse(message: str):
+        raise Refused([kb_pb2.Fault(rule=rules.ROOT, message=message)])
+
+    named = repr(root.named)
     if not root.path.is_absolute() and working_directory() is None:
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT,
-            message=f"a store is started in a directory that exists; whether {root.named!r} does depends on the "
-                    f"working directory, and it is gone",
-        )])
+        refuse(f"a store is started in a directory that exists; whether {named} does depends on the working "
+               f"directory, and it is gone")
     if not root.path.exists():
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"a store is started in a directory that exists; {root.named!r} does not",
-        )])
+        refuse(f"a store is started in a directory that exists; {named} does not")
     if not root.path.is_dir():
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"a store is started in a directory, and {root.named!r} is not one",
-        )])
+        refuse(f"a store is started in a directory, and {named} is not one")
     if (root.path / MARKER).is_file():
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"a store is never started over another; {root.named!r} already has a store inside it",
-        )])
+        refuse(f"a store is never started over another; {named} already has a store inside it")
     if (root.path / MARKER.parent).exists() or (root.path / MARKER.parent).is_symlink():
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT,
-            message=f"a store goes in a place of its own, and {root.named!r} already holds something in that place",
-        )])
+        refuse(f"a store goes in a place of its own, and {named} already holds something in that place")
     above = find_above(root.path.resolve().parent)
     if above is not None:
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT, message=f"stores do not nest; {root.named!r} is inside the store at {str(above)!r}",
-        )])
+        refuse(f"stores do not nest; {named} is inside the store at {str(above)!r}")
 
 
 def find_above(start: Path) -> Path | None:

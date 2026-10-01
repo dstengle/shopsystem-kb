@@ -2,11 +2,11 @@
 words occur, what the journal holds, and what a piece of work read. Nothing here writes."""
 from datetime import datetime
 
-from kb import composition, journal, links, places, read, refusals, search, values
+from kb import composition, links, places, read, refusals, search, values
 from kb.content import text
 from kb.contract import kb_pb2
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
-from kb.store import Store, readable
+from kb.store import Store
 from kb.values import ArtifactId, Locator, Refused
 
 
@@ -73,7 +73,7 @@ def found(store: Store, asked: Searching) -> kb_pb2.SearchResponse:
 def entries(store: Store, asked: JournalFilter) -> kb_pb2.JournalResponse:
     """The journal's entries, oldest first, narrowed by each of artifact, role, piece of work, time and set given."""
     return kb_pb2.JournalResponse(entries=[
-        _entry(entry) for entry in readable(journal.entries(store.dir))
+        _entry(entry) for entry in store.history()
         if (asked.artifact is None or entry.get("artifact") == str(asked.artifact))
         and (not asked.role or entry["actor"]["role"] == asked.role)
         and (not asked.execution or entry["actor"]["execution"] == asked.execution)
@@ -96,7 +96,7 @@ def snapshotted(store: Store, named: list) -> list[dict]:
     return [
         {
             "artifact": str(artifact_id), "revision": store.artifact(artifact_id)["revision"],
-            "digest": journal.digest(store.path(artifact_id)),
+            "digest": store.digest(artifact_id),
         }
         for artifact_id in named
     ]
