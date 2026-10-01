@@ -1,6 +1,6 @@
 """Where kb reads its own keywords in a type, and every place one of them stands. kb reads `ref` only on a field
-directly under `properties` of the top of a type's schema or of the top of a collection's `items`; `parts` and
-`summary` only at either top; `sections` only at the top of a type's schema. The top of a schema is the schema and
+directly under `properties` of the top of a type's schema or of the top of a collection's `items`; `parts` only at
+either top; `sections` and `summary` only at the top of a type's schema. The top of a schema is the schema and
 each of its `allOf` members, as `composition.composition` reads them. Only places where JSON Schema 2020-12 puts a
 schema are walked, so a field named like a keyword, or a value keyword holding one, is never a keyword of kb's; a
 whole `$ref` is not followed, since the type it names is checked when it is written."""
@@ -9,7 +9,7 @@ from typing import Iterator, NamedTuple
 OWN = ("ref", "parts", "sections", "summary")
 
 _TOP, _ITEMS, _FIELD, _ELSEWHERE = "top", "items", "field", "elsewhere"
-_READ = {_TOP: {"parts", "summary", "sections"}, _ITEMS: {"parts", "summary"}, _FIELD: {"ref"}, _ELSEWHERE: set()}
+_READ = {_TOP: {"parts", "summary", "sections"}, _ITEMS: {"parts"}, _FIELD: {"ref"}, _ELSEWHERE: set()}
 
 _ONE = ("items", "additionalProperties", "contains", "not", "if", "then", "else", "propertyNames",
         "unevaluatedItems", "unevaluatedProperties", "contentSchema")

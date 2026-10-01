@@ -1,7 +1,8 @@
 """Where kb reads its own keywords in a type, beyond the scenarios: kb's keyword names as data are never refused; a
-keyword under a top `allOf` member is read, one under any other branch refused at the keyword's place; collections at
-depth are read, an ordinary array's `items` is not a collection's; a `ref` both misplaced and malformed is refused
-for its place alone. Through the contract, each store under its own tmp_path."""
+keyword under a top `allOf` member is read, one under any other branch refused at the keyword's place; the fields
+shown at a glance are refused at the top of a collection's items; collections at depth are read, an ordinary array's
+`items` is not a collection's; a `ref` both misplaced and malformed is refused for its place alone. Through the
+contract, each store under its own tmp_path."""
 import pytest
 
 from calls import define, request, start_a_store
@@ -60,9 +61,7 @@ READ_UNDER_A_TOP_ALL_OF = {
         {"a": [{"title": "One", "about": "tag/nothing"}]}, "a/0/about",
     ),
     "two levels of collections": (
-        _object({}, parts={"a": {"items": _object({}, summary=["title"], parts={
-            "b": {"items": _object({"about": LINK}, summary=["about"])},
-        })}}),
+        _object({}, parts={"a": {"items": _object({}, parts={"b": {"items": _object({"about": LINK})}})}}),
         {"a": [{"title": "One", "b": [{"title": "Two", "about": "tag/nothing"}]}]}, "a/0/b/0/about",
     ),
 }
@@ -127,6 +126,14 @@ MISPLACED = {
         "schema/properties/tags/items/ref", "ref",
     ),
     "the top of the schema itself": ({**_object({}), "ref": LINK["ref"]}, "schema/ref", "ref"),
+    "glance fields at the top of a collection's items": (
+        _object({}, parts={"a": {"items": _object({}, summary=["title"])}}), "schema/parts/a/items/summary",
+        "placement",
+    ),
+    "glance fields in a collection's items' allOf": (
+        _object({}, parts={"a": {"items": {"allOf": [_object({}, summary=["title"])]}}}),
+        "schema/parts/a/items/allOf/0/summary", "placement",
+    ),
 }
 
 
