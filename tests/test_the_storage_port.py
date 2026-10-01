@@ -360,7 +360,7 @@ def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_f
     store.land([], [entry("half", at=half, role="writer")])
     ids = lambda **filters: [record["id"] for record in store.history(**filters)]
     assert ids() == ["first", "second", "half", "late"]
-    assert ids(artifact=name("note/a")) == ["first", "late"]
+    assert ids(artifact=name("note/a")) == ["late", "first"]  # one artifact's entries come in the order they landed
     assert ids(role="writer") == ["half", "late"]
     assert ids(execution="run-1") == ["first", "second"]
     assert ids(since=half) == ["half", "late"]

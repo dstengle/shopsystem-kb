@@ -228,9 +228,14 @@ def _since(client, day):
     return _journal_of(client, since=day)
 
 
-@then("the client is given only the change made today")
+@then("the client is given only the entries stamped from that moment on, which is the change made today")
 def _only_todays_change(narrowed):
     assert narrowed == [("write", DECISION, "agent", "restock-run-12")]
+
+
+@then("the client is given none stamped before that moment")
+def _none_stamped_before(narrowed):
+    assert ("create", DECISION, "shopkeeper", "") not in narrowed
 
 
 @when("the client reads the journal for a set of changes the history holds nothing under", target_fixture="asked")
@@ -514,3 +519,122 @@ def test_entries_for_different_artifacts_at_the_same_moment_come_in_the_order_t(
 )
 def test_an_entry_stamped_before_a_moment_that_lands_after_a_read_since_it_is_n():
     pass
+
+
+def _changed_at(root, reading, artifact, body):
+    """The artifact changed by a client whose clock stands at the moment the reading gives."""
+    stood = moment(reading)
+    changed = write(kb_client.connect(root, clock=lambda: stood), artifact, {"sections": [
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": body},
+    ]}, message=body)
+    assert not changed.faults, changed.faults
+
+
+@given(
+    "the client has changed the decision with a clock that reads 2026-09-23 at 14:30, "
+    "and then changed it again with a clock that reads 2026-09-23 at 14:00",
+)
+def _changed_with_a_clock_that_ran_back(root):
+    _changed_at(root, "2026-09-23 at 14:30", DECISION, "Costs move weekly, said first.\n")
+    _changed_at(root, "2026-09-23 at 14:00", DECISION, "Costs move weekly, said second.\n")
+
+
+@when("the client reads the journal for the decision", target_fixture="entries")
+def _read_the_journal_for_the_decision_itself(client):
+    return _read_the_journal_for_the_decision(client)
+
+
+@then("the client is given the entries in the order the changes landed")
+def _in_landing_order(entries):
+    assert [entry.revision for entry in entries] == [1, 2, 3, 4]
+
+
+@then("the change that landed second comes after the one that landed first, though its moment is earlier")
+def _the_later_landing_comes_after(entries):
+    first, second = entries[-2:]
+    assert (first.message, second.message) == ("Costs move weekly, said first.\n", "Costs move weekly, said second.\n")
+    assert datetime.fromisoformat(second.at) < datetime.fromisoformat(first.at)
+
+
+FIRST_ARTIFACT, OTHER_ARTIFACT = DECISION, "decision/restock-on-thursdays"
+
+
+def _create_other(client):
+    made = create(client, "decision", {"title": "Restock on Thursdays", "sections": SECTIONS}, message="Restock")
+    assert not made.faults, made.faults
+
+
+@given(
+    "the client has changed one artifact with a clock that reads 2026-09-23 at 14:30, "
+    "and then changed another artifact with a clock that reads 2026-09-23 at 14:00",
+    target_fixture="landed",
+)
+def _changed_two_artifacts_with_a_clock_that_ran_back(root):
+    _changed_at(root, "2026-09-23 at 14:30", FIRST_ARTIFACT, "Costs move weekly, said first.\n")
+    stood = moment("2026-09-23 at 14:00")
+    _create_other(kb_client.connect(root, clock=lambda: stood))
+    return [FIRST_ARTIFACT, OTHER_ARTIFACT]
+
+
+def _entry_for(entries, artifact, at):
+    [found] = [entry for entry in entries if entry.artifact == artifact and entry.at.startswith(at)]
+    return entries.index(found)
+
+
+@then(
+    "the entry for the other artifact, stamped 2026-09-23 at 14:00, is given before the entry for the first, "
+    "stamped 2026-09-23 at 14:30"
+)
+def _the_earlier_moment_comes_first(entries):
+    assert _entry_for(entries, OTHER_ARTIFACT, "2026-09-23T14:00") < _entry_for(entries, FIRST_ARTIFACT, "2026-09-23T14:30")
+
+
+@then("that is the opposite order to the one the two changes landed in")
+def _opposite_to_landing(entries, landed):
+    at = {FIRST_ARTIFACT: "2026-09-23T14:30", OTHER_ARTIFACT: "2026-09-23T14:00"}
+    read = sorted(landed, key=lambda artifact: _entry_for(entries, artifact, at[artifact]))
+    assert read == landed[::-1]
+
+
+@given("the client has changed one artifact, and then changed a different artifact", target_fixture="landed")
+def _changed_one_then_a_different_one(client):
+    changed = write(client, FIRST_ARTIFACT, {"sections": SECTIONS}, message="Say it plainly")
+    assert not changed.faults, changed.faults
+    _create_other(client)
+    return [FIRST_ARTIFACT, OTHER_ARTIFACT]
+
+
+@then("the two entries both say they happened at 2026-09-23 at 14:30")
+def _both_at_the_moment(entries, landed):
+    both = [entry for entry in entries if entry.artifact in landed and entry.at.startswith("2026-09-23T14:30")]
+    assert sorted(entry.artifact for entry in both) == sorted(landed)
+
+
+@then("the entry for the artifact changed first is given before the entry for the artifact changed second")
+def _landing_order_settles_the_tie(entries, landed):
+    at_the_moment = [entry.artifact for entry in entries if entry.at.startswith("2026-09-23T14:30")]
+    assert at_the_moment == landed
+
+
+@given(parsers.parse("the client has read the journal since {reading}"), target_fixture="first_read")
+def _read_since_a_moment(client, reading):
+    read = journal(client, since=moment(reading).isoformat())
+    assert not read.faults, read.faults
+    return list(read.entries)
+
+
+@given(parsers.parse("a change stamped {reading} has landed since that read"))
+def _a_late_change_landed(root, reading):
+    _changed_at(root, reading, DECISION, "Costs move weekly, said late.\n")
+
+
+@when(parsers.parse("the client reads the journal since {reading} again"), target_fixture="asked")
+def _read_since_again(client, reading):
+    return journal(client, since=moment(reading).isoformat())
+
+
+@then(parsers.parse("the client is not given the entry stamped {reading}"))
+def _not_given_the_late_entry(asked, reading):
+    assert not asked.faults, asked.faults
+    assert moment(reading) not in [datetime.fromisoformat(entry.at) for entry in asked.entries]

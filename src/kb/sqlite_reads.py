@@ -135,8 +135,9 @@ class Reads:
         }
         clauses = [clause for clause, value in asked.items() if value is not None]
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        order = "rowid" if artifact is not None else "moment, rowid"
         rows = self._rows(
-            f"SELECT record FROM entries{where} ORDER BY moment, seq", *(value for value in asked.values() if value is not None),
+            f"SELECT record FROM entries{where} ORDER BY {order}", *(value for value in asked.values() if value is not None),
         )
         return [decoded(record) for (record,) in rows]
 

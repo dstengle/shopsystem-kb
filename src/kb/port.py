@@ -160,7 +160,8 @@ class Port(Protocol):
 
     def history(self, artifact: ArtifactId | None = None, role: str = "", execution: str = "",
                 since: datetime | None = None, batch: str = "") -> list[dict]:
-        """The entries, oldest first by moment then seq, narrowed by each filter given."""
+        """The entries, narrowed by each filter given: those of one artifact in the order they landed, whatever else
+        is asked, and every other read by moment, then the order they landed."""
 
     def entry_ids(self, at: datetime) -> list[str]:
         """The ids of the entries stamped at a moment."""
