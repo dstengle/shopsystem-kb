@@ -9,6 +9,7 @@ a change that breaks one is refactored into place first, then made.
 |---|---|---|
 | `contract/` | `kb.proto` and generated code | hand-written logic |
 | `servicer.py` | the rpc adapter: request in, one call into the domain, response out, inside the one fail-closed wrapper | domain logic, file paths, git |
+| `operating.py` | the operator's commands that are not rpcs (export), each one call into the domain inside `servicer.py`'s one wrapper | domain logic, finding the store |
 | `values.py` | conversion of single request fields into validated values: ids, locators, kinds, roots, the directory an export is written to, content trees; the one reading of a moment in UTC, "UTC unless it says otherwise", which `in_utc` provides for both `since` and the clock | anything that touches the store or the filesystem |
 | `signatures.py` | who makes a change and why: the actor, the signature, and the conversions of a writer's, a reader's and a starter's; refuses one that does not sign | I/O, other request values |
 | `requests.py` | each rpc's request as the values its one domain call takes, built from `values.py`; refuses a request that does not convert | domain logic, I/O |
@@ -36,8 +37,8 @@ a change that breaks one is refactored into place first, then made.
 | `content.py` | artifact content crossing the contract as canonical text, and `NotCanonical`, the refusal of text kb cannot keep: what kb publishes about content (adrs/0018) | anything else |
 | `journal.py` | history entries, their ids and stamps, and fingerprints of canonical text; it writes nothing, its entries ride with the set handed to the port | anything else |
 | `metaschema.py` | the one type a new store holds | logic |
-| `export.py` | the store written out as canonical files at one moment, never over anything: `<dir>/<kind>/<slug>.yaml`, every artifact read in one view of the store before the directory is touched; refuses a directory that holds anything | checks, rpc types, the store's own files |
-| `client.py`, `cli.py` | the in-process transport, and the operator's export through it, not part of the contract; the operator's init, validate and export commands | domain logic |
+| `export.py` | the store written out as canonical files at one moment, never over anything: `<dir>/<kind>/<slug>.yaml`, every artifact read in one view of the store before the directory is touched; refuses what is not a directory, or a directory that holds anything | checks, rpc types, the store's own files |
+| `client.py`, `cli.py` | the in-process transport, and beside it, never on it, the operator's export over the store it finds, not part of the contract; the operator's init, validate and export commands | domain logic |
 
 A new concern gets a new module. Nothing is added "beside" existing code in a
 module that does not own it.

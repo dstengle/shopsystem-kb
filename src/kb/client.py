@@ -1,12 +1,23 @@
-"""Transports. In-process: an object with the stub's method names that calls the servicer directly."""
+"""Transports. In-process: an object with the stub's method names that calls the servicer directly; and, beside it, the
+operator's commands that are not rpcs, each a function over the store it finds."""
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from kb import export, store
+from kb import store
+from kb.export import Exported
 from kb.contract import kb_pb2
+from kb.operating import Operator
 from kb.servicer import KbServicer
+
+
+def _found(root: Path | None) -> tuple[Path | None, kb_pb2.Fault | None]:
+    """The store's root: the one given, or, with none, the one found the way git finds a repository; or the fault
+    that says none was found."""
+    if root is not None:
+        return root, None
+    return store.locate(os.environ)
 
 
 class InProcessClient:
@@ -22,9 +33,7 @@ class InProcessClient:
         self._clock = clock
 
     def _servicer(self) -> tuple[KbServicer | None, kb_pb2.Fault | None]:
-        if self._root is not None:
-            return KbServicer(self._root, self._clock), None
-        root, refusal = store.locate(os.environ)
+        root, refusal = _found(self._root)
         if refusal is not None:
             return None, refusal
         return KbServicer(root, self._clock), None
@@ -75,10 +84,6 @@ class InProcessClient:
     def Delete(self, request, timeout=None):
         return self._call("Delete", request, kb_pb2.DeleteResponse)
 
-    def Export(self, directory: str):
-        """The operator's export of the store this call finds to the directory named; not part of the contract."""
-        return self._call("Export", directory, export.Exported)
-
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:
     """A client over the store at <root>/kb/, in this process; with no root, over whichever store each call finds.
@@ -86,3 +91,11 @@ def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProc
     stamp; with no clock, with the machine's. A clock returns a `datetime`, read as UTC when it has no zone; the
     journal gives every moment in UTC."""
     return InProcessClient(Path(root) if root is not None else None, clock)
+
+
+def export(directory: str) -> Exported:
+    """The operator's export of the store this call finds to the directory named; not part of the contract."""
+    root, refusal = _found(None)
+    if refusal is not None:
+        return Exported(faults=[refusal])
+    return Operator(root).export(directory)

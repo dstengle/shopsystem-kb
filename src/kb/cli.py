@@ -1,8 +1,8 @@
 """kb's own command line, for the operator: set a store up, check one, and export one. Nothing else; every change to
 content goes through a client.
 
-Each command is one call on the in-process client. A refusal is printed to stderr and exits 2; a check that finds a
-violation exits 1.
+Each command is one call on the in-process client, or on one of the operator's commands beside it. A refusal is
+printed to stderr and exits 2; a check that finds a violation exits 1.
 """
 import argparse
 import os
@@ -59,7 +59,7 @@ def _validate() -> int:
 
 def _export(directory: str) -> int:
     """Write the store this directory finds out as files into the directory named."""
-    exported = kb_client.connect().Export(directory)
+    exported = kb_client.export(directory)
     if exported.faults:
         return _refused("export", exported.faults)
     return 0

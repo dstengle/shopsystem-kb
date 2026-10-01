@@ -16,11 +16,12 @@ class Exported:
 
 def written(store: Port, into: Directory) -> None:
     """Every artifact the store holds, all read at one moment, then written as canonical text into the directory,
-    which is made when it does not exist. Raises Refused, writing nothing, when the directory holds anything."""
+    which is made, with any directory above it, when it does not exist. Raises Refused, writing nothing, when it is not a
+    directory or holds anything."""
     with store.at_one_moment():
         artifacts = {name: store.artifact(name) for name in store.ids()}
     _empty(into)
-    into.path.mkdir(exist_ok=True)
+    into.path.mkdir(parents=True, exist_ok=True)
     for name, artifact in artifacts.items():
         folder = into.path / name.kind.name
         folder.mkdir(exist_ok=True)
@@ -28,9 +29,13 @@ def written(store: Port, into: Directory) -> None:
             file.write(canonical.dump(artifact))
 
 
-
 def _empty(into: Directory) -> None:
-    """Refuse a directory that holds anything: an export never writes over what is there."""
+    """Refuse what is not a directory, and a directory that holds anything: an export never writes over what is
+    there."""
+    if into.path.exists() and not into.path.is_dir():
+        raise Refused([kb_pb2.Fault(
+            rule=rules.ROOT, message=f"an export is written into a directory; {into.named!r} is not a directory",
+        )])
     if into.path.is_dir() and any(into.path.iterdir()):
         raise Refused([kb_pb2.Fault(
             rule=rules.ROOT, message=f"an export never overwrites; {into.named!r} already holds something",
