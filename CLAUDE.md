@@ -88,7 +88,7 @@ module that does not own it.
 
 ## Working here
 
-- `make dev` once; `make test` runs the suite in this checkout's virtualenv;
+- `make dev` once; `make test` runs the suite in this checkout's virtualenv, in parallel (`-n auto`), the operator's commands run in-process (one test runs the installed `kb`); during red-green run the slice's marker (`-m slice-N`), and the whole suite once per slice;
   `make contract` regenerates the stubs after `kb.proto` changes.
 - Behaviour comes from `features/`; code is written red-green against a
   scenario, one at a time, and never adds behaviour no scenario asks for.

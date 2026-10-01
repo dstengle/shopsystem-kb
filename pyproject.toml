@@ -22,6 +22,7 @@ kb = "kb.cli:main"
 dev = [
   "pytest>=9,<10",
   "pytest-bdd>=8.1.0",
+  "pytest-xdist>=3.6",
   "grpcio-tools>=1.84.0",
 ]
 

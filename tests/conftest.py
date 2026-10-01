@@ -1,7 +1,6 @@
 """Suite wiring. Step definitions live beside the scenarios they serve; shared Givens are added here by slice 1."""
 import os
 import re
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -11,7 +10,7 @@ from pytest_bdd import given, parsers, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version, start_a_store, check
 import held
-from kb import client as kb_client, store
+from kb import cli, client as kb_client, store
 
 
 def pytest_configure(config):
@@ -182,15 +181,15 @@ def _nothing_written(root, before):
 
 # The operator's command line, and the Givens that set where the operator works and which store, if any, is named.
 
-KB = Path(sys.executable).with_name("kb")
 OPERATOR = "operator"
 
 
 def _kb(*args, cwd, env=None):
-    """kb's own console command, run as the operator runs it: in a directory, with KB_ROOT and KB_ACTOR set only when
-    a step sets them."""
+    """kb's own command line, run as the operator runs it: in a directory, with KB_ROOT and KB_ACTOR set only when a
+    step sets them. It runs in this process (tests/test_the_kb_command.py shows the installed command runs the same
+    command line), so a step answers in milliseconds and sees the store's wait as the test set it."""
     clean = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
-    return subprocess.run([*held.operator(KB), *args], cwd=cwd, env={**clean, **(env or {})}, capture_output=True, text=True)
+    return held.in_process(cli.main, list(args), cwd, {**clean, **(env or {})})
 
 
 def _store_needing_attention(root):

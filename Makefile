@@ -6,7 +6,7 @@ dev:
 	.venv/bin/pip install -e '.[dev]'
 
 test:
-	.venv/bin/python -m pytest -q
+	.venv/bin/python -m pytest -q -n auto
 
 # The performance bounds at 30,000 artifacts (spec/index.md); not part of test. `bench/bounds.py 3000` for a quick look.
 bench:

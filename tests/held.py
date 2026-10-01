@@ -2,9 +2,12 @@
 holding a marker and one SQLite database beside it. The steps ask for what they mean here and never look at a path.
 What the store holds comes back through the port's public reads, or as an opaque value that a step only compares
 with another taken at another time."""
+import contextlib
 import hashlib
+import io
+import os
 import sqlite3
-import sys
+import types
 from pathlib import Path
 
 from kb import canonical, sqlite_store, store
@@ -15,9 +18,7 @@ from kb.values import artifact_id
 _PLACE = "kb"
 _MARKER = "store.yaml"
 _DATABASE = "store.sqlite3"
-_STORE_WAITS = sqlite_store.BUSY
 WAIT = 0.2  # seconds the store waits for the write lock while a test holds it
-_OPERATOR_PROGRAM = Path(__file__).with_name("operator_program.py")
 
 
 def _place(root):
@@ -234,9 +235,25 @@ def another_change_holds(root, request, monkeypatch):
     return holding
 
 
-def operator(kb):
-    """How the operator's kb is run: the console command itself, or, while a test has shortened the store's wait,
-    kb's command line in a program that waits as long as the store does here."""
-    if sqlite_store.BUSY == _STORE_WAITS:
-        return [str(kb)]
-    return [sys.executable, str(_OPERATOR_PROGRAM), str(sqlite_store.BUSY)]
+
+
+def in_process(main, argv, cwd, env):
+    """A command line's `main` run in this process as a program would be: in a directory, with exactly the environment
+    given, its output captured; what a finished program shows, its exit code and what it wrote to each stream. The
+    directory and the environment are put back afterwards, whatever happens."""
+    out, err = io.StringIO(), io.StringIO()
+    was_in, was_env = os.getcwd(), dict(os.environ)
+    try:
+        os.chdir(cwd)
+        os.environ.clear()
+        os.environ.update(env)
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                code = main(argv)
+            except SystemExit as exited:
+                code = exited.code if isinstance(exited.code, int) else 2
+    finally:
+        os.chdir(was_in)
+        os.environ.clear()
+        os.environ.update(was_env)
+    return types.SimpleNamespace(returncode=code or 0, stdout=out.getvalue(), stderr=err.getvalue())
