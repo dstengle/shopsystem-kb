@@ -25,6 +25,12 @@ def order(artifact_id) -> tuple[str, str]:
     """The one order artifacts' names are given in: by kind, then by `<slug>.yaml`, compared as the paths of the
     files a store once kept them in compared, so `work/...` comes before `work-item/...`, and `price-2` before
     `price`."""
+    return place(artifact_id)
+
+
+def place(artifact_id) -> tuple[str, str]:
+    """The place the export layout gives an artifact, as steps below the directory: its kind, then `<slug>.yaml`;
+    the inverse of `filed`."""
     kind, slug = parted(str(artifact_id))
     return kind, f"{slug}.yaml"
 

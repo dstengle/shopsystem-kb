@@ -4,7 +4,7 @@ Each artifact's entries are written in the order the current version of its type
 its content, revision and type version are written as the store holds them."""
 from dataclasses import dataclass, field
 
-from kb import canonical, composition, refusals, settled, values
+from kb import canonical, composition, names, refusals, settled, values
 from kb.port import Port
 from kb.values import Directory, Refused
 
@@ -24,9 +24,9 @@ def written(store: Port, into: Directory) -> None:
     _empty(into)
     into.path.mkdir(parents=True, exist_ok=True)
     for name, artifact in artifacts.items():
-        folder = into.path / name.kind.name
-        folder.mkdir(exist_ok=True)
-        with (folder / f"{name.slug}.yaml").open("x", encoding="utf-8") as file:
+        folder, filename = names.place(name)
+        (into.path / folder).mkdir(exist_ok=True)
+        with (into.path / folder / filename).open("x", encoding="utf-8") as file:
             file.write(canonical.dump(artifact))
 
 
