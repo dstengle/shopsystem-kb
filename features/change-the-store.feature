@@ -159,6 +159,7 @@ Feature: Change the store
     And both replacements are in the history
     And the decision holds the different rationale
 
+  @slice-115
   Scenario: A change that waits longer than the store waits for another change is refused as busy
     Pins that a change never waits for ever behind another: it is refused as busy, leaves nothing behind, and can simply be made again.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -168,6 +169,7 @@ Feature: Change the store
     And nothing is written
     And the same change may be made again
 
+  @slice-115
   Scenario: A read while another change is being written is not refused as busy
     Pins that reading never meets the wait for another change: a client can always read, however long a change holds the store.
     Given a store holding a decision with a purpose and a rationale, at its first version

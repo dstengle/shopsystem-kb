@@ -78,6 +78,7 @@ Feature: Make several changes in one go
     Then the set lands
     And the store holds both decisions, each pointing at the other
 
+  @slice-115
   Scenario: A set that waits longer than the store waits for another change is refused as busy
     Pins that a set is held to the same wait as a single change: refused as busy, none of it written, and free to be asked for again.
     Given another change is being written and holds the store longer than the store waits

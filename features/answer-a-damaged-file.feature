@@ -50,6 +50,7 @@ Feature: Answer a damaged file
       | is missing, while the store's marker is still there | the operator checks a directory exported from another store for import in that store                             |
       | is missing, while the store's marker is still there | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
 
+  @slice-118
   Scenario Outline: A store whose database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, refuses every call and command that needs it
     Pins that a store that cannot be written to gives the same named fault as a damaged one, naming the database, never a crash, with nothing written in the store or in a directory an export was aimed at.
     Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
@@ -97,6 +98,7 @@ Feature: Answer a damaged file
       | is a file that is read-only           | the operator checks a directory exported from another store for import in that store                             |
       | is a file that is read-only           | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
 
+  @slice-117
   Scenario Outline: A store found that was made by an earlier kb, in a form this kb cannot read, refuses every call and command that needs it
     Pins that an earlier kb's store always gives one named fault saying how to move it, however it is found, never a crash, with nothing written.
     Given a store holding a decision, a process and a tag, made by an earlier kb in a form this kb cannot read

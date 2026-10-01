@@ -85,6 +85,7 @@ Feature: Operate a store
     When the operator runs kb validate there
     Then the check is rejected because KB_ROOT names a store other than the one they are standing in, and neither of the two is guessed at
 
+  @slice-115
   Scenario: The operator checks the store while another change is being written
     Pins that checking is a read: it goes ahead however long another change holds the store.
     Given a store whose content the operator did not write

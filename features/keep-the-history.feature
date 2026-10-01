@@ -38,7 +38,7 @@ Feature: Keep the history
     When the client reads the journal for that piece of work
     Then the client is given only the change the agent made
 
-  @slice-35
+  @slice-116
   Scenario: The client reads the journal since a time
     Pins the "what has happened lately" question, so a client can catch up without walking the whole history, and that it is answered by the moment each entry is stamped with, as the store holds the entries when it is read.
     Given today is 2026-09-23
@@ -165,6 +165,7 @@ Feature: Keep the history
     Then the store's history holds two entries, both saying they happened at 2026-09-20 at 08:00
     And each names itself as its own set
 
+  @slice-116
   Scenario: The history of one artifact comes in the order its changes landed
     Pins that one artifact's story reads in the order things happened to it, even when a clock gave a later change an earlier moment.
     Given today is 2026-09-23
@@ -174,6 +175,7 @@ Feature: Keep the history
     Then the client is given the entries in the order the changes landed
     And the change that landed second comes after the one that landed first, though its moment is earlier
 
+  @slice-116
   Scenario: The history across artifacts comes in the order of the moments
     Pins that a read across artifacts is ordered by moment, so a change that landed later but is stamped earlier comes first.
     Given today is 2026-09-23
@@ -183,6 +185,7 @@ Feature: Keep the history
     Then the entry for the other artifact, stamped 2026-09-23 at 14:00, is given before the entry for the first, stamped 2026-09-23 at 14:30
     And that is the opposite order to the one the two changes landed in
 
+  @slice-116
   Scenario: Entries for different artifacts at the same moment come in the order they landed
     Pins that a shared moment never leaves the order of the history to chance: the tie is settled by which landed first.
     Given today is 2026-09-23
@@ -193,6 +196,7 @@ Feature: Keep the history
     Then the two entries both say they happened at 2026-09-23 at 14:30
     And the entry for the artifact changed first is given before the entry for the artifact changed second
 
+  @slice-116
   Scenario: An entry stamped before a moment that lands after a read since it is not given by a later read
     Pins that a late-landing entry stamped before the moment asked for stays out of every read since that moment, so a client catching up never has the past turn up in it.
     Given today is 2026-09-23

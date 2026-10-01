@@ -216,6 +216,7 @@ Feature: Export and import a store
     When the operator checks the directory for import
     Then the file holding that copy is reported as an error, naming the file
 
+  @slice-115
   Scenario: An import that waits longer than the store waits for another change is refused as busy
     Pins that an import, which writes, is held to the same wait as any change: refused as busy, nothing written, free to be run again.
     Given a freshly started store
@@ -226,6 +227,7 @@ Feature: Export and import a store
     And nothing is written
     And the same import may be run again
 
+  @slice-115
   Scenario: The operator exports the store while another change is being written
     Pins that an export is a read: it is written however long another change holds the store.
     Given a store holding a decision
