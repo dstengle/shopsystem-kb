@@ -29,10 +29,10 @@ def _position(place: str, view: dict, declared: dict) -> tuple:
 
 
 def _rank(step: str, node, level: str, schema: dict) -> tuple:
-    """A step's rank among the entries beside it: an entry of a list by its index as a number; a name by where its
-    level's entries stand, the names it does not hold standing where the type would put them and those the type does
-    not declare after them, by name."""
-    if level in (_SECTIONS, _ITEMS):
+    """A step's rank among the entries beside it: an entry of a list, at any level, by its index as a number; a name by
+    where its level's entries stand, the names it does not hold standing where the type would put them and those the
+    type does not declare after them, by name."""
+    if level in (_SECTIONS, _ITEMS) or isinstance(node, list):
         return (int(step) if step.isdigit() else len(node or []), "")
     names = _sequence(node, level, schema)
     return (names.index(step) if step in names else len(names), step)
@@ -57,7 +57,7 @@ def _inside(step: str, node, level: str, schema: dict) -> tuple:
         return _entry(step, node), _SECTION, {}
     if level == _ITEMS:
         return _entry(step, node), _ITEM, schema
-    child = node.get(step) if isinstance(node, dict) else None
+    child = node.get(step) if isinstance(node, dict) else _entry(step, node)
     if level in (_TOP, _ITEM) and step in schema.get("parts", {}):
         return child, _ITEMS, schema["parts"][step].get("items", {})
     if level in (_TOP, _SECTION) and step == "sections":
