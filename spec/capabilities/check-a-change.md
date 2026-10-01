@@ -2,7 +2,7 @@
 id: capability/check-a-change
 title: Check a change
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision]
+rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision, decision/faults-ordered-by-place-then-rule]
 formulated_as: features/check-a-change.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/check-a-change.feature
 
 ## Purpose
 
-Every create, change and added item is checked against the current version of its type and the store as it stands before anything lands. That covers the fields and their shapes, the shape of every section, required sections in order, links that land, and links into what the change drops. A refusal gives every fault at once and leaves the store as it was. An artifact behind its type is checked like any other. This capability is not the check of the whole store (check-the-store).
+Every create, change and added item is checked against the current version of its type and the store as it stands before anything lands. That covers the fields and their shapes, the shape of every section, required sections in order, links that land, and links into what the change drops. A refusal gives every fault at once, in an order kb decides, and leaves the store as it was. An artifact behind its type is checked like any other. This capability is not the check of the whole store (check-the-store).
 
 ## Behaviour
 
@@ -18,6 +18,7 @@ Every create, change and added item is checked against the current version of it
 - If an artifact points at something the store does not hold, the artifact is refused because a link must land on a node of a kind the type allows.
 - If an artifact has several faults, it is refused with every one of them, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
 - If an artifact has faults found by different rules, such as a shape its type does not allow and a missing section, it is refused with all of them together, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
+- If an artifact is refused with several faults, they are given in the order of their places in it, then of the rules they break.
 - If a section carries anything besides its title, its body and the sections inside it, the artifact is refused because a section holds exactly those, naming the extra entry.
 - If a section carries a body and no title, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
 - If a section carries a title and no body, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
@@ -40,6 +41,7 @@ Every create, change and added item is checked against the current version of it
 - Every artifact carries one implicit link to its type artifact (`schema/<kind>`), so removing a type still in use is refused by the same rule; the adapter knows nothing of kinds.
 - The port is a kb-internal Python interface, not published. Above it, unchanged: names, content checks, sections and items, signatures, faults, the contract. `store.py` keeps discovery and the marker; `port.py` holds the interface and `sqlite_store.py` the SQLite adapter; `journal.py` keeps entry naming and fingerprints but writes no files; the git code is gone.
 - Faults are `{ artifact, place, rule, message }`; a fault for content that breaks a type's JSON Schema carries the keyword it breaks as its rule.
+- Faults are put in kb's order before they are returned: places in the order they stand in the artifact, then rules; the order the library finds them in is not kept.
 
 ## Not yet
 

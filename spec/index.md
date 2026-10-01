@@ -13,12 +13,13 @@ kb knows nothing about any domain. It ships no type beyond the one that describe
 - Artifacts are typed, ordered documents. Domain parts are typed nodes with names, never text quoted inside a code fence. Inline formatting is never modelled; a prose body is one markdown string.
 - Renderings are outputs written elsewhere, never stored in their source, and never in the store's tree.
 - Every artifact carries the version of the type it was last checked against. Migration is not built; versioning is.
+- Types are written in JSON Schema 2020-12 with kb's own keywords, which are accepted only where kb reads them (define-a-type).
 - The boundary is enforced mechanically: a corpus-only role gets the client and no shell; a shell-bearing role runs where the store is not.
 - All YAML kb reads or writes is YAML 1.2: content over the contract, types, exported and imported files, and the type that describes types.
-- What a client may depend on is published and versioned together by kb's release tag, which clients pin: `kb.proto` (package `kb.v1`) and its messages, `kb.init` and `kb.NotStarted`, the in-process client's `connect` with its clock, `kb.content` (content as canonical text, and `NotCanonical`), the connection file's form (`kb/server.yaml` and its `address`), and each fault's `rule` name. A fault's message wording, the store's files and layout, the storage port and every other module may change behind the contract.
+- What a client may depend on is published and versioned together by kb's release tag, which clients pin: `kb.proto` (package `kb.v1`) and its messages, `kb.init` and `kb.NotStarted`, the in-process client's `connect` with its clock, `kb.content` (content as canonical text, and `NotCanonical`), the connection file's form (`kb/server.yaml` and its `address`), each fault's `rule` name, and where kb reads its keywords in a type with the shape of a `ref`. A fault's message wording, the store's files and layout, the storage port and every other module may change behind the contract.
 - Every response is either the call's result or a refusal holding every fault, never both.
-- A fault's `rule` is one of kb's own rule names, or, for content that breaks a type's JSON Schema, the JSON Schema keyword it breaks. kb's own rule names: `not-found`, `kind`, `locator`, `collection`, `identity`, `on_delete`, `unreadable`, `item-name`, `shape`, `built-on`, `targets`, `version`, `content`, `sections`, `ref`, `actor`, `message`, `operations`, `since`, `title`, `root`, `store`, `clock`, `busy`, `revision`.
-- Errors are a typed list of `{ artifact, place, rule, message }`.
+- A fault's `rule` is one of kb's own rule names, or, for content that breaks a type's JSON Schema, the JSON Schema keyword it breaks. kb's own rule names: `not-found`, `kind`, `locator`, `collection`, `identity`, `on_delete`, `unreadable`, `item-name`, `shape`, `built-on`, `targets`, `version`, `content`, `sections`, `ref`, `actor`, `message`, `operations`, `since`, `title`, `root`, `store`, `clock`, `busy`, `revision`, `placement`.
+- Errors are a typed list of `{ artifact, place, rule, message }`, each artifact's faults in the order of their places in it, then of their rules.
 - Bounds: one database per store; at most one store above any directory (stores never nest); one delete rule, refuse; a server's network is its only boundary (no authentication or encryption); on one machine several callers share a store directly, the database's write lock serialising their changes, and across containers only through a server, which takes changes one at a time; no store on a read-only filesystem, until what a read-only store means is defined; a store made by an earlier kb in a form this kb cannot read is never read or written, only its files imported into a new store; a store made by a later kb, in a form this kb does not know, is never opened, a later version of kb being needed to read it; a set holds one kind of change.
 - Performance bounds, at 30,000 artifacts: a summary read and a three-step traversal under 100 ms each; a single change under 50 ms; a set of 100 changes under 1 s. Provisional until the scale targets are set.
 
@@ -29,12 +30,12 @@ Reading order:
 1. `capabilities/start-a-store.md`: the client brings a store into being in its own process.
 2. `capabilities/find-the-store.md`: every other call finds its store from where the client works or `KB_ROOT`.
 3. `capabilities/reach-a-served-store.md`: a store served to several callers over the network.
-4. `capabilities/define-a-type.md`: types as data, composition, versions.
+4. `capabilities/define-a-type.md`: types as data, written in JSON Schema with kb's keywords where kb reads them, composition, versions.
 5. `capabilities/hand-over-content.md`: how content handed to the store is read.
 6. `capabilities/name-artifacts-and-items.md`: names minted from titles and positions.
 7. `capabilities/name-what-is-asked-for.md`: names, kinds and places checked and resolved.
 8. `capabilities/sign-a-change.md`: every change carries a role and a reason.
-9. `capabilities/check-a-change.md`: every change checked against its type and the links into it before it lands.
+9. `capabilities/check-a-change.md`: every change checked against its type and the links into it before it lands, its faults in kb's order.
 10. `capabilities/change-the-store.md`: create, replace, add, remove, alone or alongside other writers, refused as busy after waiting too long or as moved since the revision the client read.
 11. `capabilities/make-several-changes-in-one-go.md`: a set of one kind of change, checked whole, all or nothing, its new artifacts pointing at each other by keys.
 12. `capabilities/read-an-artifact.md`: reads at every level, links followed to a depth.
@@ -50,7 +51,7 @@ Reading order:
 
 kb and shop-knowledge were one effort until the walking skeleton was green, then two. Feature files for both were formulated in one session from both specs and committed to the repo whose behaviour they describe; every kb scenario cites the shop-knowledge scenario that needs it, and a kb scenario nothing upstream needs is a question for the spec, not a feature. One living plan, kept in shop-knowledge, covered both repos until slice 1 was green: create a decision and read it back through `shop-knol`, which needed `Init`, `Create` and summary `Read` here; the repos were checked out side by side and shop-knowledge installed kb as an editable path dependency; slices in that phase could touch both repos and said which repo each scenario runs in. When slice 1 was green, the messages it needed became the contract's first version: kb was tagged 0.1, shop-knowledge pins it, and from then each repo has its own plan. shop-knowledge's scenarios remain the demand signal for kb, arriving as a request to bump the contract version.
 
-Three changes follow, built in order: (1) storage behind a port with SQLite as its first adapter, behind today's contract; (2) the public contract's v1 (starting a store off the wire, one method per action with its own request and response, batches per kind with references inside a set, an expected revision on changes, one signature message, a versioned package, result or refusal), published as one breaking release; (3) the type language, if still wanted.
+Three changes follow, built in order: (1) storage behind a port with SQLite as its first adapter, behind today's contract; (2) the public contract's v1 (starting a store off the wire, one method per action with its own request and response, batches per kind with references inside a set, an expected revision on changes, one signature message, a versioned package, result or refusal), published as one breaking release; (3) the type language, kept as JSON Schema 2020-12 and narrowed to where kb reads its keywords: a type carrying one where kb does not read it, or a `ref` that does not state its whole shape, is refused, a type the store already holds staying as it is until it is next changed; the type of types resolves its metaschema through a registry of kb's own; and faults come in kb's order, by place, then rule.
 
 ## Testing
 

@@ -2,7 +2,7 @@
 id: capability/make-several-changes-in-one-go
 title: Make several changes in one go
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-and-expected-revision, decision/busy-rule, decision/sets-one-kind-at-a-time, decision/references-inside-a-set, decision/expected-revision]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-and-expected-revision, decision/busy-rule, decision/sets-one-kind-at-a-time, decision/references-inside-a-set, decision/expected-revision, decision/faults-ordered-by-place-then-rule]
 formulated_as: features/make-several-changes-in-one-go.feature
 ---
 
@@ -18,6 +18,8 @@ The client asks for an ordered set of changes of one kind (creates, replacements
 - When the client asks for several changes in one go, saying which role and why, it is given one name for the set, which it never asked for, and each change's own result, and the store's history shows the set as one change.
 - When the client reads the history under the name it was given for a set, it finds exactly that set's changes.
 - If a change in a set does not fit its type, the set is refused because a change in it does not fit its type, the store holds none of its changes, and every fault in the set comes back, not only the first.
+- If a change in a set is refused with several faults, that change's faults are given in the order of their places in its artifact, then of the rules they break.
+- If several changes in a set are refused, their faults are given in the order of the set.
 - If a set is stopped for any reason (a change names an artifact the store holds nothing under, or removes an artifact something still points at), the set is refused naming that reason, the store holds none of its changes, and the history holds no entry for any of them.
 - If a set holds no changes at all, it is refused because a set must hold at least one change, the store holds no artifact it did not hold before, and the history holds no entry for it.
 - When a set changes one artifact twice, the history holds an entry for each change with the revision it left, and the artifact's revision goes up by two.

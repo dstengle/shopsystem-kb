@@ -428,3 +428,24 @@ source: docs/superpowers/specs/2026-10-01-kb-batch24-review-answers.md; the cont
 Content may write a character beyond the first 65,536 as two escapes, one for each half, as JSON does, and reads back holding that one character; half of a character alone, in either order, is still refused because the content cannot be read as written.
 date: 2026-10-01
 source: docs/superpowers/specs/2026-10-01-kb-batch24-review-answers.md
+
+## decision/type-language-stays-json-schema
+kb keeps JSON Schema 2020-12, with its own keywords, as the language types are written in, not a smaller structural model of kb's own: the one client's eight types use about ten JSON Schema keywords and fit inside it; a replacement would break contract v1 (a fault's rule is the JSON Schema keyword it breaks) and every type a store holds, with no migration to carry them; and kb would rebuild the validator, its errors and the type of types that the library gives it today.
+date: 2026-10-01
+revisit_when: a client needs a type JSON Schema cannot state, or types must migrate between versions
+source: docs/superpowers/specs/2026-10-01-kb-type-language-design.md; the controller's recommendation under the person's delegation of 2026-10-01
+
+## decision/kb-keywords-read-where-written
+A type carrying one of kb's keywords where kb does not read it is refused, naming the place, with nothing written, because until now a `ref` nested in an object or a `oneOf` branch was accepted and never read as a link (not checked to land, not counted, not holding up a removal): `ref` is read only on a field directly under `properties` of the type, of a base it is built on, of the items of any of its collections at any depth, or of a named shape another field uses; `parts` and `summary` only at the top of a type's schema or of a collection's items; `sections` only at the top of a type's schema; the `parts` inside a `ref` is the ref's own. A `ref` must state `targets`, `cardinality` (one or many), `parts` and `on_delete` (refuse, the one rule kb knows), or the type is refused, naming the place, with nothing written. A misplaced or incomplete `ref`, or one with a `cardinality` or `on_delete` kb does not know, carries rule `ref`, a missing `targets` keeps `targets`, and a misplaced `parts`, `sections` or `summary` carries `placement`, which joins kb's published rule names. Where kb reads its keywords and the shape of a `ref` are published as the rule a client defines types by. A type the store already holds stays as it is until it is next changed, when the change is refused if the type as changed still carries one. Every other JSON Schema keyword stays open to types.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-type-language-design.md; the controller's answers to the integration's questions, under the person's delegation of 2026-10-01
+
+## decision/metaschema-from-a-registry-of-kbs-own
+The type of types resolves the 2020-12 metaschema through a registry kb builds itself from the library's published specifications, declared as kb's dependency, not through what the validator happens to add.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-type-language-design.md
+
+## decision/faults-ordered-by-place-then-rule
+Faults come in an order kb decides, not the order the library finds them in: by place, places in the order they stand in the artifact, then by rule; across the changes of a set, in the order of the set. This holds for a refused artifact, a type refused as it is written, each change of a set, and each artifact's violations in a check.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-type-language-design.md; the controller's answers to the integration's questions, under the person's delegation of 2026-10-01
