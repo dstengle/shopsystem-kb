@@ -2,7 +2,7 @@
 id: capability/check-the-store
 title: Check the store
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/stale-is-safe, decision/result-or-refusal, decision/faults-ordered-by-place-then-rule]
+rests_on: [decision/0006-validation-from-composed-schema, decision/stale-is-safe, decision/result-or-refusal, decision/faults-ordered-by-reading-order-then-rule-name]
 formulated_as: features/check-the-store.feature
 ---
 
@@ -16,7 +16,7 @@ The client checks every artifact the store holds against the current version of 
 
 - When the client checks a store where everything fits its type, it is told of no violation.
 - When the client checks the store, every violation is reported, each naming the artifact, the place in it and the rule broken.
-- When the client checks the store, each artifact's violations are given in the order of their places in it, then of the rules they break.
+- When the client checks the store, each artifact's violations are given in the order its places stand in the artifact as it reads back, which is the order its type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and violations at one place come in the alphabetical order of the names of the rules they break.
 - When the client checks a store holding an artifact last checked against an older version of its type, that artifact is listed as behind its type and is not reported as a violation.
 - When the client checks a store holding an artifact behind its type that no longer fits the current version, it is listed as behind its type and also reported as a violation naming the artifact, the place and the rule broken, and the check itself does not fail.
 

@@ -2,7 +2,7 @@
 id: capability/define-a-type
 title: Define a type
 narrator: the client
-rests_on: [decision/types-are-data, decision/0006-validation-from-composed-schema, decision/composition-covers-common-fields, decision/validation-engine, decision/stale-is-safe, decision/integrity-checked-both-ways, decision/type-language-stays-json-schema, decision/kb-keywords-read-where-written, decision/metaschema-from-a-registry-of-kbs-own, decision/faults-ordered-by-place-then-rule]
+rests_on: [decision/types-are-data, decision/0006-validation-from-composed-schema, decision/composition-covers-common-fields, decision/validation-engine, decision/stale-is-safe, decision/integrity-checked-both-ways, decision/type-language-stays-json-schema, decision/kb-keywords-read-where-written, decision/metaschema-from-a-registry-of-kbs-own, decision/faults-ordered-by-reading-order-then-rule-name]
 formulated_as: features/define-a-type.feature
 ---
 
@@ -26,7 +26,7 @@ The client decides what its artifacts are made of by defining types, which are o
 - If the client defines a type with a link field that does not say whether it points at one artifact or several, whether it may point into a part, or what a removal does, the type is refused because a link field says which kinds it may point at, whether it points at one artifact or several, whether it may point into a part and what a removal does, naming the place, and nothing is written anywhere in the store.
 - If the client defines a type with a link field whose removal rule is anything but refuse, the type is refused because refuse is the one removal rule kb knows, naming the place, and nothing is written anywhere in the store.
 - If the client defines a type with a link field that says it points at anything but one artifact or several, the type is refused because a link field points at one artifact or several, naming the place, and nothing is written anywhere in the store.
-- If a type the client defines is refused with several faults, they are given in the order of their places in it, then of the rules they break.
+- If a type the client defines is refused with several faults, they are given in the order its places stand in the type as it would read back, which is the order the type's own type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and faults at one place come in the alphabetical order of the names of the rules they break.
 - A type may use any keyword of JSON Schema 2020-12 that is not one of kb's own, anywhere in its schema.
 - While the store holds a type that carries one of kb's keywords where kb does not read it, the type stays in the store as it is.
 - If the client changes a type the store holds and the type as changed still carries one of kb's keywords where kb does not read it, the change is refused because kb does not read it there, naming the place.

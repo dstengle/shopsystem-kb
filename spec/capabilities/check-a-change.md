@@ -2,7 +2,7 @@
 id: capability/check-a-change
 title: Check a change
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision, decision/faults-ordered-by-place-then-rule]
+rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision, decision/faults-ordered-by-reading-order-then-rule-name]
 formulated_as: features/check-a-change.feature
 ---
 
@@ -18,7 +18,7 @@ Every create, change and added item is checked against the current version of it
 - If an artifact points at something the store does not hold, the artifact is refused because a link must land on a node of a kind the type allows.
 - If an artifact has several faults, it is refused with every one of them, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
 - If an artifact has faults found by different rules, such as a shape its type does not allow and a missing section, it is refused with all of them together, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
-- If an artifact is refused with several faults, they are given in the order of their places in it, then of the rules they break.
+- If an artifact is refused with several faults, they are given in the order its places stand in the artifact as it would read back, which is the order its type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and faults at one place come in the alphabetical order of the names of the rules they break.
 - If a section carries anything besides its title, its body and the sections inside it, the artifact is refused because a section holds exactly those, naming the extra entry.
 - If a section carries a body and no title, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
 - If a section carries a title and no body, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
@@ -41,7 +41,7 @@ Every create, change and added item is checked against the current version of it
 - Every artifact carries one implicit link to its type artifact (`schema/<kind>`), so removing a type still in use is refused by the same rule; the adapter knows nothing of kinds.
 - The port is a kb-internal Python interface, not published. Above it, unchanged: names, content checks, sections and items, signatures, faults, the contract. `store.py` keeps discovery and the marker; `port.py` holds the interface and `sqlite_store.py` the SQLite adapter; `journal.py` keeps entry naming and fingerprints but writes no files; the git code is gone.
 - Faults are `{ artifact, place, rule, message }`; a fault for content that breaks a type's JSON Schema carries the keyword it breaks as its rule.
-- Faults are put in kb's order before they are returned: places in the order they stand in the artifact, then rules; the order the library finds them in is not kept.
+- Faults are put in kb's order before they are returned: places in the order the artifact reads back in (the order its type declares, which is the order the store writes it in), then rule names alphabetically; the order the library finds them in is not kept, and neither is the order the client wrote the artifact in.
 
 ## Not yet
 
