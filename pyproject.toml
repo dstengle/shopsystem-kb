@@ -11,6 +11,7 @@ dependencies = [
   "protobuf>=7.35.1,<8",
   "grpcio>=1.84.0",
   "jsonschema>=4.18",
+  "jsonschema-specifications>=2025.9.1",
   "referencing>=0.37.0",
   "ruamel.yaml>=0.19.1,<0.20",
 ]

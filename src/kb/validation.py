@@ -5,6 +5,7 @@ over a node JSON Schema found misshapen. kb's keywords are read through kb.compo
 corpus it is checked against, are given; nothing here finds or opens a file.
 """
 from jsonschema import Draft202012Validator
+from jsonschema_specifications import REGISTRY as SPECIFICATIONS
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
@@ -59,10 +60,11 @@ def _item(item_schema: dict, corpus) -> dict:
 
 
 def registry(corpus) -> Registry:
-    """Every type the corpus holds, found by the URI kb:schema/<type> when a schema refers to it, and only then."""
+    """The 2020-12 metaschema and its vocabularies, from the specifications package kb declares, and every type the
+    corpus holds, found by the URI kb:schema/<type> when a schema refers to it, and only then."""
     def retrieve(uri: str):
         return DRAFT202012.create_resource(type_schema(uri, corpus))
-    return Registry(retrieve=retrieve)
+    return SPECIFICATIONS.combine(Registry(retrieve=retrieve))
 
 
 def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_pb2.Fault]:
