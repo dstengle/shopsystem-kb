@@ -42,6 +42,8 @@ CREATE VIRTUAL TABLE search USING fts5 (
     words, artifact UNINDEXED, kind UNINDEXED, what UNINDEXED, name UNINDEXED, ordinal UNINDEXED,
     tokenize = "ascii tokenchars '_'"
 );
+CREATE TABLE searched (row INTEGER PRIMARY KEY, artifact TEXT NOT NULL);
+CREATE INDEX searched_by_artifact ON searched (artifact);
 """
 
 
@@ -136,7 +138,8 @@ class SqliteStore(Reads):
 
     def _written(self, change: Change, landed: int, step: int) -> None:
         name = str(change.artifact)
-        for table, column in (("parts", "artifact"), ("search", "artifact"), ("artifacts", "id")):
+        self._unsearched(name)
+        for table, column in (("parts", "artifact"), ("artifacts", "id")):
             self._db.execute(f"DELETE FROM {table} WHERE {column} = ?", (name,))
         self._linked(change.artifact, () if change.content is None else change.links)
         stored = None if change.content is None else encoded(change.content)
@@ -151,10 +154,21 @@ class SqliteStore(Reads):
             "INSERT INTO artifacts (id, kind, revision, content) VALUES (?, ?, ?, ?)", (name, kind, change.revision, stored),
         )
         self._db.executemany("INSERT INTO parts VALUES (?, ?)", [(name, place) for place in set(change.parts)])
-        self._db.executemany("INSERT INTO search VALUES (?, ?, ?, ?, ?, ?)", [
-            (" ".join(search.tokens(words)), name, kind, what, label, ordinal)
-            for ordinal, (what, label, words) in enumerate(_searched(change.content))
-        ])
+        self._searchable(name, kind, change.content)
+
+    def _unsearched(self, name: str) -> None:
+        """An artifact's search rows taken out, found through `searched`, since search finds rows only by words."""
+        self._db.execute("DELETE FROM search WHERE rowid IN (SELECT row FROM searched WHERE artifact = ?)", (name,))
+        self._db.execute("DELETE FROM searched WHERE artifact = ?", (name,))
+
+    def _searchable(self, name: str, kind: str, content: dict) -> None:
+        """An artifact's search rows, each noted in `searched` under the artifact."""
+        for ordinal, (what, label, words) in enumerate(_searched(content)):
+            row = self._db.execute(
+                "INSERT INTO search VALUES (?, ?, ?, ?, ?, ?)",
+                (" ".join(search.tokens(words)), name, kind, what, label, ordinal),
+            ).lastrowid
+            self._db.execute("INSERT INTO searched VALUES (?, ?)", (row, name))
 
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""
