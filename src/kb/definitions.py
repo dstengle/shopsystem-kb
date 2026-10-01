@@ -1,7 +1,7 @@
 """A type checked as it is written, as the whole set leaves the types: every shape it refers to belongs to a type the
-store holds, it is not built on itself, every link field says which kinds it may point at, and a change to it moves
-its version on. What a type could never check an artifact against is refused here, once, rather than by every create
-that uses it."""
+store holds, it is not built on itself, every link field says which kinds it may point at; and, for each change to it,
+that its version moves on from the version it changed. What a type could never check an artifact against is refused
+here, once, rather than by every create that uses it."""
 from kb import composition, refusals
 from kb.contract import kb_pb2
 from kb.values import ArtifactId
@@ -22,16 +22,16 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
     for place, name, field in _link_fields(schema, "schema"):
         if not isinstance(field["ref"], dict) or "targets" not in field["ref"]:
             found.append(refusals.no_targets(type_id, place, name))
-    return found + _version_kept(type_id, content, draft)
+    return found
 
 
-def _version_kept(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
-    """The fault of a type whose schema the set changed while its version did not go up from the version the store
-    held before the set; nothing for a type the store did not hold."""
-    held = draft.before(type_id)
-    if held is None:
+def version_kept(type_id: ArtifactId, content: dict, held: dict) -> list[kb_pb2.Fault]:
+    """The fault of a type whose schema changed from the one held while its version did not go up from the held
+    version; nothing when the version given is not a number, which the type of types refuses."""
+    version = content.get("version")
+    if isinstance(version, bool) or not isinstance(version, int):
         return []
-    if content["schema"] == held["schema"] or content["version"] > held["version"]:
+    if content.get("schema") == held["schema"] or version > held["version"]:
         return []
     return [refusals.version_kept(type_id, held["version"])]
 

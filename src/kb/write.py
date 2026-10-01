@@ -126,51 +126,50 @@ def _acted(draft: Draft, operation) -> Change | list:
 
 def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
     """An operation's faults: those it was refused with as it acted; for a removal, every link the set leaves pointing
-    at what it removed; for a change, the names it handed back that the artifact did not hold, and, for the last the
-    set makes to an artifact, the artifact as the set leaves it against its type as the set leaves it."""
+    at what it removed; for a change, those it found as it acted, then what it left against its type as the set leaves
+    it, and, for the last the set makes to a type, that type checked as a type."""
     if not isinstance(outcome, Change):
         return outcome
-    return [*outcome.faults, *_left(draft, outcome, last)]
-
-
-def _left(draft: Draft, outcome: Change, last: dict) -> list:
-    """What a change leaves refused for, judged against the state the whole set leaves."""
     if outcome.left is None:
         return [
             refusals.still_linked(str(outcome.artifact_id), each.source, each.place)
             for each in draft.links_in(outcome.artifact_id) if each.source != outcome.artifact_id
         ]
-    if last[outcome.artifact_id] is not outcome:
-        return []
-    try:
-        return _fits(draft, outcome.artifact_id)
-    except Refused as refused:
-        return list(refused.faults)
-
-
-def _fits(draft: Draft, artifact_id: ArtifactId) -> list:
-    """Every fault of an artifact against its type, both as the set leaves them; a type, once it fits the type of
-    types, checked as a type too."""
-    checked = settled.checked(draft.artifact(artifact_id))
-    faults = validation.validate(
-        str(artifact_id), checked, composition.kind_schema(artifact_id.kind, draft)["schema"], draft,
-    )
-    if not faults and artifact_id.kind == values.TYPE_KIND:
-        faults = definitions.faults(artifact_id, checked, draft)
+    faults = [*outcome.faults, *_fits(draft, outcome)]
+    if not faults and last[outcome.artifact_id] is outcome and outcome.artifact_id.kind == values.TYPE_KIND:
+        faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return faults
 
 
+def _fits(draft: Draft, change: Change) -> list:
+    """Every fault of what a change left against its type, its links landing, both as the set leaves them."""
+    try:
+        schema = _typed(draft, change)
+    except Refused as refused:
+        return list(refused.faults)
+    return validation.validate(str(change.artifact_id), settled.checked(change.left), schema["schema"], draft)
+
+
+def _typed(draft: Draft, change: Change) -> dict:
+    """The type a change is checked against: its kind's as the set leaves it, or, for an artifact the set later removes
+    when it leaves no such type, as the change acted on it. Raises Refused when an artifact the set leaves has no
+    type."""
+    if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(change.artifact_id.kind)):
+        return change.acted
+    return composition.kind_schema(change.artifact_id.kind, draft)
+
+
 def _versioned(draft: Draft, change: Change, last: bool) -> Change:
-    """The last change the set makes to an artifact, recording the version of its type as the set leaves it, the one
-    it was checked against, its entries in the order that type declares, and put in the draft so; any other change as
-    it acted."""
-    if change.left is None or not last:
+    """A change recording the version of the type it was checked against, its entries in the order that type
+    declares; the last the set makes to an artifact put in the draft so."""
+    if change.left is None:
         return change
-    schema = composition.kind_schema(change.artifact_id.kind, draft)
+    schema = _typed(draft, change)
     left = settled.order(
         {**change.left, "schema_version": schema["version"]}, composition.declared(schema["schema"], draft),
     )
-    draft.put(change.artifact_id, left)
+    if last:
+        draft.put(change.artifact_id, left)
     return change._replace(schema_version=schema["version"], left=left)
 
 

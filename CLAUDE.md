@@ -21,8 +21,8 @@ a change that breaks one is refactored into place first, then made.
 | `refusals.py` | the faults the domain makes of what a store holds, each with its rule and message | conversions, type checks |
 | `rules.py` | the name of every rule a fault of kb's own carries, which kb publishes (adrs/0018) | faults, messages |
 | `write.py` | the write pipeline: draft, apply every operation, validate the whole draft, settle each entry's stamp, then land the set and its entries through the port in one call; starting a store, recording a snapshot | rpc types, SQL |
-| `edits.py` | what each operation of a set does to the draft, acting on the draft as the operations before it left it: what it names, the revisions it makes, the names of its items; never what its content or links come to, which `write.py` checks once against the state the whole set leaves | rpc types, writes |
-| `draft.py` | the store as a set's changes would leave it, read like the store: what it holds, each artifact, the links into one, and which held artifacts' links a changed type reads anew, over the port; what the store held before the set | writes, checks |
+| `edits.py` | what each operation of a set does to the draft, acting on the draft as the operations before it left it: what it names, the revisions it makes, a type's version moved on from the one it acted on, the names of its items; never what its content or links come to, which `write.py` checks for every change against the state the whole set leaves | rpc types, writes |
+| `draft.py` | the store as a set's changes would leave it, read like the store: what it holds, each artifact, the links into one, and which held artifacts' links a changed type reads anew, over the port | writes, checks |
 | `places.py` | resolving a place inside an artifact to where its node stands, or the refusal saying why nothing does; whether a link's place names a part | I/O, what an operation does there |
 | `read.py` | reads at every level, resolution and stubs | writes |
 | `query.py` | list, refs, search, journal, snapshot gathering, asked of the store through the port | writes, SQL |

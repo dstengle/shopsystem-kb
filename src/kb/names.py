@@ -94,9 +94,7 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
     and never worked out again. An item that is not a set of named entries carries no name, and is passed over, as is
     a collection that is not a list."""
     for collection, part in parts.items():
-        found = node.get(collection, [])
-        if not isinstance(found, list):
-            continue
+        found = _listed(node, collection)
         taken = {item["id"] for item in found if isinstance(item, dict) and keep_named and "id" in item}
         for place, item in enumerate(found, start=1):
             if not isinstance(item, dict):
@@ -109,10 +107,10 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
 
 
 def held(parts: dict, node: dict) -> dict[str, set]:
-    """The names the items of each collection the node holds carry; an item that is not a set of named entries
-    carries none."""
+    """The names the items of each collection the node holds carry; an item that is not a set of named entries, or a
+    collection that is not a list, carries none."""
     return {
-        collection: {item.get("id") for item in node.get(collection, []) if isinstance(item, dict)}
+        collection: {item.get("id") for item in _listed(node, collection) if isinstance(item, dict)}
         for collection in parts
     }
 
@@ -132,7 +130,7 @@ def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misna
     found = []
     for collection in schema.get("parts", {}):
         seen = set()
-        for index, item in enumerate(content.get(collection, [])):
+        for index, item in enumerate(_listed(content, collection)):
             if not isinstance(item, dict) or "id" not in item:
                 continue
             name = item["id"]
@@ -144,3 +142,9 @@ def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misna
                 found.append(Misnamed(collection, index, name, "unknown"))
             seen.add(name)
     return found
+
+
+def _listed(node: dict, collection: str) -> list:
+    """The items of a collection a node holds; none when it holds none, or a value that is not a list."""
+    found = node.get(collection, [])
+    return found if isinstance(found, list) else []

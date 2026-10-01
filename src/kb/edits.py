@@ -5,7 +5,7 @@ come to is checked once the whole set has acted (kb.write)."""
 import copy
 from typing import NamedTuple
 
-from kb import composition, names, places, refusals, requests, settled, values
+from kb import composition, definitions, names, places, refusals, requests, settled, values
 from kb.draft import Draft
 from kb.values import ArtifactId, Refused
 
@@ -13,8 +13,9 @@ from kb.values import ArtifactId, Refused
 class Change(NamedTuple):
     """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name; the
     version its entry records and the version of the type it was last checked against; the artifact as this
-    operation left it, None for a removal; and the faults of the names it handed back, which refuse the set while it
-    still acts, so what it leaves is checked too."""
+    operation left it, None for a removal; the type of its kind as it acted, which it is checked against when the set
+    leaves none; and the faults of the names it handed back and of a type's version kept, which refuse the set while
+    it still acts, so what it leaves is checked too."""
     op: str
     artifact_id: ArtifactId
     path: str = ""
@@ -22,6 +23,7 @@ class Change(NamedTuple):
     revision: int = 0
     schema_version: int = 0
     left: dict | None = None
+    acted: dict | None = None
     faults: tuple = ()
 
 
@@ -31,7 +33,10 @@ def apply(draft: Draft, operation) -> Change:
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
-    return change._replace(revision=left["revision"], schema_version=left["schema_version"], left=left)
+    return change._replace(
+        revision=left["revision"], schema_version=left["schema_version"], left=left,
+        acted=composition.kind_schema(change.artifact_id.kind, draft),
+    )
 
 
 def _changed(draft: Draft, operation) -> Change:
@@ -88,6 +93,8 @@ def _append(draft: Draft, addition: requests.Add) -> Change:
     spot = places.resolve(content, locator)
     if spot.key not in _collections_at(draft, locator):
         raise Refused([refusals.not_a_collection(locator)])
+    if not isinstance(spot.holder.get(spot.key, []), list):
+        raise Refused([refusals.not_a_collection(locator)])
     item = addition.item.tree
     spot.holder.setdefault(spot.key, []).append(item)
     faults = _revise(draft, locator.id, current, content)
@@ -120,18 +127,20 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
 
 def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> tuple:
     """The artifact's next version put in the draft: its new items named, its version up by one, its title kept.
-    Returns the faults of the names its items hand back that the artifact did not hold; with any, no item is named."""
+    Returns the faults of the names its items hand back that the artifact did not hold, with any of which no item is
+    named, and, for a type, of a schema changed while its version did not move on from the one it acted on."""
     schema = composition.kind_schema(artifact_id.kind, draft)
     declared = composition.declared(schema["schema"], draft)
     held = names.held(declared["parts"], current)
-    faults = tuple(refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held))
-    if not faults:
+    misnamed = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
+    if not misnamed:
         names.items(declared["parts"], content, True, _item_parts(draft))
+    kept = definitions.version_kept(artifact_id, content, current) if artifact_id.kind == values.TYPE_KIND else []
     artifact = settled.given(
         content, current["id"], current["type"], schema["version"], current["revision"] + 1, current["title"],
     )
     draft.put(artifact_id, settled.order(artifact, declared))
-    return faults
+    return (*misnamed, *kept)
 
 
 def _item_parts(draft: Draft):

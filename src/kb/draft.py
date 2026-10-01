@@ -1,6 +1,6 @@
 """The store as a set's changes would leave it, read like the store: artifacts put here stand over the ones the store
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
-artifact), the links into an artifact and what the store held before the set, over the port."""
+artifact) and the links into an artifact, over the port."""
 from kb import composition, links, names
 from kb.port import Linking, Port
 from kb.values import TYPE_KIND, ArtifactId
@@ -28,10 +28,6 @@ class Draft:
         if artifact_id in self._pending:
             return self._pending[artifact_id]
         return self._store.artifact(artifact_id)
-
-    def before(self, artifact_id: ArtifactId) -> dict | None:
-        """The artifact as the store held it before the set, None when it held none."""
-        return self._store.artifact(artifact_id) if self._store.holds(artifact_id) else None
 
     def links_in(self, target: ArtifactId) -> list[Linking]:
         """Every link into an artifact or a part inside it from an artifact the draft holds, in the order of their
