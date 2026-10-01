@@ -51,7 +51,12 @@ _Representer.add_representer(str, _represent_str)
 
 
 class _Constructor(SafeConstructor):
-    """A value is read as written: one that looks like a date or a time is the text it was written as."""
+    """A value is read as written: one that looks like a date or a time is the text it was written as, and a character
+    written as two escapes, one for each half, is that one character, in a key as in a value."""
+
+    def construct_scalar(self, node):
+        value = super().construct_scalar(node)
+        return _joined(value) if isinstance(value, str) else value
 
 
 _Constructor.add_constructor("tag:yaml.org,2002:timestamp", SafeConstructor.construct_yaml_str)
@@ -132,12 +137,13 @@ def _named_once(node, place: tuple) -> None:
 
 
 def _held_as_text(node, place: tuple) -> None:
-    """Every scalar is text that encodes as UTF-8: an escape for half of a character (\\ud800) reads as a value no text
-    can hold, and nothing downstream could write or fingerprint it. Raises NotCanonical naming the place."""
+    """Every scalar is text once each pair of escapes for the two halves of a character is read as that character: an
+    escape for half of a character alone (\\ud800) reads as a value no text can hold, and nothing downstream could
+    write or fingerprint it. Raises NotCanonical naming the place."""
     if isinstance(node, nodes.ScalarNode):
         try:
-            node.value.encode("utf-8")
-        except UnicodeEncodeError:
+            _joined(node.value)
+        except UnicodeDecodeError:
             raise NotCanonical(
                 "it is not YAML that can be read: it holds an escape for half of a character, which no text can hold",
                 "/".join(place),
@@ -149,6 +155,16 @@ def _held_as_text(node, place: tuple) -> None:
     elif isinstance(node, nodes.SequenceNode):
         for index, item in enumerate(node.value):
             _held_as_text(item, (*place, str(index)))
+
+
+def _joined(value: str) -> str:
+    """The text with each pair of halves of a character, as YAML 1.2 reads two escapes, read as that one character.
+    Raises UnicodeDecodeError when a half stands alone, in either order."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return value.encode("utf-16-le", "surrogatepass").decode("utf-16-le")
+    return value
 
 
 def dump(artifact: dict) -> str:

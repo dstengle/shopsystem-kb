@@ -773,6 +773,10 @@ SENSELESS = {
     "content that cannot be read as written at all": (WHOLE + "options: [Keep weekly\n", ""),
     "content holding text written with an escape for half of a character, which no text can hold":
         (WHOLE + 'options:\n  - title: "\\ud800"\n', "options/0/title"),
+    "content holding an escape for the first half of a character, followed by text that is not its other half":
+        (WHOLE + 'options:\n  - title: "Keep \\ud83d weekly"\n', "options/0/title"),
+    "content holding an escape for the second half of a character, with no first half before it":
+        (WHOLE + 'options:\n  - title: "Keep \\ude00 weekly"\n', "options/0/title"),
     "content that is a list rather than a set of named entries": ("- Purpose\n- Rationale\n", ""),
     "content that is a single bare value": ("Keep prices in step with costs.\n", ""),
     "content with nothing in it at all": ("", ""),
@@ -882,3 +886,50 @@ def _rejected_as_prose_that_is_no_block(attempt):
     assert refused.faults[0].message.startswith(
         "every piece of prose is written as a block, and this prose could not be written back as one"
     )
+
+
+@scenario(
+    "hand-over-content.feature",
+    "A character beyond the first 65,536 written as two escapes reads back as that one character",
+)
+def test_a_character_beyond_the_first_65536_written_as_two_escapes_reads_back_as_that_one_character():
+    pass
+
+
+BEYOND = "\U0001F600"  # one character beyond the first 65,536, which JSON writes as the escapes 😀
+
+
+@when(
+    "the client creates a decision carrying a field written as a character beyond the first 65,536 in two escapes, "
+    "one for each half, saying which role and why",
+    target_fixture="created",
+)
+def _create_with_two_escapes(client):
+    return _raw(client, WHOLE + 'options:\n  - title: "Keep \\ud83d\\ude00 weekly"\n')
+
+
+@then("the two halves read together as that one character")
+def _halves_read_together(client, created):
+    assert not created.faults, created.faults
+    title = content.loads(read(client, created.id, whole=True).content)["options"][0]["title"]
+    assert title == f"Keep {BEYOND} weekly"
+    assert len(title) == len("Keep - weekly")
+
+
+@then("the field reads back holding it")
+def _field_reads_back_holding_it(root, client, created):
+    assert content.loads(read(client, created.id, whole=True).content)["options"][0]["title"] == f"Keep {BEYOND} weekly"
+    assert held.artifact(root, created.id)["options"][0]["title"] == f"Keep {BEYOND} weekly"
+
+
+@scenario("hand-over-content.feature", "Content holding half of a character alone is refused")
+def test_content_holding_half_of_a_character_alone_is_refused():
+    pass
+
+
+@then("the artifact is rejected because the content cannot be read as written")
+def _rejected_as_unreadable_content(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.path, fault.rule) for fault in refused.faults] == [(attempt["place"], "content")]
+    assert "it is not YAML that can be read" in refused.faults[0].message
