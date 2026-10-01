@@ -44,10 +44,10 @@ Feature: Operate a store
 
   @slice-113
   Scenario: The command line changes content only by importing into a freshly started store
-    Pins the limit of the command line: it sets stores up, checks, serves and exports them, and imports into a freshly started one, and nothing else, because every other change to content goes through a client.
+    Pins the limit of the command line: it sets stores up, checks and exports them, and imports into a freshly started one, and nothing else, because every other change to content goes through a client.
     Given a store
     When the operator asks what the command line offers
-    Then it offers setting a store up, checking, serving and exporting one, and importing into a freshly started store
+    Then it offers setting a store up, checking and exporting one, and importing into a freshly started store
     And nothing else that changes what the store holds
 
   @slice-46

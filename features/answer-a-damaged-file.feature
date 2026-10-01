@@ -2,16 +2,15 @@
 Feature: Answer a damaged file
   Narrator: the client
 
-  @slice-109
+  @slice-112.1
   Scenario Outline: A store whose database cannot be read, because it is damaged or missing beside its marker, refuses every call and command that needs it
-    Pins that a database the store cannot read always gives the same named fault, naming the database, never a crash, with nothing served and nothing written in the store or in a directory an export was aimed at.
+    Pins that a database the store cannot read always gives the same named fault, naming the database, never a crash, with nothing written in the store or in a directory an export was aimed at.
     Given a store holding a decision, a process and a tag, each of a kind the store holds a type for
     And the store's database <damage>
     And an empty directory outside the store
     When <someone does something that needs the store>
     Then what was asked is rejected because the store's database cannot be read, and the database is named
     And the fault is given as any other fault is given, never breaking off
-    And nothing is served
     And nothing is written in the store, nor in the empty directory, which stays as it was
 
     Examples:
@@ -30,7 +29,6 @@ Feature: Answer a damaged file
       | was damaged behind the store's back                 | the client snapshots the decision and the process for a piece of work                                            |
       | was damaged behind the store's back                 | the client checks the store                                                                                      |
       | was damaged behind the store's back                 | the operator runs kb validate in that store                                                                      |
-      | was damaged behind the store's back                 | the operator runs kb serve in that store                                                                         |
       | was damaged behind the store's back                 | the operator runs kb export in that store, aimed at the empty directory                                          |
       | was damaged behind the store's back                 | the operator checks a directory exported from another store for import in that store                             |
       | was damaged behind the store's back                 | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
@@ -48,7 +46,6 @@ Feature: Answer a damaged file
       | is missing, while the store's marker is still there | the client snapshots the decision and the process for a piece of work                                            |
       | is missing, while the store's marker is still there | the client checks the store                                                                                      |
       | is missing, while the store's marker is still there | the operator runs kb validate in that store                                                                      |
-      | is missing, while the store's marker is still there | the operator runs kb serve in that store                                                                         |
       | is missing, while the store's marker is still there | the operator runs kb export in that store, aimed at the empty directory                                          |
       | is missing, while the store's marker is still there | the operator checks a directory exported from another store for import in that store                             |
       | is missing, while the store's marker is still there | the operator runs kb import in that store on a directory exported from another store, saying which role they are |
