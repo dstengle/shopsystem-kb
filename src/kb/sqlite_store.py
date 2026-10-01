@@ -61,15 +61,17 @@ def make(path: Path) -> None:
 
 @contextlib.contextmanager
 def opened(path: Path) -> Iterator["SqliteStore"]:
-    """The database at path, open read-write until the block ends. Raises Unreadable when it cannot be opened,
-    and creates nothing."""
+    """The database at path, open read-write until the block ends. Raises Unreadable, naming it, when it cannot be
+    opened, which creates nothing, or when any statement finds it damaged, which shows only once one is made."""
     supported()
     try:
         db = sqlite3.connect(_uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None)
     except sqlite3.OperationalError as error:
-        raise Unreadable(f"the database {path} cannot be opened: {error}") from None
+        raise Unreadable(f"{path}: {error}") from None
     try:
         yield SqliteStore(db)
+    except sqlite3.DatabaseError as error:
+        raise Unreadable(f"{path}: {error}") from error
     finally:
         db.close()
 

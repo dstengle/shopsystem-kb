@@ -141,3 +141,19 @@ def _apart(directory, stores):
         for path in sorted(directory.rglob("*"))
         if not any(store == path or store in path.parents for store in stores)
     }
+
+
+def damage_the_database(root):
+    """Overwrite the store's database with other bytes behind its back, the marker beside it left as it was."""
+    (_place(root) / _DATABASE).write_bytes(b"notes written over the store's database by hand\n" * 64)
+
+
+def take_away_the_database(root):
+    """Take the store's database away behind its back, the marker beside it left where it is."""
+    (_place(root) / _DATABASE).unlink()
+
+
+def bytes_held(root):
+    """Everything in the place of the store started in `root`, each path with its bytes: what a store whose database
+    cannot be read holds, compared byte for byte, since no read of it can be made."""
+    return _apart(_place(root), [])
