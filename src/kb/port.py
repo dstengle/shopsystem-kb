@@ -43,7 +43,9 @@ class Change:
     """One change of a set: the artifact, its whole content after the change (None for a removal), its links and the
     places of the parts it holds, the revision the change read it at (0 when it was not held), the revision it
     leaves it at, and the types it was checked and its links read through that the set does not change, each with
-    the revision it was read at. The adapter lands none of the set when any of those has since moved."""
+    the revision it was read at. The adapter lands none of the set when any of those has since moved. `searched` are
+    the rows the artifact is found by, as kb gives them (search.searchable): each `(what, label, words)`, what being
+    "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them."""
     artifact: ArtifactId
     content: dict | None
     links: tuple[Link, ...] = ()
@@ -51,6 +53,7 @@ class Change:
     read: int = 0
     revision: int = 0
     through: tuple[tuple[ArtifactId, int], ...] = ()
+    searched: tuple[tuple[str, str, str], ...] = ()
 
     @property
     def op(self) -> str:

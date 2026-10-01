@@ -5,7 +5,8 @@ the types it was read through. A fault anywhere refuses the whole set with every
 from typing import NamedTuple
 
 from kb import (
-    canonical, composition, definitions, edits, links, places, port, refusals, requests, settled, validation, values,
+    canonical, composition, definitions, edits, links, places, port, refusals, requests, search, settled, validation,
+    values,
 )
 from kb.draft import Draft
 from kb.edits import Change
@@ -133,14 +134,17 @@ def _serialised(changes: list[Change]) -> list[str | None]:
 
 def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
     """A change as the port takes it, read at the revision before the one it leaves, or, for an import, as not held:
-    its content as it left the artifact, and, for the last change the set makes to that artifact, its links and the
-    places of its parts as the set leaves them, read through the types as the set leaves them, with the revisions of
-    those types the set leaves as they are."""
+    its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
+    artifact, its links and the places of its parts as the set leaves them, read through the types as the set leaves
+    them, with the revisions of those types the set leaves as they are."""
     read = 0 if change.op == "import" else change.revision - 1
-    if change.left is None or not last:
-        return port.Change(change.artifact_id, change.left, read=read, revision=change.revision)
+    if change.left is None:
+        return port.Change(change.artifact_id, None, read=read, revision=change.revision)
+    searched = tuple(search.searchable(change.left))
+    if not last:
+        return port.Change(change.artifact_id, change.left, read=read, revision=change.revision, searched=searched)
     return port.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
         tuple(places.parts(change.left)), read, change.revision,
-        draft.as_read(composition.read_through(change.artifact_id.kind, draft)),
+        draft.as_read(composition.read_through(change.artifact_id.kind, draft)), searched,
     )

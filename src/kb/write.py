@@ -7,7 +7,7 @@ fault anywhere refuses the whole set with every fault found, and nothing is writ
 snapshot land through the port too."""
 from typing import NamedTuple
 
-from kb import canonical, drafting, journal, port, query, refusals, settled, store, values
+from kb import canonical, drafting, journal, port, query, refusals, search, settled, store, values
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
@@ -44,7 +44,7 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
         signed=Signed(actor, "initialise store"), op="create", artifact=str(METASCHEMA_ID), path="", revision=1,
         schema_version=1, text=canonical.dump(metaschema), stamp=stamp,
     )
-    created = port.Change(METASCHEMA_ID, metaschema, revision=1)
+    created = port.Change(METASCHEMA_ID, metaschema, revision=1, searched=tuple(search.searchable(metaschema)))
     store.start(root, lambda made: made.land([created], [entry]))
 
 

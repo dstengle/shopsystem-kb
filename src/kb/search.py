@@ -7,6 +7,7 @@ from typing import NamedTuple
 from kb.settled import IDENTITY
 
 WIDTH = 60
+UNSEARCHED = {*IDENTITY, "sections"} - {"title"}
 
 
 class Hit(NamedTuple):
@@ -39,6 +40,16 @@ def rank(artifacts, text: str, sections: bool = True, fields: bool = False) -> l
     return sorted(hits, key=lambda hit: -hit.count)
 
 
+def searchable(content: dict):
+    """The rows an artifact is found by, each `(what, label, words)` with its words folded as `tokens` folds them:
+    each section at every depth, by its title, with its body, then each field `rank` reads, by its name, with its
+    value; so a store that keeps them finds every text `rank` would match a word in."""
+    for section in _sections(content.get("sections", [])):
+        yield "section", section["title"], " ".join(tokens(section["body"]))
+    for name, value in _fields(content):
+        yield "field", name, " ".join(tokens(value))
+
+
 def terms(text: str) -> list[str]:
     """The words searched for, each folded as `tokens` folds the words a text holds, so a store that keeps the
     folded words of every section and field can find each text `rank` would match a word in."""
@@ -62,10 +73,10 @@ def _folded(word: str) -> str:
 
 
 def _fields(artifact: dict):
-    """The title, then every other field that holds text, in the order the artifact holds them."""
-    yield "title", artifact["title"]
+    """The title, then every other field that holds text, in the order the artifact holds them: the title comes first
+    of them, since an artifact opens with the keys naming it, the title last of those."""
     for name, value in artifact.items():
-        if name not in IDENTITY and name != "sections" and isinstance(value, str):
+        if name not in UNSEARCHED and isinstance(value, str):
             yield name, value
 
 

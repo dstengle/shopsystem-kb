@@ -35,7 +35,9 @@ def name(text):
 
 
 def put(text, content, read=0, links=(), parts=()):
-    return port.Change(name(text), content, tuple(links), tuple(parts), read, read + 1)
+    """A change landing content, with the rows it is found by as kb gives them."""
+    searched = tuple(search.searchable(content))
+    return port.Change(name(text), content, tuple(links), tuple(parts), read, read + 1, searched=searched)
 
 
 def removal(text, read):
@@ -337,6 +339,17 @@ def test_search_finds_an_artifact_by_what_it_holds_now_and_nothing_once_it_is_re
     assert (store.search(search.terms("zebra")), store.search(search.terms("okapi"))) == ([], found)
     land(store, removal("note/a", read=2))
     assert (store.search(search.terms("zebra")), store.search(search.terms("okapi"))) == ([], [])
+
+
+def test_an_artifact_changed_and_then_removed_leaves_no_row_matching_its_words(store):
+    def held(word):
+        return {"title": f"About {word}", "summary": word, "sections": [{"title": "One", "body": f"{word} again\n"}]}
+    land(store, put("note/a", held("zebra")), put("note/b", held("okapi")))
+    land(store, put("note/a", held("gnu"), read=1), put("note/c", held("lemur")))
+    land(store, removal("note/a", read=2))
+    found = {word: store.search(search.terms(word)) for word in ("zebra", "gnu", "okapi", "lemur")}
+    assert (found["zebra"], found["gnu"]) == ([], [])
+    assert [len(found["okapi"]), len(found["lemur"])] == [3, 3]
 
 def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_first(store):
     later, half = T0 + timedelta(hours=2), T0 + timedelta(milliseconds=500)

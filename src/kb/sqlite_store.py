@@ -179,7 +179,7 @@ class SqliteStore(Checks):
             "INSERT INTO artifacts (id, kind, revision, content) VALUES (?, ?, ?, ?)", (name, kind, change.revision, stored),
         )
         self._db.executemany("INSERT INTO parts VALUES (?, ?)", [(name, place) for place in set(change.parts)])
-        sqlite_search.searchable(self._db, name, kind, change.content)
+        sqlite_search.searchable(self._db, name, kind, change.searched)
 
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""

@@ -1,9 +1,7 @@
-"""The SQLite adapter's search rows: the rows an artifact is found by, each section at every depth by its title with
-its body, then each field holding text by its name with its value, written into the FTS5 table and noted in `searched`
-under the artifact, so they can be taken out again, since FTS5 finds rows only by their words."""
+"""The SQLite adapter's search rows: the rows kb gives a change to find its artifact by, each written into `searched`
+under the artifact at a row id the adapter gives it, after every one held, and then into the FTS5 table under that
+same row id, given outright, so they can be taken out again, since FTS5 finds rows only by their words."""
 import sqlite3
-
-from kb import search
 
 
 def unsearched(db: sqlite3.Connection, name: str) -> None:
@@ -12,22 +10,13 @@ def unsearched(db: sqlite3.Connection, name: str) -> None:
     db.execute("DELETE FROM searched WHERE artifact = ?", (name,))
 
 
-def searchable(db: sqlite3.Connection, name: str, kind: str, content: dict) -> None:
-    """An artifact's search rows, each noted in `searched` under the artifact."""
-    for ordinal, (what, label, words) in enumerate(_searched(content)):
-        row = db.execute(
-            "INSERT INTO search VALUES (?, ?, ?, ?, ?, ?)",
-            (" ".join(search.tokens(words)), name, kind, what, label, ordinal),
-        ).lastrowid
-        db.execute("INSERT INTO searched VALUES (?, ?)", (row, name))
-
-
-def _searched(content: dict):
-    def sections(held):
-        for section in held:
-            yield "section", section["title"], section["body"]
-            yield from sections(section.get("sections", []))
-    yield from sections(content.get("sections", []))
-    for key, value in content.items():
-        if isinstance(key, str) and isinstance(value, str):
-            yield "field", key, value
+def searchable(db: sqlite3.Connection, name: str, kind: str, rows: tuple[tuple[str, str, str], ...]) -> None:
+    """An artifact's search rows, each noted in `searched` under a row id after every one held, then kept in `search`
+    under that row id."""
+    [last] = db.execute("SELECT COALESCE(MAX(row), 0) FROM searched").fetchone()
+    numbered = [(last + ordinal + 1, ordinal, row) for ordinal, row in enumerate(rows)]
+    db.executemany("INSERT INTO searched (row, artifact) VALUES (?, ?)", [(row, name) for row, _, _ in numbered])
+    db.executemany(
+        "INSERT INTO search (rowid, words, artifact, kind, what, name, ordinal) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [(row, words, name, kind, what, label, ordinal) for row, ordinal, (what, label, words) in numbered],
+    )
