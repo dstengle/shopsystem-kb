@@ -114,7 +114,7 @@ def _delete(draft: Draft, removal: requests.Remove) -> Change:
     if locator.place:
         raise Refused([refusals.whole_only(locator)])
     blocking = [
-        refusals.still_linked(locator.id, each.source, each.place)
+        refusals.still_linked(str(locator.id), each.source, each.place)
         for each in draft.links_in(locator.id) if each.source != locator.id
     ]
     if blocking:

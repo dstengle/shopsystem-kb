@@ -62,6 +62,22 @@ WORK_ITEM_TYPE = {
     },
 }
 
+NOTE_TYPE = {
+    "title": "Note",
+    "version": 1,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "about": {
+                "type": "string",
+                "ref": {"targets": ["decision"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
+            },
+        },
+        "required": ["title"],
+    },
+}
+
 
 TAG_TYPE = {
     "title": "Tag",

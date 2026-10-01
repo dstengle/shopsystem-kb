@@ -68,8 +68,23 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
         )
         for change, text, stamp in zip(changes, texts, stamps, strict=True)
     ]
-    held.land(handed, entries, relinks)
+    _landed(held, draft, handed, entries, relinks)
     return Landed(batch, [Result(change.artifact_id, change.revision, change.item) for change in changes])
+
+
+def _landed(held: port.Port, draft: Draft, handed: list[port.Change], entries: list, relinks: list) -> None:
+    """The set handed to the port; a link the port finds into what the set takes out is refused, one fault for each,
+    the item named for a part dropped and the artifact for one removed."""
+    try:
+        held.land(handed, entries, relinks)
+    except port.Linked as linked:
+        raise Refused([
+            refusals.still_linked(
+                f"{each.target}#{each.part}" if each.part and draft.holds(each.target) else str(each.target),
+                each.source, each.place,
+            )
+            for each in linked.links
+        ]) from linked
 
 
 def record(held: port.Port, named: list, signed: Signed, clock: journal.Clock | None = None) -> str:

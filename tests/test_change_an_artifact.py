@@ -4,7 +4,7 @@ import re
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, append, apply, creation, define, create, journal, listing, read, refs,
+    CLIENT, DECISION_TYPE, NOTE_TYPE, append, apply, creation, define, create, journal, listing, read, refs,
     remove, replacement, request, write,
 )
 import held
@@ -27,6 +27,11 @@ def test_the_client_changes_one_node_inside_an_artifact():
 
 @scenario("change-the-store.feature", "The client changes one item of a collection")
 def test_the_client_changes_one_item_of_a_collection():
+    pass
+
+
+@scenario("change-the-store.feature", "A replacement that leaves out an item something links into is refused")
+def test_a_replacement_that_leaves_out_an_item_something_links_into_is_refused():
     pass
 
 
@@ -420,21 +425,6 @@ def _rejected_for_a_name_not_plain(attempt):
     _misnamed(attempt, "a name is a plain name of lower-case letters, digits and single hyphens")
 
 
-NOTE_TYPE = {
-    "title": "Note",
-    "version": 1,
-    "schema": {
-        "type": "object",
-        "properties": {
-            "title": {"type": "string"},
-            "about": {
-                "type": "string",
-                "ref": {"targets": ["decision"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
-            },
-        },
-        "required": ["title"],
-    },
-}
 MONTHLY = {"title": "Go monthly", "body": "Review on the first Monday of the month."}
 
 
@@ -551,3 +541,40 @@ def _rejected_for_its_signature(attempt, reason):
     assert refused.faults[0].message.startswith(reason)
     if "revision" in refused.DESCRIPTOR.fields_by_name:
         assert refused.revision == 0
+
+
+LINKED_OPTION = f"{DECISION}#options/keep-weekly"
+LEAVING_IT_OUT = {
+    "replaces the decision with content that leaves that option out":
+        lambda client: write(client, DECISION, {"sections": SECTIONS, "options": OPTIONS[1:]}, message="Drop weekly"),
+    "replaces the decision's collection of options with one that leaves it out":
+        lambda client: write(client, DECISION, OPTIONS[1:], message="Drop weekly", path="options"),
+}
+
+
+@given("another artifact links into one of those options")
+def _a_note_links_into_an_option(client):
+    define(client, NOTE_TYPE)
+    create(client, "note", {"title": "Why weekly", "about": LINKED_OPTION})
+
+
+@when(
+    parsers.re(f"the client (?P<call>{'|'.join(map(re.escape, LEAVING_IT_OUT))}), saying which role and why"),
+    target_fixture="attempt",
+)
+def _leave_the_linked_option_out(root, client, call):
+    before = held.text(root, DECISION)
+    return {"response": LEAVING_IT_OUT[call](client), "before": before}
+
+
+@then("the change is rejected because something still points at that item")
+def _rejected_while_pointed_at(root, attempt):
+    assert {fault.rule for fault in attempt["response"].faults} == {"on_delete"}
+    assert held.text(root, DECISION) == attempt["before"]
+
+
+@then("the client is given each link into that option")
+def _each_link_into_the_option(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.path) for fault in faults] == [("note/why-weekly", "about")]
+    assert f"'{LINKED_OPTION}'" in faults[0].message
