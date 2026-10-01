@@ -87,18 +87,18 @@ def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], cor
             return True
         if type_id in seen or not corpus.holds(type_id):
             return False
-        return any(reads(referred, seen | {type_id}) for referred in _referred(corpus.artifact(type_id).get("schema")))
+        return any(reads(each, seen | {type_id}) for each in referred(corpus.artifact(type_id).get("schema")))
     return [values.Kind(type_id.slug) for type_id in types if reads(type_id, frozenset())]
 
 
-def _referred(node):
+def referred(node):
     """Every type a kb: reference anywhere in a schema names."""
     if isinstance(node, dict):
         for key, value in node.items():
             named = reference(value) if key == "$ref" and isinstance(value, str) else None
             if named is not None and named.type_id is not None:
                 yield named.type_id
-            yield from _referred(value)
+            yield from referred(value)
     elif isinstance(node, list):
         for value in node:
-            yield from _referred(value)
+            yield from referred(value)

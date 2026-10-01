@@ -8,8 +8,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
-from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define
-from conftest import _kb
+from calls import CLIENT, DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, write
+from conftest import OPERATOR, _kb
 import held
 from kb import canonical, client as kb_client
 from kb.contract import kb_pb2
@@ -547,8 +547,9 @@ def _store_as_before(ran, root, before):
 
 
 @given("a freshly started store")
-def _a_freshly_started_store(root):
+def _a_freshly_started_store(root, before):
     _started(root)
+    before.update({"started": held.holds(root), "type of types": held.text(root, "schema/schema")})
 
 
 @given(
@@ -568,3 +569,492 @@ def _for_import_with_a_differing_type_of_types(tmp_path):
 def _the_copy_is_an_error(ran):
     assert ran.returncode == 1, ran.stderr
     assert [line[1] for line in _report(ran) if line[0] == "error"] == ["schema/schema.yaml"], ran.stdout
+
+
+# The operator's import of a directory into a freshly started store. Each directory is, as for the check, a real
+# export of a store of its own, broken where a step says; the store imported into is read through `held` and its
+# history through the contract.
+
+@scenario(
+    FEATURE,
+    "The operator imports a directory that checks clean into a freshly started store, saying which role they are",
+)
+def test_a_clean_directory_lands_as_one_signed_set():
+    pass
+
+
+def _exported_names(target):
+    """The name of every artifact a directory for import holds but the type that describes types, sorted."""
+    files = [path.relative_to(target) for path in Path(target).glob("*/*.yaml")]
+    return sorted(
+        str(file.with_suffix("")) for file in files
+        if file != Path("schema/schema.yaml") and file.parts[0] not in ("journal", ".git")
+    )
+
+
+def _decision_at_revision_three(client):
+    """The type for decisions moved on to version 2, then a decision written against it and changed twice."""
+    define(client, DECISION_TYPE)
+    next_version(client, "decision", DECISION_TYPE)
+    content = {"title": "Price reviews happen weekly", "sections": [
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": "Costs move weekly.\n"},
+    ]}
+    create(client, "decision", content)
+    for body in ("Costs move every week.\n", "Costs move weekly, and so do we.\n"):
+        content["sections"][1]["body"] = body
+        assert not write(client, WEEKLY, {key: value for key, value in content.items() if key != "title"}).faults
+
+
+@given(
+    "a directory for import that checks clean, holding a type for decisions and a decision at revision 3 written "
+    "against version 2 of the decision type",
+    target_fixture="target",
+)
+def _for_import_with_a_decision_at_revision_three(tmp_path):
+    target = _for_import(tmp_path, _decision_at_revision_three)
+    weekly = _read(target, WEEKLY)
+    assert (weekly["revision"], weekly["schema_version"]) == (3, 2), weekly
+    return target
+
+
+@when("the operator imports the directory, saying which role they are", target_fixture="ran")
+def _kb_import(root, target):
+    return _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+
+def _imported(root):
+    """The entries an import left in the store's history: every entry after its starting one."""
+    entries = held.history(kb_client.connect(root))
+    assert entries[0].message == "initialise store", entries[0]
+    return entries[1:]
+
+
+@then("everything in the directory lands as one set, signed by that role, with a message naming the directory")
+def _lands_as_one_signed_set(ran, root, target):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.names(root) == sorted([*_exported_names(target), "schema/schema"])
+    entries = _imported(root)
+    assert sorted(entry.artifact for entry in entries) == _exported_names(target)
+    assert {(entry.batch, entry.actor.role, entry.message) for entry in entries} == {
+        (entries[0].batch, OPERATOR, f"import {target}"),
+    }
+
+
+def _identity(artifact):
+    return {key: artifact[key] for key in IDENTITY}
+
+
+@then(
+    "the decision lands under the same name and title, at revision 3, written against version 2 of the decision type"
+)
+def _the_decision_lands_as_it_was(root, target):
+    landed = held.artifact(root, WEEKLY)
+    assert _identity(landed) == {**_identity(_read(target, WEEKLY)), "revision": 3, "schema_version": 2}
+    assert held.text(root, WEEKLY) == (Path(target) / _file(WEEKLY)).read_text(encoding="utf-8")
+
+
+@then(
+    "the type for decisions lands under the same name and title, at the revision and type version the directory gives "
+    "it"
+)
+def _the_type_lands_as_it_was(root, target):
+    assert held.text(root, "schema/decision") == (Path(target) / "schema/decision.yaml").read_text(encoding="utf-8")
+    assert held.artifact(root, "schema/decision")["revision"] == 2
+
+
+@scenario(
+    FEATURE,
+    "The operator imports a directory that checks clean, and the history shows each type landing before its artifacts",
+)
+def test_each_type_lands_before_its_artifacts():
+    pass
+
+
+@given(
+    "a directory for import that checks clean, holding a type for decisions, a type for work items, two decisions and "
+    "a work item",
+    target_fixture="target",
+)
+def _for_import_with_two_types(tmp_path):
+    return _for_import(tmp_path)
+
+
+@then(
+    "the store's history holds its starting entry followed by one import entry for each of the five artifacts, and "
+    "nothing else"
+)
+def _one_import_entry_each(ran, root):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    entries = _imported(root)
+    assert sorted(entry.artifact for entry in entries) == sorted(
+        ["schema/decision", "schema/work-item", WEEKLY, MONTHLY, MONDAYS],
+    )
+    assert {entry.op for entry in entries} == {"import"}
+
+
+@then("in the history each type's import entry comes before the import entries of the artifacts of its kind")
+def _types_first(root):
+    landed = [entry.artifact for entry in _imported(root)]
+    for kind in ("decision", "work-item"):
+        of_kind = [index for index, name in enumerate(landed) if name.startswith(f"{kind}/")]
+        assert of_kind and landed.index(f"schema/{kind}") < min(of_kind), landed
+
+
+@scenario(FEATURE, "Importing a directory that holds an error is refused")
+def test_importing_a_directory_holding_an_error_is_refused():
+    pass
+
+
+@then("the import is rejected because the check found errors")
+def _rejected_as_the_check_found_errors(ran):
+    assert ran.returncode == 2
+    assert ran.stderr == (
+        "kb import: refused: content: the check found 1 error(s) in the directory, and nothing was written\n"
+    )
+
+
+@then("the operator is shown the check's report")
+def _shown_the_report(ran, root, target):
+    assert ["error", _file(WEEKLY), "sections"] in [line[:3] for line in _report(ran)], ran.stdout
+    assert ran.stdout == _kb("import", str(target), "--check", cwd=root).stdout
+
+
+@then("nothing is written")
+def _nothing_written(root, before):
+    assert held.holds(root) == before["started"]
+
+
+@scenario(FEATURE, "The operator imports with errors skipped")
+def test_importing_with_errors_skipped():
+    pass
+
+
+STANDALONE = "work-item/stands-alone"
+
+
+def _with_an_error_and_one_linking(target):
+    _a_file_with_an_error(target)
+    _linking_directly(target, "decision/broken")
+    return {"decision/broken": "error", "decision/linking": "decision/linking -> decision/broken"}
+
+
+def _with_an_error_and_two_linking(target):
+    left_out = _with_an_error_and_one_linking(target)
+    _put(target, _decision("decision/onward", supersedes="decision/linking"))
+    return {**left_out, "decision/onward": "decision/onward -> decision/linking -> decision/broken"}
+
+
+def _with_a_broken_type_and_a_decision(target):
+    _a_broken_decision_type(target)
+    _put(target, _decision("decision/of-the-type"))
+    return {"schema/decision": "error", "decision/of-the-type": "decision/of-the-type -> schema/decision"}
+
+
+TOGETHER_WITH = {
+    "a type for decisions, a decision with an error and a decision that links to it": _with_an_error_and_one_linking,
+    "a type for decisions, a decision with an error, a decision that links to it, and a decision that links to that "
+    "one": _with_an_error_and_two_linking,
+    "a type for decisions whose content does not fit the type that describes types, and a decision":
+        _with_a_broken_type_and_a_decision,
+}
+
+
+@given(
+    parsers.parse(
+        "a directory for import holding a type for work items and a work item that leads to no broken file, together "
+        "with {broken}"
+    ),
+    target_fixture="target",
+)
+def _for_import_with_errors_to_skip(tmp_path, broken, files):
+    target = _for_import(tmp_path, _the_two_types)
+    _put(target, _artifact(STANDALONE, "Stands alone"))
+    files.update(TOGETHER_WITH[broken](target))
+    return target
+
+
+@when("the operator imports the directory with errors skipped, saying which role they are", target_fixture="ran")
+def _kb_import_skipping_errors(root, target):
+    return _kb("import", str(target), "--skip-errors", cwd=root, env={"KB_ACTOR": OPERATOR})
+
+
+@then("the type for work items and the work item land")
+def _the_work_item_lands(ran, root, target):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    for name in ("schema/work-item", STANDALONE):
+        assert held.text(root, name) == (Path(target) / _file(name)).read_text(encoding="utf-8")
+
+
+LEFT_OUT = {
+    "the decision with an error and the decision that links to it": ["decision/broken", "decision/linking"],
+    "the three decisions": ["decision/broken", "decision/linking", "decision/onward"],
+    "the type for decisions and the decision": ["schema/decision", "decision/of-the-type"],
+}
+
+
+@then(parsers.parse("{left_out} do not land"))
+def _left_out(root, target, files, left_out):
+    assert sorted(LEFT_OUT[left_out]) == sorted(files)
+    landing = sorted(set(_exported_names(target)) - set(files))
+    assert held.names(root) == sorted([*landing, "schema/schema"])
+    assert sorted(entry.artifact for entry in _imported(root)) == landing
+
+
+@then("the operator is told what was skipped and why")
+def _told_what_was_skipped(ran, files):
+    told = {
+        line[1]: "error" if line[0] == "error" else line[2] for line in _report(ran) if line[0] in ("error", "skipped")
+    }
+    assert told == {
+        _file(name): " -> ".join(_file(part) for part in why.split(" -> ")) if why != "error" else why
+        for name, why in files.items()
+    }, ran.stdout
+
+
+@scenario(FEATURE, "Importing into a store that holds an artifact besides the type that describes types is refused")
+def test_importing_into_a_store_that_is_not_fresh_is_refused():
+    pass
+
+
+@given("a store that has been given a type for decisions since it was started")
+def _store_given_a_type(root, before):
+    define(_started(root), DECISION_TYPE)
+    before.update(started=held.holds(root))
+
+
+@given("a directory for import that checks clean", target_fixture="target")
+def _for_import_that_checks_clean(tmp_path):
+    return _for_import(tmp_path, lambda client: define(client, WORK_ITEM_TYPE))
+
+
+@then("the import is rejected because import goes only into a freshly started store")
+def _rejected_as_not_fresh(ran, root, before):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == (
+        "kb import: refused: store: import goes only into a freshly started store; this one holds 1 artifact(s) "
+        "besides the type that describes types\n"
+    )
+    assert held.holds(root) == before["started"]
+
+
+@scenario(FEATURE, "The operator imports the kb directory of an existing store")
+def test_importing_the_kb_directory_of_an_existing_store():
+    pass
+
+
+PASSED_OVER = {
+    ".git/HEAD": b"ref: refs/heads/main\n",
+    ".git/objects/ab/cdef": b"\x78\x9c\x00\x01",
+    "journal/20260924T120000000000Z-1.yaml": b"id: 20260924T120000000000Z-1\nop: create\n",
+    "store.yaml": b"contract: '0.1'\n",
+    "store.sqlite3": b"SQLite format 3\x00\x10\x00",
+    "store.sqlite3-wal": b"\x37\x7f\x06\x82",
+    "store.sqlite3-shm": b"\x00\x00",
+}
+
+
+@given(
+    "the kb directory of an existing store, holding its types and artifacts, which check clean, together with its "
+    "history and its store marker",
+    target_fixture="target",
+)
+def _the_kb_directory_of_a_store(tmp_path):
+    """An export laid out as a store's kb directory is: the files of its types and artifacts, beside them the history
+    an old store kept in git and in `journal/`, and the marker and database files a store keeps."""
+    target = _for_import(tmp_path)
+    for file, data in PASSED_OVER.items():
+        (target / file).parent.mkdir(parents=True, exist_ok=True)
+        (target / file).write_bytes(data)
+    return target
+
+
+@when("the operator imports that kb directory, saying which role they are", target_fixture="ran")
+def _kb_import_the_kb_directory(root, target):
+    return _kb_import(root, target)
+
+
+@then("its types and artifacts land as they would from an export")
+def _land_as_from_an_export(ran, root, target):
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    names = _exported_names(target)
+    assert held.names(root) == sorted([*names, "schema/schema"])
+    for name in names:
+        assert held.text(root, name) == (Path(target) / _file(name)).read_text(encoding="utf-8"), name
+
+
+@then("its history and its store marker are passed over, neither landing in the store")
+def _history_and_marker_passed_over(root, target, before):
+    assert sorted(entry.artifact for entry in _imported(root)) == _exported_names(target)
+    assert not any(name.startswith(("journal/", ".git/", "store")) for name in held.names(root))
+    assert held.holds(root)["marker"] == before["started"]["marker"]
+
+
+@scenario(FEATURE, "Importing when nothing names the operator's role is refused")
+def test_importing_without_a_role_is_refused():
+    pass
+
+
+@given("a freshly started store, and nothing names which role the operator is")
+def _a_freshly_started_store_and_no_role(root, before):
+    _a_freshly_started_store(root, before)
+
+
+@when("the operator imports the directory", target_fixture="ran")
+def _kb_import_without_a_role(root, target):
+    return _kb("import", str(target), cwd=root)
+
+
+@then("the import is rejected because the role must be named through KB_ACTOR")
+def _rejected_without_kb_actor(ran):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == "kb import: refused: actor: an import lands only under a role, named through KB_ACTOR\n"
+
+
+@scenario(FEATURE, "kb export and kb import find the store as kb validate does, with the same refusals")
+def test_export_and_import_find_the_store_as_validate_does():
+    pass
+
+
+@given(
+    "a freshly started store, with the operator working in a folder deep inside the directory it sits in",
+    target_fixture="where",
+)
+def _fresh_and_working_deep_inside(root):
+    _started(root)
+    deep = root / "notes" / "2026" / "september"
+    deep.mkdir(parents=True)
+    return {"cwd": deep, "env": {}}
+
+
+@given(
+    "a freshly started store, with the operator working outside any store and KB_ROOT naming that one",
+    target_fixture="where",
+)
+def _fresh_and_named_from_outside(root, tmp_path):
+    _started(root)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    return {"cwd": outside, "env": {"KB_ROOT": str(root)}}
+
+
+@when("the operator runs kb export to an empty directory there", target_fixture="ran")
+def _kb_export_there(where, tmp_path):
+    target = tmp_path / "exported"
+    target.mkdir()
+    where["target"] = target
+    return _kb("export", str(target), cwd=where["cwd"], env=where["env"])
+
+
+@when(
+    "the operator runs kb import of a directory that checks clean, saying which role they are there",
+    target_fixture="ran",
+)
+def _kb_import_there(where, tmp_path):
+    where["target"] = _for_import(tmp_path)
+    return _kb("import", str(where["target"]), cwd=where["cwd"], env={**where["env"], "KB_ACTOR": OPERATOR})
+
+
+@then("the store found above where they are working is the one exported")
+@then("the store KB_ROOT names is the one exported")
+def _that_store_exported(ran, root, where):
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    assert _files(where["target"]) == sorted(f"{name}.yaml" for name in held.names(root))
+
+
+@then("the store found above where they are working is the one imported into")
+@then("the store KB_ROOT names is the one imported into")
+def _that_store_imported_into(ran, root, where):
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    assert held.names(root) == sorted([*_exported_names(where["target"]), "schema/schema"])
+
+
+@then(parsers.parse(
+    "the {command} is rejected because no store was found, neither above where they are working nor named outright"
+))
+def _rejected_as_no_store(ran, where, command):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == (
+        f"kb {command}: refused: store: no store was found, neither above {where['cwd']} nor named outright\n"
+    )
+
+
+@then(parsers.parse("the {command} is rejected because KB_ROOT names a directory that holds no store"))
+def _rejected_as_kb_root_names_no_store(ran, where, command):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == (
+        f"kb {command}: refused: store: KB_ROOT names a directory that holds no store: {where['env']['KB_ROOT']}\n"
+    )
+
+
+@then(parsers.parse(
+    "the {command} is rejected because KB_ROOT names a store other than the one they are standing in, and neither of "
+    "the two is guessed at"
+))
+def _rejected_as_two_stores(ran, where, command):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == (
+        f"kb {command}: refused: store: KB_ROOT names a store other than the one {where['cwd']} is working in: "
+        f"KB_ROOT is {where['env']['KB_ROOT']}, the working directory is inside {where['cwd']}; neither is guessed at\n"
+    )
+
+
+@scenario(FEATURE, "Importing with errors skipped when nothing would land is refused")
+def test_importing_with_errors_skipped_when_nothing_would_land_is_refused():
+    pass
+
+
+@given("a directory for import in which every file has an error", target_fixture="target")
+def _for_import_all_broken(tmp_path):
+    """The export of a store holding the types for decisions and work items, the decisions and the work item, each
+    file then broken: the type for decisions given a version that is not a number, the type for work items, the
+    decisions and the work item made unreadable, and the copy of the type that describes types given a field of its
+    own."""
+    target = _for_import(tmp_path)
+    _a_broken_decision_type(target)
+    for name in ("schema/work-item", WEEKLY, MONTHLY, MONDAYS):
+        (Path(target) / _file(name)).write_text(f"id: {name}\ntitle: [never closed\n", encoding="utf-8")
+    copy = _read(target, "schema/schema")
+    copy["schema"]["properties"]["owner"] = {"type": "string"}
+    _put(target, copy)
+    return target
+
+
+@then("the import is rejected because nothing would land")
+def _rejected_as_nothing_would_land(ran):
+    assert ran.returncode == 2
+    assert {line[1] for line in _report(ran) if line[0] == "error"} == {
+        _file(name) for name in ("schema/schema", "schema/decision", "schema/work-item", WEEKLY, MONTHLY, MONDAYS)
+    }, ran.stdout
+    assert ran.stderr == (
+        "kb import: refused: operations: nothing in the directory would land, and nothing was written\n"
+    )
+
+
+@scenario(FEATURE, "The operator imports a directory whose type that describes types matches the store's")
+def test_a_matching_type_of_types_is_passed_over():
+    pass
+
+
+@given(
+    "a directory for import that checks clean, holding a copy of the type that describes types that matches the "
+    "store's",
+    target_fixture="target",
+)
+def _for_import_with_a_matching_type_of_types(tmp_path, root):
+    target = _for_import(tmp_path, lambda client: define(client, DECISION_TYPE))
+    assert (Path(target) / "schema/schema.yaml").read_text(encoding="utf-8") == held.text(root, "schema/schema")
+    return target
+
+
+@then("the directory's copy of the type that describes types is passed over")
+def _the_copy_is_passed_over(ran, root):
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    assert [entry.artifact for entry in _imported(root)] == ["schema/decision"]
+
+
+@then("the store's type that describes types is kept as it was")
+def _the_type_of_types_kept(root, before):
+    assert held.text(root, "schema/schema") == before["type of types"]
+    entries = journal(kb_client.connect(root), artifact="schema/schema").entries
+    assert [(entry.op, entry.message) for entry in entries] == [("create", "initialise store")]

@@ -2,13 +2,19 @@
 collection, an artifact removed. Each acts on the draft as the operations before it left it, on a copy of what it was
 asked to put there, so the same set can act again on another draft, and is refused there with every fault it finds in
 what it names, the revisions it makes and the names of its items; what its content and links come to is checked once
-the whole set has acted (kb.write)."""
+the whole set has acted (kb.write). An import puts an artifact in the draft whole, as the file it came from gives it."""
 import copy
 from typing import NamedTuple
 
 from kb import composition, definitions, names, places, refusals, requests, settled, values
 from kb.draft import Draft
 from kb.values import ArtifactId, Refused
+
+
+class Import(NamedTuple):
+    """An artifact brought whole from a file for import: its name, and the artifact, identity and all."""
+    artifact_id: ArtifactId
+    artifact: dict
 
 
 class Change(NamedTuple):
@@ -41,6 +47,9 @@ def apply(draft: Draft, operation) -> Change:
 
 
 def _changed(draft: Draft, operation) -> Change:
+    if isinstance(operation, Import):
+        draft.put(operation.artifact_id, copy.deepcopy(operation.artifact))
+        return Change("import", operation.artifact_id)
     if isinstance(operation, requests.Create):
         return Change("create", _create(draft, operation))
     if isinstance(operation, requests.Add):

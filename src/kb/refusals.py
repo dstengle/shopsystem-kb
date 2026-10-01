@@ -140,6 +140,27 @@ def no_type_offered(file: str, kind_name: str) -> kb_pb2.Fault:
     )
 
 
+def not_fresh(held: int) -> kb_pb2.Fault:
+    """An import into a store that holds artifacts besides the type that describes types."""
+    return kb_pb2.Fault(
+        rule=rules.STORE,
+        message=f"import goes only into a freshly started store; this one holds {held} artifact(s) besides the type "
+                f"that describes types",
+    )
+
+
+def check_failed(errors: int) -> kb_pb2.Fault:
+    """An import of a directory whose check found errors, with none skipped."""
+    return kb_pb2.Fault(
+        rule=rules.CONTENT, message=f"the check found {errors} error(s) in the directory, and nothing was written",
+    )
+
+
+def nothing_lands() -> kb_pb2.Fault:
+    """An import that would land nothing."""
+    return kb_pb2.Fault(rule=rules.OPERATIONS, message="nothing in the directory would land, and nothing was written")
+
+
 def clock_failed(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.CLOCK, message=f"the clock failed when it was asked the time: {problem}")
 

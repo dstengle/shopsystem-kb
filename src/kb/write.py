@@ -205,8 +205,9 @@ def _typed(draft: Draft, change: Change) -> dict:
 
 def _versioned(draft: Draft, change: Change, last: bool) -> Change:
     """A change recording the version of the type it was checked against, its entries in the order that type
-    declares; the last the set makes to an artifact put in the draft so."""
-    if change.left is None:
+    declares; the last the set makes to an artifact put in the draft so. An import keeps the version it was written
+    against."""
+    if change.left is None or change.op == "import":
         return change
     schema = _typed(draft, change)
     left = settled.order(
@@ -232,12 +233,13 @@ def _serialised(changes: list[Change]) -> list[str | None]:
 
 
 def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
-    """A change as the port takes it, read at the revision before the one it leaves: its content as it left the
-    artifact, and, for the last change the set makes to that artifact, its links and the places of its parts as the
-    set leaves them, read through the types as the set leaves them."""
+    """A change as the port takes it, read at the revision before the one it leaves, or, for an import, as not held:
+    its content as it left the artifact, and, for the last change the set makes to that artifact, its links and the
+    places of its parts as the set leaves them, read through the types as the set leaves them."""
+    read = 0 if change.op == "import" else change.revision - 1
     if change.left is None or not last:
-        return port.Change(change.artifact_id, change.left, read=change.revision - 1, revision=change.revision)
+        return port.Change(change.artifact_id, change.left, read=read, revision=change.revision)
     return port.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
-        tuple(places.parts(change.left)), change.revision - 1, change.revision,
+        tuple(places.parts(change.left)), read, change.revision,
     )
