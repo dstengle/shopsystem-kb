@@ -326,3 +326,8 @@ A set's links and types are checked once against the state the whole set leaves,
 date: 2026-10-01
 supersedes: decision/a-set-is-checked-whole
 source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md; the formulation question on make-several-changes-in-one-go #9, answered 2026-10-01
+
+## decision/clock-failure-rule
+A clock that fails during a change gives the client a fault with rule `clock`, no artifact and no path, and `clock` joins kb's published rule names, since no existing name fits and the list is closed.
+date: 2026-10-01
+source: docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md; the controller's answer of 2026-10-01

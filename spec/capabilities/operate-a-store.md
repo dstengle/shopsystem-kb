@@ -19,7 +19,7 @@ From a shell, without any client, the operator sets a store up, checks the whole
 - If the directory already has a store inside it, kb init is refused because that directory already has a store inside it, and that store holds what it held before.
 - If the directory sits inside a store, kb init is refused because that directory is inside a store, and that store holds what it held before.
 - When the operator runs kb validate, they are told of everything in the store that does not fit its type, and where, and of everything behind the type it was last checked against.
-- The command line offers setting a store up, checking, serving and exporting one, and importing into a freshly started store, and nothing else that changes what the store holds.
+- The command line offers setting a store up, checking and exporting one, and importing into a freshly started store, and nothing else that changes what the store holds.
 - While the operator works in a folder deep inside the directory a store sits in, when they run kb validate, the store found above where they are working is the one checked.
 - While the operator works outside any store with `KB_ROOT` naming one, when they run kb validate, the store `KB_ROOT` names is the one checked.
 - If the operator works outside any store and nothing names one, kb validate is refused because no store was found, neither above where they are working nor named outright.
@@ -34,4 +34,4 @@ From a shell, without any client, the operator sets a store up, checks the whole
 
 ## Not yet
 
-- None.
+- Serving among what the command line offers. Promoted when the served-store lines (reach-a-served-store, this capability's kb serve lines) are formulated and built.

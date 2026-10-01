@@ -2,7 +2,7 @@
 id: capability/change-the-store
 title: Change the store
 narrator: the client
-rests_on: [decision/graph-as-records, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/integrity-checked-both-ways, decision/a-refused-write-changes-nothing, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine, decision/0007-input-safety-at-the-boundary]
+rests_on: [decision/graph-as-records, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/integrity-checked-both-ways, decision/a-refused-write-changes-nothing, decision/a-set-lands-in-one-transaction, decision/write-lock-on-one-machine, decision/clock-failure-rule, decision/0007-input-safety-at-the-boundary]
 formulated_as: features/change-the-store.feature
 ---
 
@@ -39,6 +39,7 @@ The client creates an artifact, replaces an artifact or one node inside it, adds
 - `revision` is an integer kb increments on every write; `schema_version` is set to the type's current version on every write.
 - A delete is refused while there are inbound references to the artifact or anything beneath it; the only delete rule is `on_delete: refuse`. A part is taken out by rewriting its collection. Every refusal because something still points at what would go (a whole artifact, a dropped item, a type in use) carries the rule `on_delete` and names each link; the port's own name for it, `linked`, is not published.
 - Every change, single or in a set, lands in one database transaction. SQLite's write lock serialises writers across threads and processes on one machine, and readers never wait. When the adapter finds a change's revision moved since kb read it (`conflict`, internal to the port), kb re-drafts the change against the new state and lands it; the client never sees that fault. Every rpc runs inside one fail-closed wrapper, so an exception a clock or the database raises becomes a fault.
+- A clock that fails during a change gives a fault with rule `clock`, no artifact and no path.
 
 ## Not yet
 
