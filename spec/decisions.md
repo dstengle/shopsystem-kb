@@ -455,3 +455,9 @@ Faults at different places come in the order the artifact reads back in, which i
 date: 2026-10-01
 supersedes: decision/faults-ordered-by-place-then-rule
 source: the person's answers under their delegation of 2026-10-01, to the questions on the fault-order lines of check-a-change, check-the-store, make-several-changes-in-one-go and define-a-type
+
+## decision/no-held-types-before-the-placement-rule
+A type the store held before kb read its keywords only where it reads them is not provided for: there are no stores or clients to carry, as everything is new code, so a type is checked against the placement rule whenever it is written and the lines about held types are removed.
+date: 2026-10-01
+supersedes: decision/kb-keywords-read-where-written (its clause on a type the store already holds)
+source: the person, 2026-10-01: "Don't worry about migration. This is all new code so migration is not needed at this point"

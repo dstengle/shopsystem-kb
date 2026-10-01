@@ -130,21 +130,6 @@ Feature: Define a type
       | pattern |
       | format  |
 
-  @slice-125
-  Scenario: A held type that carries a keyword where kb does not read it stays as it is
-    Pins that tightening where kb's keywords may stand does not reach back into a store, so a type written before it is not altered.
-    Given a type the store holds that carries one of kb's keywords where kb does not read it
-    When the client reads that type
-    Then the type reads back as it was
-
-  @slice-125
-  Scenario: Changing a held type that still carries a keyword where kb does not read it is refused
-    Pins that a held type is checked against the placement rule when it is changed, so it cannot be changed while the keyword stays where kb does not read it.
-    Given a type the store holds that carries one of kb's keywords where kb does not read it
-    When the client changes that type, moving its version on and leaving the keyword where it is
-    Then the change is rejected because kb does not read it there
-    And the refusal names the place
-
   @slice-71
   Scenario Outline: A type built on a base carries everything the base declares, of every kind
     Pins that a base is carried in full and not only its fields and sections, so a client can put anything a type is made of into a base and have it hold for every type built on it.

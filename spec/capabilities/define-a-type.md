@@ -28,8 +28,6 @@ The client decides what its artifacts are made of by defining types, which are o
 - If the client defines a type with a link field that says it points at anything but one artifact or several, the type is refused because a link field points at one artifact or several, naming the place, and nothing is written anywhere in the store.
 - If a type the client defines is refused with several faults, they are given in the order its places stand in the type as it would read back, which is the order the type's own type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and faults at one place come in the alphabetical order of the names of the rules they break.
 - A type may use any keyword of JSON Schema 2020-12 that is not one of kb's own, anywhere in its schema.
-- While the store holds a type that carries one of kb's keywords where kb does not read it, the type stays in the store as it is.
-- If the client changes a type the store holds and the type as changed still carries one of kb's keywords where kb does not read it, the change is refused because kb does not read it there, naming the place.
 - Where a type is built on a base, it carries everything the base declares: the base's collections, whose items the store names, the fields it shows at a glance, and its link fields with the kinds they allow.
 - If the client changes a type without moving its version on, the change is refused because a type's version goes up whenever the type changes, and the type reads back as it was.
 - When a type is changed so that artifacts the store holds no longer fit it, the change is accepted, and checking the store reports those artifacts.
@@ -42,7 +40,6 @@ The client decides what its artifacts are made of by defining types, which are o
 - A `ref` carries all four of `targets` (a list of kinds), `cardinality` (`one` or `many`), `parts` (yes or no) and `on_delete` (`refuse`, the one rule kb knows), or the type is refused.
 - Where kb reads its keywords, and the shape of a `ref`, are published: they are the rule a client defines types by.
 - A type refused for one of these carries a rule of kb's own, as every other refusal of a type as it is written does, never a JSON Schema keyword: a misplaced `ref`, a `ref` missing part of its shape, and a `ref` whose `cardinality` or `on_delete` kb does not know carry `ref`; a `ref` without `targets` keeps `targets`; a misplaced `parts`, `sections` or `summary` carries `placement`.
-- A type the store held before this rule stays as it is; only a change to it is checked against the rule.
 - Every other JSON Schema 2020-12 keyword (`enum`, `pattern`, `format` and the rest) is left to the library, wherever it stands.
 - A reference is a field value: a string `decision/adr-0007` or, into a part, `process/x#steps/draft`. The type declares its target types, cardinality, whether part paths are allowed, and the delete rule.
 - Cross-type `$ref` resolves through the `referencing` library against a registry of every `schema/*` artifact, with URIs `kb:schema/<type>#/...`.
