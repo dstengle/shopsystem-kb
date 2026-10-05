@@ -479,3 +479,9 @@ The fields shown at a glance (`summary`) are read only at the top of a type's sc
 date: 2026-10-01
 supersedes: decision/kb-keywords-read-where-written (its clause on `summary` at the top of a collection's items)
 source: the batch 26 review's question, decided by the controller under the person's delegation of 2026-10-01
+
+## decision/batch-rpcs-prefixed
+The four set rpcs are named with the prefix `Batch`, not the suffix `Many`: `BatchCreate`, `BatchReplace`, `BatchAdd` and `BatchRemove`, with their messages `Batch<Change>Request`, `Batch<Change>Response` and the result `Batch<Changed>` (`BatchCreated`, `BatchReplaced`, `BatchAdded`, `BatchRemoved`); what a set does is unchanged. Contract v1 was not yet tagged and no client pinned it, so the rename lands inside v1.
+date: 2026-10-05
+supersedes: decision/sets-one-kind-at-a-time (its rpc names), decision/references-inside-a-set (its rpc name)
+source: the person's request of 2026-10-05; lines approved under the person's delegation

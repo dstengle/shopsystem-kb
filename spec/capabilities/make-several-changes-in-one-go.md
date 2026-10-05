@@ -38,8 +38,8 @@ The client asks for an ordered set of changes of one kind (creates, replacements
 
 ## Implementation, may change
 
-- `Apply` and its four operation messages are gone. `CreateMany`, `ReplaceMany`, `AddMany` and `RemoveMany` each take an ordered list of one kind of change and one `Signature`, each with a request and a response message of its own, and return the set's name, minted by kb, and each change's own result in the order of the set; the set lands in one database transaction.
-- A create in `CreateMany` may carry a key, unique in the set. A link written as `@` followed by a key names the artifact that create makes; kb puts the name it mints in its place before anything is checked. A reference names a whole artifact, never a part.
+- `Apply` and its four operation messages are gone. `BatchCreate`, `BatchReplace`, `BatchAdd` and `BatchRemove` each take an ordered list of one kind of change and one `Signature`, each with a request and a response message of its own, and return the set's name, minted by kb, and each change's own result in the order of the set; the set lands in one database transaction.
+- A create in `BatchCreate` may carry a key, unique in the set. A link written as `@` followed by a key names the artifact that create makes; kb puts the name it mints in its place before anything is checked. A reference names a whole artifact, never a part.
 - A key no create carries, a key carried twice and a key with a place are faults with rule `ref`.
 - A replacement, an addition or a removal in a set may carry an expected revision; a mismatch is the fault with rule `revision` (change-the-store).
 - The set's name is carried by every entry the set writes.
