@@ -80,17 +80,17 @@ class InProcessClient:
     def Remove(self, request, timeout=None):
         return self._call("Remove", request, kb_pb2.RemoveResponse)
 
-    def CreateMany(self, request, timeout=None):
-        return self._call("CreateMany", request, kb_pb2.CreateManyResponse)
+    def BatchCreate(self, request, timeout=None):
+        return self._call("BatchCreate", request, kb_pb2.BatchCreateResponse)
 
-    def ReplaceMany(self, request, timeout=None):
-        return self._call("ReplaceMany", request, kb_pb2.ReplaceManyResponse)
+    def BatchReplace(self, request, timeout=None):
+        return self._call("BatchReplace", request, kb_pb2.BatchReplaceResponse)
 
-    def AddMany(self, request, timeout=None):
-        return self._call("AddMany", request, kb_pb2.AddManyResponse)
+    def BatchAdd(self, request, timeout=None):
+        return self._call("BatchAdd", request, kb_pb2.BatchAddResponse)
 
-    def RemoveMany(self, request, timeout=None):
-        return self._call("RemoveMany", request, kb_pb2.RemoveManyResponse)
+    def BatchRemove(self, request, timeout=None):
+        return self._call("BatchRemove", request, kb_pb2.BatchRemoveResponse)
 
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> InProcessClient:

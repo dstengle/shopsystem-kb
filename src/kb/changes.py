@@ -68,8 +68,8 @@ def removing(request: kb_pb2.RemoveRequest) -> tuple[list, Signed]:
     return _one(request.signature, lambda: _remove(request.locator, request.revision))
 
 
-def creating_many(request: kb_pb2.CreateManyRequest) -> tuple[list, Signed]:
-    """A CreateMany as the domain takes it: a set of creates, signed; a key two or more of its creates carry, whether
+def creating_many(request: kb_pb2.BatchCreateRequest) -> tuple[list, Signed]:
+    """A BatchCreate as the domain takes it: a set of creates, signed; a key two or more of its creates carry, whether
     or not they convert, refused beside every other fault of the set, after them."""
     converted, signed = _many(request.signature, [
         lambda item=item: _create(item.kind, item.title, item.content, item.key) for item in request.items
@@ -95,22 +95,22 @@ def _key_or_none(text: str) -> str | None:
         return None
 
 
-def replacing_many(request: kb_pb2.ReplaceManyRequest) -> tuple[list, Signed]:
-    """A ReplaceMany as the domain takes it: a set of replacements, signed."""
+def replacing_many(request: kb_pb2.BatchReplaceRequest) -> tuple[list, Signed]:
+    """A BatchReplace as the domain takes it: a set of replacements, signed."""
     return _many(request.signature, [
         lambda item=item: _replace(item.locator, item.content, item.revision) for item in request.items
     ])
 
 
-def adding_many(request: kb_pb2.AddManyRequest) -> tuple[list, Signed]:
-    """An AddMany as the domain takes it: a set of items added, signed."""
+def adding_many(request: kb_pb2.BatchAddRequest) -> tuple[list, Signed]:
+    """An BatchAdd as the domain takes it: a set of items added, signed."""
     return _many(request.signature, [
         lambda item=item: _add(item.locator, item.content, item.revision) for item in request.items
     ])
 
 
-def removing_many(request: kb_pb2.RemoveManyRequest) -> tuple[list, Signed]:
-    """A RemoveMany as the domain takes it: a set of removals, signed."""
+def removing_many(request: kb_pb2.BatchRemoveRequest) -> tuple[list, Signed]:
+    """A BatchRemove as the domain takes it: a set of removals, signed."""
     return _many(request.signature, [
         lambda item=item: _remove(item.locator, item.revision) for item in request.items
     ])

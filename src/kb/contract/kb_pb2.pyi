@@ -515,7 +515,7 @@ class CreateItem(_message.Message):
     key: str
     def __init__(self, kind: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., key: _Optional[str] = ...) -> None: ...
 
-class CreateManyRequest(_message.Message):
+class BatchCreateRequest(_message.Message):
     __slots__ = ("items", "signature")
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
@@ -523,7 +523,7 @@ class CreateManyRequest(_message.Message):
     signature: Signature
     def __init__(self, items: _Optional[_Iterable[_Union[CreateItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class CreatedMany(_message.Message):
+class BatchCreated(_message.Message):
     __slots__ = ("batch", "results")
     BATCH_FIELD_NUMBER: _ClassVar[int]
     RESULTS_FIELD_NUMBER: _ClassVar[int]
@@ -531,13 +531,13 @@ class CreatedMany(_message.Message):
     results: _containers.RepeatedCompositeFieldContainer[Created]
     def __init__(self, batch: _Optional[str] = ..., results: _Optional[_Iterable[_Union[Created, _Mapping]]] = ...) -> None: ...
 
-class CreateManyResponse(_message.Message):
+class BatchCreateResponse(_message.Message):
     __slots__ = ("result", "refusal")
     RESULT_FIELD_NUMBER: _ClassVar[int]
     REFUSAL_FIELD_NUMBER: _ClassVar[int]
-    result: CreatedMany
+    result: BatchCreated
     refusal: Refusal
-    def __init__(self, result: _Optional[_Union[CreatedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+    def __init__(self, result: _Optional[_Union[BatchCreated, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ReplaceItem(_message.Message):
     __slots__ = ("locator", "content", "revision")
@@ -549,7 +549,7 @@ class ReplaceItem(_message.Message):
     revision: int
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
 
-class ReplaceManyRequest(_message.Message):
+class BatchReplaceRequest(_message.Message):
     __slots__ = ("items", "signature")
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
@@ -557,7 +557,7 @@ class ReplaceManyRequest(_message.Message):
     signature: Signature
     def __init__(self, items: _Optional[_Iterable[_Union[ReplaceItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class ReplacedMany(_message.Message):
+class BatchReplaced(_message.Message):
     __slots__ = ("batch", "results")
     BATCH_FIELD_NUMBER: _ClassVar[int]
     RESULTS_FIELD_NUMBER: _ClassVar[int]
@@ -565,13 +565,13 @@ class ReplacedMany(_message.Message):
     results: _containers.RepeatedCompositeFieldContainer[Replaced]
     def __init__(self, batch: _Optional[str] = ..., results: _Optional[_Iterable[_Union[Replaced, _Mapping]]] = ...) -> None: ...
 
-class ReplaceManyResponse(_message.Message):
+class BatchReplaceResponse(_message.Message):
     __slots__ = ("result", "refusal")
     RESULT_FIELD_NUMBER: _ClassVar[int]
     REFUSAL_FIELD_NUMBER: _ClassVar[int]
-    result: ReplacedMany
+    result: BatchReplaced
     refusal: Refusal
-    def __init__(self, result: _Optional[_Union[ReplacedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+    def __init__(self, result: _Optional[_Union[BatchReplaced, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class AddItem(_message.Message):
     __slots__ = ("locator", "content", "revision")
@@ -583,7 +583,7 @@ class AddItem(_message.Message):
     revision: int
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
 
-class AddManyRequest(_message.Message):
+class BatchAddRequest(_message.Message):
     __slots__ = ("items", "signature")
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
@@ -591,7 +591,7 @@ class AddManyRequest(_message.Message):
     signature: Signature
     def __init__(self, items: _Optional[_Iterable[_Union[AddItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class AddedMany(_message.Message):
+class BatchAdded(_message.Message):
     __slots__ = ("batch", "results")
     BATCH_FIELD_NUMBER: _ClassVar[int]
     RESULTS_FIELD_NUMBER: _ClassVar[int]
@@ -599,13 +599,13 @@ class AddedMany(_message.Message):
     results: _containers.RepeatedCompositeFieldContainer[Added]
     def __init__(self, batch: _Optional[str] = ..., results: _Optional[_Iterable[_Union[Added, _Mapping]]] = ...) -> None: ...
 
-class AddManyResponse(_message.Message):
+class BatchAddResponse(_message.Message):
     __slots__ = ("result", "refusal")
     RESULT_FIELD_NUMBER: _ClassVar[int]
     REFUSAL_FIELD_NUMBER: _ClassVar[int]
-    result: AddedMany
+    result: BatchAdded
     refusal: Refusal
-    def __init__(self, result: _Optional[_Union[AddedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+    def __init__(self, result: _Optional[_Union[BatchAdded, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class RemoveItem(_message.Message):
     __slots__ = ("locator", "revision")
@@ -615,7 +615,7 @@ class RemoveItem(_message.Message):
     revision: int
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
-class RemoveManyRequest(_message.Message):
+class BatchRemoveRequest(_message.Message):
     __slots__ = ("items", "signature")
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
@@ -623,7 +623,7 @@ class RemoveManyRequest(_message.Message):
     signature: Signature
     def __init__(self, items: _Optional[_Iterable[_Union[RemoveItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
-class RemovedMany(_message.Message):
+class BatchRemoved(_message.Message):
     __slots__ = ("batch", "results")
     BATCH_FIELD_NUMBER: _ClassVar[int]
     RESULTS_FIELD_NUMBER: _ClassVar[int]
@@ -631,10 +631,10 @@ class RemovedMany(_message.Message):
     results: _containers.RepeatedCompositeFieldContainer[Removed]
     def __init__(self, batch: _Optional[str] = ..., results: _Optional[_Iterable[_Union[Removed, _Mapping]]] = ...) -> None: ...
 
-class RemoveManyResponse(_message.Message):
+class BatchRemoveResponse(_message.Message):
     __slots__ = ("result", "refusal")
     RESULT_FIELD_NUMBER: _ClassVar[int]
     REFUSAL_FIELD_NUMBER: _ClassVar[int]
-    result: RemovedMany
+    result: BatchRemoved
     refusal: Refusal
-    def __init__(self, result: _Optional[_Union[RemovedMany, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+    def __init__(self, result: _Optional[_Union[BatchRemoved, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...

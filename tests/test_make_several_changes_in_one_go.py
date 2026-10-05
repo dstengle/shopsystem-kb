@@ -77,7 +77,7 @@ def _two_sets_in_the_history(client, sets):
 def _given_a_name_for_the_set(applied):
     assert not applied.refused, applied.faults
     assert applied.batch
-    assert "batch" not in kb_pb2.CreateManyRequest.DESCRIPTOR.fields_by_name
+    assert "batch" not in kb_pb2.BatchCreateRequest.DESCRIPTOR.fields_by_name
 
 
 @then("each change also comes back with its own result")

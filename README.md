@@ -11,8 +11,8 @@ that an in-process client uses today and a server can host later.
 The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release: no v0 rpc or request remains (`Actor` stays only as the type of `Entry.actor`).
 
 - Changes: `Create`, `Replace`, `Add` and `Remove`, each taking one `Signature { role, execution, message }` and
-  answering its result or a `Refusal`; the same four as sets, `CreateMany`, `ReplaceMany`, `AddMany` and
-  `RemoveMany`. A `CreateItem` of a set carries a `key`, and links in that set written `@<key>` reach the artifact
+  answering its result or a `Refusal`; the same four as sets, `BatchCreate`, `BatchReplace`, `BatchAdd` and
+  `BatchRemove`. A `CreateItem` of a set carries a `key`, and links in that set written `@<key>` reach the artifact
   that create makes. An artifact, or a place inside it, is named by a `Locator { id, place }`. A replace, add or remove
   may say the `revision` it read, and is refused with rule `revision` if the artifact moved since.
 - Reads: `Read` (one level: `summary`, `whole` with a depth, or `section`), `List`, `Follow`, `Search`, `History`,

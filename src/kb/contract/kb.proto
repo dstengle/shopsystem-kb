@@ -22,10 +22,10 @@ service Kb {
   rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
   rpc Add(AddRequest) returns (AddResponse);
   rpc Remove(RemoveRequest) returns (RemoveResponse);
-  rpc CreateMany(CreateManyRequest) returns (CreateManyResponse);
-  rpc ReplaceMany(ReplaceManyRequest) returns (ReplaceManyResponse);
-  rpc AddMany(AddManyRequest) returns (AddManyResponse);
-  rpc RemoveMany(RemoveManyRequest) returns (RemoveManyResponse);
+  rpc BatchCreate(BatchCreateRequest) returns (BatchCreateResponse);
+  rpc BatchReplace(BatchReplaceRequest) returns (BatchReplaceResponse);
+  rpc BatchAdd(BatchAddRequest) returns (BatchAddResponse);
+  rpc BatchRemove(BatchRemoveRequest) returns (BatchRemoveResponse);
 }
 
 // Who made an entry in the history: the role, and the piece of work. The
@@ -206,7 +206,7 @@ message ReplaceResponse {
 // Narrows the history to the entries about one artifact, made under one
 // role, for one piece of work, at or after a time (ISO 8601, a date alone
 // meaning its midnight, UTC unless it says otherwise), or landed in one
-// set, named by the batch a *Many gave, by each one given; with none, every
+// set, named by the batch a Batch* gave, by each one given; with none, every
 // entry.
 message HistoryRequest {
   string artifact = 1;
@@ -449,21 +449,21 @@ message CreateItem {
   string key = 4;
 }
 
-message CreateManyRequest {
+message BatchCreateRequest {
   repeated CreateItem items = 1;
   Signature signature = 2;
 }
 
 // The set's name, minted by kb, and each create's result in the order of
 // the set.
-message CreatedMany {
+message BatchCreated {
   string batch = 1;
   repeated Created results = 2;
 }
 
-message CreateManyResponse {
+message BatchCreateResponse {
   oneof outcome {
-    CreatedMany result = 1;
+    BatchCreated result = 1;
     Refusal refusal = 2;
   }
 }
@@ -475,21 +475,21 @@ message ReplaceItem {
   int32 revision = 3;  // the revision the client read the artifact at; 0 says none
 }
 
-message ReplaceManyRequest {
+message BatchReplaceRequest {
   repeated ReplaceItem items = 1;
   Signature signature = 2;
 }
 
 // The set's name, minted by kb, and each replacement's result, naming the
 // artifact it replaced, in the order of the set.
-message ReplacedMany {
+message BatchReplaced {
   string batch = 1;
   repeated Replaced results = 2;
 }
 
-message ReplaceManyResponse {
+message BatchReplaceResponse {
   oneof outcome {
-    ReplacedMany result = 1;
+    BatchReplaced result = 1;
     Refusal refusal = 2;
   }
 }
@@ -501,21 +501,21 @@ message AddItem {
   int32 revision = 3;  // the revision the client read the artifact at; 0 says none
 }
 
-message AddManyRequest {
+message BatchAddRequest {
   repeated AddItem items = 1;
   Signature signature = 2;
 }
 
 // The set's name, minted by kb, and each addition's result, in the order
 // of the set.
-message AddedMany {
+message BatchAdded {
   string batch = 1;
   repeated Added results = 2;
 }
 
-message AddManyResponse {
+message BatchAddResponse {
   oneof outcome {
-    AddedMany result = 1;
+    BatchAdded result = 1;
     Refusal refusal = 2;
   }
 }
@@ -526,21 +526,21 @@ message RemoveItem {
   int32 revision = 2;  // the revision the client read the artifact at; 0 says none
 }
 
-message RemoveManyRequest {
+message BatchRemoveRequest {
   repeated RemoveItem items = 1;
   Signature signature = 2;
 }
 
 // The set's name, minted by kb, and each removal's result, naming the
 // artifact it removed, in the order of the set.
-message RemovedMany {
+message BatchRemoved {
   string batch = 1;
   repeated Removed results = 2;
 }
 
-message RemoveManyResponse {
+message BatchRemoveResponse {
   oneof outcome {
-    RemovedMany result = 1;
+    BatchRemoved result = 1;
     Refusal refusal = 2;
   }
 }

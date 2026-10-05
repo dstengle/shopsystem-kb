@@ -89,25 +89,25 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.RemoveRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.RemoveResponse.FromString,
                 _registered_method=True)
-        self.CreateMany = channel.unary_unary(
-                '/kb.v1.Kb/CreateMany',
-                request_serializer=kb_dot_contract_dot_kb__pb2.CreateManyRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.CreateManyResponse.FromString,
+        self.BatchCreate = channel.unary_unary(
+                '/kb.v1.Kb/BatchCreate',
+                request_serializer=kb_dot_contract_dot_kb__pb2.BatchCreateRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.BatchCreateResponse.FromString,
                 _registered_method=True)
-        self.ReplaceMany = channel.unary_unary(
-                '/kb.v1.Kb/ReplaceMany',
-                request_serializer=kb_dot_contract_dot_kb__pb2.ReplaceManyRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceManyResponse.FromString,
+        self.BatchReplace = channel.unary_unary(
+                '/kb.v1.Kb/BatchReplace',
+                request_serializer=kb_dot_contract_dot_kb__pb2.BatchReplaceRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.BatchReplaceResponse.FromString,
                 _registered_method=True)
-        self.AddMany = channel.unary_unary(
-                '/kb.v1.Kb/AddMany',
-                request_serializer=kb_dot_contract_dot_kb__pb2.AddManyRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.AddManyResponse.FromString,
+        self.BatchAdd = channel.unary_unary(
+                '/kb.v1.Kb/BatchAdd',
+                request_serializer=kb_dot_contract_dot_kb__pb2.BatchAddRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.BatchAddResponse.FromString,
                 _registered_method=True)
-        self.RemoveMany = channel.unary_unary(
-                '/kb.v1.Kb/RemoveMany',
-                request_serializer=kb_dot_contract_dot_kb__pb2.RemoveManyRequest.SerializeToString,
-                response_deserializer=kb_dot_contract_dot_kb__pb2.RemoveManyResponse.FromString,
+        self.BatchRemove = channel.unary_unary(
+                '/kb.v1.Kb/BatchRemove',
+                request_serializer=kb_dot_contract_dot_kb__pb2.BatchRemoveRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.BatchRemoveResponse.FromString,
                 _registered_method=True)
 
 
@@ -180,25 +180,25 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def CreateMany(self, request, context):
+    def BatchCreate(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ReplaceMany(self, request, context):
+    def BatchReplace(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def AddMany(self, request, context):
+    def BatchAdd(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def RemoveMany(self, request, context):
+    def BatchRemove(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -262,25 +262,25 @@ def add_KbServicer_to_server(servicer, server):
                     request_deserializer=kb_dot_contract_dot_kb__pb2.RemoveRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.RemoveResponse.SerializeToString,
             ),
-            'CreateMany': grpc.unary_unary_rpc_method_handler(
-                    servicer.CreateMany,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.CreateManyRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.CreateManyResponse.SerializeToString,
+            'BatchCreate': grpc.unary_unary_rpc_method_handler(
+                    servicer.BatchCreate,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.BatchCreateRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.BatchCreateResponse.SerializeToString,
             ),
-            'ReplaceMany': grpc.unary_unary_rpc_method_handler(
-                    servicer.ReplaceMany,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceManyRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.ReplaceManyResponse.SerializeToString,
+            'BatchReplace': grpc.unary_unary_rpc_method_handler(
+                    servicer.BatchReplace,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.BatchReplaceRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.BatchReplaceResponse.SerializeToString,
             ),
-            'AddMany': grpc.unary_unary_rpc_method_handler(
-                    servicer.AddMany,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.AddManyRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.AddManyResponse.SerializeToString,
+            'BatchAdd': grpc.unary_unary_rpc_method_handler(
+                    servicer.BatchAdd,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.BatchAddRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.BatchAddResponse.SerializeToString,
             ),
-            'RemoveMany': grpc.unary_unary_rpc_method_handler(
-                    servicer.RemoveMany,
-                    request_deserializer=kb_dot_contract_dot_kb__pb2.RemoveManyRequest.FromString,
-                    response_serializer=kb_dot_contract_dot_kb__pb2.RemoveManyResponse.SerializeToString,
+            'BatchRemove': grpc.unary_unary_rpc_method_handler(
+                    servicer.BatchRemove,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.BatchRemoveRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.BatchRemoveResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -591,7 +591,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def CreateMany(request,
+    def BatchCreate(request,
             target,
             options=(),
             channel_credentials=None,
@@ -604,9 +604,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/CreateMany',
-            kb_dot_contract_dot_kb__pb2.CreateManyRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.CreateManyResponse.FromString,
+            '/kb.v1.Kb/BatchCreate',
+            kb_dot_contract_dot_kb__pb2.BatchCreateRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.BatchCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -618,7 +618,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def ReplaceMany(request,
+    def BatchReplace(request,
             target,
             options=(),
             channel_credentials=None,
@@ -631,9 +631,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/ReplaceMany',
-            kb_dot_contract_dot_kb__pb2.ReplaceManyRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.ReplaceManyResponse.FromString,
+            '/kb.v1.Kb/BatchReplace',
+            kb_dot_contract_dot_kb__pb2.BatchReplaceRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.BatchReplaceResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -645,7 +645,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def AddMany(request,
+    def BatchAdd(request,
             target,
             options=(),
             channel_credentials=None,
@@ -658,9 +658,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/AddMany',
-            kb_dot_contract_dot_kb__pb2.AddManyRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.AddManyResponse.FromString,
+            '/kb.v1.Kb/BatchAdd',
+            kb_dot_contract_dot_kb__pb2.BatchAddRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.BatchAddResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -672,7 +672,7 @@ class Kb:
             _registered_method=True)
 
     @staticmethod
-    def RemoveMany(request,
+    def BatchRemove(request,
             target,
             options=(),
             channel_credentials=None,
@@ -685,9 +685,9 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/RemoveMany',
-            kb_dot_contract_dot_kb__pb2.RemoveManyRequest.SerializeToString,
-            kb_dot_contract_dot_kb__pb2.RemoveManyResponse.FromString,
+            '/kb.v1.Kb/BatchRemove',
+            kb_dot_contract_dot_kb__pb2.BatchRemoveRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.BatchRemoveResponse.FromString,
             options,
             channel_credentials,
             insecure,

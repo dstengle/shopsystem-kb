@@ -32,10 +32,10 @@ RPCS = {
     "Snapshot": lambda c: snapshot(c, "restock-2026-10-01", [DECISION, PROCESS]),
     "Add": lambda c: add(c, DECISION, "options", {"title": "Go monthly"}),
     "Remove": lambda c: remove(c, DECISION),
-    "CreateMany": lambda c: create_many(c, [created("decision", "Close early on Sundays", NEW)]),
-    "ReplaceMany": lambda c: replace_many(c, [replaced(DECISION, NEW)]),
-    "AddMany": lambda c: add_many(c, [added(DECISION, "options", {"title": "Go monthly"})]),
-    "RemoveMany": lambda c: remove_many(c, [removed(DECISION)]),
+    "BatchCreate": lambda c: create_many(c, [created("decision", "Close early on Sundays", NEW)]),
+    "BatchReplace": lambda c: replace_many(c, [replaced(DECISION, NEW)]),
+    "BatchAdd": lambda c: add_many(c, [added(DECISION, "options", {"title": "Go monthly"})]),
+    "BatchRemove": lambda c: remove_many(c, [removed(DECISION)]),
 }
 
 COMMANDS = {

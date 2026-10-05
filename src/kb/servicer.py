@@ -77,21 +77,21 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def Remove(self, request, held):
         return responses.removed(self._land(held, changes.removing(request)).results[0])
 
-    @boundary(kb_pb2.CreateManyResponse)
-    def CreateMany(self, request, held):
-        return responses.landed(kb_pb2.CreatedMany, self._land(held, changes.creating_many(request)), responses.created)
+    @boundary(kb_pb2.BatchCreateResponse)
+    def BatchCreate(self, request, held):
+        return responses.landed(kb_pb2.BatchCreated, self._land(held, changes.creating_many(request)), responses.created)
 
-    @boundary(kb_pb2.ReplaceManyResponse)
-    def ReplaceMany(self, request, held):
-        return responses.landed(kb_pb2.ReplacedMany, self._land(held, changes.replacing_many(request)), responses.replaced)
+    @boundary(kb_pb2.BatchReplaceResponse)
+    def BatchReplace(self, request, held):
+        return responses.landed(kb_pb2.BatchReplaced, self._land(held, changes.replacing_many(request)), responses.replaced)
 
-    @boundary(kb_pb2.AddManyResponse)
-    def AddMany(self, request, held):
-        return responses.landed(kb_pb2.AddedMany, self._land(held, changes.adding_many(request)), responses.added)
+    @boundary(kb_pb2.BatchAddResponse)
+    def BatchAdd(self, request, held):
+        return responses.landed(kb_pb2.BatchAdded, self._land(held, changes.adding_many(request)), responses.added)
 
-    @boundary(kb_pb2.RemoveManyResponse)
-    def RemoveMany(self, request, held):
-        return responses.landed(kb_pb2.RemovedMany, self._land(held, changes.removing_many(request)), responses.removed)
+    @boundary(kb_pb2.BatchRemoveResponse)
+    def BatchRemove(self, request, held):
+        return responses.landed(kb_pb2.BatchRemoved, self._land(held, changes.removing_many(request)), responses.removed)
 
     def _land(self, held, change) -> write.Landed:
         """A set of changes landed under its signature."""

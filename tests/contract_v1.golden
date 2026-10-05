@@ -203,52 +203,52 @@ message CreateItem
   title = 2 singular string
   content = 3 singular string
   key = 4 singular string
-message CreateManyRequest
+message BatchCreateRequest
   items = 1 repeated kb.v1.CreateItem
   signature = 2 singular kb.v1.Signature
-message CreatedMany
+message BatchCreated
   batch = 1 singular string
   results = 2 repeated kb.v1.Created
-message CreateManyResponse
-  result = 1 singular kb.v1.CreatedMany oneof outcome
+message BatchCreateResponse
+  result = 1 singular kb.v1.BatchCreated oneof outcome
   refusal = 2 singular kb.v1.Refusal oneof outcome
 message ReplaceItem
   locator = 1 singular kb.v1.Locator
   content = 2 singular string
   revision = 3 singular int32
-message ReplaceManyRequest
+message BatchReplaceRequest
   items = 1 repeated kb.v1.ReplaceItem
   signature = 2 singular kb.v1.Signature
-message ReplacedMany
+message BatchReplaced
   batch = 1 singular string
   results = 2 repeated kb.v1.Replaced
-message ReplaceManyResponse
-  result = 1 singular kb.v1.ReplacedMany oneof outcome
+message BatchReplaceResponse
+  result = 1 singular kb.v1.BatchReplaced oneof outcome
   refusal = 2 singular kb.v1.Refusal oneof outcome
 message AddItem
   locator = 1 singular kb.v1.Locator
   content = 2 singular string
   revision = 3 singular int32
-message AddManyRequest
+message BatchAddRequest
   items = 1 repeated kb.v1.AddItem
   signature = 2 singular kb.v1.Signature
-message AddedMany
+message BatchAdded
   batch = 1 singular string
   results = 2 repeated kb.v1.Added
-message AddManyResponse
-  result = 1 singular kb.v1.AddedMany oneof outcome
+message BatchAddResponse
+  result = 1 singular kb.v1.BatchAdded oneof outcome
   refusal = 2 singular kb.v1.Refusal oneof outcome
 message RemoveItem
   locator = 1 singular kb.v1.Locator
   revision = 2 singular int32
-message RemoveManyRequest
+message BatchRemoveRequest
   items = 1 repeated kb.v1.RemoveItem
   signature = 2 singular kb.v1.Signature
-message RemovedMany
+message BatchRemoved
   batch = 1 singular string
   results = 2 repeated kb.v1.Removed
-message RemoveManyResponse
-  result = 1 singular kb.v1.RemovedMany oneof outcome
+message BatchRemoveResponse
+  result = 1 singular kb.v1.BatchRemoved oneof outcome
   refusal = 2 singular kb.v1.Refusal oneof outcome
 service Kb
   rpc Create(kb.v1.CreateRequest) returns (kb.v1.CreateResponse)
@@ -262,7 +262,7 @@ service Kb
   rpc Snapshot(kb.v1.SnapshotRequest) returns (kb.v1.SnapshotResponse)
   rpc Add(kb.v1.AddRequest) returns (kb.v1.AddResponse)
   rpc Remove(kb.v1.RemoveRequest) returns (kb.v1.RemoveResponse)
-  rpc CreateMany(kb.v1.CreateManyRequest) returns (kb.v1.CreateManyResponse)
-  rpc ReplaceMany(kb.v1.ReplaceManyRequest) returns (kb.v1.ReplaceManyResponse)
-  rpc AddMany(kb.v1.AddManyRequest) returns (kb.v1.AddManyResponse)
-  rpc RemoveMany(kb.v1.RemoveManyRequest) returns (kb.v1.RemoveManyResponse)
+  rpc BatchCreate(kb.v1.BatchCreateRequest) returns (kb.v1.BatchCreateResponse)
+  rpc BatchReplace(kb.v1.BatchReplaceRequest) returns (kb.v1.BatchReplaceResponse)
+  rpc BatchAdd(kb.v1.BatchAddRequest) returns (kb.v1.BatchAddResponse)
+  rpc BatchRemove(kb.v1.BatchRemoveRequest) returns (kb.v1.BatchRemoveResponse)

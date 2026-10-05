@@ -54,7 +54,7 @@ SAYING_REVISION_ONE = {
     "Replace": lambda: replacing(DECISION, {"sections": SECTIONS}, message="Replace what was read", revision=1),
     "Add": lambda: adding(DECISION, "options", {"title": "Go monthly"}, message="Add to what was read", revision=1),
     "Remove": lambda: removing(DECISION, message="Remove what was read", revision=1),
-    "ReplaceMany": lambda: kb_pb2.ReplaceManyRequest(
+    "BatchReplace": lambda: kb_pb2.BatchReplaceRequest(
         items=[replaced(DECISION, {"sections": SECTIONS}, revision=1)],
         signature=kb_pb2.Signature(role="client", message="Replace what was read"),
     ),

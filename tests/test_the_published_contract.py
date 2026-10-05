@@ -4,7 +4,7 @@ None; `kb.contract.kb_pb2`'s being importable, as package `kb.v1`; the changes `
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
 `place`; the reads `Read`, `List`, `Follow`, `Search` and `History`, the signed `Snapshot` and the `Check`, each
 answering its result or a refusal; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
-faults; that each item an `AddMany` adds names the artifact it went to; and the set of kb's own rule names against
+faults; that each item an `BatchAdd` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
 import inspect
 import re
@@ -218,8 +218,8 @@ def _field_type(message, field):
 
 
 @pytest.mark.parametrize("message", ["CreateRequest", "ReplaceRequest", "AddRequest", "RemoveRequest",
-                                     "CreateManyRequest", "ReplaceManyRequest", "AddManyRequest",
-                                     "RemoveManyRequest", "SnapshotRequest"])
+                                     "BatchCreateRequest", "BatchReplaceRequest", "BatchAddRequest",
+                                     "BatchRemoveRequest", "SnapshotRequest"])
 def test_every_change_and_the_snapshot_carry_their_signature_as_a_signature(message):
     assert _field_type(message, "signature") == "Signature"
 

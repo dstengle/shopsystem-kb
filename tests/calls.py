@@ -243,30 +243,30 @@ def read(client, artifact_id, whole=False, depth=0, section=""):
 
 
 def created(type_name, title, content, key=""):
-    """A create inside a CreateMany: the title beside the content, and the key it carries, if any."""
+    """A create inside a BatchCreate: the title beside the content, and the key it carries, if any."""
     return kb_pb2.CreateItem(kind=type_name, title=title, content=dumps(content), key=key)
 
 
 def replaced(artifact_id, content, revision=0):
-    """A replacement of a whole artifact inside a ReplaceMany, saying the revision the client read it at when revision
+    """A replacement of a whole artifact inside a BatchReplace, saying the revision the client read it at when revision
     is given."""
     return kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), revision=revision)
 
 
 def create_many(client, items, message="Make several changes", actor=CLIENT):
-    """A CreateMany of the creates in order, under the client's role unless another actor is given. Returns the
+    """A BatchCreate of the creates in order, under the client's role unless another actor is given. Returns the
     answer, faults and all."""
-    return answer(client.CreateMany(kb_pb2.CreateManyRequest(items=items, signature=signature(message, actor))))
+    return answer(client.BatchCreate(kb_pb2.BatchCreateRequest(items=items, signature=signature(message, actor))))
 
 
 def replace_many(client, items, message="Make several changes", actor=CLIENT):
-    """A ReplaceMany of the replacements in order, under the client's role unless another actor is given. Returns the
+    """A BatchReplace of the replacements in order, under the client's role unless another actor is given. Returns the
     answer, faults and all."""
-    return answer(client.ReplaceMany(kb_pb2.ReplaceManyRequest(items=items, signature=signature(message, actor))))
+    return answer(client.BatchReplace(kb_pb2.BatchReplaceRequest(items=items, signature=signature(message, actor))))
 
 
 def added(artifact_id, collection, content, revision=0):
-    """One item for the collection named inside an artifact, inside an AddMany, saying the revision the client read
+    """One item for the collection named inside an artifact, inside an BatchAdd, saying the revision the client read
     the artifact at when revision is given."""
     return kb_pb2.AddItem(
         locator=kb_pb2.Locator(id=artifact_id, place=collection), content=dumps(content), revision=revision,
@@ -274,21 +274,21 @@ def added(artifact_id, collection, content, revision=0):
 
 
 def removed(artifact_id, revision=0):
-    """A removal of a whole artifact inside a RemoveMany, saying the revision the client read it at when revision is
+    """A removal of a whole artifact inside a BatchRemove, saying the revision the client read it at when revision is
     given."""
     return kb_pb2.RemoveItem(locator=kb_pb2.Locator(id=artifact_id), revision=revision)
 
 
 def add_many(client, items, message="Make several changes", actor=CLIENT):
-    """An AddMany of the additions in order, under the client's role unless another actor is given. Returns the
+    """An BatchAdd of the additions in order, under the client's role unless another actor is given. Returns the
     answer, faults and all."""
-    return answer(client.AddMany(kb_pb2.AddManyRequest(items=items, signature=signature(message, actor))))
+    return answer(client.BatchAdd(kb_pb2.BatchAddRequest(items=items, signature=signature(message, actor))))
 
 
 def remove_many(client, items, message="Make several changes", actor=CLIENT):
-    """A RemoveMany of the removals in order, under the client's role unless another actor is given. Returns the
+    """A BatchRemove of the removals in order, under the client's role unless another actor is given. Returns the
     answer, faults and all."""
-    return answer(client.RemoveMany(kb_pb2.RemoveManyRequest(items=items, signature=signature(message, actor))))
+    return answer(client.BatchRemove(kb_pb2.BatchRemoveRequest(items=items, signature=signature(message, actor))))
 
 
 def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0):
