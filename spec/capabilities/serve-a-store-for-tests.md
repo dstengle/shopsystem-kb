@@ -16,6 +16,7 @@ The client's own tests serve a store they started with kb's own server, so the c
 
 - When the client serves a started store for its tests, naming another directory to hold the connection, it is given the address the store is served at, and a client working in that directory reaches the store through a server at that address.
 - When the client's tests are done with a store they served, however they ended, the server is stopped and the directory named for the connection no longer holds it.
+- If the client serves a store for its tests naming a directory that already holds the connection to a server, serving is refused because that directory already holds a connection, and that connection is left as it was.
 - Where the client serves a store for its tests with a clock, each change made through that server is stamped in the history with the moment the clock gives.
 
 ## Implementation, may change
