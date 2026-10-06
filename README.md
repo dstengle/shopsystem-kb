@@ -18,7 +18,9 @@ The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release:
 - Reads: `Read` (one level: `summary`, `whole` with a depth, or `section`), `List`, `Follow`, `Search`, `History`,
   the signed `Snapshot`, and `Check`. They replace v0's `Refs`, `Journal` and `Validate`.
 - No rpc starts a store: `kb.init(root, role, *, execution="", clock=None)` does, in your own process, and raises
-  `kb.NotStarted` carrying the faults when it refuses. `kb.client.connect(root, *, clock=None)` gives the client.
+  `kb.NotStarted` carrying the faults when it refuses. The first history entry names the `execution` when one is
+  given, and a fresh store lists `schema/schema` as its one type, the published id of the type of types.
+  `kb.client.connect(root, *, clock=None)` gives the client.
   The client's `where()` asks where its store is without making a call: it runs the search a call would make,
   opening nothing and calling nothing, and returns a `kb.client.Where` holding `root` (the directory the search
   stopped at), `address` (the server's `host:port`, empty unless the connection to a server was found) and `faults`

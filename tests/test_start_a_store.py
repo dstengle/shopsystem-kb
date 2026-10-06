@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import DECISION_TYPE, check, define, journal, moment, read, start_a_store, starting
+from calls import DECISION_TYPE, check, define, journal, listing, moment, read, start_a_store, starting
 import held
 from kb import client as kb_client
 
@@ -357,3 +357,36 @@ def _each_its_own_set(client):
     entries = journal(client).entries
     assert [entry.batch for entry in entries] == [entry.id for entry in entries]
     assert len({entry.batch for entry in entries}) == len(entries)
+
+
+PIECE_OF_WORK = "run-7"
+
+
+@when("the client starts a store there, saying which role it is and naming a piece of work", target_fixture="started")
+def _start_a_store_naming_a_piece_of_work(root):
+    return starting(root, execution=PIECE_OF_WORK)
+
+
+@then("the store's one history entry names that piece of work beside the role")
+def _the_entry_names_the_piece_of_work(client, starter):
+    [entry] = held.history(client)
+    assert (entry.actor.role, entry.actor.execution) == (starter, PIECE_OF_WORK)
+
+
+@given("a store holding nothing but the one type that describes what a type is", target_fixture="root")
+def _a_store_holding_only_the_metaschema(tmp_path):
+    root = tmp_path / "store"
+    root.mkdir()
+    start_a_store(root)
+    return root
+
+
+@when("the client lists the kind of types", target_fixture="listed")
+def _list_the_kind_of_types(client):
+    return listing(client, "schema", ids_only=True)
+
+
+@then("the client is given the one type that describes what a type is, and no other type")
+def _given_only_the_metaschema(listed):
+    assert not listed.refused, listed.faults
+    assert list(listed.ids) == ["schema/schema"]

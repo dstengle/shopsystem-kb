@@ -132,12 +132,12 @@ def start_a_store(root, clock=None):
     kb.init(root, CLIENT.role, clock=clock)
 
 
-def starting(root, role=CLIENT.role, clock=None):
+def starting(root, role=CLIENT.role, clock=None, execution=""):
     """A store asked to be started at root through `kb.init`, under the client's role unless another is given,
-    stamped by the clock when one is given, answered as a step reads it: `faults`, every fault `kb.NotStarted`
-    carried, none when the store was started."""
+    stamped by the clock when one is given, for the piece of work when one is named, answered as a step reads it:
+    `faults`, every fault `kb.NotStarted` carried, none when the store was started."""
     try:
-        kb.init(root, role, clock=clock)
+        kb.init(root, role, execution=execution, clock=clock)
     except kb.NotStarted as refused:
         return SimpleNamespace(faults=refused.faults)
     return SimpleNamespace(faults=[])
