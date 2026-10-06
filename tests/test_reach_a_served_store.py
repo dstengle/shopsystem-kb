@@ -136,8 +136,9 @@ def _working_where_the_store_is(root, monkeypatch):
 
 
 @when("the client reads the decision", target_fixture="shown")
-def _read_the_decision():
-    return answer(kb_client.connect().Read(READ))
+def _read_the_decision(readied_clock):
+    """Read by a client working where it works, with the clock it was readied with, if any."""
+    return answer(kb_client.connect(clock=readied_clock.get("clock")).Read(READ))
 
 
 @then("the removal is rejected because something still points at it")
@@ -205,7 +206,10 @@ def _not_refused_as_served(changed):
 
 
 @then("the directory the store sits in holds no connection to a server")
-def _no_connection_beside_the_store(root):
+def _no_connection_beside_the_store(root, changed):
+    """Once the change has landed through the server: a refused one could leave nothing written either way."""
+    assert not changed.faults, changed.faults
+    assert read(kb_client.connect(root), DECISION).revision == 2
     assert not (root / "kb" / "server.yaml").exists()
 
 
@@ -222,7 +226,7 @@ def test_kb_root_naming_a_directory_holding_the_connection_to_a_server_reaches_t
     arranged = tmp_path / "arranged"
     serving.connection(arranged, serving.serving(root, request))
     monkeypatch.setenv("KB_ROOT", str(arranged))
-    shown = _read_the_decision()
+    shown = _read_the_decision({})
     assert not shown.refused, shown.faults
     assert shown == answer(kb_client.connect(root).Read(READ))
 
@@ -292,7 +296,7 @@ def test_a_connection_naming_a_listener_that_accepts_and_never_answers_is_refuse
     serving.connection(arranged, address)
     monkeypatch.chdir(arranged)
     began = time.monotonic()
-    shown = _read_the_decision()
+    shown = _read_the_decision({})
     assert time.monotonic() - began < SOON
     assert [(fault.rule, address in fault.message) for fault in shown.faults] == [("unreachable", True)], shown.faults
 
@@ -304,7 +308,7 @@ def test_a_connection_naming_no_host_and_port_kb_can_reach_is_refused_as_a_conne
     arranged = tmp_path / "arranged"
     connection = serving.connection(arranged, named)
     monkeypatch.chdir(arranged)
-    _refused_as_a_connection_leading_nowhere(_read_the_decision(), connection)
+    _refused_as_a_connection_leading_nowhere(_read_the_decision({}), connection)
 
 
 BEYOND_GRPC_DEFAULT = 5 * 1024 * 1024  # bytes: past gRPC's default 4 MB limit on a message, either way

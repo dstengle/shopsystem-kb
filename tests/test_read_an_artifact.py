@@ -220,7 +220,8 @@ def _working_deep_inside_that_directory(that_directory, monkeypatch):
 @then("the read is rejected, naming that directory")
 def _rejected_naming_that_directory(shown, that_directory):
     assert shown.refused
-    assert [str(that_directory) in fault.message for fault in shown.faults] == [True], shown.faults
+    assert [(fault.rule, str(that_directory) in fault.message) for fault in shown.faults] == [("store", True)], \
+        shown.faults
 
 
 ANSWERED = {
