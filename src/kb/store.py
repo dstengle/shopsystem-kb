@@ -191,6 +191,15 @@ def given(root: Path) -> kb_pb2.Fault | None:
     return kb_pb2.Fault(rule=rules.STORE, message=f"the root given holds no store: {root}")
 
 
+def locate_from(root: Path) -> tuple[Found | None, kb_pb2.Fault | None]:
+    """The store, or the connection to the server serving one, found from a root a client was readied with, the way
+    it is found from the working directory: upward from the root. KB_ROOT is not consulted."""
+    above = _search_above(root.absolute())
+    if above is None:
+        return None, kb_pb2.Fault(rule=rules.STORE, message=f"the root given holds no store, nor does anything above it: {root}")
+    return _found_at(above)
+
+
 def locate(env: Mapping[str, str]) -> tuple[Found | None, kb_pb2.Fault | None]:
     """The store, or the connection to the server serving one, a call goes to from the working directory, or the
     fault that refuses it. Nothing is guessed at. A working directory that is gone is inside no store."""

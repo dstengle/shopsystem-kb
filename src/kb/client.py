@@ -17,11 +17,10 @@ from kb.servicer import KbServicer
 
 
 def _found(root: Path | None) -> tuple[store.Found | None, kb_pb2.Fault | None]:
-    """What a call reaches: the store at the root given, when it holds one, or, with none, the store or the
-    connection to a server found the way git finds a repository; or the fault that says none was found."""
+    """What a call reaches: the store or the connection to a server found the way git finds a repository, upward
+    from the root given or, with none, from the working directory; or the fault that says none was found."""
     if root is not None:
-        refusal = store.given(root)
-        return (None, refusal) if refusal is not None else (store.Found(root), None)
+        return store.locate_from(root)
     return store.locate(os.environ)
 
 

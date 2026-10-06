@@ -8,6 +8,7 @@ from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create,
 import held
 import serving
 from kb import client as kb_client
+from kb import store as kb_store
 from kb.content import loads
 from kb.contract import kb_pb2
 
@@ -739,3 +740,78 @@ def _no_directory_given(asked_where):
 @then("the question is rejected, naming that directory")
 def _question_rejected_naming_that_directory(asked_where, that_directory):
     assert [str(that_directory) in fault.message for fault in asked_where.faults] == [True], asked_where.faults
+
+
+@given(
+    "the client has read the decision while working in a folder deep inside the directory the store sits in",
+    target_fixture="first_shown",
+)
+def _read_before_moving(root, monkeypatch):
+    _working_deep_inside_the_store(root, monkeypatch)
+    shown = read(kb_client.connect(), DECISION)
+    assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+    return shown
+
+
+MOVED_TITLE = "Price Reviews Happen Weekly"  # the same name, a different title
+
+
+@given(
+    "the client's working directory has since moved into a folder deep inside the directory a different store sits "
+    "in, holding its own copy of the decision with a different title"
+)
+def _moved_into_a_different_store(tmp_path, monkeypatch):
+    other = _another_store(tmp_path)
+    client = kb_client.connect(other)
+    define(client, tagged_decision_type())
+    create(client, "decision", {"title": MOVED_TITLE, "sections": OLDER_SECTIONS})
+    monkeypatch.chdir(_deep_inside(other))
+
+
+@when("the client next reads the decision", target_fixture="shown")
+def _read_the_decision_again(first_shown):
+    return read(kb_client.connect(), DECISION)
+
+
+@then("the client is given the decision as the store it now sits in holds it")
+def _as_the_new_store_holds_it(shown):
+    assert (shown.id, shown.title) == (DECISION, MOVED_TITLE)
+
+
+@given(
+    "the client was readied with a root that is a folder deep inside the directory the store sits in",
+    target_fixture="readied",
+)
+def _readied_with_a_deep_root(root):
+    return {"client": kb_client.connect(_deep_inside(root))}
+
+
+@given("KB_ROOT names a different store", target_fixture="other")
+def _kb_root_names_a_different_store(tmp_path, monkeypatch, opened_roots):
+    other = _another_store(tmp_path)
+    monkeypatch.setenv("KB_ROOT", str(other))
+    return other
+
+
+@then("the client is given the decision, from the store found above the root it was readied with")
+def _from_the_store_above_the_root(shown):
+    assert not shown.faults, shown.faults
+    assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+
+
+@then("the store KB_ROOT names is not consulted")
+def _kb_root_store_not_consulted(other, readied, opened_roots):
+    assert readied["used"] is readied["client"]
+    assert other not in opened_roots
+
+
+@pytest.fixture
+def opened_roots(monkeypatch):
+    """The root of every store opened from now on, in the order they are opened."""
+    roots, opening = [], kb_store.opened
+
+    def recorded(root):
+        roots.append(root)
+        return opening(root)
+    monkeypatch.setattr(kb_store, "opened", recorded)
+    return roots
