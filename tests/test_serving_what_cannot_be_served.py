@@ -75,7 +75,7 @@ def test_a_server_that_cannot_bind_its_address_leaves_nothing_open(root):
     server started on the store next owns it (Task 1's review, M6)."""
     start_a_store(root)
     with socket.create_server(("127.0.0.1", 0)) as taken:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError, match="nothing can listen there"):
             server.started(root, Address("127.0.0.1", taken.getsockname()[1]))
     after = server.started(root, Address("127.0.0.1", 0))
     after.stop()
