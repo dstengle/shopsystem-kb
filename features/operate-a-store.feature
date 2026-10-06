@@ -85,6 +85,7 @@ Feature: Operate a store
     When the operator runs kb validate there
     Then the check is rejected because KB_ROOT names a store other than the one they are standing in, and neither of the two is guessed at
 
+  @slice-128
   Scenario Outline: The operator serves a store at the address they give
     Pins that the store is served exactly where the operator says, whether that address names one of the machine's interfaces or all of them.
     Given a directory holding a store
@@ -97,6 +98,7 @@ Feature: Operate a store
       | one interface of the machine   | that interface                      |
       | every interface of the machine | any one of the machine's interfaces |
 
+  @slice-128
   Scenario: Serving a store without giving an address is refused
     Pins that a store is never served somewhere the operator did not choose: with no address given, nothing is served.
     Given a directory holding a store

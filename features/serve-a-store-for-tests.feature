@@ -6,12 +6,14 @@ Feature: Serve a store for tests
     Given a store the client started, holding a decision
     And a directory other than the one the store sits in
 
+  @slice-133
   Scenario: The client serves a started store for its tests, naming another directory to hold the connection
     Pins that a client's own tests can put a store behind kb's own server and reach it the way a served store is reached, without anyone running kb serve.
     When the client serves the store for its tests, naming that other directory to hold the connection
     Then the client is given the address the store is served at
     And a client working in that other directory reads the decision through a server at that address
 
+  @slice-133
   Scenario Outline: The client's tests are done with a store they served, however they ended
     Pins that serving a store for tests leaves nothing behind: whatever became of the tests, no server is left running and no connection is left pointing at one.
     Given the client is serving the store for its tests, naming that other directory to hold the connection
@@ -24,6 +26,7 @@ Feature: Serve a store for tests
       | passed                   |
       | broken off with an error |
 
+  @slice-133
   Scenario: The client serves a store for its tests with a clock
     Pins that a client's tests can say when the changes made through the server they serve happen, so they can lay down a history across several days through a served store without waiting for them.
     Given the client is serving the store for its tests with a clock that reads 2026-09-23 at 14:30, naming that other directory to hold the connection
