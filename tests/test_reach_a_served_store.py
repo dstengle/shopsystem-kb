@@ -1,5 +1,7 @@
 """A store reached through a server: the client finds the connection to it where it works, and each call goes over
-the network to the server, which `kb serve` runs on a port of the test's own (tests/serving.py)."""
+the network to the server, on a port the system picks (tests/serving.py): `kb serve` run as a program where a step
+says the operator runs it, and otherwise a server hosted in the test's own process, whose clock and lock a step
+watches."""
 import threading
 
 import pytest

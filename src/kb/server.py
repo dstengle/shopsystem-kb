@@ -52,6 +52,33 @@ def refused(root: Path) -> list[kb_pb2.Fault]:
     return _Opening(root).opened(None).faults
 
 
+class InOrder:
+    """A lock that lets those waiting on it in one at a time, in the order they came to it: each draws a ticket as it
+    comes and goes in when its ticket is the one being served."""
+
+    def __init__(self):
+        self._turn = threading.Condition()
+        self._drawn = 0
+        self._serving = 0
+
+    def __enter__(self):
+        with self._turn:
+            ticket = self._drawn
+            self._drawn += 1
+            self._turn.notify_all()
+            self._turn.wait_for(lambda: self._serving == ticket)
+
+    def __exit__(self, *raised):
+        with self._turn:
+            self._serving += 1
+            self._turn.notify_all()
+
+    def arrived(self, count: int, timeout: float) -> bool:
+        """Whether, within timeout seconds, count have come to the lock since it was made, taken or waiting."""
+        with self._turn:
+            return self._turn.wait_for(lambda: self._drawn >= count, timeout)
+
+
 class _OneAtATime:
     """The servicer a server hosts, each rpc that writes taken under the server's lock (`Server.taking`), so changes
     are taken one at a time in the order they come to it; every other rpc as the servicer answers it."""
@@ -73,13 +100,13 @@ class _OneAtATime:
 
 class Server:
     """A store served at an address, answering until it is stopped; `taking` is the lock its changes are taken
-    under, one at a time."""
+    under, one at a time, in the order they arrive."""
 
     def __init__(self, root: Path, listen: Address, clock=None):
         """The store owned, its lock taken before anything listens, then bound at the address, which the lock names.
         Refused with `served` when another server owns the store."""
         self._owned = served.owned(root)
-        self.taking = threading.Lock()
+        self.taking = InOrder()
         self._grpc = grpc.server(futures.ThreadPoolExecutor(max_workers=WORKERS))
         kb_pb2_grpc.add_KbServicer_to_server(_OneAtATime(KbServicer(root, clock, hosted=True), self), self._grpc)
         self.address = Address(listen.host, self._grpc.add_insecure_port(str(listen)))
