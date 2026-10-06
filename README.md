@@ -19,6 +19,10 @@ The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release:
   the signed `Snapshot`, and `Check`. They replace v0's `Refs`, `Journal` and `Validate`.
 - No rpc starts a store: `kb.init(root, role, *, execution="", clock=None)` does, in your own process, and raises
   `kb.NotStarted` carrying the faults when it refuses. `kb.client.connect(root, *, clock=None)` gives the client.
+  The client's `where()` asks where its store is without making a call: it runs the search a call would make,
+  opening nothing and calling nothing, and returns a `kb.client.Where` holding `root` (the directory the search
+  stopped at), `address` (the server's `host:port`, empty unless the connection to a server was found) and `faults`
+  (why a call would be refused for finding nothing); `root` and `faults` are never both filled.
 - `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`. The published rule names are listed in spec/index.md, with `busy`
   and `revision` among them; a JSON Schema keyword passes through as the rule of a content fault.
 

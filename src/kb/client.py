@@ -3,6 +3,7 @@ transport for it, the servicer called directly for a store found, the network (k
 server; and, beside it, the operator's commands that are not rpcs, each a function over the store it finds, never
 through a server."""
 import os
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -24,6 +25,16 @@ def _found(root: Path | None) -> tuple[store.Found | None, kb_pb2.Fault | None]:
     return store.locate(os.environ)
 
 
+@dataclass(frozen=True)
+class Where:
+    """Where the client's search stopped, as a call would make it, nothing opened and nothing called: `root`, the
+    directory it stopped at; `address`, the server's `host:port` when what it found there is the connection to one,
+    and empty otherwise; `faults`, the reasons a call would be refused for finding nothing, never beside a root."""
+    root: str = ""
+    address: str = ""
+    faults: list[kb_pb2.Fault] = field(default_factory=list)
+
+
 class Client:
     """Same method names, requests and responses as kb_pb2_grpc.KbStub.
 
@@ -36,6 +47,13 @@ class Client:
     def __init__(self, root: Path | None = None, clock: Callable[[], datetime] | None = None):
         self._root = root
         self._clock = clock
+
+    def where(self) -> Where:
+        """Where a call made now would go: the search it would make, given back as a value."""
+        found, refusal = _found(self._root)
+        if refusal is not None:
+            return Where(faults=[refusal])
+        return Where(str(found.root), "" if found.address is None else str(found.address))
 
     def _call(self, rpc: str, request, response):
         """The rpc on what this call finds, or the response carrying the fault that says nothing was found."""

@@ -4,7 +4,7 @@ import grpc
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
+from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
 import held
 import serving
 from kb import client as kb_client
@@ -188,7 +188,9 @@ def _working_deep_inside_a_connection(root, tmp_path, request, monkeypatch, serv
     monkeypatch.delenv("KB_ROOT", raising=False)
 
 
-@given("a directory outside the store holds both a store and the connection to a server", target_fixture="both")
+@given(
+    "a directory outside the store holds both a store and the connection to a server", target_fixture="that_directory",
+)
 def _store_beside_a_connection(root, tmp_path, request):
     both = tmp_path / "both"
     both.mkdir()
@@ -197,16 +199,27 @@ def _store_beside_a_connection(root, tmp_path, request):
     return both
 
 
+@given(
+    "a directory outside the store holds the connection to a server, naming the server's address",
+    target_fixture="that_directory",
+)
+def _a_connection_naming_an_address(tmp_path, served):
+    arranged = tmp_path / "arranged"
+    served["address"] = serving.closed_port()
+    serving.connection(arranged, served["address"])
+    return arranged
+
+
 @given("the client is working in a folder deep inside that directory")
-def _working_deep_inside_that_directory(both, monkeypatch):
-    monkeypatch.chdir(_deep_inside(both))
+def _working_deep_inside_that_directory(that_directory, monkeypatch):
+    monkeypatch.chdir(_deep_inside(that_directory))
     monkeypatch.delenv("KB_ROOT", raising=False)
 
 
 @then("the read is rejected, naming that directory")
-def _rejected_naming_that_directory(shown, both):
+def _rejected_naming_that_directory(shown, that_directory):
     assert shown.refused
-    assert [str(both) in fault.message for fault in shown.faults] == [True], shown.faults
+    assert [str(that_directory) in fault.message for fault in shown.faults] == [True], shown.faults
 
 
 ANSWERED = {
@@ -329,9 +342,13 @@ def _outside_with_nothing_naming_one(tmp_path, monkeypatch):
 
 @then("the read is rejected because no store was found, neither above where it is working nor named outright")
 def _rejected_with_no_store_found(shown, elsewhere):
-    assert [fault.rule for fault in shown.faults] == ["store"]
-    assert "no store was found" in shown.faults[0].message
-    assert str(elsewhere) in shown.faults[0].message
+    _no_store_found(shown.faults, elsewhere)
+
+
+def _no_store_found(faults, elsewhere):
+    assert [fault.rule for fault in faults] == ["store"]
+    assert "no store was found" in faults[0].message
+    assert str(elsewhere) in faults[0].message
 
 
 @given("the client is working outside any store, with KB_ROOT naming a directory that holds no store", target_fixture="empty")
@@ -345,9 +362,13 @@ def _outside_with_kb_root_naming_nothing(tmp_path, monkeypatch):
 
 @then("the read is rejected because KB_ROOT names a directory that holds no store")
 def _rejected_as_kb_root_holds_no_store(shown, empty):
-    assert [fault.rule for fault in shown.faults] == ["store"]
-    assert "KB_ROOT names a directory that holds no store" in shown.faults[0].message
-    assert str(empty) in shown.faults[0].message
+    _kb_root_holds_no_store(shown.faults, empty)
+
+
+def _kb_root_holds_no_store(faults, empty):
+    assert [fault.rule for fault in faults] == ["store"]
+    assert "KB_ROOT names a directory that holds no store" in faults[0].message
+    assert str(empty) in faults[0].message
 
 
 @then("no content comes back")
@@ -418,8 +439,12 @@ def _given_the_refusal_as_an_answer(shown):
 
 @then("the read is rejected because the directory it is working in is gone")
 def _rejected_as_working_directory_gone(shown):
-    assert [fault.rule for fault in shown.faults] == ["store"]
-    assert "the working directory is gone" in shown.faults[0].message
+    _working_directory_gone(shown.faults)
+
+
+def _working_directory_gone(faults):
+    assert [fault.rule for fault in faults] == ["store"]
+    assert "the working directory is gone" in faults[0].message
 
 
 @given(
@@ -631,3 +656,86 @@ def _not_fallen_back_on(shown, tmp_path):
     message = shown.faults[0].message
     assert "no store was found" not in message
     assert str(tmp_path / "elsewhere") not in message and not message.endswith(".")
+
+
+@when("the client asks where its store is", target_fixture="asked_where")
+def _ask_where(channels):
+    return kb_client.connect().where()
+
+
+@then("the client is given the directory the store sits in")
+def _given_the_directory_the_store_sits_in(asked_where, root):
+    assert asked_where.root == str(root)
+
+
+@then("no fault is given")
+def _no_fault_given(asked_where):
+    assert list(asked_where.faults) == []
+
+
+UNREADABLE = {
+    "whose database was damaged behind the store's back": held.damage_the_database,
+    "whose marker names a form of store this kb does not know, one a later kb made": held.made_by_a_later_kb,
+}
+
+
+@given(
+    parsers.re(f"a store holding a decision, a process and a tag, (?P<wrong>{'|'.join(map(re.escape, UNREADABLE))})"),
+    target_fixture="that_store",
+)
+def _store_this_kb_cannot_read(tmp_path, wrong):
+    that_store = tmp_path / "unreadable"
+    that_store.mkdir()
+    client = kb_client.connect(that_store)
+    start_a_store(that_store)
+    for type_content in (DECISION_TYPE, PROCESS_TYPE, TAG_TYPE):
+        define(client, type_content)
+    create(client, "decision", {"title": "Price reviews happen weekly", "sections": OLDER_SECTIONS})
+    create(client, "process", {"title": "Open the shop", "steps": [{"title": "Unlock"}, {"title": "Count the float"}]})
+    create(client, "tag", {"title": "Pricing"})
+    UNREADABLE[wrong](that_store)
+    return that_store
+
+
+@given("the client is working in a folder deep inside the directory that store sits in")
+def _working_deep_inside_that_store(that_store, monkeypatch):
+    _working_deep_inside_the_store(that_store, monkeypatch)
+
+
+@then("the client is given the directory that store sits in")
+def _given_the_directory_that_store_sits_in(asked_where, that_store):
+    _given_the_directory_the_store_sits_in(asked_where, that_store)
+
+
+@then("the client is given that directory and the address the connection names")
+def _given_that_directory_and_the_address(asked_where, that_directory, served):
+    assert (asked_where.root, asked_where.address) == (str(that_directory), served["address"])
+
+
+@then("the server is not called")
+def _server_not_called(asked_where, channels):
+    assert list(asked_where.faults) == [] and channels == []
+
+
+NOTHING_FOUND = {
+    "no store was found, neither above where it is working nor named outright":
+        lambda faults, request: _no_store_found(faults, request.getfixturevalue("elsewhere")),
+    "KB_ROOT names a directory that holds no store":
+        lambda faults, request: _kb_root_holds_no_store(faults, request.getfixturevalue("empty")),
+    "the directory it is working in is gone": lambda faults, request: _working_directory_gone(faults),
+}
+
+
+@then(parsers.re(f"the question is rejected because (?P<why>{'|'.join(map(re.escape, NOTHING_FOUND))})"))
+def _question_rejected_because(asked_where, request, why):
+    NOTHING_FOUND[why](list(asked_where.faults), request)
+
+
+@then("no directory is given")
+def _no_directory_given(asked_where):
+    assert asked_where.root == ""
+
+
+@then("the question is rejected, naming that directory")
+def _question_rejected_naming_that_directory(asked_where, that_directory):
+    assert [str(that_directory) in fault.message for fault in asked_where.faults] == [True], asked_where.faults
