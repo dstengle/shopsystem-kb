@@ -3,6 +3,7 @@ the address it says it serves at read from the one line it prints, and the serve
 or failed; a server hosted in the test's own process, its clock a gate a step can shut and its changes' lock watched;
 and the connection to a server, written where a step says, as whoever arranges the callers writes it."""
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -73,6 +74,44 @@ def connection(directory, address):
     place.mkdir(parents=True, exist_ok=True)
     (place / "server.yaml").write_text(canonical.dump({"address": address}), encoding="utf-8")
     return place / "server.yaml"
+
+
+def closed_port():
+    """An address on 127.0.0.1 at a port the system gave this test, bound and closed again, so no server was ever
+    there."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as bound:
+        bound.bind(("127.0.0.1", 0))
+        return f"127.0.0.1:{bound.getsockname()[1]}"
+
+
+class Silent:
+    """A plain TCP listener on 127.0.0.1 at a port the system gave this test, that accepts every connection and never
+    says anything on it: something at the address that is not a kb server."""
+
+    def __init__(self):
+        self._listener = socket.create_server(("127.0.0.1", 0))
+        self._accepted = []
+        self.address = f"127.0.0.1:{self._listener.getsockname()[1]}"
+        threading.Thread(target=self._accept, daemon=True).start()
+
+    def _accept(self):
+        while True:
+            try:
+                self._accepted.append(self._listener.accept()[0])
+            except OSError:
+                return
+
+    def close(self):
+        self._listener.close()
+        for accepted in self._accepted:
+            accepted.close()
+
+
+def silent(request):
+    """A listener that accepts and never answers, closed when the test ends; its address, as `host:port`."""
+    listening = Silent()
+    request.addfinalizer(listening.close)
+    return listening.address
 
 
 PATIENCE = 30.0  # seconds a step waits for the server's signal before the test fails

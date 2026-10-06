@@ -3,6 +3,7 @@ the network to the server, on a port the system picks (tests/serving.py): `kb se
 says the operator runs it, and otherwise a server hosted in the test's own process, whose clock and lock a step
 watches."""
 import threading
+import time
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -12,7 +13,7 @@ from calls import (
     tagged_decision_type,
 )
 import serving
-from kb import client as kb_client, content
+from kb import canonical, client as kb_client, content
 from kb.contract import kb_pb2
 
 scenarios("reach-a-served-store.feature")
@@ -202,3 +203,73 @@ def test_kb_root_naming_a_directory_holding_the_connection_to_a_server_reaches_t
     shown = _read_the_decision()
     assert not shown.refused, shown.faults
     assert shown == answer(kb_client.connect(root).Read(READ))
+
+
+CONNECTIONS = {
+    "cannot be read": b"address: [127.0.0.1:50051\n",
+    "names no address": canonical.dump({"host": "127.0.0.1"}).encode("utf-8"),
+}
+
+
+@given(parsers.parse("the client is working where the connection to a server is found, and that connection {state}"),
+       target_fixture="connection")
+def _working_where_a_connection_leads_nowhere(tmp_path, monkeypatch, state):
+    arranged = tmp_path / "arranged"
+    connection = serving.connection(arranged, "127.0.0.1:1")
+    connection.write_bytes(CONNECTIONS[state])
+    monkeypatch.chdir(arranged)
+    return connection
+
+
+@then("the read is rejected because the connection cannot be read or names no address, and the connection is named "
+      "back")
+def _refused_as_a_connection_leading_nowhere(shown, connection):
+    assert shown.refused
+    assert [(fault.rule, str(connection) in fault.message) for fault in shown.faults] == [("connection", True)], \
+        shown.faults
+
+
+@given("the client is working where the connection to a server is found, and no server was ever at the address it "
+       "names", target_fixture="address")
+def _working_where_a_connection_names_nothing(tmp_path, monkeypatch):
+    arranged = tmp_path / "arranged"
+    address = serving.closed_port()
+    serving.connection(arranged, address)
+    monkeypatch.chdir(arranged)
+    return address
+
+
+@given("the client is working where the connection to a server is found, and the server at the address it names "
+       "answered a read and has stopped", target_fixture="address")
+def _working_where_a_connection_names_a_stopped_server(root, tmp_path, request, monkeypatch):
+    hosting = serving.hosted(root, request, None)
+    address = str(hosting.address)
+    arranged = tmp_path / "arranged"
+    serving.connection(arranged, address)
+    monkeypatch.chdir(arranged)
+    assert not answer(kb_client.connect().Read(READ)).refused
+    hosting.stop()
+    return address
+
+
+@then("the read is rejected because the server cannot be reached, and the address is named back")
+def _refused_as_unreachable(shown, address):
+    assert shown.refused
+    assert [(fault.rule, address in fault.message) for fault in shown.faults] == [("unreachable", True)], shown.faults
+
+
+SOON = 10.0  # seconds within which a call to something that never answers comes back refused
+
+
+def test_a_connection_naming_a_listener_that_accepts_and_never_answers_is_refused_as_unreachable_soon(
+        tmp_path, request, monkeypatch):
+    """Something at the address that accepts and says nothing is not a server that can be reached: the call comes
+    back refused with `unreachable` within a few seconds, never hanging (the plan's Review Focus 4)."""
+    address = serving.silent(request)
+    arranged = tmp_path / "arranged"
+    serving.connection(arranged, address)
+    monkeypatch.chdir(arranged)
+    began = time.monotonic()
+    shown = _read_the_decision()
+    assert time.monotonic() - began < SOON
+    assert [(fault.rule, address in fault.message) for fault in shown.faults] == [("unreachable", True)], shown.faults

@@ -188,6 +188,27 @@ def _working_deep_inside_a_connection(root, tmp_path, request, monkeypatch, serv
     monkeypatch.delenv("KB_ROOT", raising=False)
 
 
+@given("a directory outside the store holds both a store and the connection to a server", target_fixture="both")
+def _store_beside_a_connection(root, tmp_path, request):
+    both = tmp_path / "both"
+    both.mkdir()
+    start_a_store(both)
+    serving.connection(both, str(serving.hosted(root, request, None).address))
+    return both
+
+
+@given("the client is working in a folder deep inside that directory")
+def _working_deep_inside_that_directory(both, monkeypatch):
+    monkeypatch.chdir(_deep_inside(both))
+    monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+@then("the read is rejected, naming that directory")
+def _rejected_naming_that_directory(shown, both):
+    assert shown.refused
+    assert [str(both) in fault.message for fault in shown.faults] == [True], shown.faults
+
+
 ANSWERED = {
     "answered by that store, in the client's own process": lambda served: [],
     "answered by that server, over the network": lambda served: [served["address"]],

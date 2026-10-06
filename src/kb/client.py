@@ -43,7 +43,7 @@ class Client:
         if refusal is not None:
             return responses.refused(response, [refusal])
         if found.address is not None:
-            return network.called(found.address, rpc, request)
+            return network.called(found.address, rpc, request, response)
         return getattr(KbServicer(found.root, self._clock), rpc)(request, None)
 
     def Create(self, request, timeout=None):

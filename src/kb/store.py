@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping
 
-from kb import canonical, rules, sqlite_store
+from kb import canonical, refusals, rules, sqlite_store
 from kb.addresses import Address, address
 from kb.contract import kb_pb2
 from kb.port import Port, Unreadable
@@ -31,16 +31,35 @@ class Found:
     address: Address | None = None
 
 
-def _found_at(directory: Path) -> Found:
-    """What the directory holds: its store, or, with none, the connection to a server."""
+def _found_at(directory: Path) -> tuple[Found | None, kb_pb2.Fault | None]:
+    """What the directory holds: its store, or, with none, the connection to a server; or the fault that refuses the
+    connection when it leads nowhere, and the one that refuses both held in one directory, neither guessed at."""
+    if (directory / MARKER).is_file() and (directory / CONNECTION).is_file():
+        return None, kb_pb2.Fault(rule=rules.STORE, message=(
+            f"{directory} holds both a store and the connection to a server; neither is guessed at"
+        ))
     if (directory / MARKER).is_file():
-        return Found(directory)
-    return Found(directory, _connection(directory / CONNECTION))
+        return Found(directory), None
+    named = _connection(directory / CONNECTION)
+    if named is None:
+        return None, refusals.connection(str(directory / CONNECTION))
+    return Found(directory, named), None
 
 
-def _connection(path: Path) -> Address:
-    """The address the connection at path names, its `address` read from it as YAML 1.2."""
-    return address(canonical.load(path.read_text(encoding="utf-8"))["address"])
+def _connection(path: Path) -> Address | None:
+    """The address the connection at path names, its `address` read from it as YAML 1.2; None when the file cannot
+    be read, or names no address `host:port` with a port that is a number."""
+    try:
+        held = canonical.load(path.read_text(encoding="utf-8"))
+    except (canonical.NotCanonical, UnicodeDecodeError, OSError):
+        return None
+    named = held.get("address") if isinstance(held, dict) else None
+    if not isinstance(named, str):
+        return None
+    try:
+        return address(named)
+    except ValueError:
+        return None
 
 
 def _marks(directory: Path) -> bool:
@@ -180,7 +199,7 @@ def locate(env: Mapping[str, str]) -> tuple[Found | None, kb_pb2.Fault | None]:
     if "KB_ROOT" not in env:
         if above is None:
             return None, _nothing_found(cwd)
-        return _found_at(above), None
+        return _found_at(above)
     value = env["KB_ROOT"]
     named = Path(value)
     if not value or not _marks(named):
@@ -193,7 +212,7 @@ def locate(env: Mapping[str, str]) -> tuple[Found | None, kb_pb2.Fault | None]:
             message=f"KB_ROOT names a store other than the one {cwd} is working in: KB_ROOT is {named}, "
                     f"the working directory is inside {above}; neither is guessed at",
         )
-    return _found_at(named), None
+    return _found_at(named)
 
 
 def _nothing_found(cwd: Path | None) -> kb_pb2.Fault:

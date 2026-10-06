@@ -197,5 +197,19 @@ def served(address: str) -> kb_pb2.Fault:
     ))
 
 
+def connection(path: str) -> kb_pb2.Fault:
+    """The connection to a server that cannot be read, or names no address: the file it is, named."""
+    return kb_pb2.Fault(rule=rules.CONNECTION, message=(
+        f"the connection to a server cannot be read or names no address `host:port`: {path}"
+    ))
+
+
+def unreachable(address: str) -> kb_pb2.Fault:
+    """A server the connection names that cannot be reached, never there or gone since, naming the address."""
+    return kb_pb2.Fault(
+        rule=rules.UNREACHABLE, message=f"the server the connection names, at {address}, cannot be reached",
+    )
+
+
 def escaped(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.STORE, message=f"the store could not answer, and nothing was written: {problem}")
