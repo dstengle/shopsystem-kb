@@ -137,7 +137,7 @@ def _serialised(changes: list[Change]) -> list[str | None]:
         try:
             texts.append(None if change.left is None else canonical.dump(change.left))
         except canonical.NotCanonical as fault:
-            found.append(refusals.unwritable(change.artifact_id, str(fault)))
+            found.append(refusals.unwritable(change.artifact_id, str(fault), fault.path))
     if found:
         raise Refused(found)
     return texts

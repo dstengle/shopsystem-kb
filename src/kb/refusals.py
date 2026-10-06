@@ -91,8 +91,8 @@ def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     )
 
 
-def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
-    return kb_pb2.Fault(artifact=str(artifact_id), rule=rules.CONTENT, message=problem)
+def unwritable(artifact_id: ArtifactId, problem: str, place: str = "") -> kb_pb2.Fault:
+    return kb_pb2.Fault(artifact=str(artifact_id), place=place, rule=rules.CONTENT, message=problem)
 
 
 def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:

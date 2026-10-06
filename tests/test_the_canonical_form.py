@@ -2,7 +2,7 @@
 every digest and the exported files, so a release of ruamel that moves one byte must fail here."""
 import pytest
 
-from kb import canonical
+from kb import canonical, content
 
 ARTIFACT = {
     "title": "A golden artifact",
@@ -87,3 +87,14 @@ def test_a_key_named_twice_with_half_of_a_character_is_refused_naming_a_place_th
     with pytest.raises(canonical.NotCanonical) as refused:
         canonical.load('"\\ud800": 1\n"\\ud800": 2\n')
     refused.value.path.encode("utf-8")
+
+
+@pytest.mark.parametrize("value, place", [
+    ({"sections": [{"title": "Purpose", "body": "fine"}, {"title": "Why", "body": "a \nb"}]}, "sections/1/body"),
+    ({"sections": [{"title": "Purpose", "body": "bad "}]}, "sections/0/body"),
+    ({"options": [{"title": "A", "body": "ok"}, {"title": "B", "body": "no\nline "}]}, "options/1/body"),
+])
+def test_content_dumps_names_the_place_of_prose_it_cannot_write_back(value, place):
+    with pytest.raises(content.NotCanonical) as refused:
+        content.dumps(value)
+    assert refused.value.path == place

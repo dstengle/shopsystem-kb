@@ -20,23 +20,12 @@ class _Representer(SafeRepresenter):
 
 
 def _represent_mapping(representer, mapping):
-    """Every value under a `body` key is prose."""
-    items = [
-        (key, Prose(value) if key == "body" and isinstance(value, str) else value)
-        for key, value in mapping.items()
-    ]
-    return representer.represent_mapping("tag:yaml.org,2002:map", items)
+    """Keys in the order given, never sorted."""
+    return representer.represent_mapping("tag:yaml.org,2002:map", list(mapping.items()))
 
 
 def _represent_prose(representer, value):
-    """Prose as a literal block. A line ending in a space is refused rather than written: the store writes every
-    piece of prose one way."""
-    for number, line in enumerate(value.split("\n"), start=1):
-        if line.endswith(" "):
-            raise NotCanonical(
-                "every piece of prose is written as a block, and this prose could not be written back as one; "
-                f"its line {number} ends in a space"
-            )
+    """Prose as a literal block."""
     return representer.represent_scalar("tag:yaml.org,2002:str", str(value), style="|")
 
 
@@ -176,13 +165,39 @@ def _joined(value: str) -> str:
     return value
 
 
+def _prosed(value, place: tuple = ()):
+    """The value with every value under a `body` key made prose, at the place the content names it. A line of prose
+    ending in a space is refused rather than written: the store writes every piece of prose one way."""
+    if isinstance(value, dict):
+        return {
+            key: _prose(item, (*place, str(key))) if key == "body" and isinstance(item, str)
+            else _prosed(item, (*place, str(key)))
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_prosed(item, (*place, str(index))) for index, item in enumerate(value)]
+    return value
+
+
+def _prose(value: str, place: tuple) -> Prose:
+    for number, line in enumerate(value.split("\n"), start=1):
+        if line.endswith(" "):
+            raise NotCanonical(
+                "every piece of prose is written as a block, and this prose could not be written back as one; "
+                f"its line {number} ends in a space",
+                "/".join(place),
+            )
+    return Prose(value)
+
+
 def dump(artifact: dict) -> str:
     """Block style, keys in the order given, prose as literal blocks, sequences indented under their key, no line folded.
 
-    The text is checked before it is handed back, so nothing kb writes can differ from what kb accepts.
+    The text is checked before it is handed back, so nothing kb writes can differ from what kb accepts. Prose it could
+    not write back raises NotCanonical naming the place it stands.
     """
     stream = io.StringIO()
-    _yaml().dump(artifact, stream)
+    _yaml().dump(_prosed(artifact), stream)
     text = stream.getvalue()
     check(text)
     return text
