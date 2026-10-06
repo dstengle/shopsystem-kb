@@ -25,8 +25,8 @@ from kb.values import artifact_id
 
 WORKERS = 8  # calls answered at once
 GRACE = 3  # seconds the calls in flight are given to finish when the server stops
-# the address held by this server alone, never shared with another
-OPTIONS = [("grpc.so_reuseport", 0)]
+# a message of any size, either way; and the address held by this server alone, never shared with another
+OPTIONS = [("grpc.max_send_message_length", -1), ("grpc.max_receive_message_length", -1), ("grpc.so_reuseport", 0)]
 
 
 @dataclass

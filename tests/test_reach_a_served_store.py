@@ -14,7 +14,7 @@ from calls import (
     start_a_store, tagged_decision_type,
 )
 import serving
-from kb import canonical, client as kb_client, content
+from kb import canonical, client as kb_client, content, testing as kb_testing
 from kb.contract import kb_pb2
 
 scenarios("reach-a-served-store.feature")
@@ -305,3 +305,32 @@ def test_a_connection_naming_no_host_and_port_kb_can_reach_is_refused_as_a_conne
     connection = serving.connection(arranged, named)
     monkeypatch.chdir(arranged)
     _refused_as_a_connection_leading_nowhere(_read_the_decision(), connection)
+
+
+BEYOND_GRPC_DEFAULT = 5 * 1024 * 1024  # bytes: past gRPC's default 4 MB limit on a message, either way
+
+
+def test_a_read_and_a_history_over_four_megabytes_are_answered_through_the_server(root, tmp_path, monkeypatch):
+    """gRPC refuses a message over 4 MB unless told otherwise: an artifact that large, created through the server,
+    reads back whole through it as it reads in process, and an unfiltered history that large, of changes whose
+    messages are long, answers through it as it answers in process."""
+    start_a_store(root)
+    define(kb_client.connect(root), DECISION_TYPE)
+    line = "Keep prices in step with costs, week by week.\n"
+    arranged = tmp_path / "arranged"
+    arranged.mkdir()
+    whole = kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION), whole=kb_pb2.ReadRequest.Whole())
+    with kb_testing.served(root, arranged):
+        monkeypatch.chdir(arranged)
+        client = kb_client.connect()
+        create(client, "decision", {"title": "Price reviews happen weekly", "sections": [
+            {"title": "Purpose", "body": line * (BEYOND_GRPC_DEFAULT // len(line))}, SECTIONS[1],
+        ]})
+        for each in ("Restock on Thursdays", "Restock on Fridays", "Restock on Mondays"):
+            create(client, "decision", {"title": each, "sections": SECTIONS},
+                   message="Why: " + "x" * (BEYOND_GRPC_DEFAULT // 2))
+        read_through = client.Read(whole)
+        assert read_through == kb_client.connect(root).Read(whole) and read_through.ByteSize() > BEYOND_GRPC_DEFAULT
+        history = client.History(kb_pb2.HistoryRequest())
+        assert history == kb_client.connect(root).History(kb_pb2.HistoryRequest())
+        assert history.WhichOneof("outcome") == "result" and history.ByteSize() > BEYOND_GRPC_DEFAULT
