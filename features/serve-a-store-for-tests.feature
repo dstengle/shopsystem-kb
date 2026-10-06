@@ -26,6 +26,14 @@ Feature: Serve a store for tests
       | passed                   |
       | broken off with an error |
 
+  @slice-133.1
+  Scenario: Serving a store for tests where the directory named already holds a connection is refused
+    Pins that the double never writes over, or takes away, a connection someone else put there.
+    Given that other directory already holds the connection to a server
+    When the client serves the store for its tests, naming that other directory to hold the connection
+    Then serving is rejected because that directory already holds a connection
+    And the connection that directory held is left as it was
+
   @slice-133
   Scenario: The client serves a store for its tests with a clock
     Pins that a client's tests can say when the changes made through the server they serve happen, so they can lay down a history across several days through a served store without waiting for them.
