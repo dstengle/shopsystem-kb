@@ -1,6 +1,8 @@
 """The store hosted over the network: the servicer an in-process client reaches, for one store, served by
 `grpc.server` at the address the operator gives, stamping each change with the server's own clock. A root that
-holds nothing this kb can serve is refused before anything listens (`refused`). A server is
+holds nothing this kb can serve is refused before anything listens (`refused`), and so is a store another server
+owns: a server owns the store it serves, its lock (kb.served) taken before anything is bound and held until it stops,
+so a change asked of the store directly is refused meanwhile. A server is
 started (`started`), says the address it serves at (`Server.address`), the port the system gave when it was asked
 for none, and is stopped (`Server.stop`); `kb serve` runs one until it is signalled to stop (`until_signalled`)."""
 import signal
@@ -12,7 +14,7 @@ from typing import Callable
 
 import grpc
 
-from kb import names, store
+from kb import names, served, store
 from kb.addresses import Address
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.servicer import KbServicer, boundary
@@ -52,17 +54,22 @@ class Server:
     """A store served at an address, answering until it is stopped."""
 
     def __init__(self, root: Path, listen: Address, clock=None):
+        """The store owned, its lock taken before anything listens, then bound at the address, which the lock names.
+        Refused with `served` when another server owns the store."""
+        self._owned = served.owned(root)
         self._grpc = grpc.server(futures.ThreadPoolExecutor(max_workers=WORKERS))
-        kb_pb2_grpc.add_KbServicer_to_server(KbServicer(root, clock), self._grpc)
+        kb_pb2_grpc.add_KbServicer_to_server(KbServicer(root, clock, hosted=True), self._grpc)
         self.address = Address(listen.host, self._grpc.add_insecure_port(str(listen)))
+        served.mark(self._owned, self.address)
 
     def start(self) -> None:
         """Answers from now on."""
         self._grpc.start()
 
     def stop(self) -> None:
-        """Stops answering, the calls in flight given GRACE seconds to finish."""
+        """Stops answering, the calls in flight given GRACE seconds to finish, then lets the store go."""
         self._grpc.stop(GRACE).wait()
+        self._owned.close()
 
 
 def started(root: Path, listen: Address, clock=None) -> Server:

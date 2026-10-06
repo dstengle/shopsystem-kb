@@ -15,6 +15,7 @@ import kb
 from kb import client as kb_client
 from kb import addresses, rules, server
 from kb.contract import kb_pb2
+from kb.values import Refused
 
 REFUSED, VIOLATED = 2, 1
 
@@ -73,7 +74,10 @@ def _serve(root: str, listen: str | None) -> int:
     faults = server.refused(Path(root))
     if faults:
         return _refused("serve", faults)
-    served = server.started(Path(root), addresses.address(listen))
+    try:
+        served = server.started(Path(root), addresses.address(listen))
+    except Refused as owned:
+        return _refused("serve", owned.faults)
     server.until_signalled(served, lambda: print(f"serving\t{served.address}", flush=True))
     return 0
 

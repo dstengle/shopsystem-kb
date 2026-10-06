@@ -29,6 +29,11 @@ class Serving:
             return line.rstrip("\n")
         return self.process.stderr.read()
 
+    def kill(self):
+        """The server's process killed without warning, as SIGKILL kills it, giving it no chance to let anything go."""
+        self.process.kill()
+        self.process.wait()
+
     def stop(self):
         """The server stopped, as the operator stops one, and killed if it does not stop in time."""
         if self.process.poll() is None:

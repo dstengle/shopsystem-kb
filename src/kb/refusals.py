@@ -190,5 +190,12 @@ def busy() -> kb_pb2.Fault:
     ))
 
 
+def served(address: str) -> kb_pb2.Fault:
+    """A change asked of a store directly while a server owns it, naming the address the server serves at."""
+    return kb_pb2.Fault(rule=rules.SERVED, message=(
+        f"the store is served, and every change goes through its server, at {address}; nothing was written"
+    ))
+
+
 def escaped(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.STORE, message=f"the store could not answer, and nothing was written: {problem}")
