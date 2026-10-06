@@ -197,6 +197,14 @@ def served(address: str) -> kb_pb2.Fault:
     ))
 
 
+def clock_with_a_server() -> kb_pb2.Fault:
+    """A change asked of a server by a client readied with a clock: the clock is for a store reached in process."""
+    return kb_pb2.Fault(rule=rules.CLOCK, message=(
+        "the clock belongs to a client that reaches its store in process, and a server stamps each change with its "
+        "own; nothing was written"
+    ))
+
+
 def connection(path: str) -> kb_pb2.Fault:
     """The connection to a server that cannot be read, or names no address: the file it is, named."""
     return kb_pb2.Fault(rule=rules.CONNECTION, message=(

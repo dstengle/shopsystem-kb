@@ -4,13 +4,14 @@ says the operator runs it, and otherwise a server hosted in the test's own proce
 watches."""
 import threading
 import time
+from datetime import datetime, timezone
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, TAG_TYPE, answer, create, creating, define, next_version, read, removing, replace, start_a_store,
-    tagged_decision_type,
+    DECISION_TYPE, TAG_TYPE, answer, create, creating, define, journal, next_version, read, removing, replace,
+    start_a_store, tagged_decision_type,
 )
 import serving
 from kb import canonical, client as kb_client, content
@@ -164,9 +165,16 @@ def _given_the_decision(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
 
 
+@pytest.fixture
+def machine_clock():
+    """A reading of the machine's clock taken before the call the When makes; `after()` reads it again."""
+    return {"before": datetime.now(timezone.utc)}
+
+
 @when("the client replaces the decision, saying which role and why", target_fixture="changed")
-def _replace_the_decision():
-    return replace(kb_client.connect(), DECISION, {"sections": [
+def _replace_the_decision(machine_clock, readied_clock):
+    """Made by a client working where the connection is found, with the clock it was readied with, if any."""
+    return replace(kb_client.connect(clock=readied_clock.get("clock")), DECISION, {"sections": [
         SECTIONS[0], {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
     ]}, message="Say why weekly")
 
@@ -175,6 +183,20 @@ def _replace_the_decision():
 def _refused_as_served(changed, address):
     assert changed.refused
     assert [(fault.rule, address in fault.message) for fault in changed.faults] == [("served", True)], changed.faults
+
+
+@then("every entry that change left in the journal says it happened at the moment the machine's clock gave")
+def _stamped_by_the_machines_clock(changed, machine_clock):
+    after = datetime.now(timezone.utc)
+    assert not changed.faults, changed.faults
+    entry = journal(kb_client.connect(), artifact=DECISION).entries[-1]
+    assert machine_clock["before"] <= datetime.fromisoformat(entry.at) <= after, (machine_clock["before"], entry.at)
+
+
+@then("the change is rejected because the clock belongs to a client that reaches its store in process")
+def _refused_as_a_clock(changed):
+    assert changed.refused
+    assert [fault.rule for fault in changed.faults] == ["clock"], changed.faults
 
 
 @then("the change is not refused because the store is served")

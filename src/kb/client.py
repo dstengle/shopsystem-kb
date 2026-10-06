@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from kb import network, responses, store
+from kb import network, refusals, responses, store
 from kb.export import Exported
 from kb.importing import Checked
 from kb.contract import kb_pb2
@@ -43,6 +43,8 @@ class Client:
         if refusal is not None:
             return responses.refused(response, [refusal])
         if found.address is not None:
+            if self._clock is not None and getattr(KbServicer, rpc).writes:
+                return responses.refused(response, [refusals.clock_with_a_server()])
             return network.called(found.address, rpc, request, response)
         return getattr(KbServicer(found.root, self._clock), rpc)(request, None)
 
