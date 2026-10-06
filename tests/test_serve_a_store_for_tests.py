@@ -53,8 +53,36 @@ def _another_directory(tmp_path):
        target_fixture="address")
 @when("the client serves the store for its tests, naming that other directory to hold the connection",
       target_fixture="address")
-def _serves_for_its_tests(root, other, tests):
-    return tests.enter_context(kb_testing.served(root, other))
+def _serves_for_its_tests(root, other, tests, refused):
+    """The address the store is served at; None, with what refused it in `refused`, when serving is refused."""
+    try:
+        return tests.enter_context(kb_testing.served(root, other))
+    except ValueError as refusal:
+        refused.append(refusal)
+        return None
+
+
+@pytest.fixture
+def refused():
+    """What refused serving the store for the client's tests, once a step has been refused."""
+    return []
+
+
+@given("that other directory already holds the connection to a server", target_fixture="held_connection")
+def _other_directory_holds_a_connection(other):
+    connection = serving.connection(other, serving.closed_port())
+    return {"path": connection, "bytes": connection.read_bytes()}
+
+
+@then("serving is rejected because that directory already holds a connection")
+def _rejected_as_holding_a_connection(refused, address, other):
+    assert address is None and len(refused) == 1, refused
+    assert str(other) in str(refused[0]) and "already holds a connection" in str(refused[0]), refused[0]
+
+
+@then("the connection that directory held is left as it was")
+def _held_connection_as_it_was(held_connection):
+    assert held_connection["path"].read_bytes() == held_connection["bytes"]
 
 
 @then("the client is given the address the store is served at")
