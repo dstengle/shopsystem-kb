@@ -6,6 +6,7 @@ from calls import DECISION_TYPE, define, start_a_store
 from conftest import OPERATOR, _kb, _store_needing_attention
 import held
 import serving
+from kb import served
 from kb import client as kb_client
 from kb.contract import kb_pb2, kb_pb2_grpc
 
@@ -224,3 +225,38 @@ def _kb_serve_without_an_address(root):
 def _serve_rejected_without_an_address(ran):
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr == "kb serve: refused: no address is assumed; give the one to serve at with --listen HOST:PORT\n"
+
+
+def _held_by_another_server(tmp_path, request):
+    """The address a kb server for another store is serving at."""
+    other = tmp_path / "other"
+    other.mkdir()
+    start_a_store(other)
+    return str(serving.hosted(other, request, clock=None).address)
+
+
+UNSERVABLE = {
+    "an address that names no port": lambda tmp_path, request: "127.0.0.1",
+    "an address whose port is beyond the last": lambda tmp_path, request: "127.0.0.1:65536",
+    "an address another server already holds": _held_by_another_server,
+}
+
+
+@when(parsers.re(f"the operator runs kb serve on that directory, giving (?P<address>{'|'.join(UNSERVABLE)})"),
+      target_fixture="ran")
+def _kb_serve_where_it_cannot(root, tmp_path, request, address):
+    listen = UNSERVABLE[address](tmp_path, request)
+    return {"listen": listen, "ran": _kb("serve", str(root), "--listen", listen, cwd=root)}
+
+
+@then("serving the store is rejected because the store cannot be served at that address, and the address is named back")
+def _serve_rejected_at_that_address(ran):
+    assert (ran["ran"].returncode, ran["ran"].stdout) == (2, "")
+    assert ran["ran"].stderr.startswith(f"kb serve: refused: the store cannot be served at {ran['listen']!r}"), \
+        ran["ran"].stderr
+
+
+@then("nothing is served")
+def _nothing_is_served(root):
+    """No server owns the store: its lock is there to be taken."""
+    served.owned(root).close()

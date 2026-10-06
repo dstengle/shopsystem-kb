@@ -66,7 +66,7 @@ def _init(root: str) -> int:
 
 def _serve(root: str, listen: str | None) -> int:
     """Serve the store at root at the address given until told to stop, saying on one line where it serves; with no
-    address given, nothing is served."""
+    address given, or one it cannot be served at, nothing is served."""
     if listen is None:
         print("kb serve: refused: no address is assumed; give the one to serve at with --listen HOST:PORT",
               file=sys.stderr)
@@ -78,6 +78,9 @@ def _serve(root: str, listen: str | None) -> int:
         served = server.started(Path(root), addresses.address(listen))
     except Refused as owned:
         return _refused("serve", owned.faults)
+    except ValueError as unservable:
+        print(f"kb serve: refused: the store cannot be served at {listen!r}: {unservable}", file=sys.stderr)
+        return REFUSED
     server.until_signalled(served, lambda: print(f"serving\t{served.address}", flush=True))
     return 0
 

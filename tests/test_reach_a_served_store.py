@@ -295,3 +295,13 @@ def test_a_connection_naming_a_listener_that_accepts_and_never_answers_is_refuse
     shown = _read_the_decision()
     assert time.monotonic() - began < SOON
     assert [(fault.rule, address in fault.message) for fault in shown.faults] == [("unreachable", True)], shown.faults
+
+
+@pytest.mark.parametrize("named", ["5050", ":5050", "h:-1", "127.0.0.1:99999", "127.0.0.1:"])
+def test_a_connection_naming_no_host_and_port_kb_can_reach_is_refused_as_a_connection(tmp_path, monkeypatch, named):
+    """An address with no host, or a port that is not a number from 0 to 65535, names no address: the call is
+    refused with `connection`, naming the file, as a connection that names none is (plan decision 10)."""
+    arranged = tmp_path / "arranged"
+    connection = serving.connection(arranged, named)
+    monkeypatch.chdir(arranged)
+    _refused_as_a_connection_leading_nowhere(_read_the_decision(), connection)

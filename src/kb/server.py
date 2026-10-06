@@ -25,6 +25,8 @@ from kb.values import artifact_id
 
 WORKERS = 8  # calls answered at once
 GRACE = 3  # seconds the calls in flight are given to finish when the server stops
+# the address held by this server alone, never shared with another
+OPTIONS = [("grpc.so_reuseport", 0)]
 
 
 @dataclass
@@ -105,7 +107,8 @@ class Server:
 
     def __init__(self, root: Path, listen: Address, clock=None):
         """The store owned, its lock taken before anything listens, then bound at the address, which the lock names.
-        Refused with `served` when another server owns the store; a start that fails partway leaves nothing it made
+        Refused with `served` when another server owns the store, and raises ValueError when nothing can listen at
+        the address; a start that fails partway leaves nothing it made
         open, the store let go."""
         with ExitStack() as undone:
             self._owned = served.owned(root)
@@ -113,10 +116,10 @@ class Server:
             self.taking = InOrder()
             self._pool = futures.ThreadPoolExecutor(max_workers=WORKERS)
             undone.callback(self._pool.shutdown)
-            self._grpc = grpc.server(self._pool)
+            self._grpc = grpc.server(self._pool, options=OPTIONS)
             undone.callback(self._grpc.stop, None)
             kb_pb2_grpc.add_KbServicer_to_server(_OneAtATime(KbServicer(root, clock, hosted=True), self), self._grpc)
-            self.address = Address(listen.host, self._grpc.add_insecure_port(str(listen)))
+            self.address = Address(listen.host, _bound(self._grpc, listen))
             served.mark(self._owned, self.address)
             undone.pop_all()
 
@@ -129,6 +132,15 @@ class Server:
         self._grpc.stop(GRACE).wait()
         self._pool.shutdown()
         self._owned.close()
+
+
+def _bound(hosting: grpc.Server, listen: Address) -> int:
+    """The port the server is bound to at the address, the system's when it is 0. Raises ValueError when nothing can
+    listen there."""
+    try:
+        return hosting.add_insecure_port(str(listen))
+    except RuntimeError:
+        raise ValueError("nothing can listen there") from None
 
 
 def started(root: Path, listen: Address, clock=None) -> Server:
