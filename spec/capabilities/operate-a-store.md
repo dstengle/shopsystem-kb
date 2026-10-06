@@ -27,6 +27,7 @@ From a shell, without any client, the operator sets a store up, checks the whole
 - If the operator works inside one store while `KB_ROOT` names a different store, kb validate is refused because `KB_ROOT` names a store other than the one they are standing in, and neither is guessed at.
 - When the operator runs kb serve on a directory holding a store, giving an address, the store is served at that address, on whatever interface it names, all of them included.
 - If the operator runs kb serve without an address, it is refused because no address is assumed.
+- If the operator runs kb serve giving an address it cannot serve at, because it is not a host and a port or nothing can listen there, it is refused because the store cannot be served at that address, naming the address, and nothing is served.
 - While another change is being written to the store, when the operator runs kb validate, the store is checked and kb validate is not refused because the store was busy with another change.
 
 ## Implementation, may change

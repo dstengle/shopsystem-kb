@@ -542,3 +542,8 @@ source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
 A server that "stops answering" is one that answered earlier calls and has since stopped, refused with rule `unreachable` as a server never there is; a server that stops partway through a call, which could leave a change landed while its client is told otherwise, is not decided by any line yet.
 date: 2026-10-06
 source: the formulation of reach-a-served-store's question, answered by the controller's recommendation under the person's delegation of 2026-10-06
+
+## decision/served-only-where-asked
+`kb serve` serves at exactly the address the operator gives or not at all: an address that is not a host and a port (a port from 0 to 65535, 0 asking the system for one), or one nothing can listen at, is refused naming it, with nothing served, never served at another port; and `kb.testing.served` refuses a directory for the connection that already holds one, leaving it as it was, rather than overwriting and then deleting a connection someone else wrote.
+date: 2026-10-06
+source: the batch 27 branch review (I3, I4), lines approved by the controller under the person's delegation of 2026-10-06
