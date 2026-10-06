@@ -16,7 +16,7 @@ Several clients share one store through a server that hosts the same contract ov
 
 - While a server serves a store, a client that reaches it makes the same calls and is given the same answers as a client that reaches the store in process.
 - If the connection to a server cannot be read or names no address, the call is refused because the connection cannot be read or names no address, naming the connection.
-- If the server a connection names cannot be reached, or stops answering, the call is refused because the server cannot be reached, naming the address, and the call comes back with its answer rather than breaking off.
+- If the server a connection names cannot be reached, whether no server was ever there or one that answered earlier calls has since stopped, the call is refused because the server cannot be reached, naming the address, and the call comes back with its answer rather than breaking off.
 - While a server serves a store, each change is checked against the store as every earlier change left it, in the order the changes arrive.
 - While a server serves a store, a client that finds that store directly can read it.
 - If a client that finds a served store directly asks for a change, the change is refused because the store is served, naming the server's address.
