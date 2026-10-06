@@ -48,7 +48,7 @@ def _found_at(directory: Path) -> tuple[Found | None, kb_pb2.Fault | None]:
 
 def _connection(path: Path) -> Address | None:
     """The address the connection at path names, its `address` read from it as YAML 1.2; None when the file cannot
-    be read, or names no address `host:port` with a port that is a number."""
+    be read, or names no address `host:port` with a host and a port from 0 to 65535."""
     try:
         held = canonical.load(path.read_text(encoding="utf-8"))
     except (canonical.NotCanonical, UnicodeDecodeError, OSError):
