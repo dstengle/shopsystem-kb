@@ -91,8 +91,8 @@ def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     )
 
 
-def unwritable(artifact_id: ArtifactId, problem: str) -> kb_pb2.Fault:
-    return kb_pb2.Fault(artifact=str(artifact_id), rule=rules.CONTENT, message=problem)
+def unwritable(artifact_id: ArtifactId, problem: str, place: str = "") -> kb_pb2.Fault:
+    return kb_pb2.Fault(artifact=str(artifact_id), place=place, rule=rules.CONTENT, message=problem)
 
 
 def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
@@ -188,6 +188,35 @@ def busy() -> kb_pb2.Fault:
         "the store was busy with another change for longer than it waits, and nothing was written; the same change "
         "may be made again"
     ))
+
+
+def served(address: str) -> kb_pb2.Fault:
+    """A change asked of a store directly while a server owns it, naming the address the server serves at."""
+    return kb_pb2.Fault(rule=rules.SERVED, message=(
+        f"the store is served, and every change goes through its server, at {address}; nothing was written"
+    ))
+
+
+def clock_with_a_server() -> kb_pb2.Fault:
+    """A change asked of a server by a client readied with a clock: the clock is for a store reached in process."""
+    return kb_pb2.Fault(rule=rules.CLOCK, message=(
+        "the clock belongs to a client that reaches its store in process, and a server stamps each change with its "
+        "own; nothing was written"
+    ))
+
+
+def connection(path: str) -> kb_pb2.Fault:
+    """The connection to a server that cannot be read, or names no address: the file it is, named."""
+    return kb_pb2.Fault(rule=rules.CONNECTION, message=(
+        f"the connection to a server cannot be read or names no address `host:port`: {path}"
+    ))
+
+
+def unreachable(address: str) -> kb_pb2.Fault:
+    """A server the connection names that cannot be reached, never there or gone since, naming the address."""
+    return kb_pb2.Fault(
+        rule=rules.UNREACHABLE, message=f"the server the connection names, at {address}, cannot be reached",
+    )
 
 
 def escaped(problem: str) -> kb_pb2.Fault:

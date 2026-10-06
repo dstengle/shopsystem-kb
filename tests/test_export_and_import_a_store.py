@@ -868,6 +868,16 @@ def _the_kb_directory_of_a_store(tmp_path):
     return target
 
 
+def test_the_lock_file_a_server_leaves_in_a_kb_directory_is_passed_over_by_the_import_check(tmp_path, root):
+    """A store once served keeps `served.yaml` beside its marker and database (kb.served): the kb directory of such
+    a store, checked for import, is clean, the lock file passed over as the files that mark and keep a store are."""
+    target = _the_kb_directory_of_a_store(tmp_path)
+    (target / "served.yaml").write_text("address: 127.0.0.1:50051\n", encoding="utf-8")
+    _started(root)
+    ran = _kb("import", str(target), "--check", cwd=root)
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, f"clean\t{target} checks clean for import\n", ""), ran.stdout
+
+
 @when("the operator imports that kb directory, saying which role they are", target_fixture="ran")
 def _kb_import_the_kb_directory(root, target):
     return _kb_import(root, target)

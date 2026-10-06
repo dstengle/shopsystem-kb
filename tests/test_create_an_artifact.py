@@ -882,13 +882,13 @@ def _create_with_a_line_ending_in_a_space(root, client):
 
 @then(
     "the artifact is rejected because every piece of prose is written as a block, and this prose could not be "
-    "written back as one"
+    "written back as one, and the place that prose stands is named"
 )
 def _rejected_as_prose_that_is_no_block(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [
-        ("decision/price-reviews-happen-weekly", "content"),
+    assert [(fault.artifact, fault.rule, fault.place) for fault in refused.faults] == [
+        ("decision/price-reviews-happen-weekly", "content", "sections/1/body"),
     ]
     assert refused.faults[0].message.startswith(
         "every piece of prose is written as a block, and this prose could not be written back as one"

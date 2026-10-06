@@ -105,6 +105,20 @@ Feature: Operate a store
     When the operator runs kb serve on that directory without giving an address
     Then serving the store is rejected because no address is assumed
 
+  @slice-128.1
+  Scenario Outline: Serving a store at an address it cannot be served at is refused
+    Pins that a store is served exactly where the operator says or not at all, never at some other port and never with the command breaking off.
+    Given a directory holding a store
+    When the operator runs kb serve on that directory, giving <address>
+    Then serving the store is rejected because the store cannot be served at that address, and the address is named back
+    And nothing is served
+
+    Examples:
+      | address                                  |
+      | an address that names no port            |
+      | an address whose port is beyond the last |
+      | an address another server already holds  |
+
   @slice-115
   Scenario: The operator checks the store while another change is being written
     Pins that checking is a read: it goes ahead however long another change holds the store.

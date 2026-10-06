@@ -3,12 +3,13 @@
 A schema-typed, graph-oriented artifact store. Typed documents with
 addressable parts, schemas stored as artifacts, one SQLite database as the
 canonical store (written out as canonical YAML files on the operator's
-`kb export`, and read back by `kb import`), and one versioned API contract
-that an in-process client uses today and a server can host later.
+`kb export`, and read back by `kb import`), and one versioned API contract,
+hosted both by an in-process client and by a server (`kb serve`).
 
-## The contract: v1 (kb 0.5.0)
+## The contract: v1 (kb 0.6.0)
 
-The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release: no v0 rpc or request remains (`Actor` stays only as the type of `Entry.actor`).
+The contract is `kb.v1` (`kb.contract.kb_pb2`); 0.5.0 was the breaking release that removed every v0 rpc and request
+(`Actor` stays only as the type of `Entry.actor`), and 0.6.0 adds serving a store over the network.
 
 - Changes: `Create`, `Replace`, `Add` and `Remove`, each taking one `Signature { role, execution, message }` and
   answering its result or a `Refusal`; the same four as sets, `BatchCreate`, `BatchReplace`, `BatchAdd` and
@@ -18,9 +19,46 @@ The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release:
 - Reads: `Read` (one level: `summary`, `whole` with a depth, or `section`), `List`, `Follow`, `Search`, `History`,
   the signed `Snapshot`, and `Check`. They replace v0's `Refs`, `Journal` and `Validate`.
 - No rpc starts a store: `kb.init(root, role, *, execution="", clock=None)` does, in your own process, and raises
-  `kb.NotStarted` carrying the faults when it refuses. `kb.client.connect(root, *, clock=None)` gives the client.
-- `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`. The published rule names are listed in spec/index.md, with `busy`
-  and `revision` among them; a JSON Schema keyword passes through as the rule of a content fault.
+  `kb.NotStarted` carrying the faults when it refuses. The first history entry names the `execution` when one is
+  given, and a fresh store lists `schema/schema` as its one type, the published id of the type of types.
+  `kb.client.connect(root, *, clock=None)` gives the client.
+  The client's `where()` asks where its store is without making a call: it runs the search a call would make,
+  opening nothing and calling nothing, and returns a `kb.client.Where` holding `root` (the directory the search
+  stopped at), `address` (the server's `host:port`, empty unless the connection to a server was found) and `faults`
+  (why a call would be refused for finding nothing); `root` and `faults` are never both filled.
+- `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`. `NotCanonical.path` names where the text
+  kb cannot keep stands: names and list positions from the top of the content joined by `/`, such as
+  `sections/0/body`, empty when the refusal names no place. The published rule names are listed in spec/index.md,
+  with `busy` and `revision` among them, and, new in 0.6.0, `connection`, `unreachable` and `served`; a JSON Schema
+  keyword passes through as the rule of a content fault.
+
+### Serving a store (kb 0.6.0)
+
+`kb serve <root> --listen <host:port>` serves the store at `<root>` at exactly that address (port 0 asks the system
+for one, and the line it prints says which) until it is signalled to stop; an address it cannot serve at is refused
+and nothing is served. A client reaches it through the connection to the server: `kb/server.yaml` holding one entry,
+`address: host:port`, written by whoever arranges the callers, never by kb. A client that finds the connection where
+it finds a store makes every call over the network, with the same requests and answers; one it cannot reach is
+refused with `unreachable`, a connection it cannot read with `connection`, and a client readied with a clock has its
+changes refused with `clock` (the server stamps them with its own). While a store is served, a change asked of it
+directly is refused with `served`, naming the server's address.
+
+### Serving a store for tests (kb 0.6.0)
+
+`kb.testing.served(store_root, connection_dir, *, clock=None)` is a context manager that puts the store at
+`store_root` behind kb's own server, the one `kb serve` runs, in your test's own process on `127.0.0.1` at a port
+the system picks. It writes `kb/server.yaml` under `connection_dir` naming that address and yields the address as
+`host:port`; a client working in `connection_dir` reaches the store through the server. A `connection_dir` that
+already holds a connection is refused with a `ValueError`, before anything is served, the connection left as it was. Changes made through it are
+stamped with the moment `clock` gives, or the machine's with none. When the block ends, passed or raised, the server
+is stopped, the store let go, and the connection removed (with `kb/`, if the double made it and nothing else is in
+it). While it serves, a change asked of the store directly is refused with `served`. A pytest fixture over it, with `import kb.testing`:
+
+```python
+@pytest.fixture
+def served_store(store_root, tmp_path):
+    with kb.testing.served(store_root, tmp_path) as address: yield address
+```
 
 Upgrading a store made by kb 0.3.0: start a new store and import the old
 one's files: `kb init <new-root>`, then `kb import <old-root>/kb` run inside

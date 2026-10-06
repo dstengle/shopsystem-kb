@@ -1,22 +1,70 @@
 """Where a store is and what marks it: <root>/kb/, holding the marker store.yaml and beside it the database the
-adapter keeps the store in; and finding it, the way git finds a repository: upward from the working directory, or
-named by KB_ROOT. STORE_FORM is the store marker's value alone, written to store.yaml when the store is
-started; the store's own, not part of the published contract (adrs/0018). An earlier kb's marker held `contract`,
-and a store it made is told apart by that."""
+adapter keeps the store in; or the connection to a server serving one, kb/server.yaml, written by whoever arranges
+the callers and naming the server's `address`. Finding either, the way git finds a repository: upward from the
+working directory, or named by KB_ROOT. STORE_FORM is the store marker's value alone, written to store.yaml when the
+store is started; the store's own, not part of the published contract (adrs/0018). An earlier kb's marker held
+`contract`, and a store it made is told apart by that."""
 import contextlib
 import shutil
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping
 
-from kb import canonical, rules, sqlite_store
+from kb import canonical, refusals, rules, sqlite_store
+from kb.addresses import Address, address
 from kb.contract import kb_pb2
 from kb.port import Port, Unreadable
 from kb.values import Refused, Root
 
 MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
+CONNECTION = MARKER.parent / "server.yaml"
 STORE_FORM = 1
+
+
+@dataclass(frozen=True)
+class Found:
+    """Where a search stopped: the directory, and, when what it found there is the connection to a server rather
+    than a store, the address that connection names."""
+    root: Path
+    address: Address | None = None
+
+
+def _found_at(directory: Path) -> tuple[Found | None, kb_pb2.Fault | None]:
+    """What the directory holds: its store, or, with none, the connection to a server; or the fault that refuses the
+    connection when it leads nowhere, and the one that refuses both held in one directory, neither guessed at."""
+    if (directory / MARKER).is_file() and (directory / CONNECTION).is_file():
+        return None, kb_pb2.Fault(rule=rules.STORE, message=(
+            f"{directory} holds both a store and the connection to a server; neither is guessed at"
+        ))
+    if (directory / MARKER).is_file():
+        return Found(directory), None
+    named = _connection(directory / CONNECTION)
+    if named is None:
+        return None, refusals.connection(str(directory / CONNECTION))
+    return Found(directory, named), None
+
+
+def _connection(path: Path) -> Address | None:
+    """The address the connection at path names, its `address` read from it as YAML 1.2; None when the file cannot
+    be read, or names no address `host:port` with a host and a port from 0 to 65535."""
+    try:
+        held = canonical.load(path.read_text(encoding="utf-8"))
+    except (canonical.NotCanonical, UnicodeDecodeError, OSError):
+        return None
+    named = held.get("address") if isinstance(held, dict) else None
+    if not isinstance(named, str):
+        return None
+    try:
+        return address(named)
+    except ValueError:
+        return None
+
+
+def _marks(directory: Path) -> bool:
+    """Whether the directory holds a store or the connection to a server."""
+    return (directory / MARKER).is_file() or (directory / CONNECTION).is_file()
 
 
 class EarlierKb(Exception):
@@ -117,6 +165,25 @@ def working_directory() -> Path | None:
         return None
 
 
+def _search_above(start: Path) -> Path | None:
+    """The nearest directory at or above `start` holding a store or the connection to a server, or None."""
+    for directory in (start, *start.parents):
+        if _marks(directory):
+            return directory
+    return None
+
+
+def directly(found: Found) -> kb_pb2.Fault | None:
+    """The fault for an operator's command over the store's own files that found the connection to a server; None
+    when it found the store."""
+    if found.address is None:
+        return None
+    return kb_pb2.Fault(rule=rules.STORE, message=(
+        f"these commands run where the store is, not through a server: {found.root} holds the connection to the "
+        f"server at {found.address}"
+    ))
+
+
 def given(root: Path) -> kb_pb2.Fault | None:
     """The fault for a root given outright that holds no store, its marker not inside it; None when it holds one."""
     if (root / MARKER).is_file():
@@ -124,18 +191,27 @@ def given(root: Path) -> kb_pb2.Fault | None:
     return kb_pb2.Fault(rule=rules.STORE, message=f"the root given holds no store: {root}")
 
 
-def locate(env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
-    """The store a call goes to from the working directory, or the fault that refuses it. Nothing is guessed at. A
-    working directory that is gone is inside no store."""
+def locate_from(root: Path) -> tuple[Found | None, kb_pb2.Fault | None]:
+    """The store, or the connection to the server serving one, found from a root a client was readied with, the way
+    it is found from the working directory: upward from the root. KB_ROOT is not consulted."""
+    above = _search_above(root.absolute())
+    if above is None:
+        return None, kb_pb2.Fault(rule=rules.STORE, message=f"the root given holds no store, nor does anything above it: {root}")
+    return _found_at(above)
+
+
+def locate(env: Mapping[str, str]) -> tuple[Found | None, kb_pb2.Fault | None]:
+    """The store, or the connection to the server serving one, a call goes to from the working directory, or the
+    fault that refuses it. Nothing is guessed at. A working directory that is gone is inside no store."""
     cwd = working_directory()
-    above = None if cwd is None else find_above(cwd)
+    above = None if cwd is None else _search_above(cwd)
     if "KB_ROOT" not in env:
         if above is None:
             return None, _nothing_found(cwd)
-        return above, None
+        return _found_at(above)
     value = env["KB_ROOT"]
     named = Path(value)
-    if not value or not (named / MARKER).is_file():
+    if not value or not _marks(named):
         return None, kb_pb2.Fault(
             rule=rules.STORE, message=f"KB_ROOT names a directory that holds no store: {value}",
         )
@@ -145,7 +221,7 @@ def locate(env: Mapping[str, str]) -> tuple[Path | None, kb_pb2.Fault | None]:
             message=f"KB_ROOT names a store other than the one {cwd} is working in: KB_ROOT is {named}, "
                     f"the working directory is inside {above}; neither is guessed at",
         )
-    return named, None
+    return _found_at(named)
 
 
 def _nothing_found(cwd: Path | None) -> kb_pb2.Fault:

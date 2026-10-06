@@ -26,5 +26,8 @@ CLOCK = "clock"
 BUSY = "busy"
 REVISION = "revision"
 PLACEMENT = "placement"
+SERVED = "served"
+CONNECTION = "connection"
+UNREACHABLE = "unreachable"
 
 ALL = tuple(value for name, value in sorted(globals().items()) if name.isupper() and name != "ALL")

@@ -1,10 +1,14 @@
+import grpc
 import pytest
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, define
+from calls import DECISION_TYPE, define, start_a_store
 from conftest import OPERATOR, _kb, _store_needing_attention
 import held
+import serving
+from kb import served
 from kb import client as kb_client
+from kb.contract import kb_pb2, kb_pb2_grpc
 
 scenarios("operate-a-store.feature")
 
@@ -118,7 +122,7 @@ def _kb_help(root):
 def _offers_four_commands(ran):
     assert (ran.returncode, ran.stderr) == (0, "")
     listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
-    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import}"
+    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import,serve}"
     lines = " ".join(listed.split())
     assert "init set up a store in a directory" in lines
     assert "validate check the store" in lines
@@ -128,7 +132,9 @@ def _offers_four_commands(ran):
 
 @then("nothing else that changes what the store holds")
 def _nothing_else(root):
-    for command in ("serve", "create"):
+    """Serving a store (operate-a-store's Purpose) hands it to callers, whose changes go through a client; no command
+    changes content itself but the import."""
+    for command in ("create", "replace", "remove"):
         refused = _kb(command, cwd=root)
         assert refused.returncode == 2
         assert f"invalid choice: '{command}'" in refused.stderr
@@ -175,3 +181,82 @@ def _the_store_is_checked(ran):
 @then("kb validate is not refused because the store was busy with another change")
 def _validate_not_busy(ran):
     assert (ran.returncode, ran.stderr) == (1, "")
+
+
+@given("a directory holding a store", target_fixture="root")
+def _directory_holding_a_store(root):
+    start_a_store(root)
+    return root
+
+
+INTERFACES = {"one interface of the machine": "127.0.0.1", "every interface of the machine": "0.0.0.0"}
+REACHED_THROUGH = {"that interface": "127.0.0.1", "any one of the machine's interfaces": "127.0.0.2"}
+
+
+@when(parsers.parse("the operator runs kb serve on that directory, giving an address on {interface}"),
+      target_fixture="served")
+def _kb_serve_at(root, request, interface):
+    host = INTERFACES[interface]
+    return {"host": host, "serving": serving.started(root, request, listen=f"{host}:0")}
+
+
+@then("the store is served at that address", target_fixture="port")
+def _served_at_that_address(served):
+    said = served["serving"].said()
+    host, _, port = said.removeprefix("serving\t").rpartition(":")
+    assert said.startswith("serving\t") and host == served["host"] and int(port) > 0, said
+    return int(port)
+
+
+@then(parsers.parse("a caller reaching that address through {reached} is answered from that store"))
+def _answered_from_that_store(root, port, reached):
+    with grpc.insecure_channel(f"{REACHED_THROUGH[reached]}:{port}") as channel:
+        answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
+    assert answered == kb_client.connect(root).History(kb_pb2.HistoryRequest())
+    assert answered.WhichOneof("outcome") == "result" and answered.result.entries
+
+
+@when("the operator runs kb serve on that directory without giving an address", target_fixture="ran")
+def _kb_serve_without_an_address(root):
+    return _kb("serve", str(root), cwd=root)
+
+
+@then("serving the store is rejected because no address is assumed")
+def _serve_rejected_without_an_address(ran):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == "kb serve: refused: no address is assumed; give the one to serve at with --listen HOST:PORT\n"
+
+
+def _held_by_another_server(tmp_path, request):
+    """The address a kb server for another store is serving at."""
+    other = tmp_path / "other"
+    other.mkdir()
+    start_a_store(other)
+    return str(serving.hosted(other, request, clock=None).address)
+
+
+UNSERVABLE = {
+    "an address that names no port": lambda tmp_path, request: "127.0.0.1",
+    "an address whose port is beyond the last": lambda tmp_path, request: "127.0.0.1:65536",
+    "an address another server already holds": _held_by_another_server,
+}
+
+
+@when(parsers.re(f"the operator runs kb serve on that directory, giving (?P<address>{'|'.join(UNSERVABLE)})"),
+      target_fixture="ran")
+def _kb_serve_where_it_cannot(root, tmp_path, request, address):
+    listen = UNSERVABLE[address](tmp_path, request)
+    return {"listen": listen, "ran": _kb("serve", str(root), "--listen", listen, cwd=root)}
+
+
+@then("serving the store is rejected because the store cannot be served at that address, and the address is named back")
+def _serve_rejected_at_that_address(ran):
+    assert (ran["ran"].returncode, ran["ran"].stdout) == (2, "")
+    assert ran["ran"].stderr.startswith(f"kb serve: refused: the store cannot be served at {ran['listen']!r}"), \
+        ran["ran"].stderr
+
+
+@then("nothing is served")
+def _nothing_is_served(root):
+    """No server owns the store: its lock is there to be taken."""
+    served.owned(root).close()
