@@ -2,7 +2,7 @@
 id: capability/operate-a-store
 title: Operate a store
 narrator: the operator
-rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule]
+rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule, decision/serving-built, decision/a-server-stamps-with-its-own-clock]
 formulated_as: features/operate-a-store.feature
 ---
 
@@ -31,9 +31,9 @@ From a shell, without any client, the operator sets a store up, checks the whole
 
 ## Implementation, may change
 
-- The commands are `kb init <root>`, `kb validate` and `kb serve <root> --listen <host:port>`; the role for `kb init` comes from `KB_ACTOR`. `kb serve` hosts the store at `<root>/kb/` with `grpc.server`. `kb export` and `kb import` are export-and-import-a-store.
+- The commands are `kb init <root>`, `kb validate` and `kb serve <root> --listen <host:port>`; the role for `kb init` comes from `KB_ACTOR`. `kb serve` hosts the store at `<root>/kb/` with `grpc.server`, the same servicer an in-process client reaches, and stamps each change with the server's own clock, the machine's. `kb export` and `kb import` are export-and-import-a-store.
 - Reads never wait for the write lock (change-the-store).
 
 ## Not yet
 
-- Serving among what the command line offers. Promoted when the served-store lines (reach-a-served-store, this capability's kb serve lines) are formulated and built.
+- None.

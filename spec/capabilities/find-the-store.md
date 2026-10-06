@@ -2,7 +2,7 @@
 id: capability/find-the-store
 title: Find the store
 narrator: the client
-rests_on: [decision/0003-init-refuses-inside-a-store, decision/0020-a-server-found-where-the-store-is, decision/0007-input-safety-at-the-boundary]
+rests_on: [decision/0003-init-refuses-inside-a-store, decision/0020-a-server-found-where-the-store-is, decision/0007-input-safety-at-the-boundary, decision/where-is-the-clients-search]
 formulated_as: features/find-the-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/find-the-store.feature
 
 ## Purpose
 
-Every call except starting a store finds its store on each call, the way git finds a repository: upward from where the client works, or where `KB_ROOT` names. What it finds also decides whether the store is reached in process or through a server. Nothing is guessed: two answers, or none, are refusals the client is given as faults. This capability is not what a server does once it is reached (reach-a-served-store).
+Every call except starting a store finds its store on each call, the way git finds a repository: upward from where the client works, or where `KB_ROOT` names. What it finds also decides whether the store is reached in process or through a server. The client can also ask where the search stops without making a call. Nothing is guessed: two answers, or none, are refusals the client is given as faults. This capability is not what a server does once it is reached (reach-a-served-store).
 
 ## Behaviour
 
@@ -29,11 +29,17 @@ Every call except starting a store finds its store on each call, the way git fin
 - When the client's working directory has moved into a different store, its next call is answered from the store it now sits in.
 - Where the client was readied with a root, the store is looked for from that root the way it is looked for from the working directory.
 - Where the client was readied with a root, `KB_ROOT` is not consulted.
+- While the search a call would make stops at a directory holding a store, when the client asks where its store is, it is given that directory and no fault.
+- While the search a call would make stops at a store this kb cannot read, when the client asks where its store is, it is given that directory and no fault.
+- While the search a call would make stops at a directory holding the connection to a server, when the client asks where its store is, it is given that directory and the address the connection names, and the server is not called.
+- If the search a call would make finds nothing when the client asks where its store is, the client is given the faults that say why nothing was found, and no directory.
+- If the directory the search stops at holds both a store and the connection to a server, when the client asks where its store is, it is given a fault naming that directory, and no directory.
 
 ## Implementation, may change
 
 - A directory holds a knowledge base when it holds `kb/store.yaml` (the store) or `kb/server.yaml` (the connection to a server); the search looks for both in the same place.
 - The client is `kb.client.connect`; it is constructed without finding a store, and discovery runs on each call.
+- The client publishes `where()`, the client's own search: no rpc is added for it and it calls no server. It returns a value holding `root` (the directory the search stopped at), `address` (empty unless a connection was found) and `faults`; `root` and `faults` are never both filled.
 - The operator's commands find the store the same way (operate-a-store, export-and-import-a-store).
 
 ## Not yet

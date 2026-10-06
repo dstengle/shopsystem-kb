@@ -485,3 +485,55 @@ The four set rpcs are named with the prefix `Batch`, not the suffix `Many`: `Bat
 date: 2026-10-05
 supersedes: decision/sets-one-kind-at-a-time (its rpc names), decision/references-inside-a-set (its rpc name)
 source: the person's request of 2026-10-05; lines approved under the person's delegation
+
+## decision/serving-built
+`kb serve` and the reaching of a served store are built, so serving leaves operate-a-store's Not yet: `kb serve <root> --listen <host:port>` hosts the store at `<root>/kb/` with `grpc.server` and the same servicer an in-process client reaches, and when the search stops at `kb/server.yaml`, `connect` calls the address it names over a gRPC channel with the same method names, requests and responses.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/served-store-marked-by-a-lock
+While it serves, the server holds a lock of the operating system on a file of the store's own inside `kb/` that says the address it serves at, so a client that finds the store directly reads it and is refused a change, naming that address; the lock goes when the server's process does, so a server that stopped, however it stopped, leaves no store marked as served.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/served-store-rules
+Reaching a served store is refused under three new rules of kb's own, which join the published names: `connection` (the connection cannot be read or names no address; the fault names the connection), `unreachable` (the server cannot be reached or stops answering; the fault names the address and the call comes back with its answer) and `served` (a change asked of a served store by a client that found it directly; the fault names the server's address); a change asked of a server by a client readied with a clock keeps kb's rule `clock`, and that client's reads are answered.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/a-server-stamps-with-its-own-clock
+A server stamps each change with its own clock: the machine's under `kb serve`, and the one given to `kb.testing.served` when one is given; a client's clock belongs to a client that reaches its store in process, so a change asked of a server by a client readied with one is refused.
+date: 2026-10-06
+supersedes: decision/0020-a-server-found-where-the-store-is (its clause "the clock stays the in-process client's")
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/where-is-the-clients-search
+The client publishes `where()`, which searches as a call would and answers either where the search stopped (and, for a connection, the server's address) or the faults that say why nothing was found, never both; a store this kb cannot read is still where the search stopped, and a directory holding both a store and a connection is the search's fault; it is the client's own search, so no rpc says where a store is and no server is called, and how a client tells its user where that is (`KB_ROOT`'s value, a named directory, an address) is the client's, since it knows its own environment.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md; the integration's questions 5-7 answered under the person's delegation
+
+## decision/init-carries-a-piece-of-work
+`kb.init(root, role, *, execution="", clock=None)` publishes the piece of work: when named, the store's first history entry carries it beside the role.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/type-of-types-id-published
+The type that describes types is `schema/schema`, and that id is published, so a client tells a store that holds nothing but kb's own type by listing the kind `schema` and finding that id alone; no call is added.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/not-canonical-names-its-place
+`kb.content.NotCanonical` publishes `path`, the place the refusal names written as the names and list positions from the top of the content joined by `/` (`sections/0/body`), empty when it names no place; `dumps` refusing prose a line of which ends in a space carries that prose's place, as every other refusal with a place does.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/served-double-is-kb-serve
+`kb.testing.served(store_root, connection_dir, *, clock=None)` is a published context manager that serves a started store with the server `kb serve` runs, not an imitation, in the test's own process on `127.0.0.1` at a free port, writes the connection under a different directory (a directory never holds both), yields the address and on exit, however the test ended, stops the server and removes the connection; no pytest plugin is loaded on install, a fixture over it being the client's three lines, which the README shows.
+date: 2026-10-06
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md
+
+## decision/published-contract-v1-in-0-6-0
+What a client may depend on is still versioned together by the release tag: `kb.proto` in package `kb.v1`, `kb.init` with its `execution` keyword and `kb.NotStarted`, `kb.client.connect` with its clock and `where()`, `kb.content` with `NotCanonical.path` and its form, `kb.testing.served`, the id `schema/schema`, the connection file's form, and every fault's `rule` name, `connection`, `unreachable` and `served` among them; all of it adds to contract v1 and changes nothing in it, so the package stays `kb.v1` and the release is kb 0.6.0; everything else may change without notice.
+date: 2026-10-06
+supersedes: decision/published-contract-v1
+source: docs/superpowers/specs/2026-10-06-kb-shop-knowledge-requests-design.md

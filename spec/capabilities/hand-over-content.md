@@ -2,7 +2,7 @@
 id: capability/hand-over-content
 title: Hand over content
 narrator: the client
-rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action, decision/paired-escapes-are-one-character]
+rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action, decision/paired-escapes-are-one-character, decision/not-canonical-names-its-place]
 formulated_as: features/hand-over-content.feature
 ---
 
@@ -29,7 +29,7 @@ When the client creates, changes or adds, it hands the store content as text. Th
 - When content writes a character beyond the first 65,536 as two escapes, one for each half, as JSON does, the two halves read together as that one character, and the content reads back holding it.
 - If content holds half of a character alone, with no other half beside it, it is refused because the content cannot be read as written.
 - When content carries a field written as a bare date, it reads back as the text written, not as a date.
-- If a line of prose ends in a space, so the store could not write it back as a block, the content is refused because every piece of prose is written as a block, and nothing is written.
+- If a line of prose ends in a space, so the store could not write it back as a block, the content is refused because every piece of prose is written as a block, naming the place, and nothing is written.
 
 ## Implementation, may change
 
@@ -37,6 +37,7 @@ When the client creates, changes or adds, it hands the store content as text. Th
 - Content is parsed with a safe YAML 1.2 loader using the core schema: only `true`, `false`, `null`, integers and floats are typed. Tags, anchors, aliases, `%YAML` and `%TAG` directives, documents beyond the first, and duplicate keys are each a fault naming the place.
 - One canonical checker runs on content after parsing and on the canonical text about to be stored or exported.
 - `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`, the refusal of text kb cannot keep.
+- `NotCanonical` carries `path`: the place the refusal names, written as the names and list positions from the top of the content joined by `/` (`sections/0/body`), and empty when the refusal names no place. When `kb.content.dumps` refuses prose because a line of it ends in a space, its `NotCanonical` carries the place of that prose in `path`, as every other refusal with a place does.
 
 ## Not yet
 

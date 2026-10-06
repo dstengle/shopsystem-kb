@@ -2,7 +2,7 @@
 id: capability/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/starting-leaves-the-wire]
+rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/starting-leaves-the-wire, decision/init-carries-a-piece-of-work, decision/type-of-types-id-published]
 formulated_as: features/start-a-store.feature
 ---
 
@@ -16,6 +16,7 @@ The client starts a store in a directory it names, in its own process and never 
 
 - When the client starts a store in a directory, saying which role it is, the store holds the one type that describes what a type is, no other type and no content, and the client can define its own types in it straight away.
 - When the client starts a store, the store's history holds one entry, under the client's role, with the message "initialise store", which is the writing of the type that describes types at its first revision, with a fingerprint of what was written.
+- When the client starts a store naming a piece of work, the store's one history entry names that piece of work beside the role.
 - Where the client was readied with a clock, when it starts a store, the store's one history entry says it happened at the moment the clock gives.
 - If the client starts a store without saying which role it is, starting is refused because a store can only be started under a role, and the directory holds no store.
 - When the client starts a store in a directory holding other files, the store is made inside that directory in a place of its own, and the files already there are left as they were.
@@ -29,13 +30,14 @@ The client starts a store in a directory it names, in its own process and never 
 - If what is named is a file rather than a directory, starting is refused because a store is started in a directory and what was named is not one, and the file is left as it was.
 - If the place a store goes inside the named directory already holds an empty folder or a file, starting is refused because that directory already holds the place a store goes, and what was there is left as it was.
 - While the client was readied where no store could be found and nothing named one, when it starts a store in a directory it names, the store is made there and the client can read and write in it straight away.
+- While a store holds nothing but the type that describes types, when the client lists the kind of types, it is given the type that describes types alone.
 
 ## Implementation, may change
 
 - The store is `<root>/kb/`, marked by `<root>/kb/store.yaml`, whose value says which form of store it marks (answer-a-damaged-file); its data lives in `<root>/kb/store.sqlite3`, in WAL mode. Nothing else in `<root>` is the store's concern.
 - Starting a store makes the directory, the marker and the database, and writes the type that describes types and the first history entry. No git repository is made.
-- A client starts a store by calling `kb.init(root, role)`, a function of the published package, which starts a store at the root under the role and takes the same optional clock `connect` takes; it raises `kb.NotStarted`, carrying the faults, when it refuses. There is no `Init` rpc. The root is an absolute or relative path.
-- The type that describes types (the metaschema) is shipped in kb's code and written as artifact `schema/schema`; its entry is the write of `schema/schema` at revision 1 with its digest.
+- A client starts a store by calling `kb.init(root, role, *, execution="", clock=None)`, a function of the published package, which starts a store at the root under the role, its first history entry carrying the piece of work `execution` names beside the role, and takes the same optional clock `connect` takes; it raises `kb.NotStarted`, carrying the faults, when it refuses. There is no `Init` rpc. The root is an absolute or relative path.
+- The type that describes types (the metaschema) is shipped in kb's code and written as artifact `schema/schema`, an id kb publishes; its entry is the write of `schema/schema` at revision 1 with its digest. A client tells a store that holds nothing but it by listing the kind `schema` and finding that id alone; no call is added for this.
 
 ## Not yet
 
