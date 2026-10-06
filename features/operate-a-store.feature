@@ -85,6 +85,24 @@ Feature: Operate a store
     When the operator runs kb validate there
     Then the check is rejected because KB_ROOT names a store other than the one they are standing in, and neither of the two is guessed at
 
+  Scenario Outline: The operator serves a store at the address they give
+    Pins that the store is served exactly where the operator says, whether that address names one of the machine's interfaces or all of them.
+    Given a directory holding a store
+    When the operator runs kb serve on that directory, giving an address on <interface>
+    Then the store is served at that address
+    And a caller reaching that address through <reached through> is answered from that store
+
+    Examples:
+      | interface                      | reached through                     |
+      | one interface of the machine   | that interface                      |
+      | every interface of the machine | any one of the machine's interfaces |
+
+  Scenario: Serving a store without giving an address is refused
+    Pins that a store is never served somewhere the operator did not choose: with no address given, nothing is served.
+    Given a directory holding a store
+    When the operator runs kb serve on that directory without giving an address
+    Then serving the store is rejected because no address is assumed
+
   @slice-115
   Scenario: The operator checks the store while another change is being written
     Pins that checking is a read: it goes ahead however long another change holds the store.

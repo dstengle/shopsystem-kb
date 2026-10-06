@@ -19,6 +19,12 @@ Feature: Start a store
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
+  Scenario: Starting a store naming a piece of work is recorded under that piece of work
+    Pins that the first entry in a history can be accounted to the run of work that made it, just as every later change can.
+    Given an empty directory
+    When the client starts a store there, saying which role it is and naming a piece of work
+    Then the store's one history entry names that piece of work beside the role
+
   @slice-102
   Scenario: Starting a store is stamped with the moment the client's clock gives
     Pins that the first entry in a history is timed like every entry after it, so a client laying down a history across several days can begin it on the day it chooses.
@@ -129,3 +135,9 @@ Feature: Start a store
     When the client starts a store in that empty directory, saying which role it is
     Then the store is made in the directory the client named
     And the client can read and write in it straight away
+
+  Scenario: Listing the kind of types in a store holding nothing but the type that describes types
+    Pins how a client tells that a store is still as it was started: asking for its types gives back the one type every store begins with and nothing else.
+    Given a store holding nothing but the one type that describes what a type is
+    When the client lists the kind of types
+    Then the client is given the one type that describes what a type is, and no other type

@@ -134,10 +134,9 @@ Feature: Hand over content
     When the client creates a decision carrying a field written "2026-09-24", saying which role and why
     Then that field reads back as the text that was written, not as a date
 
-  @slice-92
   Scenario: Prose the store could not write back in its one form is refused
-    Pins that the store checks its own output as strictly as its input: prose it could not lay down the way it lays down all prose is refused, rather than written some other way.
+    Pins that the store checks its own output as strictly as its input: prose it could not lay down the way it lays down all prose is refused, with where it stands named, rather than written some other way.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
     When the client creates a decision one of whose lines of prose ends in a space, saying which role and why
-    Then the artifact is rejected because every piece of prose is written as a block, and this prose could not be written back as one
+    Then the artifact is rejected because every piece of prose is written as a block, and this prose could not be written back as one, and the place that prose stands is named
     And nothing is written anywhere in the store
