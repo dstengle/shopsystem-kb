@@ -6,6 +6,7 @@ each taking one `Signature` and answering its result or a refusal, and the small
 answering its result or a refusal; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
 faults; that each item an `BatchAdd` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
+import dataclasses
 import inspect
 import re
 from pathlib import Path
@@ -65,6 +66,20 @@ def test_the_in_process_client_and_contract_are_reachable(tmp_path):
     response = kb_client.connect(root).Check(kb_pb2.CheckRequest())
     assert isinstance(response, kb_pb2.CheckResponse)
     assert response.WhichOneof("outcome") == "result"
+
+
+def test_where_the_client_finds_its_store_is_published_as_kb_client_where(tmp_path, monkeypatch):
+    """`kb.client.Where`, what `where()` on what `connect()` gives answers: `root`, `address` and `faults`, empty
+    unless set, the faults `kb_pb2.Fault`s."""
+    assert [(each.name, each.type) for each in dataclasses.fields(kb_client.Where)] == [
+        ("root", str), ("address", str), ("faults", list[kb_pb2.Fault]),
+    ]
+    assert (kb_client.Where().root, kb_client.Where().address, kb_client.Where().faults) == ("", "", [])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KB_ROOT", raising=False)
+    found = kb_client.connect().where()
+    assert isinstance(found, kb_client.Where) and found.faults
+    assert all(isinstance(fault, kb_pb2.Fault) for fault in found.faults)
 
 
 def test_kb_init_takes_a_root_and_a_role_and_the_clock_connect_takes():
