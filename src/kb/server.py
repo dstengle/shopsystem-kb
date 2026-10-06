@@ -2,9 +2,11 @@
 `grpc.server` at the address the operator gives, stamping each change with the server's own clock. A root that
 holds nothing this kb can serve is refused before anything listens (`refused`), and so is a store another server
 owns: a server owns the store it serves, its lock (kb.served) taken before anything is bound and held until it stops,
-so a change asked of the store directly is refused meanwhile. A server is
+so a change asked of the store directly is refused meanwhile. It takes changes one at a time, in the order they arrive
+at it, each checked against the store as every earlier change left it; reads are answered as they come. A server is
 started (`started`), says the address it serves at (`Server.address`), the port the system gave when it was asked
 for none, and is stopped (`Server.stop`); `kb serve` runs one until it is signalled to stop (`until_signalled`)."""
+import functools
 import signal
 import threading
 from concurrent import futures
@@ -50,15 +52,36 @@ def refused(root: Path) -> list[kb_pb2.Fault]:
     return _Opening(root).opened(None).faults
 
 
+class _OneAtATime:
+    """The servicer a server hosts, each rpc that writes taken under the server's lock (`Server.taking`), so changes
+    are taken one at a time in the order they come to it; every other rpc as the servicer answers it."""
+
+    def __init__(self, servicer: KbServicer, server: "Server"):
+        self._servicer, self._server = servicer, server
+
+    def __getattr__(self, name):
+        rpc = getattr(self._servicer, name)
+        if not getattr(rpc, "writes", False):
+            return rpc
+
+        @functools.wraps(rpc)
+        def taken(request, context=None):
+            with self._server.taking:
+                return rpc(request, context)
+        return taken
+
+
 class Server:
-    """A store served at an address, answering until it is stopped."""
+    """A store served at an address, answering until it is stopped; `taking` is the lock its changes are taken
+    under, one at a time."""
 
     def __init__(self, root: Path, listen: Address, clock=None):
         """The store owned, its lock taken before anything listens, then bound at the address, which the lock names.
         Refused with `served` when another server owns the store."""
         self._owned = served.owned(root)
+        self.taking = threading.Lock()
         self._grpc = grpc.server(futures.ThreadPoolExecutor(max_workers=WORKERS))
-        kb_pb2_grpc.add_KbServicer_to_server(KbServicer(root, clock, hosted=True), self._grpc)
+        kb_pb2_grpc.add_KbServicer_to_server(_OneAtATime(KbServicer(root, clock, hosted=True), self), self._grpc)
         self.address = Address(listen.host, self._grpc.add_insecure_port(str(listen)))
         served.mark(self._owned, self.address)
 

@@ -34,7 +34,7 @@ def boundary(response, opens: bool = True, at_one_moment: bool = False, writes: 
     """The rpc or the operator's command, over the store opened for it unless it starts one, every read it makes
     seeing the store at one moment when it only reads, answered with a response of this type: what it gave, or a
     refusal when anything in it is refused or any exception escapes it. An rpc that writes is refused while a server
-    owns the store, unless this servicer is the one that server hosts."""
+    owns the store, unless this servicer is the one that server hosts, and says it writes (`writes`)."""
     def wrap(rpc):
         @functools.wraps(rpc)
         def run(self, request, context=None):
@@ -49,6 +49,7 @@ def boundary(response, opens: bool = True, at_one_moment: bool = False, writes: 
                 return responses.refused(response, refused.faults)
             except Exception as error:
                 return responses.refused(response, [escapes.fault(error)])
+        run.writes = writes
         return run
     return wrap
 

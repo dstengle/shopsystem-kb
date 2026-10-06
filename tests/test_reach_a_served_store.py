@@ -1,10 +1,16 @@
 """A store reached through a server: the client finds the connection to it where it works, and each call goes over
 the network to the server, which `kb serve` runs on a port of the test's own (tests/serving.py)."""
+import threading
+
+import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, answer, create, define, replace, start_a_store
+from calls import (
+    DECISION_TYPE, TAG_TYPE, answer, create, creating, define, next_version, read, removing, replace, start_a_store,
+    tagged_decision_type,
+)
 import serving
-from kb import client as kb_client
+from kb import client as kb_client, content
 from kb.contract import kb_pb2
 
 scenarios("reach-a-served-store.feature")
@@ -14,6 +20,8 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
+TAG = "tag/clearance"
+TAGGED = "decision/clearance-runs-monthly"
 READ = kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION))
 
 
@@ -37,9 +45,71 @@ def _served_and_working_where_the_connection_is(root, tmp_path, request, monkeyp
     return {"connection": connection, "bytes": connection.read_bytes()}
 
 
+@pytest.fixture
+def hosting():
+    """The server a step hosts in this process, and the gate its clock is."""
+    return {"gate": serving.Gate()}
+
+
+@given("the store also holds a tag nothing points at")
+def _a_loose_tag(client):
+    define(client, TAG_TYPE)
+    next_version(client, "decision", tagged_decision_type())
+    create(client, "tag", {"title": "Clearance"})
+
+
 @given("a server serves that store", target_fixture="address")
-def _served(root, request):
-    return serving.serving(root, request)
+def _served(root, request, hosting):
+    hosting["server"] = serving.hosted(root, request, hosting["gate"])
+    return str(hosting["server"].address)
+
+
+@given("one client reaching the server is removing the tag while another reaching it is creating a decision that "
+       "points at it, each saying which role and why", target_fixture="racing")
+def _removing_while_linking_through_the_server(tmp_path, address, monkeypatch):
+    arranged = tmp_path / "arranged"
+    serving.connection(arranged, address)
+    monkeypatch.chdir(arranged)
+    return {
+        "removing": removing(TAG, message="Nothing is on clearance"),
+        "creating": creating("decision", "Clearance runs monthly", message="Say how often", content={
+            "tags": [TAG],
+            "sections": [
+                {"title": "Purpose", "body": "Clear old stock.\n"},
+                {"title": "Rationale", "body": "Stock ages monthly.\n"},
+            ],
+        }),
+    }
+
+
+def _on_a_thread(rpc, request_sent):
+    """The call made by a client of its own, working where the connection is found, on a thread; what it was
+    answered, once joined."""
+    answered = {}
+    thread = threading.Thread(
+        target=lambda: answered.update(response=getattr(kb_client.connect(), rpc)(request_sent)), daemon=True,
+    )
+    thread.start()
+    return thread, answered
+
+
+@when("the creation of the decision arrives at the server first", target_fixture="raced")
+def _creation_arrives_first(racing, hosting):
+    """The creation held inside the server, at its clock, while the removal arrives at it; then let go."""
+    gate, arrivals = hosting["gate"], serving.Arrivals(hosting["server"].taking)
+    hosting["server"].taking = arrivals
+    gate.shut()
+    creating_thread, created = _on_a_thread("Create", racing["creating"])
+    gate.holding()
+    removing_thread, removed = _on_a_thread("Remove", racing["removing"])
+    finished = threading.Thread(target=lambda: (removing_thread.join(), arrivals.second.set()), daemon=True)
+    finished.start()
+    assert arrivals.second.wait(serving.PATIENCE), "the removal never arrived at the server"
+    gate.open()
+    for thread in (creating_thread, removing_thread):
+        thread.join(serving.PATIENCE)
+        assert not thread.is_alive()
+    return {"created": answer(created["response"]), "removed": answer(removed["response"])}
 
 
 STOPPED = {
@@ -64,6 +134,19 @@ def _working_where_the_store_is(root, monkeypatch):
 @when("the client reads the decision", target_fixture="shown")
 def _read_the_decision():
     return answer(kb_client.connect().Read(READ))
+
+
+@then("the removal is rejected because something still points at it")
+def _removal_rejected(raced):
+    assert not raced["created"].faults, raced["created"].faults
+    assert [fault.rule for fault in raced["removed"].faults] == ["on_delete"], raced["removed"].faults
+
+
+@then("the store holds the tag and the decision that points at it")
+def _tag_and_decision_held():
+    client = kb_client.connect()
+    assert not read(client, TAG).faults
+    assert content.loads(read(client, TAGGED, whole=True).content)["tags"] == [TAG]
 
 
 @then("the client is given what a client that reaches that store in process is given for the same read")

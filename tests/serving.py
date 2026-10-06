@@ -1,12 +1,16 @@
 """A store served as the operator serves one: the installed `kb serve` run as a program on a port the system picks,
 the address it says it serves at read from the one line it prints, and the server stopped when the test ends, passed
-or failed; and the connection to a server, written where a step says, as whoever arranges the callers writes it."""
+or failed; a server hosted in the test's own process, its clock a gate a step can shut and its changes' lock watched;
+and the connection to a server, written where a step says, as whoever arranges the callers writes it."""
 import os
 import subprocess
 import sys
+import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
-from kb import canonical
+from kb import canonical, server
+from kb.addresses import Address
 
 KB = Path(sys.executable).with_name("kb")
 STOPPING = 10  # seconds a server is given to stop at the end of a test before it is killed
@@ -69,3 +73,58 @@ def connection(directory, address):
     place.mkdir(parents=True, exist_ok=True)
     (place / "server.yaml").write_text(canonical.dump({"address": address}), encoding="utf-8")
     return place / "server.yaml"
+
+
+PATIENCE = 30.0  # seconds a step waits for the server's signal before the test fails
+
+
+class Gate:
+    """A server's clock that, once shut, holds the next change that asks it the time, saying it is waiting, until it
+    is opened; open, it reads the machine's. kb reads the clock after a change's draft and before its landing."""
+
+    def __init__(self):
+        self._shut, self._waiting, self._go = False, threading.Event(), threading.Event()
+
+    def __call__(self):
+        if self._shut:
+            self._shut = False
+            self._waiting.set()
+            if not self._go.wait(PATIENCE):
+                raise TimeoutError("the held change was never let go")
+        return datetime.now(timezone.utc)
+
+    def shut(self):
+        self._shut = True
+
+    def holding(self):
+        """Waits until a change is held at the gate."""
+        assert self._waiting.wait(PATIENCE), "no change asked the time"
+
+    def open(self):
+        self._go.set()
+
+
+class Arrivals:
+    """The lock a server takes its changes under, watched: `second` is set once a second change has come to it."""
+
+    def __init__(self, taking):
+        self._taking, self._count, self._counting = taking, 0, threading.Lock()
+        self.second = threading.Event()
+
+    def __enter__(self):
+        with self._counting:
+            self._count += 1
+            if self._count == 2:
+                self.second.set()
+        return self._taking.__enter__()
+
+    def __exit__(self, *raised):
+        return self._taking.__exit__(*raised)
+
+
+def hosted(root, request, clock):
+    """A server for the store at root in this process, on 127.0.0.1 at a port the system picks, stamping with the
+    clock and stopped when the test ends."""
+    hosting = server.started(root, Address("127.0.0.1", 0), clock=clock)
+    request.addfinalizer(hosting.stop)
+    return hosting
