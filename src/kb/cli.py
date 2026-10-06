@@ -1,16 +1,19 @@
-"""kb's own command line, for the operator: set a store up, check one, export one, check a directory for import, and
-import one into a freshly started store. Nothing else; every other change to content goes through a client.
+"""kb's own command line, for the operator: set a store up, check one, export one, check a directory for import,
+import one into a freshly started store, and serve one to callers over the network. Nothing else; every other change
+to content goes through a client.
 
-Each command is one call on the in-process client, or on one of the operator's commands beside it. A refusal is
-printed to stderr and exits 2, an import's after the check's report; a check that finds a violation exits 1.
+Each command is one call on the client, or on one of the operator's commands beside it, or, to serve, on kb.server.
+A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
+exits 1. A store served is served until the process is told to stop, and then exits 0.
 """
 import argparse
 import os
 import sys
+from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import rules
+from kb import addresses, rules, server
 from kb.contract import kb_pb2
 
 REFUSED, VIOLATED = 2, 1
@@ -31,7 +34,12 @@ def main(argv=None) -> int:
     how.add_argument(
         "--skip-errors", action="store_true", help="land all but the files with errors and the files leading to them",
     )
+    serving = commands.add_parser("serve", help="serve a store to callers over the network, at the address given")
+    serving.add_argument("root", help="the directory the store sits in, as its kb/ subdirectory")
+    serving.add_argument("--listen", metavar="HOST:PORT", help="the address to serve at; none is assumed")
     args = parser.parse_args(argv)
+    if args.command == "serve":
+        return _serve(args.root, args.listen)
     if args.command == "init":
         return _init(args.root)
     if args.command == "export":
@@ -52,6 +60,21 @@ def _init(root: str) -> int:
         kb.init(root, role)
     except kb.NotStarted as refused:
         return _refused("init", refused.faults)
+    return 0
+
+
+def _serve(root: str, listen: str | None) -> int:
+    """Serve the store at root at the address given until told to stop, saying on one line where it serves; with no
+    address given, nothing is served."""
+    if listen is None:
+        print("kb serve: refused: no address is assumed; give the one to serve at with --listen HOST:PORT",
+              file=sys.stderr)
+        return REFUSED
+    faults = server.refused(Path(root))
+    if faults:
+        return _refused("serve", faults)
+    served = server.started(Path(root), addresses.address(listen))
+    server.until_signalled(served, lambda: print(f"serving\t{served.address}", flush=True))
     return 0
 
 

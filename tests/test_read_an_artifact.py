@@ -1,10 +1,12 @@
 import re
 
+import grpc
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
 import held
+import serving
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -143,8 +145,26 @@ def readied():
     return None
 
 
+@pytest.fixture
+def channels(monkeypatch):
+    """The address of every channel this process opens to a server from now on, in the order they are opened."""
+    opened, opening = [], grpc.insecure_channel
+
+    def recorded(target, *args, **kwargs):
+        opened.append(target)
+        return opening(target, *args, **kwargs)
+    monkeypatch.setattr(grpc, "insecure_channel", recorded)
+    return opened
+
+
+@pytest.fixture
+def served():
+    """The address of the server a scenario's store is served at, once a Given serves it."""
+    return {}
+
+
 @when("the client reads the decision", target_fixture="shown")
-def _read_the_decision_from_here(readied):
+def _read_the_decision_from_here(readied, channels):
     if readied is None:
         return read(kb_client.connect(), DECISION)
     readied["used"] = readied["client"]
@@ -154,6 +174,31 @@ def _read_the_decision_from_here(readied):
 @then("the client is given the decision, from the store found above where it is working")
 def _from_the_store_above(shown):
     assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+
+
+@given(
+    "a directory outside the store holds the connection to a server that serves this store, and the client is "
+    "working in a folder deep inside that directory"
+)
+def _working_deep_inside_a_connection(root, tmp_path, request, monkeypatch, served):
+    arranged = tmp_path / "arranged"
+    served["address"] = serving.serving(root, request)
+    serving.connection(arranged, served["address"])
+    monkeypatch.chdir(_deep_inside(arranged))
+    monkeypatch.delenv("KB_ROOT", raising=False)
+
+
+ANSWERED = {
+    "answered by that store, in the client's own process": lambda served: [],
+    "answered by that server, over the network": lambda served: [served["address"]],
+}
+
+
+@then(parsers.re(f"the client is given the decision, (?P<how>{'|'.join(map(re.escape, ANSWERED))})"))
+def _given_the_decision_answered(shown, channels, served, how):
+    assert not shown.faults, shown.faults
+    assert (shown.id, shown.title) == (DECISION, "Price reviews happen weekly")
+    assert channels == ANSWERED[how](served)
 
 
 @when("the client reads an artifact by a name the store holds nothing under", target_fixture="shown")

@@ -1,4 +1,4 @@
-"""The contract's servicer: every rpc, over one store. Hosted in-process today; grpc.server can host it later.
+"""The contract's servicer: every rpc, over one store. Called in-process by a client, or hosted by grpc.server (kb.server).
 
 Each rpc, each of the operator's commands kb.operating holds, and kb.init (kb.starting), runs inside one boundary:
 the store is opened for that call alone and closed when it ends, unless the call starts one, its request becomes
