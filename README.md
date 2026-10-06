@@ -22,6 +22,22 @@ The contract is `kb.v1` (`kb.contract.kb_pb2`), and 0.5.0 is a breaking release:
 - `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`. The published rule names are listed in spec/index.md, with `busy`
   and `revision` among them; a JSON Schema keyword passes through as the rule of a content fault.
 
+### Serving a store for tests (kb 0.6.0)
+
+`kb.testing.served(store_root, connection_dir, *, clock=None)` is a context manager that puts the store at
+`store_root` behind kb's own server, the one `kb serve` runs, in your test's own process on `127.0.0.1` at a port
+the system picks. It writes `kb/server.yaml` under `connection_dir` naming that address and yields the address as
+`host:port`; a client working in `connection_dir` reaches the store through the server. Changes made through it are
+stamped with the moment `clock` gives, or the machine's with none. When the block ends, passed or raised, the server
+is stopped, the store let go, and the connection removed (with `kb/`, if the double made it and nothing else is in
+it). While it serves, a change asked of the store directly is refused with `served`. A pytest fixture over it, with `import kb.testing`:
+
+```python
+@pytest.fixture
+def served_store(store_root, tmp_path):
+    with kb.testing.served(store_root, tmp_path) as address: yield address
+```
+
 Upgrading a store made by kb 0.3.0: start a new store and import the old
 one's files: `kb init <new-root>`, then `kb import <old-root>/kb` run inside
 the new store (or with `KB_ROOT=<new-root>`).

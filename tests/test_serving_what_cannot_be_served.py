@@ -9,6 +9,8 @@ from calls import start_a_store
 from conftest import _kb
 import held
 import serving
+from kb import server
+from kb.addresses import Address
 
 
 def _free_port():
@@ -66,3 +68,14 @@ def test_the_operators_file_commands_where_the_search_finds_a_connection_are_ref
                                  f"not through a server"), ran.stderr
     assert list(files.iterdir()) == []
     assert held.holds(root) == before
+
+
+def test_a_server_that_cannot_bind_its_address_leaves_nothing_open(root):
+    """A start that fails at binding, the port already another's, lets the store go and closes what it made, so a
+    server started on the store next owns it (Task 1's review, M6)."""
+    start_a_store(root)
+    with socket.create_server(("127.0.0.1", 0)) as taken:
+        with pytest.raises(RuntimeError):
+            server.started(root, Address("127.0.0.1", taken.getsockname()[1]))
+    after = server.started(root, Address("127.0.0.1", 0))
+    after.stop()

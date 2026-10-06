@@ -10,6 +10,7 @@ import functools
 import signal
 import threading
 from concurrent import futures
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -104,13 +105,20 @@ class Server:
 
     def __init__(self, root: Path, listen: Address, clock=None):
         """The store owned, its lock taken before anything listens, then bound at the address, which the lock names.
-        Refused with `served` when another server owns the store."""
-        self._owned = served.owned(root)
-        self.taking = InOrder()
-        self._grpc = grpc.server(futures.ThreadPoolExecutor(max_workers=WORKERS))
-        kb_pb2_grpc.add_KbServicer_to_server(_OneAtATime(KbServicer(root, clock, hosted=True), self), self._grpc)
-        self.address = Address(listen.host, self._grpc.add_insecure_port(str(listen)))
-        served.mark(self._owned, self.address)
+        Refused with `served` when another server owns the store; a start that fails partway leaves nothing it made
+        open, the store let go."""
+        with ExitStack() as undone:
+            self._owned = served.owned(root)
+            undone.callback(self._owned.close)
+            self.taking = InOrder()
+            self._pool = futures.ThreadPoolExecutor(max_workers=WORKERS)
+            undone.callback(self._pool.shutdown)
+            self._grpc = grpc.server(self._pool)
+            undone.callback(self._grpc.stop, None)
+            kb_pb2_grpc.add_KbServicer_to_server(_OneAtATime(KbServicer(root, clock, hosted=True), self), self._grpc)
+            self.address = Address(listen.host, self._grpc.add_insecure_port(str(listen)))
+            served.mark(self._owned, self.address)
+            undone.pop_all()
 
     def start(self) -> None:
         """Answers from now on."""
@@ -119,6 +127,7 @@ class Server:
     def stop(self) -> None:
         """Stops answering, the calls in flight given GRACE seconds to finish, then lets the store go."""
         self._grpc.stop(GRACE).wait()
+        self._pool.shutdown()
         self._owned.close()
 
 

@@ -16,6 +16,7 @@ import kb
 from calls import DECISION_TYPE, add_many, added, create, define, request
 from kb import client as kb_client, rules
 from kb import content as kb_content
+from kb import testing as kb_testing
 from kb.content import NotCanonical, dumps, loads, text
 from kb.contract import kb_pb2
 
@@ -35,6 +36,12 @@ TYPED = {
 def test_kb_content_publishes_only_what_the_contract_names():
     assert sorted(kb_content.__all__) == ["NotCanonical", "dumps", "loads", "text"]
     assert not hasattr(kb_content, "entries")
+
+
+def test_kb_testing_publishes_only_the_served_store_double():
+    assert kb_testing.__all__ == ["served"]
+    assert str(inspect.signature(kb_testing.served)).startswith("(store_root, connection_dir, *, clock")
+    assert inspect.signature(kb_testing.served).parameters["clock"].default is None
 
 
 def test_content_round_trips_and_refuses_what_it_cannot_keep():
