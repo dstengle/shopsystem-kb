@@ -1,11 +1,12 @@
 """A store started in the client's own process, off the wire: `init`, which `kb` publishes, and the operator's
-`kb init` calls, and `NotStarted`, what it raises when it refuses. It runs inside the servicer's one boundary: its
+`kb init` calls, and `NotStarted`, what it raises when it refuses; and `refused`, where `init` would refuse to start
+one, asked before anything is made. It runs inside the servicer's one boundary: its
 values made first, then one call into the domain, and any refusal or escaping exception its faults."""
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
 
-from kb import signatures, values, write
+from kb import signatures, store, values, write
 from kb.servicer import boundary, guarded
 
 
@@ -42,6 +43,12 @@ class _Starter:
         write.start(values.root(request.root), actor, self._clock)
         return Started()
 
+    @boundary(Started, opens=False)
+    def vacant(self, root):
+        """Where a store would be started, refused as `start` refuses it; nothing made."""
+        store.vacant(values.root(root))
+        return Started()
+
 
 def init(root, role: str, *, execution: str = "", clock: Callable[[], datetime] | None = None) -> None:
     """A new store at <root>/kb/, started under the role, for the piece of work when one is named, its first entry
@@ -51,3 +58,9 @@ def init(root, role: str, *, execution: str = "", clock: Callable[[], datetime] 
     started = _Starter(clock).start(Starting(root, role, execution))
     if started.faults:
         raise NotStarted(started.faults)
+
+
+def refused(root) -> list:
+    """The faults `init` would refuse root for as the place a store is started in, each a Fault of the contract; none
+    when one can be started there. Nothing is made."""
+    return _Starter(None).vacant(root).faults

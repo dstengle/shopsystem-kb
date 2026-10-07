@@ -1,0 +1,52 @@
+"""A store started out of sight beneath the root it is for and put in place inside it whole: started, and seeded, in a
+staging place under the root, then moved to where a store goes by one rename, on the one filesystem the root is on, so
+the root holds either no store or the whole of one. What an earlier stopped run left in the staging place is removed
+first, and the staging place is removed whenever a start ends, placed or refused. The staging place is the store's own
+layout, not published."""
+import contextlib
+import os
+import shutil
+from pathlib import Path
+from typing import Iterator
+
+from kb import importing, operating, starting, store
+
+_STAGING = ".kb-starting"
+
+
+def seeded(root, role: str, seed: str) -> importing.Checked:
+    """A store started inside root under the role, holding the seed directory's files as the operator's import lands
+    them into a freshly started store, or none: the import's answer, its report and the faults that refused it. Raises
+    NotStarted, leaving root as it found it, when no store can be started there."""
+    faults = starting.refused(root)
+    if faults:
+        raise starting.NotStarted(faults)
+    with staged(root) as place:
+        starting.init(place, role)
+        imported = operating.Operator(place).import_(operating.Importing(seed, role, False))
+        if not imported.faults:
+            placed(place, root)
+    return imported
+
+
+@contextlib.contextmanager
+def staged(root) -> Iterator[Path]:
+    """The staging place beneath root, cleared of whatever an earlier stopped run left there, for the block to start a
+    store in; removed whole when the block ends, however it ends."""
+    place = Path(root) / _STAGING
+    _cleared(place)
+    place.mkdir()
+    try:
+        yield place
+    finally:
+        _cleared(place)
+
+
+def placed(place: Path, root) -> None:
+    """The store started in the staging place put where a store goes inside root, whole, by one rename."""
+    os.rename(place / store.MARKER.parent, Path(root) / store.MARKER.parent)
+
+
+def _cleared(place: Path) -> None:
+    if place.exists():
+        shutil.rmtree(place)

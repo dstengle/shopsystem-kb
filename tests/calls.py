@@ -226,6 +226,15 @@ def create(client, type_name, content, message="Create an artifact", actor=CLIEN
     return response
 
 
+def a_decision_type_and_a_decision(client):
+    """The type for decisions defined in the store, and one decision of it created."""
+    define(client, DECISION_TYPE)
+    create(client, "decision", {"title": "Price reviews happen weekly", "sections": [
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": "Costs move weekly.\n"},
+    ]})
+
+
 def define(client, type_content):
     """Define a type: a Create of type `schema`."""
     return create(client, "schema", type_content, message=f"Define {type_content['title']}")

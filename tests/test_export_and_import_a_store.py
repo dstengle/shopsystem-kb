@@ -9,7 +9,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
 from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, replace, start_a_store, check
-from conftest import OPERATOR, _kb
+from conftest import OPERATOR, _kb, exported
 import held
 from kb import canonical, client as kb_client
 
@@ -80,7 +80,10 @@ def _loaded(text):
 
 @given("a store holding a type for decisions, a type for work items, two decisions and a work item")
 def _store_with_decisions_and_a_work_item(root):
-    client = _started(root)
+    _decisions_and_a_work_item(_started(root))
+
+
+def _decisions_and_a_work_item(client):
     define(client, DECISION_TYPE)
     define(client, WORK_ITEM_TYPE)
     for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
@@ -285,16 +288,7 @@ MONDAYS = "work-item/move-the-review-to-mondays"
 def _for_import(tmp_path, fill=None):
     """A directory for import: the export of a store holding the types for decisions and work items, two decisions and
     a work item linking to the first; or holding what `fill` gives a started store."""
-    source = tmp_path / "source"
-    source.mkdir()
-    if fill is None:
-        _store_with_decisions_and_a_work_item(source)
-    else:
-        fill(_started(source))
-    target = tmp_path / "for-import"
-    ran = _kb("export", str(target), cwd=source)
-    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
-    return target
+    return exported(tmp_path, fill or _decisions_and_a_work_item)
 
 
 def _file(name):

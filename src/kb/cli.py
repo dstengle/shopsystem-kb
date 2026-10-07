@@ -1,8 +1,9 @@
-"""kb's own command line, for the operator: set a store up, check one, export one, check a directory for import,
-import one into a freshly started store, and serve one to callers over the network. Nothing else; every other change
-to content goes through a client.
+"""kb's own command line, for the operator: set a store up, empty or seeded from a directory of files, check one,
+export one, check a directory for import, import one into a freshly started store, and serve one to callers over the
+network. Nothing else; every other change to content goes through a client.
 
-Each command is one call on the client, or on one of the operator's commands beside it, or, to serve, on kb.server.
+Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded,
+on kb.staging, or, to serve, on kb.server.
 A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
 exits 1. A store served is served until the process is told to stop, and then exits 0.
 """
@@ -13,7 +14,7 @@ from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import addresses, rules, server
+from kb import addresses, rules, server, staging
 from kb.contract import kb_pb2
 from kb.values import Refused
 
@@ -25,6 +26,8 @@ def main(argv=None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init", help="set up a store in a directory")
     init.add_argument("root", help="the directory the store is made inside, as its kb/ subdirectory")
+    init.add_argument("--seed", metavar="DIR", help="a directory of files, laid out as an export lays them out, for the "
+                      "store to hold from the start, as an import into it would land them")
     commands.add_parser("validate", help="check the store found here, or the one KB_ROOT names")
     exporting = commands.add_parser("export", help="write the store found here, or the one KB_ROOT names, out as files")
     exporting.add_argument("directory", help="an empty directory, or one that does not exist, for the files")
@@ -42,7 +45,7 @@ def main(argv=None) -> int:
     if args.command == "serve":
         return _serve(args.root, args.listen)
     if args.command == "init":
-        return _init(args.root)
+        return _init(args.root, args.seed)
     if args.command == "export":
         return _export(args.directory)
     if args.command == "import":
@@ -50,18 +53,23 @@ def main(argv=None) -> int:
     return _validate()
 
 
-def _init(root: str) -> int:
-    """Start a store under the role KB_ACTOR names."""
+def _init(root: str, seed: str | None) -> int:
+    """Start a store under the role KB_ACTOR names, holding the seed directory's files when one is named, the check's
+    report shown first; or none."""
     role = os.environ.get("KB_ACTOR", "")
     if not role:
         return _refused("init", [kb_pb2.Fault(
             rule=rules.ACTOR, message="a store can only be started under a role, named through KB_ACTOR",
         )])
     try:
-        kb.init(root, role)
+        if seed is None:
+            kb.init(root, role)
+            return 0
+        imported = staging.seeded(root, role, seed)
     except kb.NotStarted as refused:
         return _refused("init", refused.faults)
-    return 0
+    _reported(imported)
+    return _refused("init", imported.faults) if imported.faults else 0
 
 
 def _serve(root: str, listen: str | None) -> int:

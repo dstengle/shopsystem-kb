@@ -192,6 +192,19 @@ def _kb(*args, cwd, env=None):
     return held.in_process(cli.main, list(args), cwd, {**clean, **(env or {})})
 
 
+def exported(tmp_path, fill):
+    """A directory of files as an export writes them: the export of a store started in a directory of its own and
+    filled by `fill`, given a client on it."""
+    source = tmp_path / "source"
+    source.mkdir()
+    start_a_store(source)
+    fill(kb_client.connect(source))
+    target = tmp_path / "for-import"
+    ran = _kb("export", str(target), cwd=source)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    return target
+
+
 def _store_needing_attention(root):
     """A store a client filled: two decisions behind the decision type, and one of them, edited by hand, missing the
     body of its purpose."""

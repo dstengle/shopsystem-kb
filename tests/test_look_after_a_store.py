@@ -2,8 +2,8 @@ import grpc
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, define, start_a_store
-from conftest import OPERATOR, _kb, _store_needing_attention
+from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a_store
+from conftest import OPERATOR, _kb, _store_needing_attention, exported
 import held
 import serving
 from kb import served
@@ -260,3 +260,49 @@ def _serve_rejected_at_that_address(ran):
 def _nothing_is_served(root):
     """No server owns the store: its lock is there to be taken."""
     served.owned(root).close()
+
+
+# A store set up seeded from a directory of files, which an export of another store wrote.
+
+@given("a seed directory that checks clean, holding a type for decisions and a decision", target_fixture="seed")
+def _a_clean_seed(tmp_path):
+    return exported(tmp_path, a_decision_type_and_a_decision)
+
+
+@when("the operator runs kb init with that seed directory against the directory, saying which role they are",
+      target_fixture="ran")
+def _kb_init_with_a_seed(root, seed, tmp_path):
+    return _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+
+
+@then("there is a store inside that directory")
+def _a_store_there(ran, root):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.holds_a_store(root)
+    assert held.apart_from_the_store(root) == {}
+
+
+@then("it holds the files in the seed directory as kb import lands them into a freshly started store")
+def _holds_the_seed_as_imported(root, seed, tmp_path):
+    imported = tmp_path / "imported"
+    imported.mkdir()
+    assert _kb("init", str(imported), cwd=tmp_path, env={"KB_ACTOR": OPERATOR}).returncode == 0
+    ran = _kb("import", str(seed), cwd=imported, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    assert held.names(root) == held.names(imported)
+    assert [held.text(root, name) for name in held.names(root)] == [held.text(imported, name) for name in held.names(root)]
+    assert _signed_and_set(root) == _signed_and_set(imported)
+
+
+def _signed_and_set(root):
+    """The store's history but its moments and ids: each entry as the history gives it, and the sets they landed in,
+    each named by where it first stands."""
+    entries = held.history(kb_client.connect(root))
+    sets = [entry.batch for entry in entries]
+    kept = []
+    for entry in entries:
+        entry.batch = str(sets.index(entry.batch))
+        entry.ClearField("id")
+        entry.ClearField("at")
+        kept.append(entry)
+    return kept
