@@ -92,3 +92,16 @@ def test_kb_serve_with_start_on_a_root_that_does_not_exist_is_refused_as_kb_init
     assert ran.stderr.count("\n") == 1, ran.stderr
     assert not missing.exists()
     assert not _answers(port)
+
+
+def test_kb_serve_with_start_that_cannot_bind_leaves_a_store_already_there_as_it_was(root):
+    """Only a store the run itself placed is ever taken back: a store already in the root, which --start serves as it
+    stands, is left whole when its address turns out to be another's."""
+    start_a_store(root)
+    before = held.everything_but_its_serving_in(root)
+    with socket.create_server(("127.0.0.1", 0)) as taken:
+        listen = f"127.0.0.1:{taken.getsockname()[1]}"
+        ran = _kb("serve", str(root), "--listen", listen, "--start", cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr.startswith(f"kb serve: refused: the store cannot be served at {listen!r}"), ran.stderr
+    assert held.everything_but_its_serving_in(root) == before

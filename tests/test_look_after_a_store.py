@@ -18,6 +18,7 @@ scenarios("operate-a-store.feature")
 @given("a directory that has no store inside it", target_fixture="root")
 @given("a directory holding no store", target_fixture="root")
 @given("a directory that has no store inside it, and nothing names which role the operator is", target_fixture="root")
+@given("a directory holding no store, and nothing names which role the operator is", target_fixture="root")
 def _directory_with_no_store(root):
     return root
 
@@ -258,7 +259,16 @@ def _kb_serve_where_it_cannot(root, tmp_path, request, address):
     return {"listen": listen, "ran": _kb("serve", str(root), "--listen", listen, cwd=root)}
 
 
+@when(parsers.re(f"the operator runs kb serve with --start on that directory, giving (?P<address>{'|'.join(UNSERVABLE)}), "
+                 "saying which role they are"), target_fixture="ran")
+def _kb_serve_starting_where_it_cannot(root, tmp_path, request, address):
+    listen = UNSERVABLE[address](tmp_path, request)
+    return {"listen": listen,
+            "ran": _kb("serve", str(root), "--listen", listen, "--start", cwd=root, env={"KB_ACTOR": OPERATOR})}
+
+
 @then("serving the store is rejected because the store cannot be served at that address, and the address is named back")
+@then("serving is rejected because the store cannot be served at that address, and the address is named back")
 def _serve_rejected_at_that_address(ran):
     assert (ran["ran"].returncode, ran["ran"].stdout) == (2, "")
     assert ran["ran"].stderr.startswith(f"kb serve: refused: the store cannot be served at {ran['listen']!r}"), \
@@ -311,8 +321,22 @@ def _that_store_served(served, root):
 
 @then("nothing is served")
 def _nothing_is_served(root):
-    """No server owns the store: its lock is there to be taken."""
-    served.owned(root).close()
+    """No server owns the store: its lock is there to be taken; where no store was left, there is nothing to lock."""
+    if held.holds_anything_in_the_place(root):
+        served.owned(root).close()
+
+
+@then("serving is rejected because a store can only be started under a role named through KB_ACTOR")
+def _serve_rejected_without_kb_actor(served):
+    assert _said(served) == "kb serve: refused: actor: a store can only be started under a role, named through KB_ACTOR\n"
+    assert served["serving"].process.wait() == 2
+
+
+@then("that directory still holds no store")
+def _still_holds_no_store(root):
+    """The directory as it was before: empty, with no store and nothing a start left behind."""
+    assert not held.holds_anything_in_the_place(root)
+    assert held.apart_from_the_store(root) == {}
 
 
 # A store set up seeded from a directory of files, which an export of another store wrote.

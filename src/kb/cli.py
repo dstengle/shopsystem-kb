@@ -4,7 +4,7 @@ network. Nothing else; every other change to content goes through a client.
 
 Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded,
 on kb.staging, or, to serve, on kb.server, a store started first on kb.staging when a start is asked for and the root
-holds none.
+holds none, and taken back there should it then not be served.
 A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
 exits 1. A store served is served until the process is told to stop, and then exits 0.
 """
@@ -62,9 +62,7 @@ def _init(root: str, seed: str | None) -> int:
     report shown first; or none."""
     role = os.environ.get("KB_ACTOR", "")
     if not role:
-        return _refused("init", [kb_pb2.Fault(
-            rule=rules.ACTOR, message="a store can only be started under a role, named through KB_ACTOR",
-        )])
+        return _unnamed("init")
     try:
         if seed is None:
             kb.init(root, role)
@@ -76,6 +74,13 @@ def _init(root: str, seed: str | None) -> int:
         return _interrupted()
     _reported(imported)
     return _refused("init", imported.faults) if imported.faults else 0
+
+
+def _unnamed(command: str) -> int:
+    """A store's start refused because no role is named to start it under."""
+    return _refused(command, [kb_pb2.Fault(
+        rule=rules.ACTOR, message="a store can only be started under a role, named through KB_ACTOR",
+    )])
 
 
 def _interrupted() -> int:
@@ -95,23 +100,36 @@ def _serve(root: str, listen: str | None, start: bool) -> int:
         print("kb serve: refused: no address is assumed; give the one to serve at with --listen HOST:PORT",
               file=sys.stderr)
         return REFUSED
-    if start and store.given(Path(root)) is not None:
-        try:
-            staging.started(root, os.environ.get("KB_ACTOR", ""))
-        except kb.NotStarted as refused:
-            return _refused("serve", refused.faults)
-    faults = server.refused(Path(root))
-    if faults:
-        return _refused("serve", faults)
     try:
-        served = server.started(Path(root), addresses.address(listen))
+        address = addresses.address(listen)
+    except ValueError as unservable:
+        return _unservable(listen, unservable)
+    role = None
+    if start and store.given(Path(root)) is not None:
+        role = os.environ.get("KB_ACTOR", "")
+        if not role:
+            return _unnamed("serve")
+    try:
+        with staging.serving(root, role) as keep:
+            faults = server.refused(Path(root))
+            if faults:
+                return _refused("serve", faults)
+            served = server.started(Path(root), address)
+            keep()
+    except kb.NotStarted as refused:
+        return _refused("serve", refused.faults)
     except Refused as owned:
         return _refused("serve", owned.faults)
     except ValueError as unservable:
-        print(f"kb serve: refused: the store cannot be served at {listen!r}: {unservable}", file=sys.stderr)
-        return REFUSED
+        return _unservable(listen, unservable)
     server.until_signalled(served, lambda: print(f"serving\t{served.address}", flush=True))
     return 0
+
+
+def _unservable(listen: str, unservable: ValueError) -> int:
+    """Serving refused at the address given, which is named back with why."""
+    print(f"kb serve: refused: the store cannot be served at {listen!r}: {unservable}", file=sys.stderr)
+    return REFUSED
 
 
 def _validate() -> int:
