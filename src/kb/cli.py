@@ -9,6 +9,7 @@ exits 1. A store served is served until the process is told to stop, and then ex
 """
 import argparse
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -68,8 +69,19 @@ def _init(root: str, seed: str | None) -> int:
         imported = staging.seeded(root, role, seed)
     except kb.NotStarted as refused:
         return _refused("init", refused.faults)
+    except KeyboardInterrupt:
+        return _interrupted()
     _reported(imported)
     return _refused("init", imported.faults) if imported.faults else 0
+
+
+def _interrupted() -> int:
+    """The process ended by SIGINT, as Python ends one an interrupt reached, once what the run staged is gone, but
+    without the traceback: an operator's Ctrl-C is no fault of kb's. Should SIGINT be held back, the code a shell gives
+    a process it ended."""
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    os.kill(os.getpid(), signal.SIGINT)
+    return 128 + signal.SIGINT
 
 
 def _serve(root: str, listen: str | None) -> int:

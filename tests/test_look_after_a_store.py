@@ -1,3 +1,5 @@
+import signal
+
 import grpc
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -6,6 +8,7 @@ from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a
 from conftest import OPERATOR, _kb, _store_needing_attention, exported
 import held
 import serving
+import stopping
 from kb import served
 from kb import client as kb_client
 from kb.contract import kb_pb2, kb_pb2_grpc
@@ -306,3 +309,21 @@ def _signed_and_set(root):
         entry.ClearField("at")
         kept.append(entry)
     return kept
+
+
+@when("the operator's kb init with that seed directory against the directory, saying which role they are, is stopped "
+      "before it finishes", target_fixture="stopped")
+def _kb_init_with_a_seed_stopped(root, seed):
+    """The installed command, killed as SIGKILL kills it the moment the directory holds anything and still no store."""
+    return stopping.stopped(root, seed, OPERATOR)
+
+
+@then("that directory has no store inside it")
+def _no_store_inside(stopped, root):
+    assert stopped.returncode == -signal.SIGKILL
+    assert not held.holds_anything_in_the_place(root)
+
+
+@when("the operator runs the same kb init again", target_fixture="ran")
+def _kb_init_with_a_seed_again(root, seed, tmp_path):
+    return _kb_init_with_a_seed(root, seed, tmp_path)
