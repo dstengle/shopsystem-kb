@@ -18,6 +18,7 @@ from kb.values import artifact_id
 _PLACE = "kb"
 _MARKER = "store.yaml"
 _DATABASE = "store.sqlite3"
+_SERVED = "served.yaml"
 WAIT = 0.2  # seconds the store waits for the write lock while a test holds it
 
 
@@ -100,6 +101,15 @@ def everything_in(directory):
         "apart": _apart(Path(directory), stores),
         "stores": {place.relative_to(directory): _kept(place) for place in stores},
     }
+
+
+def everything_but_its_serving_in(directory):
+    """What `directory` holds, as `everything_in` gives it, but for the file a server leaves beside a store it served
+    (kb.served), which says who serves it, not what it holds."""
+    everything = everything_in(directory)
+    for kept in everything["stores"].values():
+        kept["beside"] = [name for name in kept["beside"] if name != _SERVED]
+    return everything
 
 
 def plant(root, name, content):

@@ -3,7 +3,8 @@ export one, check a directory for import, import one into a freshly started stor
 network. Nothing else; every other change to content goes through a client.
 
 Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded,
-on kb.staging, or, to serve, on kb.server.
+on kb.staging, or, to serve, on kb.server, a store started first on kb.staging when a start is asked for and the root
+holds none.
 A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
 exits 1. A store served is served until the process is told to stop, and then exits 0.
 """
@@ -15,7 +16,7 @@ from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import addresses, rules, server, staging
+from kb import addresses, rules, server, staging, store
 from kb.contract import kb_pb2
 from kb.values import Refused
 
@@ -42,9 +43,11 @@ def main(argv=None) -> int:
     serving = commands.add_parser("serve", help="serve a store to callers over the network, at the address given")
     serving.add_argument("root", help="the directory the store sits in, as its kb/ subdirectory")
     serving.add_argument("--listen", metavar="HOST:PORT", help="the address to serve at; none is assumed")
+    serving.add_argument("--start", action="store_true", help="start a store there first, under the role KB_ACTOR "
+                         "names, when it holds none")
     args = parser.parse_args(argv)
     if args.command == "serve":
-        return _serve(args.root, args.listen)
+        return _serve(args.root, args.listen, args.start)
     if args.command == "init":
         return _init(args.root, args.seed)
     if args.command == "export":
@@ -84,13 +87,19 @@ def _interrupted() -> int:
     return 128 + signal.SIGINT
 
 
-def _serve(root: str, listen: str | None) -> int:
-    """Serve the store at root at the address given until told to stop, saying on one line where it serves; with no
-    address given, or one it cannot be served at, nothing is served."""
+def _serve(root: str, listen: str | None, start: bool) -> int:
+    """Serve the store at root at the address given until told to stop, saying on one line where it serves, a store
+    started there first when a start is asked for and root holds none; with no address given, or one it cannot be
+    served at, nothing is served."""
     if listen is None:
         print("kb serve: refused: no address is assumed; give the one to serve at with --listen HOST:PORT",
               file=sys.stderr)
         return REFUSED
+    if start and store.given(Path(root)) is not None:
+        try:
+            staging.started(root, os.environ.get("KB_ACTOR", ""))
+        except kb.NotStarted as refused:
+            return _refused("serve", refused.faults)
     faults = server.refused(Path(root))
     if faults:
         return _refused("serve", faults)

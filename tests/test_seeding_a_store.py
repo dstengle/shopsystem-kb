@@ -4,9 +4,13 @@ import signal
 
 from calls import DECISION_TYPE, a_decision_type_and_a_decision, define
 from conftest import OPERATOR, _kb, exported
+import grpc
+
 import held
+import serving
 import stopping
 from kb import client as kb_client, store
+from kb.contract import kb_pb2, kb_pb2_grpc
 
 
 def test_a_seed_directory_that_is_the_directory_set_up_leaves_no_half_store(tmp_path):
@@ -76,3 +80,19 @@ def test_a_seeded_setup_after_one_was_killed_lands_the_seed_and_leaves_nothing_s
     assert (ran.returncode, ran.stderr) == (0, "")
     assert sorted(path.name for path in root.iterdir()) == ["kb"]
     assert held.names(root) == ["decision/price-reviews-happen-weekly", "schema/decision", "schema/schema"]
+
+
+def test_serving_with_start_after_a_seeded_setup_was_killed_starts_and_serves_a_store_as_if_nothing_were_there(
+        tmp_path, root, request):
+    """What a seeded setup killed once its store was started left beneath the directory is no store inside it:
+    `kb serve --start` clears it, starts a store there, holding nothing the seed held, and serves it."""
+    seed = exported(tmp_path, a_decision_type_and_a_decision)
+    assert stopping.stopped(root, seed, OPERATOR, ready=_staged_store).returncode == -signal.SIGKILL
+    assert _staged_store(root)
+    said = serving.started(root, request, "127.0.0.1:0", "--start", env={"KB_ACTOR": OPERATOR}).said()
+    assert said.startswith("serving\t127.0.0.1:"), said
+    assert sorted(path.name for path in root.iterdir()) == ["kb"]
+    assert held.names(root) == ["schema/schema"]
+    with grpc.insecure_channel(said.removeprefix("serving\t")) as channel:
+        answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
+    assert [entry.actor.role for entry in answered.result.entries] == [OPERATOR]

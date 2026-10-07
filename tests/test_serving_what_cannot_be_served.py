@@ -6,7 +6,7 @@ import socket
 import pytest
 
 from calls import start_a_store
-from conftest import _kb
+from conftest import OPERATOR, _kb
 import held
 import serving
 from kb import server
@@ -79,3 +79,16 @@ def test_a_server_that_cannot_bind_its_address_leaves_nothing_open(root):
             server.started(root, Address("127.0.0.1", taken.getsockname()[1]))
     after = server.started(root, Address("127.0.0.1", 0))
     after.stop()
+
+
+def test_kb_serve_with_start_on_a_root_that_does_not_exist_is_refused_as_kb_init_refuses_it(tmp_path):
+    """An operator's typo, or a store directory missing from a container: refused with kb.init's own fault, nothing
+    served and nothing made."""
+    missing, port = tmp_path / "missing", _free_port()
+    ran = _kb("serve", str(missing), "--listen", f"127.0.0.1:{port}", "--start", cwd=tmp_path,
+              env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr.startswith("kb serve: refused: root: a store is started in a directory that exists"), ran.stderr
+    assert ran.stderr.count("\n") == 1, ran.stderr
+    assert not missing.exists()
+    assert not _answers(port)

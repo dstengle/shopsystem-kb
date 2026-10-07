@@ -1,6 +1,7 @@
 """A store started out of sight beneath the root it is for and put in place inside it whole: started, and seeded, in a
 staging place under the root, then moved to where a store goes by one rename, on the one filesystem the root is on, so
-the root holds either no store or the whole of one. What an earlier stopped run left in the staging place is removed
+the root holds either no store or the whole of one: a store started to be served (`started`), and one seeded from a
+directory of files (`seeded`). What an earlier stopped run left in the staging place is removed
 first, and the staging place is removed whenever a start ends, placed or refused. The staging place is the store's own
 layout, not published."""
 import contextlib
@@ -14,13 +15,20 @@ from kb import importing, operating, starting, store
 _STAGING = ".kb-starting"
 
 
+def started(root, role: str) -> None:
+    """A store started inside root under the role, holding nothing yet, as a server is started on it to serve it.
+    Raises NotStarted, leaving root as it found it, when no store can be started there."""
+    _vacant(root)
+    with staged(root) as place:
+        starting.init(place, role)
+        placed(place, root)
+
+
 def seeded(root, role: str, seed: str) -> importing.Checked:
     """A store started inside root under the role, holding the seed directory's files as the operator's import lands
     them into a freshly started store, or none: the import's answer, its report and the faults that refused it. Raises
     NotStarted, leaving root as it found it, when no store can be started there."""
-    faults = starting.refused(root)
-    if faults:
-        raise starting.NotStarted(faults)
+    _vacant(root)
     with staged(root) as place:
         starting.init(place, role)
         imported = operating.Operator(place).import_(operating.Importing(seed, role, False))
@@ -45,6 +53,13 @@ def staged(root) -> Iterator[Path]:
 def placed(place: Path, root) -> None:
     """The store started in the staging place put where a store goes inside root, whole, by one rename."""
     os.rename(place / store.MARKER.parent, Path(root) / store.MARKER.parent)
+
+
+def _vacant(root) -> None:
+    """Raises NotStarted with the faults kb.init would refuse root for, before anything is made."""
+    faults = starting.refused(root)
+    if faults:
+        raise starting.NotStarted(faults)
 
 
 def _emptied(place: Path) -> None:

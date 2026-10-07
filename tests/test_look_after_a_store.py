@@ -5,7 +5,7 @@ import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a_store
-from conftest import OPERATOR, _kb, _store_needing_attention, exported
+from conftest import OPERATOR, _kb, _store_needing_attention, _store_with_content, exported
 import held
 import serving
 import stopping
@@ -16,6 +16,7 @@ from kb.contract import kb_pb2, kb_pb2_grpc
 scenarios("operate-a-store.feature")
 
 @given("a directory that has no store inside it", target_fixture="root")
+@given("a directory holding no store", target_fixture="root")
 @given("a directory that has no store inside it, and nothing names which role the operator is", target_fixture="root")
 def _directory_with_no_store(root):
     return root
@@ -213,7 +214,12 @@ def _served_at_that_address(served):
 
 @then(parsers.parse("a caller reaching that address through {reached} is answered from that store"))
 def _answered_from_that_store(root, port, reached):
-    with grpc.insecure_channel(f"{REACHED_THROUGH[reached]}:{port}") as channel:
+    _answered_at(root, f"{REACHED_THROUGH[reached]}:{port}")
+
+
+def _answered_at(root, address):
+    """A caller at the address is answered the store's history, as a client in this process reads it from root."""
+    with grpc.insecure_channel(address) as channel:
         answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
     assert answered == kb_client.connect(root).History(kb_pb2.HistoryRequest())
     assert answered.WhichOneof("outcome") == "result" and answered.result.entries
@@ -257,6 +263,50 @@ def _serve_rejected_at_that_address(ran):
     assert (ran["ran"].returncode, ran["ran"].stdout) == (2, "")
     assert ran["ran"].stderr.startswith(f"kb serve: refused: the store cannot be served at {ran['listen']!r}"), \
         ran["ran"].stderr
+
+
+@when("the operator runs kb serve with --start on that directory, giving an address, saying which role they are",
+      target_fixture="served")
+def _kb_serve_starting(root, request):
+    return {"serving": serving.started(root, request, "127.0.0.1:0", "--start", env={"KB_ACTOR": OPERATOR})}
+
+
+@given("a directory holding a store with content in it, and nothing names which role the operator is",
+       target_fixture="root")
+def _directory_holding_a_store_with_content(root, before):
+    _store_with_content(root)
+    before.update(store=root, held=held.everything_but_its_serving_in(root))
+    return root
+
+
+@when("the operator runs kb serve with --start on that directory, giving an address", target_fixture="served")
+def _kb_serve_starting_without_a_role(root, request):
+    return {"serving": serving.started(root, request, "127.0.0.1:0", "--start")}
+
+
+@then("it holds what it held before")
+def _holds_what_it_held(before):
+    assert held.everything_but_its_serving_in(before["store"]) == before["held"]
+
+
+def _said(served):
+    """The line the server said once it was serving, read once and kept."""
+    if "said" not in served:
+        served["said"] = served["serving"].said()
+    return served["said"]
+
+
+@then("a store is started in that directory")
+def _a_store_started(served, root):
+    assert _said(served).startswith("serving\t"), _said(served)
+    assert held.holds_a_store(root)
+
+
+@then("that store is served at that address")
+def _that_store_served(served, root):
+    said = _said(served)
+    assert said.startswith("serving\t127.0.0.1:") and int(said.rpartition(":")[2]) > 0, said
+    _answered_at(root, said.removeprefix("serving\t"))
 
 
 @then("nothing is served")
