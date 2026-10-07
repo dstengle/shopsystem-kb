@@ -25,6 +25,12 @@ def started(root, role: str) -> None:
         placed(place, root)
 
 
+def wanted(root) -> bool:
+    """Whether a store is to be started in root for a server to serve: it holds none, and not the connection to a
+    server either, which is refused as serving without a start refuses it."""
+    return store.given(Path(root)) is not None and not (Path(root) / store.CONNECTION).is_file()
+
+
 @contextlib.contextmanager
 def serving(root, role: str | None) -> Iterator[Callable[[], None]]:
     """With a role, a store started inside root under it (`started`) for the block to serve; the block is given what it

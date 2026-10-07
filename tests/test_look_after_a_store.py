@@ -1,4 +1,5 @@
 import signal
+import socket
 
 import grpc
 import pytest
@@ -337,6 +338,66 @@ def _still_holds_no_store(root):
     """The directory as it was before: empty, with no store and nothing a start left behind."""
     assert not held.holds_anything_in_the_place(root)
     assert held.apart_from_the_store(root) == {}
+
+
+@then("serving is rejected because that directory is inside a store")
+def _serve_rejected_as_inside_a_store(served, root, before):
+    said = _said(served)
+    assert said == (f"kb serve: refused: root: stores do not nest; {str(root)!r} is inside the store at "
+                    f"{str(before['store'])!r}\n"), said
+    assert served["serving"].process.wait() == 2
+
+
+# Serving with --start where serving without it is refused.
+
+@given("a directory holding a store another server owns", target_fixture="root")
+def _directory_holding_a_store_another_server_owns(root, request):
+    start_a_store(root)
+    serving.hosted(root, request, clock=None)
+    return root
+
+
+@given("a directory holding a store made by an earlier kb", target_fixture="root")
+def _directory_holding_an_earlier_kbs_store(root):
+    start_a_store(root)
+    held.made_by_an_earlier_kb(root)
+    return root
+
+
+@given("a directory holding a store made by a later kb", target_fixture="root")
+def _directory_holding_a_later_kbs_store(root):
+    start_a_store(root)
+    held.made_by_a_later_kb(root)
+    return root
+
+
+@given("a directory holding a connection to a server and no store", target_fixture="root")
+def _directory_holding_a_connection_and_no_store(root):
+    serving.connection(root, "127.0.0.1:1")
+    return root
+
+
+def _free_address():
+    """An address on 127.0.0.1 nothing holds, at a port the system picked and let go."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return f"127.0.0.1:{probe.getsockname()[1]}"
+
+
+@when("the operator runs kb serve with --start on that directory, giving an address nothing else holds, saying which "
+      "role they are", target_fixture="ran")
+def _kb_serve_starting_at_a_free_address(root):
+    listen = _free_address()
+    return {"listen": listen,
+            "ran": _kb("serve", str(root), "--listen", listen, "--start", cwd=root, env={"KB_ACTOR": OPERATOR})}
+
+
+@then("serving is rejected for the same reason kb serve without --start, run there at that address, is rejected")
+def _rejected_as_serve_without_start_is(ran, root):
+    """Plain kb serve, run after at the same address on the same directory, refuses with the same words and code."""
+    plain = _kb("serve", str(root), "--listen", ran["listen"], cwd=root)
+    assert plain.returncode == 2 and plain.stderr.startswith("kb serve: refused: "), plain.stderr
+    assert (ran["ran"].returncode, ran["ran"].stdout, ran["ran"].stderr) == (plain.returncode, "", plain.stderr)
 
 
 # A store set up seeded from a directory of files, which an export of another store wrote.

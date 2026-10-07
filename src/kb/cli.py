@@ -16,7 +16,7 @@ from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import addresses, rules, server, staging, store
+from kb import addresses, rules, server, staging
 from kb.contract import kb_pb2
 from kb.values import Refused
 
@@ -105,7 +105,7 @@ def _serve(root: str, listen: str | None, start: bool) -> int:
     except ValueError as unservable:
         return _unservable(listen, unservable)
     role = None
-    if start and store.given(Path(root)) is not None:
+    if start and staging.wanted(root):
         role = os.environ.get("KB_ACTOR", "")
         if not role:
             return _unnamed("serve")
