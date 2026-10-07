@@ -14,9 +14,15 @@ from serving import KB, PATIENCE
 POLL = 0.001  # seconds between two looks at the directory
 
 
-def stopped(root, seed, role, how=signal.SIGKILL):
-    """`kb init <root> --seed <seed>` under the role, sent `how` once root holds anything and still no `kb/`; its exit
-    code and what it wrote to each stream. Fails when it finished, or made the store, before it could be stopped."""
+def begun(root):
+    """Whether root holds anything new, which only the run under way puts there."""
+    return bool(os.listdir(root))
+
+
+def stopped(root, seed, role, how=signal.SIGKILL, ready=begun):
+    """`kb init <root> --seed <seed>` under the role, sent `how` once `ready(root)` holds (by default, once root holds
+    anything) and root still holds no `kb/`; its exit code and what it wrote to each stream. Fails when it finished,
+    or made the store, before it could be stopped."""
     env = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
     with _interruptible():
         process = subprocess.Popen(
@@ -24,7 +30,7 @@ def stopped(root, seed, role, how=signal.SIGKILL):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
     try:
-        _begun(root, process)
+        _readied(root, process, ready)
         process.send_signal(how)
         out, err = process.communicate(timeout=PATIENCE)
     finally:
@@ -48,11 +54,10 @@ def _interruptible():
             signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def _begun(root, process):
-    """Waits until root holds anything new, which only the run under way puts there; fails if the run ended first or
-    put a store there before it was seen."""
+def _readied(root, process, ready):
+    """Waits until ready(root) holds; fails if the run ended first or put a store in root before it was seen."""
     deadline = time.monotonic() + PATIENCE
-    while not os.listdir(root):
+    while not ready(root):
         assert process.poll() is None, f"kb init ended, {process.returncode}, before it could be stopped"
         assert time.monotonic() < deadline, "kb init put nothing in the directory"
         time.sleep(POLL)

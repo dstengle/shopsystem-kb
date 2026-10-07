@@ -6,7 +6,7 @@ from calls import DECISION_TYPE, a_decision_type_and_a_decision, define
 from conftest import OPERATOR, _kb, exported
 import held
 import stopping
-from kb import client as kb_client
+from kb import client as kb_client, store
 
 
 def test_a_seed_directory_that_is_the_directory_set_up_leaves_no_half_store(tmp_path):
@@ -47,12 +47,18 @@ def test_a_seeded_setup_interrupted_exits_without_a_traceback_and_leaves_no_stor
     assert held.holds_nothing(root)
 
 
+def _staged_store(root):
+    """Whether a store has been started in the staging place beneath root: its marker is there, written last."""
+    return (root / ".kb-starting" / store.MARKER).is_file()
+
+
 def test_a_plain_setup_after_a_seeded_one_was_killed_starts_a_store_as_if_nothing_were_there(tmp_path, root):
-    """What a killed seeded setup left beneath the directory is no store inside it, nor one it sits inside: kb init
-    starts one there, which a client can define its types in."""
+    """What a seeded setup killed once its store was started, and while the seed was landing, left beneath the
+    directory, a whole store deeper below it, is no store inside it, nor one it sits inside: kb init starts one there,
+    which a client can define its types in."""
     seed = exported(tmp_path, a_decision_type_and_a_decision)
-    assert stopping.stopped(root, seed, OPERATOR).returncode == -signal.SIGKILL
-    assert (root / ".kb-starting").is_dir()
+    assert stopping.stopped(root, seed, OPERATOR, ready=_staged_store).returncode == -signal.SIGKILL
+    assert _staged_store(root)
     ran = _kb("init", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
     assert (ran.returncode, ran.stderr) == (0, "")
     assert held.holds_a_store(root)
@@ -60,11 +66,12 @@ def test_a_plain_setup_after_a_seeded_one_was_killed_starts_a_store_as_if_nothin
 
 
 def test_a_seeded_setup_after_one_was_killed_lands_the_seed_and_leaves_nothing_staged(tmp_path, root):
-    """The same seeded setup run again clears what the killed one left before it starts, and leaves nothing but the
+    """The same seeded setup run again clears what the killed one left, a store started deeper below and the seed
+    landing in it, before it starts, and leaves nothing but the
     store in the directory."""
     seed = exported(tmp_path, a_decision_type_and_a_decision)
-    assert stopping.stopped(root, seed, OPERATOR).returncode == -signal.SIGKILL
-    assert (root / ".kb-starting").is_dir()
+    assert stopping.stopped(root, seed, OPERATOR, ready=_staged_store).returncode == -signal.SIGKILL
+    assert _staged_store(root)
     ran = _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
     assert (ran.returncode, ran.stderr) == (0, "")
     assert sorted(path.name for path in root.iterdir()) == ["kb"]
