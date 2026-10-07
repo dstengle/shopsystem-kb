@@ -189,12 +189,6 @@ def _validate_not_busy(ran):
     assert (ran.returncode, ran.stderr) == (1, "")
 
 
-@given("a directory holding a store", target_fixture="root")
-def _directory_holding_a_store(root):
-    start_a_store(root)
-    return root
-
-
 INTERFACES = {"one interface of the machine": "127.0.0.1", "every interface of the machine": "0.0.0.0"}
 REACHED_THROUGH = {"that interface": "127.0.0.1", "any one of the machine's interfaces": "127.0.0.2"}
 
@@ -318,13 +312,6 @@ def _that_store_served(served, root):
     said = _said(served)
     assert said.startswith("serving\t127.0.0.1:") and int(said.rpartition(":")[2]) > 0, said
     _answered_at(root, said.removeprefix("serving\t"))
-
-
-@then("nothing is served")
-def _nothing_is_served(root):
-    """No server owns the store: its lock is there to be taken; where no store was left, there is nothing to lock."""
-    if held.holds_anything_in_the_place(root):
-        served.owned(root).close()
 
 
 @then("serving is rejected because a store can only be started under a role named through KB_ACTOR")
