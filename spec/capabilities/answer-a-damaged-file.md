@@ -19,6 +19,7 @@ A store this kb cannot read never reaches a client or the operator as a crash. T
 - If the store found was made by an earlier kb, in a form this kb cannot read, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by an earlier version of kb, saying how to move it: start a new store and import the old one's files; nothing is written.
 - If the store found has a marker naming a form of store this kb does not know, one a later kb made, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by a later version of kb, which is needed to read it; the store is not opened and nothing is written.
 - If the store found has a marker that cannot be read at all, whatever its bytes, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by a later version of kb, which is needed to read it, as for a form this kb does not know; the refusal is given as any other fault, never breaking off, and nothing is written.
+- If the operator runs kb serve on a store whose database cannot be read, it is refused because the database cannot be read, naming the database, and nothing is served.
 
 ## Implementation, may change
 
@@ -30,5 +31,4 @@ A store this kb cannot read never reaches a client or the operator as a crash. T
 
 ## Not yet
 
-- kb serve refusing to serve a store whose database cannot be read, nothing served. Promoted when the served-store lines (reach-a-served-store, operate-a-store's kb serve lines) are formulated and built.
 - Reading a store on a read-only filesystem. Promoted when what a read-only store means is defined: whether it may be read while nothing may change it, what its history says, how a served store relates to it.

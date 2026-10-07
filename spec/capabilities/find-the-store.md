@@ -44,4 +44,4 @@ Every call except starting a store finds its store on each call, the way git fin
 
 ## Not yet
 
-- None.
+- A `KB_SERVER` variable naming a server for callers; the connection stays `kb/server.yaml`. Promoted when a caller cannot mount `kb/server.yaml` where its `KB_ROOT` names.
