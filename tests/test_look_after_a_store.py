@@ -9,7 +9,7 @@ from conftest import OPERATOR, _kb, _store_needing_attention, exported
 import held
 import serving
 import stopping
-from kb import served
+from kb import canonical, served
 from kb import client as kb_client
 from kb.contract import kb_pb2, kb_pb2_grpc
 
@@ -327,3 +327,61 @@ def _no_store_inside(stopped, root):
 @when("the operator runs the same kb init again", target_fixture="ran")
 def _kb_init_with_a_seed_again(root, seed, tmp_path):
     return _kb_init_with_a_seed(root, seed, tmp_path)
+
+
+# A seeded setup that is refused leaves the directory as it was.
+
+@given("a seed directory that checks clean", target_fixture="seed")
+def _a_seed_that_checks_clean(tmp_path):
+    return exported(tmp_path, a_decision_type_and_a_decision)
+
+
+@given("a seed directory holding one file whose content does not fit its type", target_fixture="seed")
+def _a_seed_with_one_unfit_file(tmp_path):
+    seed = exported(tmp_path, a_decision_type_and_a_decision)
+    unfit = seed / "decision" / "price-reviews-happen-weekly.yaml"
+    decision = canonical.entries(unfit.read_text(encoding="utf-8"))
+    decision["sections"] = decision["sections"][:1]
+    unfit.write_text(canonical.dump(decision), encoding="utf-8")
+    return seed
+
+
+@given("a file where the seed directory should be", target_fixture="seed")
+def _a_file_where_the_seed_should_be(tmp_path):
+    seed = tmp_path / "seed-file"
+    seed.write_text("a file the operator named where a directory was wanted\n")
+    return seed
+
+
+@when("the operator runs kb init with that seed directory against the directory", target_fixture="ran")
+def _kb_init_with_a_seed_and_no_role(root, seed, tmp_path):
+    return _kb("init", str(root), "--seed", str(seed), cwd=tmp_path)
+
+
+@when("the operator runs kb init with that file as the seed directory against the directory, saying which role they "
+      "are", target_fixture="ran")
+def _kb_init_with_a_file_as_the_seed(root, seed, tmp_path):
+    return _kb_init_with_a_seed(root, seed, tmp_path)
+
+
+@then("setting the store up is rejected because the seed directory's files do not check clean")
+def _rejected_as_the_seed_does_not_check_clean(ran):
+    assert ran.returncode == 2
+    assert ran.stderr.startswith("kb init: refused: "), ran.stderr
+
+
+@then("the operator is shown the check's report")
+def _shown_the_checks_report(ran, seed, tmp_path):
+    """The lines kb import --check gives the same directory, in a store freshly started."""
+    fresh = tmp_path / "fresh"
+    fresh.mkdir()
+    assert _kb("init", str(fresh), cwd=tmp_path, env={"KB_ACTOR": OPERATOR}).returncode == 0
+    checked = _kb("import", "--check", str(seed), cwd=fresh)
+    assert checked.stdout and checked.returncode == 1
+    assert ran.stdout == checked.stdout
+
+
+@then("setting the store up is rejected because files for import are read from a directory")
+def _init_rejected_as_read_from_a_directory(ran, seed):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == f"kb init: refused: root: an import is read from a directory; {str(seed)!r} is not one\n"
