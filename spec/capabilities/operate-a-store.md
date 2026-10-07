@@ -20,7 +20,7 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 - If the directory sits inside a store, kb init is refused because that directory is inside a store, and that store holds what it held before.
 - When the operator runs kb init with a seed directory on a directory with no store inside it, saying which role they are, there is a store inside that directory holding the files in the seed directory as kb import lands them into a freshly started store (export-and-import-a-store).
 - If the operator runs kb init with a seed directory whose files do not check clean, kb init is refused because the seed directory's files do not check clean, the check's report is shown, and the directory still has no store inside it.
-- If kb init with a seed directory is stopped before it finishes, the directory has no store inside it, and kb init run again starts one.
+- If kb init with a seed directory is stopped before it finishes, however it was stopped, the directory has no store inside it, and the same kb init run again starts a store holding the files in the seed directory.
 - If the directory already has a store inside it, kb init with a seed directory is refused because that directory already has a store inside it, and that store holds what it held before.
 - If nothing names the operator's role, kb init with a seed directory is refused because the role must be named through `KB_ACTOR`, and the directory still has no store inside it.
 - If the directory sits inside a store, kb init with a seed directory is refused because that directory is inside a store, and that store holds what it held before.
