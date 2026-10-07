@@ -34,6 +34,7 @@ Feature: Operate a store
     Then setting the store up is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
 
+  @slice-138
   Scenario: The operator sets up a store seeded from a directory of files
     Pins that a store can be set up already holding a directory of files, landed exactly as an import into a freshly started store would land them.
     Given a directory that has no store inside it
@@ -42,6 +43,7 @@ Feature: Operate a store
     Then there is a store inside that directory
     And it holds the files in the seed directory as kb import lands them into a freshly started store
 
+  @slice-140
   Scenario: Setting up a store from a seed directory whose files do not check clean is refused
     Pins that a seed is all or nothing: a seed with any error leaves no store behind, and the operator is shown why.
     Given a directory that has no store inside it
@@ -51,6 +53,7 @@ Feature: Operate a store
     And the operator is shown the check's report
     And that directory still has no store inside it
 
+  @slice-139
   Scenario: A seeded setup that was stopped before it finished leaves no store, and the same setup run again lands the seed
     Pins that a setup stopped partway, however it was stopped, never leaves a half-seeded store, and nothing it left behind gets in the way of running it again.
     Given a directory that has no store inside it
@@ -61,6 +64,7 @@ Feature: Operate a store
     Then there is a store inside that directory
     And it holds the files in the seed directory as kb import lands them into a freshly started store
 
+  @slice-140
   Scenario: Setting up a seeded store where the directory already has one inside it is refused
     Pins that a seed never lands over an existing store: the store that is there is left exactly as it was.
     Given a directory that already has a store inside it, with content in that store
@@ -69,6 +73,7 @@ Feature: Operate a store
     Then setting the store up is rejected because that directory already has a store inside it
     And the store that is there holds what it held before
 
+  @slice-140
   Scenario: Setting up a seeded store without naming which role is refused
     Pins that a seeded store, like an empty one, cannot be created by nobody.
     Given a directory that has no store inside it, and nothing names which role the operator is
@@ -77,6 +82,7 @@ Feature: Operate a store
     Then setting the store up is rejected because the role must be named through KB_ACTOR
     And that directory still has no store inside it
 
+  @slice-140
   Scenario: Setting up a seeded store inside a store is refused
     Pins that seeding does not make stores nest any more than setting up an empty one does.
     Given a directory that sits inside a store
@@ -85,6 +91,7 @@ Feature: Operate a store
     Then setting the store up is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
 
+  @slice-140
   Scenario: Setting up a store seeded from something that is not a directory is refused
     Pins that a seed is read only from a directory, so a setup pointed at anything else leaves no store behind.
     Given a directory that has no store inside it
@@ -178,6 +185,7 @@ Feature: Operate a store
       | an address whose port is beyond the last |
       | an address another server already holds  |
 
+  @slice-141
   Scenario: The operator serves a directory holding no store, asking for it to be started first
     Pins that one command can bring a store into being and serve it, so an empty place becomes a served store without a separate setup.
     Given a directory holding no store
@@ -185,6 +193,7 @@ Feature: Operate a store
     Then a store is started in that directory
     And that store is served at that address
 
+  @slice-141
   Scenario: Serving with --start a directory that already holds a store serves that store as it stands
     Pins that asking for a start never touches a store that is already there, and needs no role when nothing is started.
     Given a directory holding a store with content in it, and nothing names which role the operator is
@@ -192,6 +201,7 @@ Feature: Operate a store
     Then that store is served at that address
     And it holds what it held before
 
+  @slice-142
   Scenario: Serving with --start a directory holding no store without naming which role is refused
     Pins that a store started in order to be served is attributable from its first change, like any other.
     Given a directory holding no store, and nothing names which role the operator is
@@ -200,6 +210,7 @@ Feature: Operate a store
     And nothing is served
     And that directory still holds no store
 
+  @slice-142
   Scenario Outline: Serving with --start a directory holding no store at an address it cannot be served at is refused
     Pins that a store is never left started behind a serve that failed: an address refused leaves the directory as empty as it was.
     Given a directory holding no store
@@ -214,6 +225,7 @@ Feature: Operate a store
       | an address whose port is beyond the last |
       | an address another server already holds  |
 
+  @slice-143
   Scenario: Serving with --start a directory that sits inside a store is refused
     Pins that starting a store in order to serve it never makes stores nest.
     Given a directory that sits inside a store
@@ -222,6 +234,7 @@ Feature: Operate a store
     And nothing is served
     And the store it sits inside holds what it held before
 
+  @slice-143
   Scenario Outline: Serving with --start is refused wherever serving without it is refused
     Pins that asking for a start changes only what happens where no store is: everywhere kb serve would refuse, kb serve with --start refuses the same way.
     Given <directory>

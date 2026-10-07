@@ -69,6 +69,7 @@ Feature: Answer a damaged file
     And the fault is given as any other fault is given, never breaking off
     And nothing is written in the store
 
+  @slice-144
   Scenario Outline: The operator runs kb serve on a store whose database cannot be read
     Pins that a store whose database cannot be read is never put behind a server: serving it gives the one named fault, naming the database, and nothing is served.
     Given a directory holding a store
