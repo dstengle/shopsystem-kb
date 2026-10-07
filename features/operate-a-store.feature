@@ -34,6 +34,65 @@ Feature: Operate a store
     Then setting the store up is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
 
+  Scenario: The operator sets up a store seeded from a directory of files
+    Pins that a store can be set up already holding a directory of files, landed exactly as an import into a freshly started store would land them.
+    Given a directory that has no store inside it
+    And a seed directory that checks clean, holding a type for decisions and a decision
+    When the operator runs kb init with that seed directory against the directory, saying which role they are
+    Then there is a store inside that directory
+    And it holds the files in the seed directory as kb import lands them into a freshly started store
+
+  Scenario: Setting up a store from a seed directory whose files do not check clean is refused
+    Pins that a seed is all or nothing: a seed with any error leaves no store behind, and the operator is shown why.
+    Given a directory that has no store inside it
+    And a seed directory holding one file whose content does not fit its type
+    When the operator runs kb init with that seed directory against the directory, saying which role they are
+    Then setting the store up is rejected because the seed directory's files do not check clean
+    And the operator is shown the check's report
+    And that directory still has no store inside it
+
+  Scenario: A seeded setup that was stopped before it finished leaves no store, and the same setup run again lands the seed
+    Pins that a setup stopped partway, however it was stopped, never leaves a half-seeded store, and nothing it left behind gets in the way of running it again.
+    Given a directory that has no store inside it
+    And a seed directory that checks clean, holding a type for decisions and a decision
+    When the operator's kb init with that seed directory against the directory, saying which role they are, is stopped before it finishes
+    Then that directory has no store inside it
+    When the operator runs the same kb init again
+    Then there is a store inside that directory
+    And it holds the files in the seed directory as kb import lands them into a freshly started store
+
+  Scenario: Setting up a seeded store where the directory already has one inside it is refused
+    Pins that a seed never lands over an existing store: the store that is there is left exactly as it was.
+    Given a directory that already has a store inside it, with content in that store
+    And a seed directory that checks clean
+    When the operator runs kb init with that seed directory against the directory, saying which role they are
+    Then setting the store up is rejected because that directory already has a store inside it
+    And the store that is there holds what it held before
+
+  Scenario: Setting up a seeded store without naming which role is refused
+    Pins that a seeded store, like an empty one, cannot be created by nobody.
+    Given a directory that has no store inside it, and nothing names which role the operator is
+    And a seed directory that checks clean
+    When the operator runs kb init with that seed directory against the directory
+    Then setting the store up is rejected because the role must be named through KB_ACTOR
+    And that directory still has no store inside it
+
+  Scenario: Setting up a seeded store inside a store is refused
+    Pins that seeding does not make stores nest any more than setting up an empty one does.
+    Given a directory that sits inside a store
+    And a seed directory that checks clean
+    When the operator runs kb init with that seed directory against the directory, saying which role they are
+    Then setting the store up is rejected because that directory is inside a store
+    And the store it sits inside holds what it held before
+
+  Scenario: Setting up a store seeded from something that is not a directory is refused
+    Pins that a seed is read only from a directory, so a setup pointed at anything else leaves no store behind.
+    Given a directory that has no store inside it
+    And a file where the seed directory should be
+    When the operator runs kb init with that file as the seed directory against the directory, saying which role they are
+    Then setting the store up is rejected because files for import are read from a directory
+    And that directory still has no store inside it
+
   @slice-46
   Scenario: The operator checks the whole store
     Pins the operator's health check: one command tells them everything that does not fit and everything that has fallen behind, for content they did not write.
@@ -118,6 +177,64 @@ Feature: Operate a store
       | an address that names no port            |
       | an address whose port is beyond the last |
       | an address another server already holds  |
+
+  Scenario: The operator serves a directory holding no store, asking for it to be started first
+    Pins that one command can bring a store into being and serve it, so an empty place becomes a served store without a separate setup.
+    Given a directory holding no store
+    When the operator runs kb serve with --start on that directory, giving an address, saying which role they are
+    Then a store is started in that directory
+    And that store is served at that address
+
+  Scenario: Serving with --start a directory that already holds a store serves that store as it stands
+    Pins that asking for a start never touches a store that is already there, and needs no role when nothing is started.
+    Given a directory holding a store with content in it, and nothing names which role the operator is
+    When the operator runs kb serve with --start on that directory, giving an address
+    Then that store is served at that address
+    And it holds what it held before
+
+  Scenario: Serving with --start a directory holding no store without naming which role is refused
+    Pins that a store started in order to be served is attributable from its first change, like any other.
+    Given a directory holding no store, and nothing names which role the operator is
+    When the operator runs kb serve with --start on that directory, giving an address
+    Then serving is rejected because a store can only be started under a role named through KB_ACTOR
+    And nothing is served
+    And that directory still holds no store
+
+  Scenario Outline: Serving with --start a directory holding no store at an address it cannot be served at is refused
+    Pins that a store is never left started behind a serve that failed: an address refused leaves the directory as empty as it was.
+    Given a directory holding no store
+    When the operator runs kb serve with --start on that directory, giving <address>, saying which role they are
+    Then serving is rejected because the store cannot be served at that address, and the address is named back
+    And nothing is served
+    And that directory still holds no store
+
+    Examples:
+      | address                                  |
+      | an address that names no port            |
+      | an address whose port is beyond the last |
+      | an address another server already holds  |
+
+  Scenario: Serving with --start a directory that sits inside a store is refused
+    Pins that starting a store in order to serve it never makes stores nest.
+    Given a directory that sits inside a store
+    When the operator runs kb serve with --start on that directory, giving an address, saying which role they are
+    Then serving is rejected because that directory is inside a store
+    And nothing is served
+    And the store it sits inside holds what it held before
+
+  Scenario Outline: Serving with --start is refused wherever serving without it is refused
+    Pins that asking for a start changes only what happens where no store is: everywhere kb serve would refuse, kb serve with --start refuses the same way.
+    Given <directory>
+    When the operator runs kb serve with --start on that directory, giving <address>, saying which role they are
+    Then serving is rejected for the same reason kb serve without --start, run there at that address, is rejected
+
+    Examples:
+      | directory                                                 | address                         |
+      | a directory holding a store                               | an address that names no port   |
+      | a directory holding a store another server owns           | an address nothing else holds   |
+      | a directory holding a store made by an earlier kb         | an address nothing else holds   |
+      | a directory holding a store made by a later kb            | an address nothing else holds   |
+      | a directory holding a connection to a server and no store | an address nothing else holds   |
 
   @slice-115
   Scenario: The operator checks the store while another change is being written
