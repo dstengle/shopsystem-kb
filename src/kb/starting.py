@@ -1,7 +1,8 @@
 """A store started in the client's own process, off the wire: `init`, which `kb` publishes, and the operator's
-`kb init` calls, and `NotStarted`, what it raises when it refuses; and `refused`, where `init` would refuse to start
-one, asked before anything is made. It runs inside the servicer's one boundary: its
-values made first, then one call into the domain, and any refusal or escaping exception its faults."""
+`kb init` calls, and `NotStarted`, what it raises when it refuses; `refused`, where `init` would refuse to start one,
+asked before anything is made; and `prepared`, a step a start takes on the filesystem first. Each runs inside the
+servicer's one boundary: its values made first, then one call into the domain, and any refusal or escaping exception
+its faults."""
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
@@ -44,6 +45,12 @@ class _Starter:
         return Started()
 
     @boundary(Started, opens=False)
+    def prepared(self, step: Callable[[], None]):
+        """A step a start takes on the filesystem before the store is started; nothing more."""
+        step()
+        return Started()
+
+    @boundary(Started, opens=False)
     def vacant(self, root):
         """Where a store would be started, refused as `start` refuses it; nothing made."""
         store.vacant(values.root(root))
@@ -64,3 +71,11 @@ def refused(root) -> list:
     """The faults `init` would refuse root for as the place a store is started in, each a Fault of the contract; none
     when one can be started there. Nothing is made."""
     return _Starter(None).vacant(root).faults
+
+
+def prepared(step: Callable[[], None]) -> None:
+    """A step a start takes on the filesystem before the store is started, such as making the place it is started in,
+    run inside the one boundary. Raises NotStarted with the fault when it fails."""
+    started = _Starter(None).prepared(step)
+    if started.faults:
+        raise NotStarted(started.faults)

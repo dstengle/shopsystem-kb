@@ -32,10 +32,10 @@ def seeded(root, role: str, seed: str) -> importing.Checked:
 @contextlib.contextmanager
 def staged(root) -> Iterator[Path]:
     """The staging place beneath root, cleared of whatever an earlier stopped run left there, for the block to start a
-    store in; removed whole when the block ends, however it ends."""
+    store in; removed whole when the block ends, however it ends. Raises NotStarted, with the fault, when it cannot be
+    made."""
     place = Path(root) / _STAGING
-    _cleared(place)
-    place.mkdir()
+    starting.prepared(lambda: _emptied(place))
     try:
         yield place
     finally:
@@ -45,6 +45,11 @@ def staged(root) -> Iterator[Path]:
 def placed(place: Path, root) -> None:
     """The store started in the staging place put where a store goes inside root, whole, by one rename."""
     os.rename(place / store.MARKER.parent, Path(root) / store.MARKER.parent)
+
+
+def _emptied(place: Path) -> None:
+    _cleared(place)
+    place.mkdir()
 
 
 def _cleared(place: Path) -> None:

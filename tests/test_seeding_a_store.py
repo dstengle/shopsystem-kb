@@ -17,3 +17,17 @@ def test_a_seed_directory_that_is_the_directory_set_up_leaves_no_half_store(tmp_
     else:
         assert held.apart_from_the_store(root) == before["apart"]
         assert held.names(root) == ["decision/price-reviews-happen-weekly", "schema/decision", "schema/schema"]
+
+
+def test_a_seeded_setup_in_a_directory_the_operator_cannot_write_is_refused_and_leaves_it_as_it_was(tmp_path, root):
+    """A directory kb cannot write in (a bind mount another user owns) is refused as kb init refuses it, exit 2 and
+    one refusal line, never a traceback; nothing is made in it."""
+    seed = exported(tmp_path, a_decision_type_and_a_decision)
+    root.chmod(0o555)
+    try:
+        ran = _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+        assert ran.returncode == 2
+        assert ran.stderr.startswith("kb init: refused: ") and ran.stderr.count("\n") == 1, ran.stderr
+        assert list(root.iterdir()) == []
+    finally:
+        root.chmod(0o755)
