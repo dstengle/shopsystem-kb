@@ -27,6 +27,7 @@ CALLER = Path(__file__).resolve().parent / "caller.py"
 KB = Path(sys.executable).parent / "kb"
 ROLE_LINE = "kb serve: refused: actor: a store can only be started under a role, named through KB_ACTOR"
 PATIENCE = 180
+SERVE = "kb serve /data --listen 0.0.0.0:50051 --start"  # the image's default command, run under a shell
 DECISION_TYPE = {
     "version": 1,
     "schema": {
@@ -96,7 +97,8 @@ def seeds(scratch: Path) -> dict[str, dict[str, str]]:
 def project_file(image: str, seeded: dict[str, dict[str, str]]) -> dict:
     """The compose project: `kb` as the README's example has it, but on the image built from the checkout; `agent`, the same image
     running the caller's program with the connection given by a compose config; a service for each seed; `bare`, an
-    empty volume with no role named; `locked`, a store its user cannot write."""
+    empty volume with no role named; `locked`, a store its user cannot write; `unwritable`, an empty /data its user
+    cannot write, as a bind mount of a directory root owns is, a tmpfs root owns standing in for it."""
     configs = {"kb-connection": {"content": "address: kb:50051\n"}, "caller": {"content": CALLER.read_text()}}
     services = {
         "kb": {"image": image, "environment": {"KB_ACTOR": "operator"}, "volumes": ["kb-store:/data"]},
@@ -108,6 +110,8 @@ def project_file(image: str, seeded: dict[str, dict[str, str]]) -> dict:
         },
         "bare": {"image": image, "volumes": ["bare-store:/data"]},
         "locked": {"image": image, "environment": {"KB_ACTOR": "operator"}, "volumes": ["locked-store:/data"]},
+        "unwritable": {"image": image, "environment": {"KB_ACTOR": "operator"},
+                       "volumes": [{"type": "tmpfs", "target": "/data", "tmpfs": {"mode": 0o755}}]},
     }
     for seed, files in seeded.items():
         services[seed] = {"image": image, "environment": {"KB_ACTOR": "operator"}, "volumes": ["kb-store:/data"],
@@ -129,6 +133,7 @@ def checks(compose: "Compose") -> None:
     a_stop_and_a_start_keep_the_store(compose, created)
     no_role_on_an_empty_volume(compose)
     a_store_its_user_cannot_write(compose)
+    an_empty_data_its_user_cannot_write(compose)
 
 
 def refused_seed_leaves_no_store(compose: "Compose") -> None:
@@ -207,6 +212,15 @@ def a_store_its_user_cannot_write(compose: "Compose") -> None:
     holds(ran.returncode == 2 and refusal and "/data/kb/store.sqlite3" in refusal[0], "unreadable, naming it", ran)
     holds("Traceback" not in ran.stderr, "no traceback", ran)
     passed("a store its user cannot write exits 2 with unreadable, naming the database, and no traceback")
+
+
+def an_empty_data_its_user_cannot_write(compose: "Compose") -> None:
+    ran = compose.run("unwritable", "-c", f"{SERVE}; refused=$?; ls -A /data; exit $refused", entrypoint="sh")
+    holds(ran.returncode == 2, "an empty /data its user cannot write exits 2", ran)
+    holds(any(line.startswith("kb serve: refused: ") for line in ran.stderr.splitlines()), "it is refused", ran)
+    holds("Traceback" not in ran.stderr, "no traceback", ran)
+    holds(ran.stdout == "", "nothing is left in /data", ran)
+    passed("an empty /data its user cannot write exits 2 with kb serve's refusal, no traceback, nothing made in it")
 
 
 class Compose:

@@ -8,7 +8,7 @@ services:
     volumes:
       - kb-store:/data              # the store lives at /data/kb/
   agent:
-    image: my-shop-knol-role
+    image: my-shop-knol-role        # your caller's image
     environment:
       KB_ROOT: /kb-connection
     configs:

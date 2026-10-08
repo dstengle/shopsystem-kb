@@ -89,7 +89,7 @@ services:
     volumes:
       - kb-store:/data              # the store lives at /data/kb/
   agent:
-    image: my-shop-knol-role
+    image: my-shop-knol-role        # your caller's image
     environment:
       KB_ROOT: /kb-connection
     configs:
@@ -104,6 +104,7 @@ volumes:
   kb-store: {}
 ```
 
+- `agent` stands for your caller: put your caller's image in place of `my-shop-knol-role`.
 - Seeding, when wanted, is one step before the first `up`, from a directory of files laid out as `kb export` lays
   them out: `docker compose run --rm -v ./seed:/seed:ro kb init /data --seed /seed`. A seed that does not check clean
   is refused with the check's report, as `kb import` shows it, and the volume is left holding no store.
@@ -124,9 +125,10 @@ volumes:
   store is already there. Nothing is lost in an empty store: run `docker compose down -v`, which removes the volume
   and the store in it, and seed again.
 - The container runs as the user `kb` (uid and gid 1000), which owns `/data` in the image, so a named volume takes
-  that ownership. A bind mount that user cannot write is refused with kb's own `unreadable` fault naming the
-  database, and the container exits 2; own the directory by uid 1000, or run the service as its owner with
-  `--user` (`user:` in compose, as in `docker compose run --rm --user "$(id -u):$(id -g)" kb ...`).
+  that ownership. A bind mount that user cannot write (a host directory Docker made as root, say) is refused: the
+  container exits 2 with one line naming the cause, and nothing is made in it. Over a store already there, the
+  refusal is kb's `unreadable` fault naming the database. Own the directory by uid 1000, or run the service as its
+  owner with `--user` (`user:` in compose, as in `docker compose run --rm --user "$(id -u):$(id -g)" kb ...`).
 - The image is built from the repository at a release tag; `make image` builds one from a checkout, and
   `make image-check` checks one serves a store beside its callers.
 
