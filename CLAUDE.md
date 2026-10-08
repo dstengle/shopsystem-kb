@@ -99,6 +99,9 @@ module that does not own it.
 
 - `make dev` once; `make test` runs the suite in this checkout's virtualenv, in parallel (`-n auto`), the operator's commands run in-process (one test runs the installed `kb`); during red-green run the slice's marker (`-m slice-N`), and the whole suite once per slice;
   `make contract` regenerates the stubs after `kb.proto` changes.
+- `make image` builds kb's image from the checkout (`shopsystem-kb:dev`); `make image-check` builds its own and checks
+  it serves a store beside its callers in a throwaway compose project (`docker/image_check.py`), leaving nothing
+  behind. Neither is part of `make test`; a release that fails `image-check` does not ship.
 - Behaviour comes from `features/`; code is written red-green against a
   scenario, one at a time, and never adds behaviour no scenario asks for.
 - A refactor is an enabling slice: its check is the suite still green and

@@ -1,0 +1,23 @@
+# kb served beside its callers: the README's "Running kb in Docker". Callers reach it by its service name, kb:50051,
+# through the connection a compose config gives them; no port is published to the host.
+services:
+  kb:
+    build: https://github.com/dstengle/shopsystem-kb.git#v0.7.0
+    environment:
+      KB_ACTOR: operator            # needed only when the store is started
+    volumes:
+      - kb-store:/data              # the store lives at /data/kb/
+  agent:
+    image: my-shop-knol-role
+    environment:
+      KB_ROOT: /kb-connection
+    configs:
+      - source: kb-connection
+        target: /kb-connection/kb/server.yaml
+    depends_on:
+      kb: { condition: service_healthy }
+configs:
+  kb-connection:
+    content: "address: kb:50051\n"
+volumes:
+  kb-store: {}
