@@ -558,3 +558,13 @@ What a client may depend on is still versioned together by the release tag: `kb.
 date: 2026-10-07
 supersedes: decision/published-contract-v1-in-0-6-0
 source: docs/superpowers/specs/2026-10-07-kb-docker-design.md
+
+## decision/seed-may-be-the-root
+`kb init <root> --seed <root>` is accepted, not refused: the seed is read with kb's staging place passed over, as an import passes over a store's own files, so an operator who copies a seed into the volume a store will live in can seed it from there. Chosen over refusing a seed that is, or holds, the root, which would make the operator keep the seed elsewhere.
+date: 2026-10-08
+source: the batch 28 review (B2), lines approved by the controller under the person's delegation of 2026-10-08
+
+## decision/unwritable-root-refused
+A root kb cannot write is refused before anything is made, by kb init (with a seed directory or without), kb serve --start and `kb.init` alike, with rule `root`, naming the root, rather than as a store that could not answer naming a place kb would have made; nothing is served and nothing is made in it. The rule is kb's existing one for where a store may be started; no rule name is added.
+date: 2026-10-08
+source: the batch 28 review (B1), lines approved by the controller under the person's delegation of 2026-10-08
