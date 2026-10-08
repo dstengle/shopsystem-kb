@@ -217,7 +217,8 @@ def a_store_its_user_cannot_write(compose: "Compose") -> None:
 def an_empty_data_its_user_cannot_write(compose: "Compose") -> None:
     ran = compose.run("unwritable", "-c", f"{SERVE}; refused=$?; ls -A /data; exit $refused", entrypoint="sh")
     holds(ran.returncode == 2, "an empty /data its user cannot write exits 2", ran)
-    holds(any(line.startswith("kb serve: refused: ") for line in ran.stderr.splitlines()), "it is refused", ran)
+    refusals = [line for line in ran.stderr.splitlines() if line.startswith("kb serve: refused: ")]
+    holds(any("Permission denied" in line for line in refusals), "it is refused, the refusal naming its cause", ran)
     holds("Traceback" not in ran.stderr, "no traceback", ran)
     holds(ran.stdout == "", "nothing is left in /data", ran)
     passed("an empty /data its user cannot write exits 2 with kb serve's refusal, no traceback, nothing made in it")

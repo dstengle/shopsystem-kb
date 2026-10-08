@@ -10,7 +10,7 @@ from conftest import OPERATOR, _kb, _store_needing_attention, _store_with_conten
 import held
 import serving
 import stopping
-from kb import canonical, served
+from kb import canonical
 from kb import client as kb_client
 from kb.contract import kb_pb2, kb_pb2_grpc
 
@@ -489,7 +489,8 @@ def _kb_init_with_a_file_as_the_seed(root, seed, tmp_path):
 @then("setting the store up is rejected because the seed directory's files do not check clean")
 def _rejected_as_the_seed_does_not_check_clean(ran):
     assert ran.returncode == 2
-    assert ran.stderr.startswith("kb init: refused: "), ran.stderr
+    assert ran.stderr == ("kb init: refused: content: the check found 1 error(s) in the directory, and nothing was "
+                          "written\n"), ran.stderr
 
 
 @then("the operator is shown the check's report")

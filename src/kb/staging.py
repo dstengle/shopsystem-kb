@@ -21,9 +21,9 @@ def started(root, role: str) -> None:
     """A store started inside root under the role, holding nothing yet, as a server is started on it to serve it.
     Raises NotStarted, leaving root as it found it, when no store can be started there."""
     _vacant(root)
-    with staged(root) as place:
+    with _staged(root) as place:
         starting.init(place, role)
-        placed(place, root)
+        _placed(place, root)
 
 
 def wanted(root) -> bool:
@@ -37,8 +37,9 @@ def serving(root, role: str | None) -> Iterator[Callable[[], None]]:
     """With a role, a store started inside root under it (`started`) for the block to serve; the block is given what it
     calls once the store is served, to keep it. A store this run placed and the block did not keep is taken back out
     of root, whole, however the block ended, leaving root as it found it, but when the block was refused (`Refused`,
-    another server owning the store), which leaves the store to the server that owns it. With no role, nothing is started, and
-    nothing is ever taken back. Raises NotStarted, leaving root as it found it, when no store can be started there."""
+    another server owning the store), which leaves the store to the server that owns it. With no role, nothing is
+    started, and nothing is ever taken back. Raises NotStarted, leaving root as it found it, when no store can be
+    started there."""
     if role is not None:
         started(root, role)
     kept = []
@@ -57,16 +58,16 @@ def seeded(root, role: str, seed: str) -> importing.Checked:
     them into a freshly started store, or none: the import's answer, its report and the faults that refused it. Raises
     NotStarted, leaving root as it found it, when no store can be started there."""
     _vacant(root)
-    with staged(root) as place:
+    with _staged(root) as place:
         starting.init(place, role)
         imported = operating.Operator(place).import_(operating.Importing(seed, role, False))
         if not imported.faults:
-            placed(place, root)
+            _placed(place, root)
     return imported
 
 
 @contextlib.contextmanager
-def staged(root) -> Iterator[Path]:
+def _staged(root) -> Iterator[Path]:
     """The staging place beneath root, cleared of whatever an earlier stopped run left there, for the block to start a
     store in; removed whole when the block ends, however it ends. Raises NotStarted, with the fault, when it cannot be
     made."""
@@ -78,14 +79,14 @@ def staged(root) -> Iterator[Path]:
         _cleared(place)
 
 
-def placed(place: Path, root) -> None:
+def _placed(place: Path, root) -> None:
     """The store started in the staging place put where a store goes inside root, whole, by one rename."""
     os.rename(place / store.MARKER.parent, Path(root) / store.MARKER.parent)
 
 
 def _taken_back(root) -> None:
     """The store placed inside root moved out to the staging place by one rename, and removed with it."""
-    with staged(root) as place:
+    with _staged(root) as place:
         os.rename(Path(root) / store.MARKER.parent, place / store.MARKER.parent)
 
 
