@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 from kb import importing, operating, starting, store
+from kb.values import Refused
 
 _STAGING = ".kb-starting"
 
@@ -35,13 +36,17 @@ def wanted(root) -> bool:
 def serving(root, role: str | None) -> Iterator[Callable[[], None]]:
     """With a role, a store started inside root under it (`started`) for the block to serve; the block is given what it
     calls once the store is served, to keep it. A store this run placed and the block did not keep is taken back out
-    of root, whole, however the block ended, leaving root as it found it. With no role, nothing is started, and
+    of root, whole, however the block ended, leaving root as it found it, but when the block was refused (`Refused`,
+    another server owning the store), which leaves the store to the server that owns it. With no role, nothing is started, and
     nothing is ever taken back. Raises NotStarted, leaving root as it found it, when no store can be started there."""
     if role is not None:
         started(root, role)
     kept = []
     try:
         yield lambda: kept.append(True)
+    except Refused:
+        kept.append(True)
+        raise
     finally:
         if role is not None and not kept:
             _taken_back(root)

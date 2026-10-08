@@ -9,8 +9,9 @@ from calls import start_a_store
 from conftest import OPERATOR, _kb
 import held
 import serving
-from kb import server
+from kb import server, staging
 from kb.addresses import Address
+from kb.values import Refused
 
 
 def _free_port():
@@ -105,3 +106,20 @@ def test_kb_serve_with_start_that_cannot_bind_leaves_a_store_already_there_as_it
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr.startswith(f"kb serve: refused: the store cannot be served at {listen!r}"), ran.stderr
     assert held.everything_but_its_serving_in(root) == before
+
+
+def test_a_started_store_another_server_took_first_is_left_to_that_server(root):
+    """A store this run placed, which another server came to own before this run's server could, is not taken back:
+    the other server serves it, so it stays in the root, whole, and that server still answers (the final review, I1)."""
+    other = None
+    with pytest.raises(Refused) as refused:
+        with staging.serving(root, OPERATOR) as keep:
+            other = server.started(root, Address("127.0.0.1", 0))
+            server.started(root, Address("127.0.0.1", 0))
+            keep()
+    try:
+        assert [fault.rule for fault in refused.value.faults] == ["served"]
+        assert (root / "kb" / "store.yaml").is_file()
+        assert _answers(other.address.port)
+    finally:
+        other.stop()
