@@ -68,3 +68,17 @@ Feature: Answer a damaged file
     Then what was asked is rejected because the store was made by a later version of kb, which is needed to read it
     And the fault is given as any other fault is given, never breaking off
     And nothing is written in the store
+
+  @slice-144
+  Scenario Outline: The operator runs kb serve on a store whose database cannot be read
+    Pins that a store whose database cannot be read is never put behind a server: serving it gives the one named fault, naming the database, and nothing is served.
+    Given a directory holding a store
+    And the store's database <damage>
+    When the operator runs kb serve on that directory, giving an address
+    Then serving the store is rejected because the store's database cannot be read, and the database is named
+    And nothing is served
+
+    Examples:
+      | damage                                              |
+      | was damaged behind the store's back                 |
+      | is missing, while the store's marker is still there |

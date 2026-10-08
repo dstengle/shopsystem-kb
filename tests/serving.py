@@ -18,12 +18,13 @@ STOPPING = 10  # seconds a server is given to stop at the end of a test before i
 
 
 class Serving:
-    """`kb serve` started on a root, listening where it was asked; `address` once it has said where it serves."""
+    """`kb serve` started on a root, listening where it was asked, with whatever else is asked of it (`--start`) and
+    KB_ROOT and KB_ACTOR set only as `env` sets them."""
 
-    def __init__(self, root, listen):
-        env = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
+    def __init__(self, root, listen, *asked, env=None):
+        clean = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
         self.process = subprocess.Popen(
-            [str(KB), "serve", str(root), "--listen", listen], env=env, cwd=root,
+            [str(KB), "serve", str(root), "--listen", listen, *asked], env={**clean, **(env or {})}, cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
 
@@ -52,9 +53,10 @@ class Serving:
         self.process.stderr.close()
 
 
-def started(root, request, listen="127.0.0.1:0"):
-    """`kb serve` on root, listening where asked, stopped when the test ends."""
-    serving = Serving(root, listen)
+def started(root, request, listen="127.0.0.1:0", *asked, env=None):
+    """`kb serve` on root, listening where asked, with whatever else is asked of it and the environment `env` adds,
+    stopped when the test ends."""
+    serving = Serving(root, listen, *asked, env=env)
     request.addfinalizer(serving.stop)
     return serving
 

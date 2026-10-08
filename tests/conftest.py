@@ -10,7 +10,7 @@ from pytest_bdd import given, parsers, then, when
 
 from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version, start_a_store, check
 import held
-from kb import cli, client as kb_client, store
+from kb import cli, client as kb_client, served, store
 
 
 def pytest_configure(config):
@@ -192,6 +192,19 @@ def _kb(*args, cwd, env=None):
     return held.in_process(cli.main, list(args), cwd, {**clean, **(env or {})})
 
 
+def exported(tmp_path, fill):
+    """A directory of files as an export writes them: the export of a store started in a directory of its own and
+    filled by `fill`, given a client on it."""
+    source = tmp_path / "source"
+    source.mkdir()
+    start_a_store(source)
+    fill(kb_client.connect(source))
+    target = tmp_path / "for-import"
+    ran = _kb("export", str(target), cwd=source)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    return target
+
+
 def _store_needing_attention(root):
     """A store a client filled: two decisions behind the decision type, and one of them, edited by hand, missing the
     body of its purpose."""
@@ -248,3 +261,16 @@ def _inside_one_naming_another(root, tmp_path):
     other.mkdir()
     start_a_store(other)
     return {"cwd": _store_needing_attention(root), "env": {"KB_ROOT": str(other)}}
+
+
+@given("a directory holding a store", target_fixture="root")
+def _directory_holding_a_store(root):
+    start_a_store(root)
+    return root
+
+
+@then("nothing is served")
+def _nothing_is_served(root):
+    """No server owns the store: its lock is there to be taken; where no store was left, there is nothing to lock."""
+    if held.holds_anything_in_the_place(root):
+        served.owned(root).close()

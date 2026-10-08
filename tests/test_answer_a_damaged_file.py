@@ -10,6 +10,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, create, define, request, start_a_store
 from conftest import _kb
 import held
+import serving
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
@@ -253,3 +254,21 @@ def _store_whose_marker_cannot_be_read(root):
     client = _store_with_a_decision_a_process_and_a_tag(root)
     held.with_a_marker_that_cannot_be_read(root)
     return client
+
+
+@scenario(FEATURE, "The operator runs kb serve on a store whose database cannot be read")
+def test_the_operator_runs_kb_serve_on_a_store_whose_database_cannot_be_read():
+    pass
+
+
+@when("the operator runs kb serve on that directory, giving an address", target_fixture="answered")
+def _kb_serve_giving_an_address(root):
+    return _kb("serve", str(root), "--listen", serving.closed_port(), cwd=root)
+
+
+@then("serving the store is rejected because the store's database cannot be read, and the database is named")
+def _serving_rejected_as_unreadable(answered):
+    assert (answered.returncode, answered.stdout) == (2, "")
+    [line] = answered.stderr.splitlines()
+    assert line.startswith("kb serve: refused: ")
+    _unreadable(*line.split(": ", 3)[2:4])

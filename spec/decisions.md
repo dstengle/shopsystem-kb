@@ -547,3 +547,14 @@ source: the formulation of reach-a-served-store's question, answered by the cont
 `kb serve` serves at exactly the address the operator gives or not at all: an address that is not a host and a port (a port from 0 to 65535, 0 asking the system for one), or one nothing can listen at, is refused naming it, with nothing served, never served at another port; and `kb.testing.served` refuses a directory for the connection that already holds one, leaving it as it was, rather than overwriting and then deleting a connection someone else wrote.
 date: 2026-10-06
 source: the batch 27 branch review (I3, I4), lines approved by the controller under the person's delegation of 2026-10-06
+
+## decision/0021-kb-served-from-a-container
+The operator is an activity a developer takes on, not a person, and the development environment is containerized, so a laptop and a deployment have one shape: kb is a service beside its callers on a shared network, which callers reach by its service name (`kb:50051`), never by a port published to the host; a store is started on the first `up` when a role is named; seeding belongs to `kb init`, refused over a store that exists; the connection reaches callers through compose, with no change to kb's discovery; the image is built from the repository first and published later.
+date: 2026-10-07
+source: adrs/0021-kb-served-from-a-container.md
+
+## decision/published-contract-v1-in-0-7-0
+What a client may depend on is still versioned together by the release tag: `kb.proto` in package `kb.v1`, `kb.init` with its `execution` keyword and `kb.NotStarted`, `kb.client.connect` with its clock and `where()`, `kb.content` with `NotCanonical.path` and its form, `kb.testing.served`, the id `schema/schema`, the connection file's form, every fault's `rule` name, and kb's image's store directory (`/data`), its port (50051), its entry point (`kb`) and its default command (`serve /data --listen 0.0.0.0:50051 --start`), the Dockerfile's insides not among them; with `kb init --seed` and `kb serve --start` this adds to contract v1 and changes nothing in it, so the package stays `kb.v1` and the release is kb 0.7.0; everything else may change without notice.
+date: 2026-10-07
+supersedes: decision/published-contract-v1-in-0-6-0
+source: docs/superpowers/specs/2026-10-07-kb-docker-design.md
