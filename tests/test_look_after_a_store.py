@@ -508,3 +508,41 @@ def _shown_the_checks_report(ran, seed, tmp_path):
 def _init_rejected_as_read_from_a_directory(ran, seed):
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr == f"kb init: refused: root: an import is read from a directory; {str(seed)!r} is not one\n"
+
+
+# A directory kb cannot write is refused, whichever command would start a store in it.
+
+@given("a directory that has no store inside it and that kb cannot write", target_fixture="root")
+def _an_unwritable_directory(root, request):
+    root.chmod(0o555)
+    request.addfinalizer(lambda: root.chmod(0o755))
+    return root
+
+
+UNWRITABLE_STARTS = {
+    "kb init": lambda root, tmp_path: ("init", str(root)),
+    "kb init with a seed directory": lambda root, tmp_path: (
+        "init", str(root), "--seed", str(exported(tmp_path, a_decision_type_and_a_decision))),
+    "kb serve with --start, giving an address": lambda root, tmp_path: (
+        "serve", str(root), "--listen", serving.closed_port(), "--start"),
+}
+
+
+@when(parsers.re(f"the operator runs (?P<command>{'|'.join(UNWRITABLE_STARTS)}) against that directory, "
+                 "saying which role they are"), target_fixture="ran")
+def _kb_start_where_kb_cannot_write(root, tmp_path, command):
+    arguments = UNWRITABLE_STARTS[command](root, tmp_path)
+    return _kb(*arguments, cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+
+
+@then("starting the store is rejected because a store can only be started in a directory kb can write, and the "
+      "directory is named")
+def _start_rejected_as_not_writable(ran, root):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert f"refused: root: a store is started in a directory kb can write, and {str(root)!r} is not one\n" \
+        in ran.stderr, ran.stderr
+
+
+@then("that directory still has nothing made in it")
+def _nothing_made_in_it(root):
+    assert list(root.iterdir()) == []
