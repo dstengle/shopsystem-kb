@@ -100,13 +100,18 @@ Feature: Operate a store
     Then setting the store up is rejected because files for import are read from a directory
     And that directory still has no store inside it
 
-  @slice-147
-  Scenario: The operator sets up a store seeded from the directory it is started in
-    Pins that a seed copied into the place a store will live can be landed from there, and that nothing kb makes while starting the store is taken for part of the seed.
-    Given a directory that has no store inside it, holding files that check clean: a type for decisions and a decision
-    When the operator runs kb init with that same directory as the seed directory against it, saying which role they are
+  Scenario Outline: The operator sets up a store seeded from a directory that is, or holds, the directory it is started in
+    Pins that a seed copied into, or around, the place a store will live can be landed from there, and that nothing kb makes while starting the store is taken for part of the seed.
+    Given a directory that has no store inside it
+    And a seed directory that <relation> that directory, holding files that check clean: a type for decisions and a decision
+    When the operator runs kb init with that seed directory against the directory, saying which role they are
     Then there is a store inside that directory
-    And it holds the files the directory held as kb import lands them into a freshly started store, and nothing else
+    And it holds the files the seed directory held as kb import lands them into a freshly started store, and nothing else
+
+    Examples:
+      | relation |
+      | is       |
+      | holds    |
 
   @slice-146
   Scenario Outline: Starting a store in a directory kb cannot write is refused
