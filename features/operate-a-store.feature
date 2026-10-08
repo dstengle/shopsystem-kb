@@ -100,6 +100,7 @@ Feature: Operate a store
     Then setting the store up is rejected because files for import are read from a directory
     And that directory still has no store inside it
 
+  @slice-148
   Scenario Outline: The operator sets up a store seeded from a directory that is, or holds, the directory it is started in
     Pins that a seed copied into, or around, the place a store will live can be landed from there, and that nothing kb makes while starting the store is taken for part of the seed.
     Given a directory that has no store inside it
