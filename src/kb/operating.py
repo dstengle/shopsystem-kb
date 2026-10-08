@@ -1,6 +1,7 @@
 """The operator's commands that are not rpcs, export, the import check and the import, over one store, each run inside
 the servicer's one boundary: the store opened first, the command's values made, one call into the domain, and any
 refusal or escaping exception its faults."""
+from pathlib import Path
 from typing import NamedTuple
 
 from kb import export, importing, signatures, values
@@ -10,10 +11,12 @@ from kb.servicer import boundary
 
 class Importing(NamedTuple):
     """An import as the operator asks for it: the directory as named, the role it lands under, and whether the
-    files with errors, and those leading to them, are skipped."""
+    files with errors, and those leading to them, are skipped; and, when a start gives one, the place it made inside
+    the directory, which is not offered."""
     directory: str
     role: str
     skip_errors: bool
+    passed_over: Path | None = None
 
 
 class Operator:
@@ -36,4 +39,5 @@ class Operator:
     def import_(self, request: Importing, held):
         """A directory checked, then landed in the store as one set signed by the role, with a message naming it."""
         signed = signatures.signed(kb_pb2.Signature(role=request.role, message=f"import {request.directory}"))
-        return importing.imported(held, values.directory(request.directory), signed, request.skip_errors)
+        return importing.imported(held, values.directory(request.directory), signed, request.skip_errors,
+                                request.passed_over)

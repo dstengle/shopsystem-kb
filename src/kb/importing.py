@@ -7,6 +7,7 @@ compared, never drafted. The check writes nothing; the import lands what checks 
 everything that leads to none, into a freshly started store as one set, through the write pipeline (kb.write)."""
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from kb import (
     canonical, composition, definitions, links, names, offers, refusals, rules, settled, validation, values, write,
@@ -60,20 +61,22 @@ def _examined(store: Port, offered: list[Offered]) -> Checked:
     )
 
 
-def imported(store: Port, directory: Directory, signed: Signed, skip_errors: bool) -> Checked:
+def imported(store: Port, directory: Directory, signed: Signed, skip_errors: bool,
+             passed_over: Path | None = None) -> Checked:
     """The directory checked, then every artifact in it landed as one set under the signature, each type ahead of the
     artifacts of its kind; the store's own type that describes types is kept. A directory with errors is refused with
     the check's report, and nothing is written; or, with errors skipped, every artifact lands but the broken files
-    and the files that would be skipped, and the report says which they are and why. The store's write lock is held
-    from finding the store fresh to the landing, so nothing lands between them."""
+    and the files that would be skipped, and the report says which they are and why. Files under the place passed
+    over, when one is given, are not offered. The store's write lock is held from finding the store fresh to the
+    landing, so nothing lands between them."""
     with store.exclusive():
-        return _imported(store, directory, signed, skip_errors)
+        return _imported(store, directory, signed, skip_errors, passed_over)
 
 
-def _imported(store: Port, directory: Directory, signed: Signed, skip_errors: bool) -> Checked:
+def _imported(store: Port, directory: Directory, signed: Signed, skip_errors: bool, passed_over: Path | None) -> Checked:
     """The import, made while the store's write lock is held."""
     _fresh(store)
-    offered = offers.offered(directory)
+    offered = offers.offered(directory, passed_over)
     report = _examined(store, offered)
     if report.errors and not skip_errors:
         return Checked([refusals.check_failed(len(report.errors))], report.errors, report.skipped)

@@ -1,8 +1,10 @@
 """A directory's files as they are offered for import: which files are read, and each read as YAML 1.2 and as an
 artifact at its place in the export layout. A store's history and the files that mark and keep it, at the directory's
 top, are passed over, unread: an old store's `.git/`, `journal/` and marker, a current store's marker, database
-and the lock a server of it held, and the place kb starts a store in out of sight (`store.STAGING`). A name that names no directory is refused. Nothing here checks an artifact against
-a type."""
+and the lock a server of it held, and the place kb starts a store in out of sight (`store.STAGING`); and, wherever it
+lies below the directory, the one place a start was told it made, with everything under it. A name that names no
+directory is refused. Nothing here checks an artifact against a type."""
+from pathlib import Path
 from dataclasses import dataclass, field
 
 from kb import canonical, names, refusals, served, settled, store, values
@@ -26,22 +28,27 @@ class Offered:
     errors: list = field(default_factory=list)
 
 
-def offered(directory: Directory) -> list[Offered]:
-    """Every file below the directory, read, in the order of the places the layout gives them. Raises Refused when
-    the name names no directory."""
+def offered(directory: Directory, passed_over: Path | None = None) -> list[Offered]:
+    """Every file below the directory, read, in the order of the places the layout gives them; those under the place
+    passed over, if one is given, are not. Raises Refused when the name names no directory."""
     if not directory.path.is_dir():
         raise Refused([refusals.not_an_import_directory(directory.named)])
-    return [_offered(directory, steps) for steps in _files(directory)]
+    return [_offered(directory, steps) for steps in _files(directory, passed_over)]
 
 
-def _files(directory: Directory) -> list[tuple[str, ...]]:
+def _files(directory: Directory, passed_over: Path | None) -> list[tuple[str, ...]]:
     """The place of every file below the directory, as steps, sorted; a store's history and the files that mark and
-    keep it, at its top, passed over."""
+    keep it, at its top, and whatever lies under the place passed over, passed over."""
     found = [path.relative_to(directory.path).parts for path in directory.path.rglob("*") if path.is_file()]
     return sorted(
         steps for steps in found
         if not (len(steps) == 1 and steps[0] in KEPT) and not (len(steps) > 1 and steps[0] in HISTORY)
+        and not _under(directory.path.joinpath(*steps), passed_over)
     )
+
+
+def _under(file: Path, place: Path | None) -> bool:
+    return place is not None and place.resolve() in file.resolve().parents
 
 
 def _offered(directory: Directory, steps: tuple[str, ...]) -> Offered:
