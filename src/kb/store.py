@@ -22,6 +22,7 @@ MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
 CONNECTION = MARKER.parent / "server.yaml"
 STORE_FORM = 1
+STAGING = ".kb-starting"
 
 
 @dataclass(frozen=True)
