@@ -78,7 +78,8 @@ Spec: `spec/index.md`. Storage design: `docs/superpowers/specs/2026-10-01-kb-sto
 kb's image serves a store as a service beside its callers, which reach it by its service name, `kb:50051`, never by a
 port published to the host; the network it listens on is its boundary (no authentication, no encryption). Published:
 the store directory `/data` (the store lives at `/data/kb/`), the port 50051, the entry point `kb` and the default
-command `serve /data --listen 0.0.0.0:50051 --start`. The compose example, `docker/compose.example.yaml`:
+command `serve /data --listen 0.0.0.0:50051 --start`. The compose example, `docker/compose.example.yaml`, needs Docker
+Compose 2.23.1 or later, for its `configs:` entry given by `content:`:
 
 ```yaml
 services:
@@ -105,6 +106,12 @@ volumes:
 ```
 
 - `agent` stands for your caller: put your caller's image in place of `my-shop-knol-role`.
+- The `build:` URL's `#v0.7.0` names kb 0.7.0's tag, which exists once kb 0.7.0 is tagged and the repository is
+  reachable from where you build. Until then, build from a checkout: `build: <path to the checkout>`, or `make image`
+  in the checkout and `image: shopsystem-kb:dev` in place of `build:`.
+- The example sets no `restart:` policy on purpose: a refusal (no `KB_ACTOR` on an empty volume, a store it cannot
+  open) would restart the container in a loop. Once the store is set up and served, add `restart: unless-stopped` if
+  you want it.
 - Seeding, when wanted, is one step before the first `up`, from a directory of files laid out as `kb export` lays
   them out: `docker compose run --rm -v ./seed:/seed:ro kb init /data --seed /seed`. A seed that does not check clean
   is refused with the check's report, as `kb import` shows it, and the volume is left holding no store.
@@ -127,8 +134,14 @@ volumes:
 - The container runs as the user `kb` (uid and gid 1000), which owns `/data` in the image, so a named volume takes
   that ownership. A bind mount that user cannot write (a host directory Docker made as root, say) is refused: the
   container exits 2 with one line naming the cause, and nothing is made in it. Over a store already there, the
-  refusal is kb's `unreadable` fault naming the database. Own the directory by uid 1000, or run the service as its
-  owner with `--user` (`user:` in compose, as in `docker compose run --rm --user "$(id -u):$(id -g)" kb ...`).
+  refusal is kb's `unreadable` fault naming the database. Own the directory by uid 1000, or, for a bind mount whose
+  files are already owned by another uid, run the service as that owner with `--user` (`user:` in compose, as in
+  `docker compose run --rm --user "$(id -u):$(id -g)" kb ...`). Do not use `--user` on a named volume: its store is
+  the user `kb`'s, and a command run as another uid is refused with `unreadable`, `validate` and `export` included.
+- Getting the store's files out works whatever your uid: export inside the container and stream the files out as a
+  tar, `docker compose run --rm -T --entrypoint sh kb -c 'kb export /tmp/x && tar -C /tmp/x -c .' > kb-export.tar`.
+  It works with the server up, too; `tar -xf kb-export.tar -C <dir>` gives the files, laid out as `kb export` lays
+  them out, ready to seed another store.
 - The image is built from the repository at a release tag; `make image` builds one from a checkout, and
   `make image-check` checks one serves a store beside its callers.
 
