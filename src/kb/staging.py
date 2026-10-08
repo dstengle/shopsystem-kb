@@ -58,7 +58,7 @@ def seeded(root, role: str, seed: str) -> importing.Checked:
     _vacant(root)
     with _staged(root) as place:
         starting.init(place, role)
-        imported = operating.Operator(place).import_(operating.Importing(seed, role, False))
+        imported = operating.Operator(place).import_(operating.Importing(seed, role, False, place))
         if not imported.faults:
             _placed(place, root)
     return imported

@@ -402,40 +402,40 @@ def _kb_init_with_a_seed(root, seed, tmp_path):
 
 
 @pytest.fixture
-def files_before():
-    """What the directory held apart from any store, before the store was set up in it: nothing, unless a step says."""
+def seed_held():
+    """What the seed directory held apart from any store inside it, before the store was set up: filled by the step
+    that makes the seed."""
     return {}
 
 
-@given("a directory that has no store inside it, holding files that check clean: a type for decisions and a decision",
-       target_fixture="files_before")
-def _a_directory_holding_a_clean_seed(root, tmp_path):
-    shutil.copytree(exported(tmp_path, a_decision_type_and_a_decision), root, dirs_exist_ok=True)
-    return held.apart_from_the_store(root)
-
-
-@when("the operator runs kb init with that same directory as the seed directory against it, saying which role they "
-      "are", target_fixture="ran")
-def _kb_init_seeded_from_itself(root, tmp_path):
-    return _kb("init", str(root), "--seed", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+@given(parsers.parse("a seed directory that {relation} that directory, holding files that check clean: a type for "
+                     "decisions and a decision"), target_fixture="seed")
+def _a_seed_that_is_or_holds_the_directory(relation, root, tmp_path, tmp_path_factory, seed_held):
+    """The files of an export put in the seed: the root itself, or the directory the (empty) root lies inside."""
+    seed = root if relation == "is" else root.parent
+    shutil.copytree(exported(tmp_path_factory.mktemp("export"), a_decision_type_and_a_decision), seed,
+                    dirs_exist_ok=True)
+    seed_held.update(held.apart_from_the_store(seed))
+    return seed
 
 
 @then("there is a store inside that directory")
-def _a_store_there(ran, root, files_before):
+def _a_store_there(ran, root):
     assert (ran.returncode, ran.stderr) == (0, "")
     assert held.holds_a_store(root)
-    assert held.apart_from_the_store(root) == files_before
 
 
-@then("it holds the files the directory held as kb import lands them into a freshly started store, and nothing else")
-def _holds_what_the_directory_held_as_imported(root, files_before, tmp_path):
-    seed = tmp_path / "as-held"
-    for place, text in files_before.items():
+@then("it holds the files the seed directory held as kb import lands them into a freshly started store, and nothing "
+      "else")
+def _holds_what_the_seed_held_as_imported(seed, root, seed_held, tmp_path_factory):
+    assert held.apart_from_the_store(seed) == seed_held
+    as_held = tmp_path_factory.mktemp("as-held")
+    for place, text in seed_held.items():
         if text is None:
             continue
-        (seed / place).parent.mkdir(parents=True, exist_ok=True)
-        (seed / place).write_bytes(text)
-    _holds_the_seed_as_imported(root, seed, tmp_path, seeded_from=root)
+        (as_held / place).parent.mkdir(parents=True, exist_ok=True)
+        (as_held / place).write_bytes(text)
+    _holds_the_seed_as_imported(root, as_held, tmp_path_factory.mktemp("elsewhere"), seeded_from=seed)
 
 
 @then("it holds the files in the seed directory as kb import lands them into a freshly started store")

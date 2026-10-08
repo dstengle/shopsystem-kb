@@ -27,12 +27,12 @@ def test_a_change_made_while_an_import_is_under_way_is_never_merged_with_it(tmp_
     made = []
     reading = offers.offered
 
-    def offered_while_a_client_changes_the_store(directory):
+    def offered_while_a_client_changes_the_store(directory, *passed_over):
         made.append(request(
             client, "schema", DECISION_TYPE["title"], message="Define Decision",
             content={key: value for key, value in DECISION_TYPE.items() if key != "title"},
         ))
-        return reading(directory)
+        return reading(directory, *passed_over)
     monkeypatch.setattr(offers, "offered", offered_while_a_client_changes_the_store)
 
     imported = kb_client.import_(str(tmp_path / "for-import"), "operator")
