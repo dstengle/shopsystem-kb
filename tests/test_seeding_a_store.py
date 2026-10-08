@@ -53,7 +53,7 @@ def test_a_seeded_setup_interrupted_exits_without_a_traceback_and_leaves_no_stor
 
 def _staged_store(root):
     """Whether a store has been started in the staging place beneath root: its marker is there, written last."""
-    return (root / ".kb-starting" / store.MARKER).is_file()
+    return (root / store.STAGING / store.MARKER).is_file()
 
 
 def test_a_plain_setup_after_a_seeded_one_was_killed_starts_a_store_as_if_nothing_were_there(tmp_path, root):

@@ -1,3 +1,4 @@
+import shutil
 import signal
 import socket
 
@@ -400,15 +401,45 @@ def _kb_init_with_a_seed(root, seed, tmp_path):
     return _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
 
 
+@pytest.fixture
+def files_before():
+    """What the directory held apart from any store, before the store was set up in it: nothing, unless a step says."""
+    return {}
+
+
+@given("a directory that has no store inside it, holding files that check clean: a type for decisions and a decision",
+       target_fixture="files_before")
+def _a_directory_holding_a_clean_seed(root, tmp_path):
+    shutil.copytree(exported(tmp_path, a_decision_type_and_a_decision), root, dirs_exist_ok=True)
+    return held.apart_from_the_store(root)
+
+
+@when("the operator runs kb init with that same directory as the seed directory against it, saying which role they "
+      "are", target_fixture="ran")
+def _kb_init_seeded_from_itself(root, tmp_path):
+    return _kb("init", str(root), "--seed", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+
+
 @then("there is a store inside that directory")
-def _a_store_there(ran, root):
+def _a_store_there(ran, root, files_before):
     assert (ran.returncode, ran.stderr) == (0, "")
     assert held.holds_a_store(root)
-    assert held.apart_from_the_store(root) == {}
+    assert held.apart_from_the_store(root) == files_before
+
+
+@then("it holds the files the directory held as kb import lands them into a freshly started store, and nothing else")
+def _holds_what_the_directory_held_as_imported(root, files_before, tmp_path):
+    seed = tmp_path / "as-held"
+    for place, text in files_before.items():
+        if text is None:
+            continue
+        (seed / place).parent.mkdir(parents=True, exist_ok=True)
+        (seed / place).write_bytes(text)
+    _holds_the_seed_as_imported(root, seed, tmp_path, seeded_from=root)
 
 
 @then("it holds the files in the seed directory as kb import lands them into a freshly started store")
-def _holds_the_seed_as_imported(root, seed, tmp_path):
+def _holds_the_seed_as_imported(root, seed, tmp_path, seeded_from=None):
     imported = tmp_path / "imported"
     imported.mkdir()
     assert _kb("init", str(imported), cwd=tmp_path, env={"KB_ACTOR": OPERATOR}).returncode == 0
@@ -416,12 +447,12 @@ def _holds_the_seed_as_imported(root, seed, tmp_path):
     assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
     assert held.names(root) == held.names(imported)
     assert [held.text(root, name) for name in held.names(root)] == [held.text(imported, name) for name in held.names(root)]
-    assert _signed_and_set(root) == _signed_and_set(imported)
+    assert _signed_and_set(root, seeded_from or seed) == _signed_and_set(imported, seed)
 
 
-def _signed_and_set(root):
-    """The store's history but its moments and ids: each entry as the history gives it, and the sets they landed in,
-    each named by where it first stands."""
+def _signed_and_set(root, seed):
+    """The store's history but its moments and ids: each entry as the history gives it, with the directory it was
+    imported from named `<seed>`, and the sets they landed in, each named by where it first stands."""
     entries = held.history(kb_client.connect(root))
     sets = [entry.batch for entry in entries]
     kept = []
@@ -429,6 +460,7 @@ def _signed_and_set(root):
         entry.batch = str(sets.index(entry.batch))
         entry.ClearField("id")
         entry.ClearField("at")
+        entry.message = entry.message.replace(str(seed), "<seed>")
         kept.append(entry)
     return kept
 
@@ -508,3 +540,41 @@ def _shown_the_checks_report(ran, seed, tmp_path):
 def _init_rejected_as_read_from_a_directory(ran, seed):
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr == f"kb init: refused: root: an import is read from a directory; {str(seed)!r} is not one\n"
+
+
+# A directory kb cannot write is refused, whichever command would start a store in it.
+
+@given("a directory that has no store inside it and that kb cannot write", target_fixture="root")
+def _an_unwritable_directory(root, request):
+    root.chmod(0o555)
+    request.addfinalizer(lambda: root.chmod(0o755))
+    return root
+
+
+UNWRITABLE_STARTS = {
+    "kb init": lambda root, tmp_path: ("init", str(root)),
+    "kb init with a seed directory": lambda root, tmp_path: (
+        "init", str(root), "--seed", str(exported(tmp_path, a_decision_type_and_a_decision))),
+    "kb serve with --start, giving an address": lambda root, tmp_path: (
+        "serve", str(root), "--listen", serving.closed_port(), "--start"),
+}
+
+
+@when(parsers.re(f"the operator runs (?P<command>{'|'.join(UNWRITABLE_STARTS)}) against that directory, "
+                 "saying which role they are"), target_fixture="ran")
+def _kb_start_where_kb_cannot_write(root, tmp_path, command):
+    arguments = UNWRITABLE_STARTS[command](root, tmp_path)
+    return _kb(*arguments, cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+
+
+@then("starting the store is rejected because a store can only be started in a directory kb can write, and the "
+      "directory is named")
+def _start_rejected_as_not_writable(ran, root):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert f"refused: root: a store is started in a directory kb can write, and {str(root)!r} is not one\n" \
+        in ran.stderr, ran.stderr
+
+
+@then("that directory still has nothing made in it")
+def _nothing_made_in_it(root):
+    assert list(root.iterdir()) == []

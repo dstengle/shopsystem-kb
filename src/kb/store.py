@@ -5,6 +5,7 @@ working directory, or named by KB_ROOT. STORE_FORM is the store marker's value a
 store is started; the store's own, not part of the published contract (adrs/0018). An earlier kb's marker held
 `contract`, and a store it made is told apart by that."""
 import contextlib
+import os
 import shutil
 import sqlite3
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
 CONNECTION = MARKER.parent / "server.yaml"
 STORE_FORM = 1
+STAGING = ".kb-starting"
 
 
 @dataclass(frozen=True)
@@ -127,7 +129,7 @@ def start(root: Root, fill: Callable[[Port], None]) -> None:
 
 def vacant(root: Root) -> None:
     """Refuse a root a store cannot be started in: one that is not there, is not a directory, has a store inside it or
-    anything else in the place a store goes, or is inside a store. A relative root cannot be resolved once the
+    anything else in the place a store goes, or is inside a store, or is one kb cannot write. A relative root cannot be resolved once the
     working directory it is read against is itself gone; that is refused too, never raised."""
     def refuse(message: str):
         raise Refused([kb_pb2.Fault(rule=rules.ROOT, message=message)])
@@ -147,6 +149,8 @@ def vacant(root: Root) -> None:
     above = find_above(root.path.resolve().parent)
     if above is not None:
         refuse(f"stores do not nest; {named} is inside the store at {str(above)!r}")
+    if not os.access(root.path, os.W_OK | os.X_OK):
+        refuse(f"a store is started in a directory kb can write, and {named} is not one")
 
 
 def find_above(start: Path) -> Path | None:

@@ -1,14 +1,14 @@
 """A directory's files as they are offered for import: which files are read, and each read as YAML 1.2 and as an
 artifact at its place in the export layout. A store's history and the files that mark and keep it, at the directory's
-top, are passed over, unread: an old store's `.git/`, `journal/` and marker, and a current store's marker, database
-and the lock a server of it held. A name that names no directory is refused. Nothing here checks an artifact against
+top, are passed over, unread: an old store's `.git/`, `journal/` and marker, a current store's marker, database
+and the lock a server of it held, and the place kb starts a store in out of sight (`store.STAGING`). A name that names no directory is refused. Nothing here checks an artifact against
 a type."""
 from dataclasses import dataclass, field
 
 from kb import canonical, names, refusals, served, settled, store, values
 from kb.values import ArtifactId, Directory, Refused
 
-HISTORY = (".git", "journal")
+HISTORY = (".git", "journal", store.STAGING)
 KEPT = (
     store.MARKER.name, store.DATABASE.name, *(f"{store.DATABASE.name}-{side}" for side in ("wal", "shm")),
     served.LOCK.name,

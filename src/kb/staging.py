@@ -14,8 +14,6 @@ from typing import Callable, Iterator
 from kb import importing, operating, starting, store
 from kb.values import Refused
 
-_STAGING = ".kb-starting"
-
 
 def started(root, role: str) -> None:
     """A store started inside root under the role, holding nothing yet, as a server is started on it to serve it.
@@ -71,7 +69,7 @@ def _staged(root) -> Iterator[Path]:
     """The staging place beneath root, cleared of whatever an earlier stopped run left there, for the block to start a
     store in; removed whole when the block ends, however it ends. Raises NotStarted, with the fault, when it cannot be
     made."""
-    place = Path(root) / _STAGING
+    place = Path(root) / store.STAGING
     starting.prepared(lambda: _emptied(place))
     try:
         yield place
