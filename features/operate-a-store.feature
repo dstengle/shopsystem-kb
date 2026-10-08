@@ -100,6 +100,27 @@ Feature: Operate a store
     Then setting the store up is rejected because files for import are read from a directory
     And that directory still has no store inside it
 
+  Scenario: The operator sets up a store seeded from the directory it is started in
+    Pins that a seed copied into the place a store will live can be landed from there, and that nothing kb makes while starting the store is taken for part of the seed.
+    Given a directory that has no store inside it, holding files that check clean: a type for decisions and a decision
+    When the operator runs kb init with that same directory as the seed directory against it, saying which role they are
+    Then there is a store inside that directory
+    And it holds the files the directory held as kb import lands them into a freshly started store, and nothing else
+
+  Scenario Outline: Starting a store in a directory kb cannot write is refused
+    Pins that a directory kb cannot write is told apart from a store that cannot answer: the operator is told the directory cannot be written, and nothing is made in it.
+    Given a directory that has no store inside it and that kb cannot write
+    When the operator runs <command> against that directory, saying which role they are
+    Then starting the store is rejected because a store can only be started in a directory kb can write, and the directory is named
+    And nothing is served
+    And that directory still has nothing made in it
+
+    Examples:
+      | command                                  |
+      | kb init                                  |
+      | kb init with a seed directory            |
+      | kb serve with --start, giving an address |
+
   @slice-46
   Scenario: The operator checks the whole store
     Pins the operator's health check: one command tells them everything that does not fit and everything that has fallen behind, for content they did not write.
