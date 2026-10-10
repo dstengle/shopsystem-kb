@@ -218,6 +218,14 @@ Feature: Define a type
     And the decision still conforms to the type's first version
     And checking the store lists the decision as behind its type, not as a violation
 
+  Scenario: A type is changed and the links of an artifact conforming to its earlier version stay as that version declares
+    Pins that changing a type rewrites nothing about the artifacts left at its earlier version: a link their version declares still guards what it points at, and a field only the new version makes a link is not one for them.
+    Given a note type the store holds at its first version, whose notes link to a tag and hold a reference as plain text
+    And a tag, and a note conforming to that version that links to the tag and holds a reference
+    When the client changes the note type so that notes no longer link to a tag and their reference is a link
+    Then removing the tag is rejected because something still points at it, naming the note
+    And the note's reference is not a link
+
   @slice-106
   Scenario: Removing a type while the store holds artifacts of its kind is refused
     Pins that a type cannot be taken away from under the artifacts it checks, and that the client is told exactly which artifacts stand in the way.

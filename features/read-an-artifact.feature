@@ -94,3 +94,16 @@ Feature: Read an artifact
     Pins that a target put in place of a link says which artifact it is and what it conforms to, before the content, so a client can tell what it has been handed.
     When the client reads the whole decision following its links one step
     Then the older decision comes with its IRI, the IRI of the version of the decision type it conforms to, its title and its revision, ahead of its content
+
+  Scenario Outline: An artifact that conforms to an earlier version of its type is read as that version declares
+    Pins that a type moving on changes nothing about how an artifact left at its earlier version reads: what is shown at a glance and what counts as a link are its own version's.
+    Given a note type whose first version shows a summary at a glance and holds a reference as plain text, and whose second version shows an owner at a glance and makes the reference a link
+    And a note that conforms to the first version, with a summary and a reference
+    When the client reads <what>
+    Then the note is given as the first version declares, <as declared>
+
+    Examples:
+      | what                                        | as declared                                                              |
+      | the note at a glance                        | its summary among the fields shown and no stub for its reference         |
+      | the whole note                              | its reference given as the text it holds                                 |
+      | the whole note following its links one step | its reference given as the text it holds, with nothing filled in for it |
