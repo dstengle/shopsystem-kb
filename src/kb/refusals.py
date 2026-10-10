@@ -119,6 +119,16 @@ def export_would_overwrite(named: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.ROOT, message=f"an export never overwrites; {named!r} already holds something")
 
 
+def backup_would_overwrite(named: str) -> kb_pb2.Fault:
+    """A place a backup is to be written at where anything already is."""
+    return kb_pb2.Fault(rule=rules.ROOT, message=f"a backup never overwrites; {named!r} already holds something")
+
+
+def backup_cannot_be_written(named: str, problem: str) -> kb_pb2.Fault:
+    """A place a backup cannot be written at: nothing there is the store's own."""
+    return kb_pb2.Fault(rule=rules.ROOT, message=f"a backup cannot be written at {named!r}: {problem}")
+
+
 def unreadable_file(file: str, problem: str) -> kb_pb2.Fault:
     """A file offered for import that cannot be read as YAML 1.2."""
     return kb_pb2.Fault(artifact=file, rule=rules.UNREADABLE, message=f"it cannot be read as YAML 1.2: {problem}")

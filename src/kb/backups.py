@@ -23,8 +23,16 @@ class Restored:
 
 def made(held: Port, into: Named) -> None:
     """The store held copied whole, at one moment, into a new file at the place named, which says it holds a store of
-    this kb's form."""
-    held.copied(into.path, store.STORE_FORM)
+    this kb's form. Raises Refused, writing nothing, when anything is at the place, even a dangling link, or the file
+    cannot be made there; a copy that fails there leaves nothing."""
+    if into.path.is_symlink() or into.path.exists():
+        raise Refused([refusals.backup_would_overwrite(into.named)])
+    try:
+        held.copied(into.path, store.STORE_FORM)
+    except FileExistsError:
+        raise Refused([refusals.backup_would_overwrite(into.named)]) from None
+    except OSError as error:
+        raise Refused([refusals.backup_cannot_be_written(into.named, error.strerror or str(error))]) from None
 
 
 def read(backup: Named) -> None:

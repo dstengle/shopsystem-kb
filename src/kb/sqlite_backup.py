@@ -14,7 +14,8 @@ def copied(db: sqlite3.Connection, path: Path, form: int) -> None:
     """The database db is open on copied whole into a new file at path, in one step, so in one read transaction and
     at one moment, which neither takes nor waits for the write lock; its header set to kb's mark and the form given.
     Raises FileExistsError, writing nothing, when anything is at path; a copy that fails removes the file it made, and
-    nothing else."""
+    nothing else. A failure writing the copy is an OSError naming what SQLite said; only a database found damaged
+    stays the sqlite3.Error it was, as that of the store."""
     _created(path)
     done = False
     try:
@@ -27,6 +28,10 @@ def copied(db: sqlite3.Connection, path: Path, form: int) -> None:
         finally:
             target.close()
         done = True
+    except sqlite3.Error as error:
+        if getattr(error, "sqlite_errorcode", 0) & 0xFF in (sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB):
+            raise
+        raise OSError(str(error)) from error
     finally:
         if not done:
             path.unlink(missing_ok=True)

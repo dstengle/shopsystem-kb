@@ -41,6 +41,7 @@ RPCS = {
 COMMANDS = {
     "validate": lambda exported: (["validate"], {}),
     "export": lambda exported: (["export", str(exported.parent / "empty")], {}),
+    "backup": lambda exported: (["backup", str(exported.parent / "empty" / "store.backup")], {}),
     "import --check": lambda exported: (["import", str(exported), "--check"], {}),
     "import": lambda exported: (["import", str(exported)], {"KB_ACTOR": OPERATOR}),
 }

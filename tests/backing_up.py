@@ -7,7 +7,7 @@ import sqlite3
 import threading
 
 import pytest
-from pytest_bdd import given, then, when
+from pytest_bdd import given, parsers, then, when
 
 import at_once
 import serving
@@ -423,3 +423,157 @@ def _holds_everything_with_history_and_journal(restored):
     assert {"schema/decision", "decision/price-reviews-happen-weekly"} <= set(held)
     assert everything(restored["place"]) == held
     assert the_journal(restored["place"]) == the_journal(restored["from"])
+
+
+# A backup refuses where it cannot be made.
+
+PLACES = {
+    "a file holding something": lambda place: place.write_text("Prices are reviewed monthly.\n"),
+    "an empty file": lambda place: place.touch(),
+    "an empty directory": lambda place: place.mkdir(),
+    "a directory holding something": lambda place: (place.mkdir(), (place / "notes.txt").write_text("Weekly.\n")),
+}
+
+
+@given(parsers.re(f"(?P<what>{'|'.join(PLACES)}) at the place the backup would be written"), target_fixture="place")
+def _something_at_the_place(what, tmp_path):
+    place = tmp_path / "store.backup"
+    PLACES[what](place)
+    return {"file": place, "before": _everything_at(place)}
+
+
+def _everything_at(place):
+    """What stands at the place, each path with its bytes (a directory's with none)."""
+    return {path.relative_to(place.parent): path.read_bytes() if path.is_file() else None
+            for path in [place, *sorted(place.rglob("*"))]}
+
+
+@when("the operator backs up the store to that place", target_fixture="ran")
+def _backs_up_to(root, place):
+    return _kb("backup", str(place["file"]), cwd=root)
+
+
+@then("the backup is rejected because a backup never overwrites")
+def _backup_rejected_as_overwriting(ran, place):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == f"kb backup: refused: root: a backup never overwrites; {str(place['file'])!r} already holds something\n"
+
+
+@then("what is at that place is left as it was")
+def _left_as_it_was(place):
+    assert _everything_at(place["file"]) == place["before"]
+
+
+# kb backup finds the store as kb validate does.
+
+from conftest import (_inside_one_naming_another, _outside_with_kb_root, _outside_with_kb_root_naming_no_store,  # noqa: E402
+                      _store_needing_attention, _working_deep_inside)
+import held  # noqa: E402
+
+
+@given("a folder deep inside the directory a store sits in", target_fixture="where")
+def _a_folder_deep_inside(root):
+    return _working_deep_inside(root)
+
+
+@given("outside any store, with KB_ROOT naming a store", target_fixture="where")
+def _outside_naming_a_store(root, tmp_path):
+    return _outside_with_kb_root(root, tmp_path)
+
+
+@given("outside any store, with nothing naming one", target_fixture="where")
+def _outside_naming_nothing(tmp_path):
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    return {"cwd": outside, "env": {}}
+
+
+@given("outside any store, with KB_ROOT naming a directory that holds no store", target_fixture="where")
+def _outside_naming_no_store(tmp_path):
+    return _outside_with_kb_root_naming_no_store(tmp_path)
+
+
+@given("inside one store, with KB_ROOT naming a different store", target_fixture="where")
+def _inside_naming_another(root, tmp_path):
+    return _inside_one_naming_another(root, tmp_path)
+
+
+def _inside_a_store(root, damage):
+    _store_needing_attention(root)
+    damage(root)
+    return {"cwd": root, "env": {}}
+
+
+@given("inside a store made by an earlier kb", target_fixture="where")
+def _inside_an_earlier_kbs_store(root):
+    return _inside_a_store(root, held.made_by_an_earlier_kb)
+
+
+@given("inside a store made by a later kb", target_fixture="where")
+def _inside_a_later_kbs_store(root):
+    return _inside_a_store(root, held.made_by_a_later_kb)
+
+
+@given("inside a store whose database cannot be read", target_fixture="where")
+def _inside_an_unreadable_store(root):
+    return _inside_a_store(root, held.damage_the_database)
+
+
+@when("the operator runs kb backup there", target_fixture="ran")
+def _kb_backup_there(where, tmp_path):
+    """kb backup run where the operator works, the backup to be written beside the directory it is run from."""
+    file = tmp_path / "there.backup"
+    return {"file": file, "where": where, "ran": _kb("backup", str(file), cwd=where["cwd"], env=where["env"])}
+
+
+@then("the store kb validate would check there is the one backed up")
+def _the_store_validate_checks_is_backed_up(ran, tmp_path_factory):
+    """The backup restored in a directory of its own holds what kb validate, run there, checks."""
+    assert (ran["ran"].returncode, ran["ran"].stderr) == (0, ""), ran["ran"].stderr
+    where = ran["where"]
+    checked = _kb("validate", cwd=where["cwd"], env=where["env"])
+    place = tmp_path_factory.mktemp("restored")
+    restored = _kb("restore", str(ran["file"]), str(place), cwd=place)
+    assert (restored.returncode, restored.stderr) == (0, ""), restored.stderr
+    again = _kb("validate", cwd=place)
+    assert (again.returncode, again.stdout, again.stderr) == (checked.returncode, checked.stdout, checked.stderr)
+    assert checked.returncode == 1 and checked.stdout.startswith("violation\t")
+
+
+@then("the backup is rejected for the same reason kb validate, run there, is rejected")
+def _rejected_as_validate_is(ran):
+    where, backed_up = ran["where"], ran["ran"]
+    checked = _kb("validate", cwd=where["cwd"], env=where["env"])
+    assert (backed_up.returncode, backed_up.stdout) == (2, "")
+    assert (checked.returncode, checked.stdout) == (2, "")
+    assert backed_up.stderr.replace("kb backup:", "kb validate:", 1) == checked.stderr
+    assert not ran["file"].exists()
+
+
+# A backup is made where the store's files are, not through a server.
+
+@given("the operator is working in a directory holding a connection to a server and no store",
+       target_fixture="where")
+def _working_beside_a_connection(root):
+    root.mkdir(exist_ok=True)
+    return {"cwd": root, "env": {}}
+
+
+@given("that server serves a store")
+def _that_server_serves_a_store(where, tmp_path, request):
+    """A store of its own served by `kb serve`; the connection in the directory the operator works in names it."""
+    served = tmp_path / "served"
+    served.mkdir()
+    start_a_store(served)
+    where["address"] = serving.serving(served, request)
+    serving.connection(where["cwd"], where["address"])
+
+
+@then("the backup is rejected because a backup is made where the store's files are, not through a server")
+def _rejected_as_a_connection(ran):
+    backed_up, where = ran["ran"], ran["where"]
+    assert (backed_up.returncode, backed_up.stdout) == (2, "")
+    assert backed_up.stderr == (
+        "kb backup: refused: store: these commands run where the store is, not through a server: "
+        f"{where['cwd']} holds the connection to the server at {where['address']}\n")
+    assert not ran["file"].exists()

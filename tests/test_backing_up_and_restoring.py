@@ -104,3 +104,44 @@ def test_a_restore_interrupted_exits_without_a_traceback_and_leaves_no_store(tmp
     assert ran.returncode == -signal.SIGINT
     assert "Traceback" not in ran.stderr, ran.stderr
     assert held.holds_nothing(root)
+
+
+def test_a_backup_in_a_directory_that_does_not_exist_is_refused_naming_the_place(tmp_path, root):
+    """The place's directory is not made, and the refusal names the place, not the store."""
+    start_a_store(root)
+    place = tmp_path / "nowhere" / "store.backup"
+    ran = _kb("backup", str(place), cwd=root)
+    assert (ran.returncode, ran.stdout) == (2, "")
+    [line] = ran.stderr.splitlines()
+    assert line.startswith(f"kb backup: refused: root: a backup cannot be written at {str(place)!r}: "), line
+    assert not place.parent.exists()
+
+
+def test_a_backup_over_a_dangling_link_is_refused_and_the_link_left(tmp_path, root):
+    start_a_store(root)
+    place = tmp_path / "store.backup"
+    place.symlink_to(tmp_path / "missing")
+    ran = _kb("backup", str(place), cwd=root)
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == f"kb backup: refused: root: a backup never overwrites; {str(place)!r} already holds something\n"
+    assert place.is_symlink() and not (tmp_path / "missing").exists()
+
+
+def test_a_copy_that_fails_in_the_backups_place_is_refused_naming_it_and_leaves_nothing(tmp_path, root, monkeypatch):
+    """The file the copy may grow to is cut short, so the write into the backup fails; the store is not at fault."""
+    import resource
+    start_a_store(root)
+    define(kb_client.connect(root), DECISION_TYPE)
+    place = tmp_path / "store.backup"
+    signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+    soft, hard = resource.getrlimit(resource.RLIMIT_FSIZE)
+    resource.setrlimit(resource.RLIMIT_FSIZE, (4096, hard))
+    try:
+        ran = _kb("backup", str(place), cwd=root)
+    finally:
+        resource.setrlimit(resource.RLIMIT_FSIZE, (soft, hard))
+        signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
+    assert (ran.returncode, ran.stdout) == (2, "")
+    [line] = ran.stderr.splitlines()
+    assert line.startswith(f"kb backup: refused: root: a backup cannot be written at {str(place)!r}: "), line
+    assert not place.exists()
