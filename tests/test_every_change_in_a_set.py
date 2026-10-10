@@ -8,7 +8,8 @@ import copy
 import pytest
 
 from calls import (
-    DECISION_TYPE, check, create, create_many, created, define, iri, read, replace_many, replaced, start_a_store, type_iri,
+    DECISION_TYPE, check, create, create_many, created, define, iri, kb_ref, read, replace_many, replaced,
+    start_a_store, type_iri,
 )
 from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps, loads
@@ -118,6 +119,67 @@ def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(c
     first = {key: value for key, value in {**content, **earlier}.items() if value is not None}
     response = replace_many(client, [replaced(type_iri("decision"), first), replaced(type_iri("decision"), changed)])
     assert _faults(response) == faults
+    assert read(client, type_iri("decision")).revision == 1
+
+
+def _a_decision_type(version, change):
+    """The type for decisions as a replacement writes it, at the version given, its schema changed as said."""
+    content = {"version": version, "schema": copy.deepcopy(DECISION_TYPE["schema"])}
+    change(content["schema"])
+    return content
+
+
+def _a_shape_not_held(schema):
+    schema["properties"]["binding"] = {"$ref": kb_ref("nothing", 1, "/$defs/binding")}
+
+
+def _built_on_itself(schema):
+    schema["allOf"] = [{"$ref": kb_ref("decision")}]
+
+
+def _a_link_field_without_targets(schema):
+    del schema["properties"]["supersedes"]["ref"]["targets"]
+
+
+def _an_owner(schema):
+    schema["properties"]["owner"] = {"type": "string"}
+
+
+def _an_outcome(schema):
+    schema["properties"]["outcome"] = {"type": "string"}
+
+
+UNSOUND = [
+    (_a_shape_not_held, "schema/properties/binding/$ref", "shape"),
+    (_built_on_itself, "schema/allOf/0/$ref", "built-on"),
+    (_a_link_field_without_targets, "schema/properties/supersedes", "targets"),
+]
+
+
+@pytest.mark.parametrize("unsound, place, rule", UNSOUND)
+def test_a_type_an_earlier_change_of_a_set_leaves_unsound_is_refused_whatever_a_later_one_leaves(
+    root, client, unsound, place, rule,
+):
+    response = replace_many(client, [
+        replaced(type_iri("decision"), _a_decision_type(2, unsound)),
+        replaced(type_iri("decision"), _a_decision_type(2, _an_owner)),
+    ])
+    assert _faults(response) == [(type_iri("decision"), place, rule)]
+    assert read(client, type_iri("decision")).revision == 1
+    with store.opened(root) as held:
+        assert held.versions(values.artifact_id(type_iri("decision"))) == [1]
+
+
+def test_a_type_a_first_change_leaves_unsound_is_refused_beside_every_other_fault_of_the_set(client):
+    _with_the_decision(client)
+    response = replace_many(client, [
+        replaced(type_iri("decision"), _a_decision_type(2, _a_shape_not_held)),
+        replaced(type_iri("decision"), _a_decision_type(2, _an_outcome)),
+        replaced(DECISION, {"sections": SECTIONS[:1]}),
+    ])
+    assert _faults(response) == [
+        (type_iri("decision"), "schema/properties/binding/$ref", "shape"), (DECISION, "sections", "sections"),
+    ]
     assert read(client, type_iri("decision")).revision == 1
 
 

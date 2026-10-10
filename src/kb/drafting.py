@@ -1,6 +1,6 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
-the operations before it left it, then every artifact the set touched checked once, its content, its links and a type
-as a type, against the store as the whole set leaves it; each change then as the port takes it, with the revisions of
+the operations before it left it, then every change checked, its content, its links and a type as a type, against the
+store as the whole set leaves it; each change then as the port takes it, with the revisions of
 the types it was read through. Only what the set changes is handed: a type's change restates the links of no
 artifact, which stay as the version it conforms to declares them. A fault anywhere refuses the whole set with every
 fault found."""
@@ -40,7 +40,7 @@ def _drafted(draft: Draft, operations: list) -> list[Change]:
     outcomes = [_acted(draft, operation) for operation in operations]
     changes = [each for each in outcomes if isinstance(each, Change)]
     last = {change.artifact_id: change for change in changes}
-    faults = [fault for outcome in outcomes for fault in _faults(draft, outcome, last)]
+    faults = [fault for outcome in outcomes for fault in _faults(draft, outcome)]
     if faults:
         raise Refused(faults)
     return [_versioned(draft, change, last[change.artifact_id] is change) for change in changes]
@@ -56,10 +56,11 @@ def _acted(draft: Draft, operation) -> Change | list:
         return list(refused.faults)
 
 
-def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
+def _faults(draft: Draft, outcome: Change | list) -> list:
     """An operation's faults: those it was refused with as it acted; for a removal, every link the set leaves pointing
     at what it removed; for a change, those it found as it acted, then what it left against its type as the set leaves
-    it, and, for the last the set makes to a type, that type checked as a type."""
+    it, and, for every change the set makes to a type, each making a version that is kept, what it left checked as a
+    type."""
     if not isinstance(outcome, Change):
         return outcome
     if outcome.left is None:
@@ -69,7 +70,7 @@ def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
         ] + _read_by(draft, outcome)
     faults = [*outcome.faults, *_fits(draft, outcome)]
     typed = composition.artifact_kind(outcome.left) == values.TYPE_KIND
-    if not faults and last[outcome.artifact_id] is outcome and typed:
+    if not faults and typed:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return _in_order(draft, outcome, faults)
 
