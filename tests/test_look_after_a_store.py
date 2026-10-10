@@ -9,6 +9,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a_store
 from conftest import OPERATOR, _kb, _store_needing_attention, _store_with_content, exported
 import held
+from backing_up import *  # noqa: F403 (the backup and restore steps, bound by this module's scenarios)
 import serving
 import stopping
 from kb import canonical
@@ -125,15 +126,18 @@ def _kb_help(root):
     return _kb("--help", cwd=root)
 
 
-@then("it offers setting a store up, checking and exporting one, and importing into a freshly started store")
-def _offers_four_commands(ran):
+@then("it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing "
+      "into a freshly started store")
+def _offers_six_commands(ran):
     assert (ran.returncode, ran.stderr) == (0, "")
     listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
-    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import,serve}"
+    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import,backup,restore,serve}"
     lines = " ".join(listed.split())
     assert "init set up a store in a directory" in lines
     assert "validate check the store" in lines
     assert "export write the store" in lines
+    assert "backup back the store found here, or the one KB_ROOT names, up whole" in lines
+    assert "restore restore a backup as a store in a directory" in lines
     assert "import bring a directory of files into a freshly started store" in lines
 
 

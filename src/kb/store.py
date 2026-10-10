@@ -110,15 +110,15 @@ def _told_apart(root: Path) -> None:
     raise LaterKb(root)
 
 
-def start(root: Root, fill: Callable[[Port], None]) -> None:
-    """The store's place made, then its database, filled by `fill`, then its marker, last, so a store is marked only
-    once it is whole. A SQLite that cannot keep a store is refused before anything is made; when making the
-    database or the marker raises, the place is removed and the error raised: a failed start leaves nothing."""
+def start(root: Root, fill: Callable[[Port], None], made: Callable[[Path], None] | None = None) -> None:
+    """The store's place made, then its database, new, or made by `made`, filled by `fill`, then its marker, last, so a
+    store is marked only once it is whole. A SQLite that cannot keep a store is refused before anything is made; when
+    making the database or the marker raises, the place is removed and the error raised: a failed start leaves nothing."""
     sqlite_store.supported()
     place = root.path / MARKER.parent
     place.mkdir()
     try:
-        sqlite_store.make(root.path / DATABASE)
+        (made or sqlite_store.make)(root.path / DATABASE)
         with sqlite_store.opened(root.path / DATABASE) as made:
             fill(made)
         (root.path / MARKER).write_text(canonical.dump({"store": STORE_FORM}), encoding="utf-8")

@@ -8,7 +8,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 from kb import canonical, names, refusals, served, settled, store, values
-from kb.values import ArtifactId, Directory, Refused
+from kb.values import ArtifactId, Named, Refused
 
 HISTORY = (".git", "journal", store.STAGING)
 KEPT = (
@@ -28,7 +28,7 @@ class Offered:
     errors: list = field(default_factory=list)
 
 
-def offered(directory: Directory, passed_over: Path | None = None) -> list[Offered]:
+def offered(directory: Named, passed_over: Path | None = None) -> list[Offered]:
     """Every file below the directory, read, in the order of the places the layout gives them; those under the place
     passed over, if one is given, are not. Raises Refused when the name names no directory."""
     if not directory.path.is_dir():
@@ -36,7 +36,7 @@ def offered(directory: Directory, passed_over: Path | None = None) -> list[Offer
     return [_offered(directory, steps) for steps in _files(directory, passed_over)]
 
 
-def _files(directory: Directory, passed_over: Path | None) -> list[tuple[str, ...]]:
+def _files(directory: Named, passed_over: Path | None) -> list[tuple[str, ...]]:
     """The place of every file below the directory, as steps, sorted; a store's history and the files that mark and
     keep it, at its top, and whatever lies under the place passed over, passed over."""
     found = [path.relative_to(directory.path).parts for path in directory.path.rglob("*") if path.is_file()]
@@ -51,7 +51,7 @@ def _under(file: Path, place: Path | None) -> bool:
     return place is not None and place.resolve() in file.resolve().parents
 
 
-def _offered(directory: Directory, steps: tuple[str, ...]) -> Offered:
+def _offered(directory: Named, steps: tuple[str, ...]) -> Offered:
     """A file read as YAML 1.2, and as an artifact at the place the layout gives its name and kind."""
     file, written = "/".join(steps), names.filed(steps)
     offered = Offered(file, values.artifact_id(written) if written is not None else None)

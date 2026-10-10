@@ -1,17 +1,17 @@
 """A store started out of sight beneath the root it is for and put in place inside it whole: started, and seeded, in a
 staging place under the root, then moved to where a store goes by one rename, on the one filesystem the root is on, so
-the root holds either no store or the whole of one: a store started to be served (`started`), and one seeded from a
-directory of files (`seeded`); and a store started for a server to serve (`serving`), taken back out of the root
-should the server not then serve it. What an earlier stopped run left in the staging place is removed first, and the
-staging place is removed whenever a start ends, placed or refused. The staging place is the store's own layout, not
-published."""
+the root holds either no store or the whole of one: a store started to be served (`started`), one seeded from a
+directory of files (`seeded`), and one restored from a backup (`restored`); and a store started for a server to serve
+(`serving`), taken back out of the root should the server not then serve it. What an earlier stopped run left in the
+staging place is removed first, and the staging place is removed whenever a start ends, placed or refused. The staging
+place is the store's own layout, not published."""
 import contextlib
 import os
 import shutil
 from pathlib import Path
 from typing import Callable, Iterator
 
-from kb import importing, operating, starting, store
+from kb import backups, importing, operating, starting, store
 from kb.values import Refused
 
 
@@ -62,6 +62,17 @@ def seeded(root, role: str, seed: str) -> importing.Checked:
         if not imported.faults:
             _placed(place, root)
     return imported
+
+
+def restored(root, backup: str) -> backups.Restored:
+    """A store restored inside root from the backup named, nothing signed and so no role needed, or none: the faults
+    that refused it. Raises NotStarted, leaving root as it found it, when no store can be placed there."""
+    _vacant(root)
+    with _staged(root) as place:
+        restored = operating.Operator(place).restore(backup)
+        if not restored.faults:
+            _placed(place, root)
+    return restored
 
 
 @contextlib.contextmanager

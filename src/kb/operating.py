@@ -1,10 +1,10 @@
-"""The operator's commands that are not rpcs, export, the import check and the import, over one store, each run inside
-the servicer's one boundary: the store opened first, the command's values made, one call into the domain, and any
-refusal or escaping exception its faults."""
+"""The operator's commands that are not rpcs, export, the import check, the import, the backup and the restore, over
+one store, each run inside the servicer's one boundary: the store opened first (but for a restore, which makes it),
+the command's values made, one call into the domain, and any refusal or escaping exception its faults."""
 from pathlib import Path
 from typing import NamedTuple
 
-from kb import export, importing, signatures, values
+from kb import backups, export, importing, signatures, values
 from kb.contract import kb_pb2
 from kb.servicer import boundary
 
@@ -41,3 +41,15 @@ class Operator:
         signed = signatures.signed(kb_pb2.Signature(role=request.role, message=f"import {request.directory}"))
         return importing.imported(held, values.directory(request.directory), signed, request.skip_errors,
                                 request.passed_over)
+
+    @boundary(backups.BackedUp)
+    def backup(self, file: str, held):
+        """The store copied whole, as it stood at one moment, into a new file at the place named."""
+        backups.made(held, values.file(file))
+        return backups.BackedUp()
+
+    @boundary(backups.Restored, opens=False)
+    def restore(self, file: str):
+        """The store restored from the backup named, where no store is; nothing signed and nothing landed."""
+        backups.restored(values.root(self._root), values.file(file))
+        return backups.Restored()

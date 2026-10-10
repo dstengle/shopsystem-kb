@@ -12,7 +12,7 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from kb import sqlite_search
+from kb import sqlite_backup, sqlite_search
 from kb.port import Busy, Change, Entry, Relink, Unreadable
 from kb.sqlite_checks import Checks
 from kb.values import Kind
@@ -148,6 +148,9 @@ class SqliteStore(Checks):
             if not committed and self._db.in_transaction:
                 self._db.execute("ROLLBACK")
             self._locked = False
+
+    def copied(self, path: Path, form: int) -> None:
+        sqlite_backup.copied(self._db, path, form)
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
              kinds: tuple[Kind, ...] = ()) -> None:

@@ -17,7 +17,7 @@ from kb.edits import Import
 from kb.offers import Offered
 from kb.port import Port
 from kb.signatures import Signed
-from kb.values import TYPE_KIND, ArtifactId, Directory, Refused
+from kb.values import TYPE_KIND, ArtifactId, Named, Refused
 
 METASCHEMA_ID = values.type_of(TYPE_KIND)
 
@@ -38,7 +38,7 @@ class Checked:
     skipped: list = field(default_factory=list)
 
 
-def checked(store: Port, directory: Directory) -> Checked:
+def checked(store: Port, directory: Named) -> Checked:
     """Every file read, the artifacts among them drafted as one set, each checked."""
     return _examined(store, offers.offered(directory))
 
@@ -61,7 +61,7 @@ def _examined(store: Port, offered: list[Offered]) -> Checked:
     )
 
 
-def imported(store: Port, directory: Directory, signed: Signed, skip_errors: bool,
+def imported(store: Port, directory: Named, signed: Signed, skip_errors: bool,
              passed_over: Path | None = None) -> Checked:
     """The directory checked, then every artifact in it landed as one set under the signature, each type ahead of the
     artifacts of its kind; the store's own type that describes types is kept. A directory with errors is refused with
@@ -73,7 +73,7 @@ def imported(store: Port, directory: Directory, signed: Signed, skip_errors: boo
         return _imported(store, directory, signed, skip_errors, passed_over)
 
 
-def _imported(store: Port, directory: Directory, signed: Signed, skip_errors: bool, passed_over: Path | None) -> Checked:
+def _imported(store: Port, directory: Named, signed: Signed, skip_errors: bool, passed_over: Path | None) -> Checked:
     """The import, made while the store's write lock is held."""
     _fresh(store)
     offered = offers.offered(directory, passed_over)
