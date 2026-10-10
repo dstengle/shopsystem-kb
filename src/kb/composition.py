@@ -181,18 +181,6 @@ def read_through(kind: values.Kind, corpus) -> list[values.ArtifactId]:
     return found
 
 
-def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], corpus) -> list[values.Kind]:
-    """The kinds whose type, of those given, reads a changed type: is one, or refers by a kb: reference anywhere in
-    its schema to a type that reads one. What an artifact's links are read through can change only for these."""
-    def reads(type_id: values.ArtifactId, seen: frozenset) -> bool:
-        if type_id in changed:
-            return True
-        if type_id in seen or not corpus.holds(type_id):
-            return False
-        return any(reads(each, seen | {type_id}) for each in referred(schema_of(type_id, corpus)))
-    return [values.Kind(str(type_id)) for type_id in types if reads(type_id, frozenset())]
-
-
 def schema_of(type_id: values.ArtifactId, corpus) -> dict | None:
     """The schema of the type held at an IRI, read through the version it stands at; None when what is held there
     is not a type."""

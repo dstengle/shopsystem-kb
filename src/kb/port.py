@@ -88,19 +88,6 @@ class Change:
 
 
 @dataclass(frozen=True)
-class Relink:
-    """The links of an artifact a set leaves as it is, read again because a type they are read through changed: the
-    artifact, its links now, the revision they were read at, and the types they were read through that the set does
-    not change, each with the revision it was read at. It leaves no new revision, and its links are not held to
-    landing, since what the artifact holds was not checked again. The adapter lands none of the set when the artifact
-    or any of those types has since moved."""
-    artifact: ArtifactId
-    links: tuple[Link, ...]
-    read: int
-    through: tuple[tuple[ArtifactId, int], ...] = ()
-
-
-@dataclass(frozen=True)
 class Entry:
     """One entry of the history, as journal.py names it: its id, its moment and its seq among the entries stamped at
     that moment, what it is filtered by, and the record itself."""
@@ -128,9 +115,8 @@ class Refusal(Exception):
 
 
 class Conflict(Refusal):
-    """A change read its artifact, or a type it was read through, at a revision that has since moved; an artifact of
-    a kind whose links the set reads anew is held that the set does not change or restate; or an entry's id is
-    already held."""
+    """A change read its artifact, or a type it was read through, at a revision that has since moved; or an entry's
+    id is already held."""
 
 
 class Linked(Refusal):
@@ -207,9 +193,6 @@ class Port(Protocol):
         the form given; the copy neither takes nor waits for the write lock. Raises FileExistsError, writing nothing,
         when anything is at path; a copy that fails leaves nothing there."""
 
-    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
-             kinds: tuple[Kind, ...] = ()) -> None:
-        """The changes, in order, the links restated, and the entries, as one set, or nothing. `kinds` are those whose
-        every artifact's links the set reads anew: an artifact of one held that the set neither changes nor restates
-        is Conflict. Raises Conflict, Linked or Unlanded; and Busy, as `exclusive` does, when another change holds the
-        write lock longer than the store waits for it."""
+    def land(self, changes: list[Change], entries: list[Entry]) -> None:
+        """The changes, in order, and the entries, as one set, or nothing. Raises Conflict, Linked or Unlanded; and
+        Busy, as `exclusive` does, when another change holds the write lock longer than the store waits for it."""

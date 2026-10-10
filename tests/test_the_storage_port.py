@@ -177,18 +177,6 @@ def _race(opener, *sets):
     return outcomes
 
 
-def test_an_artifact_of_a_kind_read_anew_that_the_set_does_not_restate_is_refused_and_writes_nothing(store):
-    land(store, put("schema/note", {"v": 1}), put("note/a", {}), put("note/b", {}))
-    before = written(store)
-    restating_a = [port.Relink(name("note/a"), (), 1)]
-    with pytest.raises(port.Conflict):
-        store.land([put("schema/note", {"v": 2}, read=1)], [entry("short")], restating_a, (kind("note"),))
-    assert written(store) == before
-    store.land([put("schema/note", {"v": 2}, read=1), put("note/c", {})], [entry("whole")],
-               [*restating_a, port.Relink(name("note/b"), (), 1)], (kind("note"),))
-    assert store.artifact(name("schema/note")) == {"v": 2}
-
-
 def test_a_block_holding_the_write_lock_keeps_its_sets_a_refused_one_taken_back_alone(opener, store):
     with store.exclusive():
         land(store, put("note/a", {"title": "A"}))
@@ -408,31 +396,6 @@ def test_an_entry_id_already_held_is_refused(store):
     before = written(store)
     with pytest.raises(port.Conflict):
         store.land([put("note/b", {})], [entry("once")])
-    assert written(store) == before
-
-
-def test_links_restated_without_a_new_revision_at_the_revision_read(store):
-    land(store, put("tag/t", {}), put("note/n", {"about": "tag/t"}))
-    store.land([], [entry("restated")], [port.Relink(name("note/n"), (link("about", "about", "tag/t", ["tag"]),), 1)])
-    assert [short(each.source) for each in store.links_in(name("tag/t"))] == ["note/n"]
-    with pytest.raises(port.Linked):
-        land(store, removal("tag/t", 1))
-    unlanded = port.Relink(name("note/n"), (link("about", "about", "tag/gone", ["tag"]),), 1)
-    store.land([], [entry("dangling")], [unlanded])
-    assert [short(each.source) for each in store.links_in(name("tag/gone"))] == ["note/n"]
-    with pytest.raises(port.Conflict):
-        store.land([], [entry("moved")], [port.Relink(name("note/n"), (), 2)])
-    assert store.artifact(name("note/n")) == {"about": "tag/t"} and store.history(batch="moved") == []
-    assert [short(each) for each in store.ids()] == ["note/n", "tag/t"]
-
-
-def test_a_relink_read_through_a_type_that_has_since_moved_is_refused_and_writes_nothing(store):
-    land(store, put("schema/note", {"v": 1}), put("tag/t", {}), put("note/n", {}))
-    land(store, put("schema/note", {"v": 2}, read=1))
-    before = written(store)
-    moved = port.Relink(name("note/n"), (link("about", "about", "tag/t", ["tag"]),), 1, ((name("schema/note"), 1),))
-    with pytest.raises(port.Conflict):
-        store.land([], [entry("moved-type")], [moved])
     assert written(store) == before
 
 

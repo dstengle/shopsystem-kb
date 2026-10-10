@@ -13,9 +13,8 @@ from pathlib import Path
 from typing import Iterator
 
 from kb import sqlite_backup, sqlite_search, sqlite_types
-from kb.port import Busy, Change, Entry, Relink, Unreadable
+from kb.port import Busy, Change, Entry, Unreadable
 from kb.sqlite_checks import Checks
-from kb.values import Kind
 from kb.sqlite_reads import encoded, moment
 
 FLOOR = (3, 9, 0)  # FTS5 and its ascii tokenizer; the suite has run on the SQLite Python 3.11 ships
@@ -153,23 +152,18 @@ class SqliteStore(Checks):
     def copied(self, path: Path, form: int) -> None:
         sqlite_backup.copied(self._db, path, form, self._path)
 
-    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
-             kinds: tuple[Kind, ...] = ()) -> None:
+    def land(self, changes: list[Change], entries: list[Entry]) -> None:
         with self.exclusive(), self._saved():
             self._unheld(entries)
             landed = self._db.execute(
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
             ).lastrowid
-            self._unmoved(changes, relinks)
-            self._restated(kinds, changes, relinks)
+            self._unmoved(changes)
             before = {}
             for step, change in enumerate(changes):
                 held = self._compared(change.artifact, change.read)
                 before.setdefault(change.artifact, (held, set(self._parts(change.artifact))))
                 self._written(change, landed, step)
-            for relink in relinks:
-                self._compared(relink.artifact, relink.read)
-                self._linked(relink.artifact, relink.links)
             self._integral(changes, before)
             self._recorded(entries)
 

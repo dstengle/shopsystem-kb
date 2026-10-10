@@ -87,8 +87,7 @@ def _landing(held: port.Port, drafted: drafting.Drafted, signed: Signed, moments
 def _landed(held: port.Port, drafted: drafting.Drafted, entries: list) -> None:
     """The set handed to the port; a link the port finds into what the set takes out is refused, one fault for each,
     the item named for a part dropped and the artifact for one removed; a link the set hands that the port finds
-    landing on nothing it may land on is refused as validation refuses it. No link is restated and no kind read
-    anew: the set hands only what it changes."""
+    landing on nothing it may land on is refused as validation refuses it."""
     try:
         held.land(drafted.handed, entries)
     except port.Linked as linked:

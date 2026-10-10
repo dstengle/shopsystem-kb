@@ -5,7 +5,7 @@ to, the store's standing for everything else, a type it changed restating none. 
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
 from kb.port import Linking, Port, TypeVersion
-from kb.values import TYPE_KIND, ArtifactId, Kind, Version, type_of
+from kb.values import ArtifactId, Version, type_of
 
 
 class Draft:
@@ -14,22 +14,14 @@ class Draft:
         self._pending: dict[ArtifactId, dict] = {}
         self._removed: set[ArtifactId] = set()
         self._types: dict[ArtifactId, dict] = {}
-        self._changed: set[ArtifactId] = set()
         self._numbers: dict[ArtifactId, int] = {}
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
         self._removed.discard(artifact_id)
         self._pending[artifact_id] = artifact
-        self._note(artifact_id, artifact)
 
     def remove(self, artifact_id: ArtifactId) -> None:
-        self._note(artifact_id, self.artifact(artifact_id))
         self._removed.add(artifact_id)
-
-    def _note(self, artifact_id: ArtifactId, artifact: dict) -> None:
-        """A type the draft changes or removes noted as changed."""
-        if settled.typed(artifact):
-            self._changed.add(artifact_id)
 
     def holds(self, artifact_id: ArtifactId) -> bool:
         if artifact_id in self._removed:
@@ -98,17 +90,3 @@ class Draft:
         version = composition.conforming(artifact)
         found = composition.kept(type_of(version.kind), version.number, self)
         return found and found.content
-
-    def reread(self) -> list[Kind]:
-        """The kinds whose artifacts' links are read through a type the draft changed or removed."""
-        changed = set(self._changed)
-        if not changed:
-            return []
-        types = sorted(set(self._store.ids(TYPE_KIND)) | changed, key=names.order)
-        return list(composition.reading(changed, types, self))
-
-    def stale(self) -> list[ArtifactId]:
-        """The artifacts the store holds and the draft leaves as they are whose links are read through a type the
-        draft changed or removed, so that what the store keeps of their links is not what they carry now."""
-        touched = set(self._pending) | self._removed
-        return [each for kind in self.reread() for each in self._store.ids(kind) if each not in touched]

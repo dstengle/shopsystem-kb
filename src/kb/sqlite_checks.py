@@ -1,8 +1,7 @@
 """The SQLite adapter's checks of a set inside its landing transaction, each on the store as the set finds it or
-leaves it: each change's revision and that of every type it was read through compared with the one it was read at,
-every artifact of a kind whose links the set reads anew among what it changes or restates, every link it hands
+leaves it: each change's revision and that of every type it was read through compared with the one it was read at, every link it hands
 landing, nothing outside it linking into what it removes or drops, and each entry's id held once."""
-from kb.port import Change, Conflict, Entry, Linked, Linking, Relink, Unlanded
+from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded
 from kb.sqlite_reads import Reads
 
 
@@ -17,21 +16,10 @@ class Checks(Reads):
             raise Conflict(f"{artifact} was read at revision {read} and stands at revision {held}")
         return held
 
-    def _unmoved(self, changes: list[Change], relinks: list[Relink] = ()) -> None:
-        """Conflict when a type a change or a relink was read through stands at another revision than the one it was
-        read at."""
-        for type_id, read in {each for change in [*changes, *relinks] for each in change.through}:
+    def _unmoved(self, changes: list[Change]) -> None:
+        """Conflict when a type a change was read through stands at another revision than the one it was read at."""
+        for type_id, read in {each for change in changes for each in change.through}:
             self._compared(type_id, read)
-
-    def _restated(self, kinds, changes: list[Change], relinks: list[Relink]) -> None:
-        """Conflict when an artifact of a kind whose links the set reads anew is held and the set neither changes it
-        nor restates its links: it landed after the set was drafted."""
-        restated = {str(each.artifact) for each in [*changes, *relinks]}
-        for kind in kinds:
-            missed = [name for (name,) in self._rows("SELECT id FROM artifacts WHERE kind = ?", kind.name)
-                      if name not in restated]
-            if missed:
-                raise Conflict(f"{missed[0]} is of a kind whose links the set reads anew, and the set does not restate them")
 
     def _parts(self, artifact) -> list[str]:
         return [place for (place,) in self._rows("SELECT place FROM parts WHERE artifact = ?", str(artifact))]
