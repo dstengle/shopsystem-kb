@@ -72,10 +72,10 @@ def declared(schema: dict, corpus) -> dict:
 
 
 def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
-    """The type a kind names. Raises Refused when the corpus holds none, since a kind must name a type the store
-    holds, wherever it is given."""
+    """The type a kind names. Raises Refused when the corpus holds none, or holds there an artifact that is not a
+    type, since a kind must name a type the store holds, wherever it is given."""
     type_id = values.type_of(kind)
-    if not corpus.holds(type_id):
+    if not (corpus.holds(type_id) and settled.typed(corpus.artifact(type_id))):
         raise values.Refused([refusals.no_type(kind.name)])
     return type_id
 
