@@ -244,3 +244,78 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
   - `.venv/bin/python -m pytest -q -m slice-165` gives 6 passed.
   - `make test` passes every scenario tagged up to `@slice-165`. Every failure is a scenario tagged `@slice-166` onward, or the rule-name test.
 - [ ] **Checkpoint:** `plan status 165 green`, then `plan log "Suite: ..."`.
+
+---
+
+Tasks 8 to 10 were added on 2026-10-10 from slice 162's review (decision/an-artifact-is-read-through-its-version). They run after Task 5 and before Tasks 6 and 7, in the order 8, 9, 10. Research: `.superpowers/scout/2026-10-10-batch33/versions-read-and-links.md`.
+
+Decisions they add:
+
+12. **Reads** (read-an-artifact's last Behaviour line). A read of an artifact, at a glance, one section, whole, following links or not, and a Follow from it, reads its at-a-glance fields, the order of its entries and which of its fields are links through the version the artifact conforms to. The stub or filled-in target of a link is read through the target's own version. A list's stubs are read each through its own artifact's version. A type version read at its own IRI (slice 160.2) is unchanged.
+13. **Links stay as their version declares** (define-a-type's last Behaviour line). A change to a type restates no held artifact's links. An artifact's stored links change only when a write changes that artifact; a replacement naming a later version restates that artifact's links through its own change, as it does today.
+14. **Export and import** still read through the latest version until slices 174 and 181 (QUESTION FOR THE SPEC in the plan log). Tasks 8 to 10 do not touch `export.py` or `importing.py`, and `tests/test_export_and_import_a_store.py` stays as it is.
+
+### Task 8: Slice 163.1. An artifact is read through the version it conforms to
+
+Review: batch-end
+Model: sonnet
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-163.1`, 1 scenario outline, 3 collected): read-an-artifact / An artifact that conforms to an earlier version of its type is read as that version declares (at a glance; whole; whole following its links one step).
+- [ ] **Why it is red today:** the outline has no steps. Behind them, a summary read and a whole read take the artifact's schema from the latest version of its type, so the at-a-glance row shows the later version's fields, and the whole rows make the reference a link and are refused with `locator` when it holds plain text.
+- [ ] **Where the change lands** (4 production, 2 test):
+  - `src/kb/composition.py`: an artifact's schema is the version it conforms to; a kind's own reads (the check, the import) keep the latest.
+  - `src/kb/read.py`: stubs and what is shown at a glance take each target's own version.
+  - `src/kb/query.py`: Follow goes outward through the artifact's own version; a list's stubs each through their own.
+  - `src/kb/links.py`: the links of a pending source in a draft read through its own version.
+  - `tests/test_read_an_artifact.py` (the steps), `tests/calls.py` only if a helper is missing.
+  - CLAUDE.md's rows for `composition.py` and `read.py`.
+- [ ] **Decisions applied:** 12, 14.
+- [ ] **Tests the decisions break:** none: the scout found no test asserting that a read of an artifact behind its type goes through the latest version. `tests/test_export_and_import_a_store.py`'s export-order test stays (decision 14); if it breaks, `export.py` must keep reading the latest version through a function of its own, not be changed in meaning.
+- [ ] **Steps to reuse:** `calls.define`, `create`, `request(version=)`, `read`, `refs`, `type_iri`, `version_iri`, `change_type` or `next_version`; `tests/test_read_an_artifact.py`'s read steps.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m slice-163.1` gives 3 passed, and `make test` shows no new failure.
+- [ ] **Checkpoint:** `plan status 163.1 green`, then `plan log "Suite: ..."`.
+
+### Task 9: Slice 163.2. A type's change restates none of its artifacts' links
+
+Review: per-task
+Model: opus
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-163.2`, 1 scenario, 1 collected): define-a-type / A type is changed and the links of an artifact conforming to its earlier version stay as that version declares.
+- [ ] **Why it is red today:** the scenario has no steps. Behind them, a set that changes a type restates the links of every held artifact of that kind through the new version: the note stops linking its tag, so the tag can be removed, and its reference becomes a link.
+- [ ] **Where the change lands** (3 production, 3 test):
+  - `src/kb/drafting.py`, `src/kb/draft.py`, `src/kb/write.py`: a drafted set asks for no restating and names no kinds read anew; what they hand the port for these is empty. The port, the adapter and `composition.reading` are left as they are for Task 10.
+  - `tests/test_define_a_type.py` (the steps), `tests/test_the_link_index.py`, `tests/test_a_type_moving_under_a_change.py`.
+  - CLAUDE.md's rows for `write.py`, `drafting.py` and `draft.py`.
+- [ ] **Decisions applied:** 13.
+- [ ] **Tests the decisions break** (all decision 13):
+  - `tests/test_the_link_index.py::test_a_type_changed_to_make_a_field_a_link_blocks_removing_what_it_points_at`: rewritten and renamed: the note, left at its version, holds plain text; nothing points at the target and its removal lands.
+  - `tests/test_the_link_index.py::test_a_type_changed_in_the_same_set_as_a_removal_blocks_it`: rewritten and renamed: the set lands with no fault, the note storing no link.
+  - `tests/test_the_link_index.py::test_a_type_changed_to_stop_a_field_being_a_link_no_longer_blocks_removing_what_it_named`: rewritten and renamed: the note's link stays and the removal is refused, naming the note.
+  - `tests/test_a_type_moving_under_a_change.py::test_an_artifact_made_while_a_type_it_reads_is_drafted_anew_is_held_to_its_links`: rewritten and renamed: the artifact made before the type moved keeps the links its version makes; the one made meanwhile is held to the links of the version it names. It stays a concurrency test.
+  - The scout found the rest of both modules sound. Another test that breaks is a `BLOCKED` reply naming it.
+- [ ] **Steps to reuse:** `tests/test_the_link_index.py`'s `_retype` and `_with_a_note_about_a_tag`; `calls.remove`, `refs(inward=True)`, `change_type`; `at_once.OnAThread`, `landed_second`.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m slice-163.2` gives 1 passed, and `make test` shows no new failure beyond the four rewritten tests passing in their new form.
+- [ ] **Checkpoint:** `plan status 163.2 green`, then `plan log "Suite: ..."`.
+
+### Task 10: Slice 163.3. The restating of links leaves the port
+
+Review: per-task
+Model: opus
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Check:** `make test` gives the same passed and failed tests as the record before it, less the three deleted port cases; `grep -rnE "Relink|relinks|reread|_restated|kinds=" src/kb tests` finds nothing.
+- [ ] **Why it fails today:** the port's `land` still takes restated links and the kinds a set reads anew, the adapter still checks and writes them, and the draft still can say which kinds are read anew, though after Task 9 nothing asks.
+- [ ] **Where the change lands** (4 production plus what Task 9 left unused in `drafting.py`, `draft.py` and `write.py`; 1 test):
+  - `src/kb/port.py`: `Relink`, and `land`'s restated links and kinds, removed with their words in the docstrings.
+  - `src/kb/sqlite_store.py`, `src/kb/sqlite_checks.py`: the restating loop and its check removed; the checks of a change's own revision, of the types it was read through, and of links landing stay.
+  - `src/kb/composition.py`: `reading`, if nothing else calls it.
+  - `src/kb/drafting.py`, `src/kb/draft.py`, `src/kb/write.py`: what Task 9 left unused (the draft's `reread` and `stale`, the drafted set's relinks and kinds, their hand-over).
+  - `tests/test_the_storage_port.py`.
+  - CLAUDE.md's rows for `port.py`, `sqlite_store.py`, `sqlite_checks.py`, `write.py`, `draft.py`, `drafting.py`, and rule 4's wording if it mentions restated links; spec/capabilities/check-a-change.md's "Implementation, may change" lines on relinks are not edited here (the controller routes them).
+- [ ] **Decisions applied:** 13.
+- [ ] **Tests the decisions break** (decision 13; each tests only the removed machinery, so each is deleted): `tests/test_the_storage_port.py::test_an_artifact_of_a_kind_read_anew_that_the_set_does_not_restate_is_refused_and_writes_nothing`, `::test_links_restated_without_a_new_revision_at_the_revision_read`, `::test_a_relink_read_through_a_type_that_has_since_moved_is_refused_and_writes_nothing`. The port's cases of a change read through a type that has since moved stay.
+- [ ] **Steps:** this task lands in about 8 files but is one removal that must compile whole, so it is one dispatch; if the implementer finds it cannot finish in one, it replies `PARTIAL` at a point where the suite passes what it passed.
+- [ ] **Verify:** the Check above, with the search's output in the report.
+- [ ] **Checkpoint:** `plan status 163.3 green`, then `plan log "Suite: ..."`.
