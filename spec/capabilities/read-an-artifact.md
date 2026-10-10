@@ -2,7 +2,7 @@
 id: capability/read-an-artifact
 title: Read an artifact
 narrator: the client
-rests_on: [decision/resolve-depth-defaults-to-zero, decision/summary-is-enough-to-navigate, decision/section-reads-are-the-common-read, decision/read-asks-for-one-level, decision/0024-a-link-may-land-on-a-placeholder, decision/0027-each-type-version-is-its-own-iri, decision/placeholders-seen-in-stubs-not-read]
+rests_on: [decision/resolve-depth-defaults-to-zero, decision/summary-is-enough-to-navigate, decision/section-reads-are-the-common-read, decision/read-asks-for-one-level, decision/0024-a-link-may-land-on-a-placeholder, decision/0027-each-type-version-is-its-own-iri, decision/placeholders-seen-in-stubs-not-read, decision/an-artifact-is-read-through-its-version]
 formulated_as: features/read-an-artifact.feature
 ---
 
@@ -26,6 +26,7 @@ The client reads an artifact at a glance, one section by its title, or whole. It
 - When a read following links meets a target already filled in on the way, that target is given as a name rather than filled in again, so the read ends.
 - When the client reads a whole process following its links, the branches between steps of that process are given as written, naming the steps, and are not followed.
 - When a link is filled in, the target comes with its IRI, the IRI of the version of its type it conforms to, its title and its revision, ahead of its content.
+- When the client reads an artifact that conforms to an earlier version of its type, at a glance or whole, and following links or not, it is read as that version declares: the fields shown at a glance and which of its fields are links are that version's, whatever a later version says.
 
 ## Implementation, may change
 
