@@ -451,19 +451,15 @@ message RemoveResponse {
 }
 
 // A set of creates, landing in order as one change, or none does. A
-// create may carry a key of the client's choosing, unique in the set; a
-// link written `@` and the key, anywhere in the set, names the artifact
-// that create makes, and kb puts that artifact's IRI in its
-// place before anything is checked. A key names a whole artifact, never
-// a place inside one.
+// link anywhere in the set names what another create of it makes by the
+// IRI that create carries, earlier in the set or later.
 message CreateItem {
-  reserved 1;
-  reserved "kind";
+  reserved 1, 4;
+  reserved "kind", "key";
   string id = 5;  // the artifact's IRI
   string type = 6;  // the IRI of the type version it conforms to
   string title = 2;
   string content = 3;  // canonical YAML: fields, sections, parts
-  string key = 4;
 }
 
 message BatchCreateRequest {

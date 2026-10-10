@@ -504,18 +504,16 @@ class RemoveResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Removed, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class CreateItem(_message.Message):
-    __slots__ = ("id", "type", "title", "content", "key")
+    __slots__ = ("id", "type", "title", "content")
     ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
-    KEY_FIELD_NUMBER: _ClassVar[int]
     id: str
     type: str
     title: str
     content: str
-    key: str
-    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., key: _Optional[str] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
 class BatchCreateRequest(_message.Message):
     __slots__ = ("items", "signature")

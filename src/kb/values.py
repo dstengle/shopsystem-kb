@@ -134,16 +134,6 @@ def titled(title: str, at: str) -> tuple:
                          message="an artifact cannot be created without a title"),)
 
 
-def key(text: str) -> str:
-    """The key a create in a set carries, a plain name; none when it carries none."""
-    if text and not names.plain(text):
-        raise Refused([kb_pb2.Fault(
-            rule=rules.REF,
-            message=f"a key is a plain name of lower-case letters, digits and single hyphens; {text!r} is not",
-        )])
-    return text
-
-
 def expected(revision: int) -> int | None:
     """The revision a change says the client read its artifact at; None when it says none, as 0 says."""
     return revision or None

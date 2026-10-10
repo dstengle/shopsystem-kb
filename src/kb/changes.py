@@ -1,7 +1,6 @@
 """Each change's request, alone or in a set, as the values its one domain call takes, built from the conversions in
 kb.values and kb.signatures: who makes it and why first, refused alone when it does not say; then each change,
 converted or standing in its place as a Refusal, so the faults come back in the order of the changes."""
-from collections import Counter
 from dataclasses import dataclass
 
 from kb import rules, signatures, values
@@ -14,13 +13,12 @@ from kb.values import ArtifactId, Content, Locator, Refused, Version
 @dataclass(frozen=True)
 class Create:
     """A new artifact: the IRI its client chose, the type version it conforms to, its title and the title's faults,
-    its content, and the key it carries in a set, empty for none."""
+    and its content."""
     name: ArtifactId
     version: Version
     title: str
     title_faults: tuple
     content: Content
-    key: str = ""
 
 
 @dataclass(frozen=True)
@@ -67,30 +65,10 @@ def removing(request: kb_pb2.RemoveRequest) -> tuple[list, Signed]:
 
 
 def creating_many(request: kb_pb2.BatchCreateRequest) -> tuple[list, Signed]:
-    """A BatchCreate as the domain takes it: a set of creates, signed; a key two or more of its creates carry, whether
-    or not they convert, refused beside every other fault of the set, after them."""
-    converted, signed = _many(request.signature, [
-        lambda item=item: _create(item.id, item.type, item.title, item.content, item.key) for item in request.items
+    """A BatchCreate as the domain takes it: a set of creates, signed."""
+    return _many(request.signature, [
+        lambda item=item: _create(item.id, item.type, item.title, item.content) for item in request.items
     ])
-    twice = _carried_twice([item.key for item in request.items])
-    return converted + ([Refusal(twice)] if twice else []), signed
-
-
-def _carried_twice(keys: list[str]) -> tuple:
-    """One fault for each key, as it converts, that more than one create carries."""
-    carried = Counter(key for key in map(_key_or_none, keys) if key)
-    return tuple(
-        kb_pb2.Fault(rule=rules.REF, message=f"a key names one create in the set; {key!r} is carried by more than one")
-        for key, count in carried.items() if count > 1
-    )
-
-
-def _key_or_none(text: str) -> str | None:
-    """A key as it converts, None when it does not, its create refused for it."""
-    try:
-        return values.key(text)
-    except Refused:
-        return None
 
 
 def replacing_many(request: kb_pb2.BatchReplaceRequest) -> tuple[list, Signed]:
@@ -141,7 +119,7 @@ def _each(conversions) -> list:
     return converted
 
 
-def _create(iri: str, type_version: str, title: str, content: str, key: str = "") -> Create:
+def _create(iri: str, type_version: str, title: str, content: str) -> Create:
     """A create's IRI and type version, both faults when both fail, then the rest."""
     name, version, faults = None, None, []
     try:
@@ -154,7 +132,7 @@ def _create(iri: str, type_version: str, title: str, content: str, key: str = ""
         faults += refused.faults
     if faults:
         raise Refused(faults)
-    return Create(name, version, title, values.titled(title, iri), values.content(content), values.key(key))
+    return Create(name, version, title, values.titled(title, iri), values.content(content))
 
 
 def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0) -> Replace:

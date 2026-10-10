@@ -14,7 +14,6 @@ LONGEST = 512
 SCHEME = "https://"
 FILE = ".yaml"
 
-KEYED = "@"
 VERSIONED = "@"
 
 TYPES = "https://missingmass.io/kb/type"
@@ -91,11 +90,6 @@ def linked(text: str) -> tuple[str, str]:
     """A link as a field holds it read as the name it points at and, after `#`, the place inside that artifact."""
     name, _, place = text.partition("#")
     return name, place
-
-
-def keyed(text) -> str | None:
-    """The key a link written as `@` and a key refers to; None for a link written any other way."""
-    return text.removeprefix(KEYED) if isinstance(text, str) and text.startswith(KEYED) else None
 
 
 def placed(steps) -> str:

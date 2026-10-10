@@ -1,6 +1,6 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-those links as the port takes them, and an artifact with each of its links rewritten. The checks, removal, reads,
-walks and a set's keys all read links here."""
+those links as the port takes them, and an artifact with each of its links rewritten. The checks, removal, reads
+and walks all read links here."""
 import copy
 from typing import Callable, NamedTuple
 
