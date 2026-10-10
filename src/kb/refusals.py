@@ -119,11 +119,10 @@ def unreadable(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {problem}")
 
 
-def earlier_kb(root: str, files: str) -> kb_pb2.Fault:
-    """A store an earlier kb made, and how to move it: the directory holding its files imported into a new store."""
+def earlier_kb(root: str) -> kb_pb2.Fault:
+    """A store an earlier kb made, which this kb can neither read nor move."""
     return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
-        f"the store at {root} was made by an earlier version of kb, in a form this kb cannot read; start a new store "
-        f"and import the old one's files, from {files}"
+        f"the store at {root} was made by an earlier version of kb, which this kb cannot read or move"
     ))
 
 

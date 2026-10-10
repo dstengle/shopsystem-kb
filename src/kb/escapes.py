@@ -17,7 +17,7 @@ def fault(error: Exception) -> kb_pb2.Fault:
     if isinstance(error, port.Busy):
         return refusals.busy()
     if isinstance(error, store.EarlierKb):
-        return refusals.earlier_kb(str(error.root), str(error.files))
+        return refusals.earlier_kb(str(error.root))
     if isinstance(error, store.LaterKb):
         return refusals.later_kb(str(error.root))
     if isinstance(error, (port.Unreadable, sqlite3.Error)):

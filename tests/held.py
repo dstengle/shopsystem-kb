@@ -196,6 +196,12 @@ def made_by_an_earlier_kb(root):
     (place / _MARKER).write_text(canonical.dump({"contract": "0.1"}), encoding="utf-8")
 
 
+def made_before_contract_v2(root):
+    """Make the store in `root` look as a kb of contract v1 kept it: its marker naming the form of store that kb wrote,
+    the database beside it left as it is, so that opening it would succeed."""
+    (_place(root) / _MARKER).write_text(canonical.dump({"store": 1}), encoding="utf-8")
+
+
 def made_by_a_later_kb(root):
     """Make the store in `root` look as a later kb would keep it: its marker naming a form of store this kb does not
     know, the database beside it left as this kb wrote it, so that opening it would succeed."""

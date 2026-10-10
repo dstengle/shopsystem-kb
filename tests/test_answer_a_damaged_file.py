@@ -116,6 +116,30 @@ def _rejected_as_unreadable(answered):
         _unreadable(*line.split(": ", 3)[2:4])
 
 
+@given("a store holding a decision, a process and a tag, made by a kb before contract v2", target_fixture="client")
+def _store_made_before_contract_v2(root):
+    client = _store_with_a_decision_a_process_and_a_tag(root)
+    held.made_before_contract_v2(root)
+    return client
+
+
+def _earlier(rule, message):
+    assert rule == "unreadable"
+    assert "made by an earlier version of kb, which this kb cannot read or move" in message
+
+
+@then("what was asked is rejected because the store was made by an earlier version of kb, which this kb cannot read "
+      "or move")
+def _rejected_as_earlier(answered):
+    if hasattr(answered, "faults"):
+        [fault] = answered.faults
+        assert (fault.artifact, fault.place) == ("", "")
+        _earlier(fault.rule, fault.message)
+    else:
+        [line] = answered.stderr.splitlines()
+        _earlier(*line.split(": ", 3)[2:4])
+
+
 @then("nothing is written in the store")
 def _nothing_written_in_the_store(root, before):
     assert held.bytes_held(root) == before["held"]
