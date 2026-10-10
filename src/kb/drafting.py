@@ -66,12 +66,29 @@ def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
         return [
             refusals.still_linked(str(outcome.artifact_id), each.source, each.place)
             for each in draft.links_in(outcome.artifact_id) if each.source != outcome.artifact_id
-        ]
+        ] + _read_by(draft, outcome)
     faults = [*outcome.faults, *_fits(draft, outcome)]
     typed = composition.artifact_kind(outcome.left) == values.TYPE_KIND
     if not faults and last[outcome.artifact_id] is outcome and typed:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return _in_order(draft, outcome, faults)
+
+
+def removes_a_type(change: Change) -> bool:
+    """Whether a change removes a type."""
+    return change.left is None and names.version(change.type)[0] == names.TYPES
+
+
+def _read_by(draft: Draft, removal: Change) -> list:
+    """What still stands in the way of a type's removal once another type the set leaves reads it: each type any held
+    version of which reads a version of it, and each artifact of its kind the set leaves, in the order of their
+    names. None for a type no other reads, whose artifacts the port finds, and for anything that is not a type."""
+    removed = removal.artifact_id
+    readers = composition.readers(removed, draft) if removes_a_type(removal) else []
+    if not readers:
+        return []
+    standing = sorted([*readers, *draft.ids(values.Kind(str(removed)))], key=names.order)
+    return [refusals.still_linked(str(removed), each, "") for each in standing]
 
 
 def _in_order(draft: Draft, change: Change, faults: list) -> list:

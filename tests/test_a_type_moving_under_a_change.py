@@ -11,8 +11,8 @@ import pytest
 
 import at_once
 from calls import (
-    TAG_TYPE, change_type, check, create, creating, define, iri, kb_ref, read, refs, remove, replace, replacing, request,
-    start_a_store, targets, type_iri, version_iri,
+    TAG_TYPE, change_type, check, create, creating, define, iri, kb_ref, read, refs, remove, removing, replace, replacing,
+    request, start_a_store, targets, type_iri, version_iri,
 )
 from kb import client as kb_client
 
@@ -231,11 +231,11 @@ def test_a_change_is_not_drafted_again_when_a_type_only_a_later_version_of_its_t
     assert held.drafts == 1
 
 
-def test_a_change_does_not_land_as_drafted_when_a_type_only_the_version_it_conforms_to_reads_is_gone(root):
+def test_a_type_only_the_version_a_change_conforms_to_reads_is_not_removed_under_it(root):
     """The note conforms to its type's first version, which refers to a shape of the tool type's first version; the
-    second refers to no other type. The tool type is removed, its versions with it, between the note's change being
-    drafted and its landing: the change is drafted again against a store that no longer holds the shape it was
-    checked against, and does not land."""
+    second refers to no other type. The tool type's removal, asked between the note's change being drafted and its
+    landing, is refused naming the note type, whose first version is still held: the change lands as drafted, a note
+    of that version still creates and is still held to the shape, and the store checks."""
     client = kb_client.connect(root)
     start_a_store(root)
     _a_note_of_the_first_of_two_versions(client, _labelled(1), PLAIN, {"label": "short"})
@@ -243,8 +243,38 @@ def test_a_change_does_not_land_as_drafted_when_a_type_only_the_version_it_confo
 
     def first():
         removed = remove(client, type_iri("tool"))
-        assert not removed.faults, removed.faults
+        assert [(fault.artifact, fault.place, fault.rule) for fault in removed.faults] == [
+            (type_iri("note"), "", "on_delete"),
+        ]
 
     landed = at_once.landed_second(held, first)
-    assert landed.faults
-    assert read(client, iri("note", "x")).revision == 1
+    assert not landed.faults, landed.faults
+    assert read(client, iri("note", "x")).revision == 2
+    assert held.drafts == 1
+    assert not request(client, "note", "Y", {"label": "brief"}, version=1).faults
+    misfit = request(client, "note", "Z", {"label": "far too long"}, version=1)
+    assert [(fault.place, fault.rule) for fault in misfit.faults] == [("label", "maxLength")]
+    checked = check(client)
+    assert (checked.faults, list(checked.violations)) == ([], [])
+
+
+def test_a_type_is_not_removed_when_a_type_reading_it_was_defined_while_its_removal_was_drafted(root):
+    """The tool type's removal is drafted while no other type reads it; a note type referring to a shape of its first
+    version is defined before the removal lands. The removal is refused naming the note type, which still creates,
+    is still held to the shape, and checks."""
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, {"title": "Tool", "schema": SHAPED})
+    held = at_once.OnAThread(root, "Remove", removing(type_iri("tool")))
+
+    def first():
+        define(client, {"title": "Note", "schema": _labelled(1)})
+
+    landed = at_once.landed_second(held, first)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in landed.faults] == [(type_iri("note"), "", "on_delete")]
+    assert not read(client, version_iri("tool", 1), whole=True).faults
+    assert not request(client, "note", "X", {"label": "short"}).faults
+    misfit = request(client, "note", "Y", {"label": "far too long"})
+    assert [(fault.place, fault.rule) for fault in misfit.faults] == [("label", "maxLength")]
+    checked = check(client)
+    assert (checked.faults, list(checked.violations), list(checked.stale)) == ([], [], [])

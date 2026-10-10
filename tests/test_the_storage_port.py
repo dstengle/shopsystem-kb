@@ -592,6 +592,22 @@ def test_a_type_removed_and_held_again_at_a_number_it_had_lands_with_the_version
     assert store.type_version(first) == port.TypeVersion(first, again.content, 1, "Note 1")
 
 
+def test_the_numbers_of_the_versions_held_of_a_type_are_given_lowest_first_and_none_once_it_is_removed(store):
+    land(store, note_type(1)[0], put("schema/tag", {"title": "Tag"}))
+    assert store.versions(name("schema/note")) == [1]
+    land(store, note_type(2, read=1)[0], note_type(3, read=2)[0])
+    assert store.versions(name("schema/note")) == [1, 2, 3]
+    assert store.versions(name("schema/tag")) == []
+    assert store.versions(name("schema/nothing")) == []
+    with pytest.raises(port.Conflict):
+        land(store, note_type(4, read=1)[0])
+    assert store.versions(name("schema/note")) == [1, 2, 3]
+    land(store, removal("schema/note", 3))
+    assert store.versions(name("schema/note")) == []
+    land(store, note_type(7)[0])
+    assert store.versions(name("schema/note")) == [7]
+
+
 def test_a_type_removed_has_none_of_its_versions_read_by_its_iri(store):
     land(store, note_type(1)[0], put("schema/tag", {"title": "Tag"}))
     land(store, note_type(2, read=1)[0])

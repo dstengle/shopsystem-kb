@@ -187,6 +187,19 @@ def read_through(kind: values.Kind, schema, corpus) -> list[values.ArtifactId]:
     return found
 
 
+def readers(type_id: values.ArtifactId, corpus) -> list[values.ArtifactId]:
+    """The other types the corpus holds any held version of which reads a version of a type, by a kb: reference to a
+    shape it defines or by being built on it: each once, in the order of their names, whichever version each stands
+    at."""
+    return [each for each in corpus.ids(values.TYPE_KIND) if each != type_id and _reads(each, type_id, corpus)]
+
+
+def _reads(reader: values.ArtifactId, type_id: values.ArtifactId, corpus) -> bool:
+    """Whether any version the corpus holds of one type names a version of another in a kb: reference."""
+    versions = (values.Version(values.Kind(str(reader)), number) for number in corpus.versions(reader))
+    return any(type_id in referred(corpus.type_version(each).content.get("schema")) for each in versions)
+
+
 def references(node):
     """Every type version a kb: reference anywhere in a schema names."""
     if isinstance(node, dict):

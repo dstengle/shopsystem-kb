@@ -159,6 +159,9 @@ class Port(Protocol):
         """The version of a type held at the version's IRI, as it was made. KeyError when none is held there. A
         version is no artifact: `holds`, `artifact` and `ids` answer nothing of it."""
 
+    def versions(self, type_id: ArtifactId) -> list[int]:
+        """The number of every version held of the type at an IRI, lowest first; none where no version is held."""
+
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
         """Every artifact held, or those of one kind whose fields each hold the value given, compared as the text
         YAML 1.2 writes the value as."""

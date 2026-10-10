@@ -31,6 +31,12 @@ def removed(db: sqlite3.Connection, type_id: str) -> None:
     db.execute("DELETE FROM type_versions WHERE type = ?", (type_id,))
 
 
+def numbers(db: sqlite3.Connection, type_id: str) -> list[int]:
+    """The number of every version kept under a type's IRI, lowest first."""
+    rows = db.execute("SELECT number FROM type_versions WHERE type = ? ORDER BY number", (type_id,)).fetchall()
+    return [number for (number,) in rows]
+
+
 def read(db: sqlite3.Connection, version: str) -> tuple[str, int, str] | None:
     """The content as the database keeps it, the revision and the title of the version at an IRI; None when no
     version is held there."""

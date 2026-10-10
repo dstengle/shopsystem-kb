@@ -5,7 +5,7 @@ to, the store's standing for everything else, a type it changed restating none. 
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
 from kb.port import Linking, Port, TypeVersion
-from kb.values import ArtifactId, Version, type_of
+from kb.values import ArtifactId, Kind, Version, type_of
 
 
 class Draft:
@@ -15,13 +15,35 @@ class Draft:
         self._removed: set[ArtifactId] = set()
         self._types: dict[ArtifactId, dict] = {}
         self._numbers: dict[ArtifactId, int] = {}
+        self._made: dict[ArtifactId, dict[int, dict]] = {}
+        self._gone: set[ArtifactId] = set()
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
+        """An artifact as the draft leaves it; a type is kept too as the version of it this makes, under its number,
+        whatever the draft puts there after."""
         self._removed.discard(artifact_id)
         self._pending[artifact_id] = artifact
+        if settled.typed(artifact) and type(artifact.get("version")) is int:
+            self._made.setdefault(artifact_id, {})[artifact["version"]] = artifact
 
     def remove(self, artifact_id: ArtifactId) -> None:
+        """An artifact taken out, and with a type every version of it, the store's and those the draft made."""
         self._removed.add(artifact_id)
+        self._gone.add(artifact_id)
+        self._made.pop(artifact_id, None)
+
+    def ids(self, kind: Kind) -> list[ArtifactId]:
+        """Every artifact of a kind the draft holds, in the order of their names."""
+        put = {each for each, artifact in self._pending.items() if settled.kind(artifact) == kind.name}
+        return sorted((put | set(self._store.ids(kind))) - self._removed, key=names.order)
+
+    def versions(self, type_id: ArtifactId) -> list[int]:
+        """The number of every version of a type the draft leaves held, lowest first: those the store keeps, unless
+        the draft removed the type, and those the draft made since."""
+        if type_id in self._removed:
+            return []
+        kept = [] if type_id in self._gone else self._store.versions(type_id)
+        return sorted({*kept, *self._made.get(type_id, {})})
 
     def holds(self, artifact_id: ArtifactId) -> bool:
         if artifact_id in self._removed:
@@ -39,9 +61,10 @@ class Draft:
         return found
 
     def type_version(self, version: Version) -> TypeVersion:
-        """A version of a type as the draft leaves it: the type the draft put, when it stands at that version; any
-        other version, and every version of a type the draft did not put, as the store keeps it, a type's kept as
-        first read. KeyError when the draft removed the type, or neither it nor the store holds that version."""
+        """A version of a type as the draft leaves it: the type the draft put, when it stands at that version, or
+        as the draft made it at that version before; any other version, and every version of a type the draft did
+        not put, as the store keeps it, a type's kept as first read. KeyError when the draft removed the type, or
+        neither it nor the store holds that version; a type removed and put again holds only what was made since."""
         type_id = ArtifactId(version.kind.name)
         if type_id in self._removed:
             raise KeyError(str(version))
@@ -52,6 +75,11 @@ class Draft:
             return found
         if put.get("version") == version.number:
             return TypeVersion(version, put, put["revision"], put["title"])
+        made = self._made.get(type_id, {}).get(version.number)
+        if made is not None:
+            return TypeVersion(version, made, made["revision"], made["title"])
+        if type_id in self._gone:
+            raise KeyError(str(version))
         return self._store.type_version(version)
 
     def numbered(self, type_id: ArtifactId) -> int:

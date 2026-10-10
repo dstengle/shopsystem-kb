@@ -5,7 +5,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
     DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, change_type, check, create, define, iri, kb_ref, listing,
-    next_version, read, refs, remove, request, targets, type_iri, version_iri,
+    next_version, read, refs, remove, request, slug, targets, type_iri, version_iri,
 )
 import held
 from kb.content import loads
@@ -851,3 +851,58 @@ def _a_binding_with_no_name_rejected(client):
     assert (misfit.id, misfit.revision) == ("", 0)
     assert [(fault.place, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
     assert "'name' is a required property" in misfit.faults[0].message
+
+
+# What the second type's first version is, by how it reads the first type's first version, and the first type's short
+# name with the schema it was defined with and the one it was then changed to.
+READ_BY_ANOTHER = {
+    "refers to a shape the first type's first version defines": (
+        TOOL_USE_TYPE, "tool", TOOL_TYPE["schema"], _with(TOOL_TYPE["schema"], "maker"),
+    ),
+    "is built on the first type's first version": (
+        DECISION_ON_BASE_TYPE, "base", BASE_TYPE["schema"], _with(BASE_TYPE["schema"], "reviewer"),
+    ),
+}
+
+
+@given(
+    parsers.re(
+        "a type the store holds, with no artifacts of its kind, and a second type whose first version "
+        f"(?P<reads_it>{'|'.join(map(re.escape, READ_BY_ANOTHER))})"
+    ),
+    target_fixture="read_by_another",
+)
+def _a_type_another_types_first_version_reads(client, reads_it):
+    """The first type stands at its second version, so that it has versions to keep; the second type reads its first."""
+    second, first, defined, changed = READ_BY_ANOTHER[reads_it]
+    define(client, {"title": first.title(), "schema": defined})
+    assert not change_type(client, first, changed).faults
+    define(client, second)
+    assert list(listing(client, first, ids_only=True).ids) == []
+    return {"first": type_iri(first), "second": type_iri(slug(second["title"])), "versions": [defined, changed]}
+
+
+@when("the client removes the first type", target_fixture="attempt")
+def _remove_the_first_type(root, client, read_by_another):
+    before = held.holds(root)
+    return {"response": remove(client, read_by_another["first"]), "before": before, "after": held.holds(root)}
+
+
+@then("the removal is rejected because something still points at it, naming the second type")
+def _rejected_naming_the_second_type(attempt, read_by_another):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(read_by_another["second"], "", "on_delete")]
+    assert repr(read_by_another["first"]) in faults[0].message
+    assert attempt["after"] == attempt["before"]
+
+
+@then("the store still holds the first type and its versions")
+def _the_first_type_and_its_versions_still_held(client, read_by_another):
+    first = read_by_another["first"]
+    standing = read(client, first, whole=True)
+    assert not standing.faults, standing.faults
+    assert loads(standing.content) == {"version": 2, "schema": read_by_another["versions"][1]}
+    for number, schema in enumerate(read_by_another["versions"], start=1):
+        made = read(client, f"{first}@{number}", whole=True)
+        assert not made.faults, made.faults
+        assert loads(made.content) == {"version": number, "schema": schema}

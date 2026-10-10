@@ -93,6 +93,9 @@ class Reads:
         stored, revision, title = found
         return TypeVersion(version, decoded(stored), revision, title)
 
+    def versions(self, type_id: ArtifactId) -> list[int]:
+        return sqlite_types.numbers(self._db, str(type_id))
+
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
         narrowed = "" if kind is None else " WHERE kind = ?"
         rows = self._rows(f"SELECT id, content FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
