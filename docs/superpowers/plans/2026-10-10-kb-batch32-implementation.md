@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+- Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 - One task per slice, in slice order. The plan holds no code. The implementer writes the steps and the code under bdd-red-green, after the red run.
 - Each task has a `Review:` and a `Model:` line, and the controller dispatches by them. `Review: per-task` with `Model: opus` goes to a task that touches concurrency, the published contract, data integrity or moving stored data. `Review: batch-end` with `Model: sonnet` goes to every other task, and gets no task review because the batch's branch review covers it.
 - CLAUDE.md's rules hold:
@@ -75,7 +75,7 @@ QUESTION FOR THE SPEC (logged, recommended answer applied as decision 9). When o
 
 Review: batch-end
 Model: sonnet
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Check:** `make test` gives no collection error, `tests/test_every_scenario_is_bound.py` passes, and every failing test is a scenario tagged `@slice-149` to `@slice-153` or `@slice-156` onward, or `test_the_rule_names_kb_gives_are_exactly_the_spec_lists`.
 - [ ] **Why it is red today** (suite record at 1809133):
@@ -93,7 +93,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 
 Review: batch-end
 Model: sonnet
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Check:** `make test` gives the same passed and failed tests as slice 154's record. `wc -l src/kb/values.py` gives at most 200, and no module under `src/kb/` is over 250 lines.
 - [ ] **Why it is red today:** `src/kb/values.py` is 241 lines (backlog, 2026-10-01). The IRI, type-version and set conversions that Tasks 3 to 7 add would push it past 250.
@@ -109,7 +109,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 
 Review: per-task
 Model: opus
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Scenarios** (`@slice-156`, 6 scenarios, 6 collected):
   - change-the-store / The client creates an artifact, giving its IRI and the IRI of the version of its type it conforms to
@@ -154,7 +154,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 
 Review: per-task
 Model: opus
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Scenarios** (`@slice-157`, 1 scenario, 1 collected): answer-a-damaged-file / A store found that was made by a kb before contract v2 refuses every call and command that needs it.
 - [ ] **Why it is red today:**
@@ -165,6 +165,11 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
   - `src/kb/store.py`: the marker check tells `store: 1` (and the older `contract` marker) apart as `EarlierKb` before anything is opened.
   - `src/kb/refusals.py`: `earlier_kb`'s message says the store was made by an earlier kb that this kb cannot read or move, with no advice to import. The rule stays `unreadable`.
   - Update CLAUDE.md's `store.py` row.
+  - `src/kb/escapes.py` only if the message no longer takes the files it is handed.
+  - Count (scout, 2026-10-10): 2 production, 2 test. No Steps.
+- [ ] **Tests the decisions break:**
+  - `tests/test_the_faults_escapes_become.py` (line 10, the earlier kb's fault asserting the advice to import): decision 7 and decision/v1-store-cannot-be-moved. Rewritten to assert the message says this kb can neither read nor move the store, with no advice to import; the rule stays `unreadable`.
+  - Checked and sound: `test_look_after_a_store.py`, `test_start_a_store.py`, `test_serving_what_cannot_be_served.py` assert only the rule and the prefix.
 - [ ] **Decisions applied:** 7. Review Focus 4 is pinned here by a plain test, with the store found through `KB_ROOT` and found upward.
 - [ ] **Steps to reuse:**
   - The answer-a-damaged-file steps for a store "made by an earlier kb" (write a kb.v1 marker and database beside a store's files).
@@ -177,7 +182,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 
 Review: per-task
 Model: opus
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Scenarios** (`@slice-158`, 8 scenarios, 8 collected), all name-artifacts-and-items:
   - An artifact created at an IRI not under its type's IRI is refused
@@ -197,6 +202,14 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
   - `src/kb/refusals.py` (the two `identity` faults, naming the IRI).
   - `src/kb/sqlite_store.py`/`sqlite_checks.py`, if a removed IRI's rows block a new artifact there (decision 8).
   - `names.py` alone answers "is this IRI under that type's" (rule 6).
+  - `src/kb/composition.py`: the nearest held type an IRI sits under (decision 9 needs the held types, which `names.py` cannot see).
+  - A create at a held IRI reaches the port's `Conflict` today and escapes as `store`; the draft's check refuses it first. The adapter already deletes and reinserts a removed artifact's row, so decision 8 likely holds; the red run says.
+  - Count (scout, 2026-10-10): 4 production (`edits.py`, `refusals.py`, `names.py`, `composition.py`), 2 test (`test_create_an_artifact.py`, `test_remove_an_artifact.py`).
+- [ ] **Tests the decisions break:** none: the scout checked every create in `tests/` (all build IRIs under their type through `calls.iri`) and every assertion on `Conflict`.
+- [ ] **Satisfied already:** the four title scenarios pass at bd159cd; they are not stop conditions (ledger ruling). The controller records them.
+- [ ] **Steps:**
+  1. The IRI rules: `names.py` and `composition.py`, with plain tests through their public functions. Check: those plain tests pass, `make test` shows no new failure.
+  2. The refusals and the scenarios: `edits.py`, `refusals.py`, the step definitions in the two test modules, Review Focus 2 and 3 pinned. Check: `-m slice-158` gives 8 passed.
 - [ ] **Decisions applied:** 8, 9. Review Focus 2 and 3 are pinned here by plain tests through the contract.
 - [ ] **Steps to reuse:**
   - Task 3's "a store holding a decision type at …" and "the decision is held at …".
@@ -210,7 +223,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 
 Review: per-task
 Model: opus
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Scenarios** (`@slice-159`, 3 scenarios, 3 collected):
   - hand-over-content / Content given to a create that carries what travels beside it is refused
@@ -223,6 +236,9 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 - [ ] **Where the change lands:**
   - `src/kb/values.py`/`settled.py` refuse content carrying `id`, `type` or `revision` (decision 2), each named back, with the rule the old scenario's refusal carried.
   - `src/kb/read.py` gives a filled-in target `id`, `type`, `title` and `revision` ahead of its content, in the canonical order.
+  - Correction (scout, 2026-10-10): `values.py` and `settled.py` already refuse `id`, `type`, `revision` and `title` in content with rule `identity`, each named back; they need no change. The contract's `Stub` has no `revision`: `kb.proto` gains it at the next free number (`make contract`), `tests/contract_v2.golden` gains the line, and `read.py` passes it.
+  - Count: 2 production (`kb.proto` with its generated code, `read.py`), 3 test (`test_create_an_artifact.py`, `test_read_an_artifact.py`, `contract_v2.golden`). No Steps.
+- [ ] **Tests the decisions break:** `tests/contract_v2.golden`: rewritten to carry `Stub`'s `revision` (decision 2: a filled-in link comes with its revision). No other: the scout checked the read and hand-over tests.
 - [ ] **Decisions applied:** 2.
 - [ ] **Steps to reuse:**
   - The slice 1.6 hand-over steps ("the artifact is rejected because content holds only what the type declares").
@@ -235,7 +251,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
 
 Review: per-task
 Model: opus
-Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0/scripts
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
 - [ ] **Scenarios** (`@slice-160`, 5 scenarios, 7 collected), all make-several-changes-in-one-go:
   - A create in a set points at what another create in it makes, earlier or later (2 examples)
@@ -253,6 +269,15 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.10.0
   - `names.KEYED`/`keyed` and `values.key` are deleted.
   - `changes.py`'s duplicate-key check becomes the duplicate-IRI check (decision 10).
   - CLAUDE.md: remove the `keys.py` row, and update `changes.py`'s, `drafting.py`'s and `names.py`'s rows.
+  - Count (scout, 2026-10-10): 6 production (`kb.proto` with its generated code, `keys.py`, `drafting.py`, `changes.py`, `values.py`, `names.py`), 4 test (`test_make_several_changes_in_one_go.py`, `calls.py`, `test_every_change_in_a_set.py`, `contract_v2.golden`).
+  - Two creates at one IRI in a set can now be refused twice, by Task 5's held-in-the-draft check and by this task's set check. The scenario's Then lines say how many faults the set carries; if they do not decide it, stop and report `BLOCKED` with the two answers observed.
+- [ ] **Tests the decisions break:**
+  - `tests/test_every_change_in_a_set.py` (lines 118-131, the two tests of a key carried twice, rule `ref`): decisions 1 and 10. Rewritten to assert two creates in one set carrying the same IRI are refused beside every other fault of the set, with the rule decision 10 gives.
+  - `tests/test_make_several_changes_in_one_go.py` line 338 asserts the kind's old name: rewritten to the type's IRI (decision 6).
+  - `tests/contract_v2.golden`: the create's `key` removed and reserved (decision 1).
+- [ ] **Steps:**
+  1. Sets by IRI: the duplicate-IRI check in `changes.py` beside the key, the step definitions and `tests/calls.py` taking IRIs, `test_every_change_in_a_set.py` rewritten, Review Focus 5 pinned. Check: `-m slice-160` gives 7 passed, `make test` shows no new failure.
+  2. The key removed: `kb.proto` (field reserved, `make contract`), the golden file, `keys.py` deleted with its call in `drafting.py`, `values.key`, `names.KEYED`/`keyed`, what is left of the key in `changes.py`, CLAUDE.md's rows. Check: `-m slice-160` still 7 passed, `make test` as before, and `grep -rnE "keys\.resolved|KEYED|keyed\(|values\.key|\.key\b" src/kb` finds nothing.
 - [ ] **Decisions applied:** 1, 10. Review Focus 5 is pinned here by a plain test.
 - [ ] **Steps to reuse:**
   - The make-several Background.
