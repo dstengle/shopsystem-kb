@@ -34,8 +34,9 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 - While clients are writing to the store, when the operator backs it up, the backup is made and the clients go on writing, none of their changes refused because of the backup.
 - While another change is being written to the store, when the operator backs it up, the backup is made and is not refused because the store was busy with another change.
 - While a server serves the store, when the operator backs it up, the backup is made and the server goes on serving.
-- If the place a backup would be written holds anything, the backup is refused because a backup never overwrites, and what it holds is left as it was.
-- kb backup finds the store as kb validate does, with the same refusals.
+- If anything is already at the place a backup would be written, even an empty file or directory, the backup is refused because a backup never overwrites, and what is there is left as it was.
+- kb backup finds the store as kb validate does, and is refused as kb validate is: when no store is found, when `KB_ROOT` names none or another, when the store was made by an earlier or a later kb, and when its database cannot be read.
+- Where a connection to a server is found and no store, kb backup is refused because a backup is made where the store's files are, not through a server.
 - When the operator restores a backup in a directory with no store inside it, there is a store inside that directory holding everything the store backed up held, its history and its journal included, and no role is needed.
 - When the operator restores a backup, the restored store's history ends with the last entry the store held when backed up.
 - If the directory already has a store inside it, the restore is refused because that directory already has a store inside it, and that store holds what it held before.
