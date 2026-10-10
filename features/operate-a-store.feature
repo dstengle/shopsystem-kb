@@ -137,6 +137,7 @@ Feature: Operate a store
     Then the operator is told of everything in the store that does not fit its type, and where
     And of everything that is behind the type it was last checked against
 
+  @slice-149
   Scenario: The command line offers setting up, checking, exporting, backing up, restoring and importing, and nothing else that changes what the store holds
     Pins the limit of the command line: beside setting up, checking and exporting, it backs a store up and restores a backup, and every other change to content still goes through a client.
     Given a store
@@ -144,6 +145,7 @@ Feature: Operate a store
     Then it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a freshly started store
     And nothing else that changes what the store holds
 
+  @slice-149
   Scenario: The operator backs up a store, and the backup holds it whole
     Pins that a backup leaves nothing of the store behind: not only what it holds now, but how each thing came to be and every entry of its journal.
     Given a store holding a type for decisions and two decisions, one of them replaced since it was made
@@ -153,6 +155,7 @@ Feature: Operate a store
     And it holds the history of each decision
     And it holds every entry of the store's journal, the snapshot included
 
+  @slice-150
   Scenario: A set landing while the operator backs up the store is in the backup whole or not at all
     Pins that a backup is the store at one moment: a set that lands while it is made is never found in it in part.
     Given a store holding a type for decisions
@@ -160,6 +163,7 @@ Feature: Operate a store
     When the operator backs up the store while that set is landing
     Then the backup holds either all three decisions of that set, with their history and journal entries, or none of them
 
+  @slice-150
   Scenario: The operator backs up the store while clients are writing to it
     Pins that backing up a running store does not stop its writers: they are never turned away because a backup is being made.
     Given a store holding a type for decisions
@@ -169,6 +173,7 @@ Feature: Operate a store
     And the clients go on writing
     And none of their changes is refused because of the backup
 
+  @slice-150
   Scenario: The operator backs up the store while another change is being written
     Pins that a backup goes ahead however long another change holds the store.
     Given a store holding a type for decisions and a decision
@@ -177,6 +182,7 @@ Feature: Operate a store
     Then the backup is made
     And the backup is not refused because the store was busy with another change
 
+  @slice-150
   Scenario: The operator backs up a store a server is serving
     Pins that a served store can be backed up without stopping its server.
     Given a store holding a type for decisions and a decision
@@ -185,6 +191,7 @@ Feature: Operate a store
     Then the backup is made
     And the server goes on serving: a caller reaching it is answered from that store
 
+  @slice-153
   Scenario Outline: Backing up a store to a place where anything already is is refused
     Pins that a backup never writes over anything, however little is there: even an empty file or an empty directory turns it away untouched.
     Given a store holding a type for decisions and a decision
@@ -200,6 +207,7 @@ Feature: Operate a store
       | an empty directory            |
       | a directory holding something |
 
+  @slice-153
   Scenario Outline: kb backup finds the store as kb validate does, and is refused where kb validate is
     Pins that the operator's backup finds a store by the same rules as the operator's check and turns away the same situations, so the two never disagree about which store is meant or whether it can be read.
     Given <where the operator works>
@@ -217,6 +225,7 @@ Feature: Operate a store
       | inside a store made by a later kb                                         | the backup is rejected for the same reason kb validate, run there, is rejected  |
       | inside a store whose database cannot be read                              | the backup is rejected for the same reason kb validate, run there, is rejected  |
 
+  @slice-153
   Scenario: Backing up where a connection to a server is found and no store is refused
     Pins that a backup is taken from the store's own files, never through a server, so standing beside a connection is not enough to back up the store it reaches.
     Given the operator is working in a directory holding a connection to a server and no store
@@ -224,6 +233,7 @@ Feature: Operate a store
     When the operator runs kb backup there
     Then the backup is rejected because a backup is made where the store's files are, not through a server
 
+  @slice-149
   Scenario: The operator restores a backup in a directory with no store inside it
     Pins that a backup comes back as the store it was, nothing left out, and that restoring needs no role because it makes no change of its own.
     Given a backup of a store holding a type for decisions and two decisions, one of them replaced since it was made, and a snapshot of what a piece of work read
@@ -234,6 +244,7 @@ Feature: Operate a store
     And it holds the history of each decision
     And it holds every entry of the backed-up store's journal, the snapshot included
 
+  @slice-149
   Scenario: A restored store's history ends where the backed-up store's did
     Pins that restoring adds nothing to the history: the restored store goes on from exactly where the store stood when it was backed up.
     Given a backup of a store whose last entry is the replacing of a decision
@@ -241,6 +252,7 @@ Feature: Operate a store
     When the operator restores that backup in that directory
     Then the restored store's history ends with the replacing of that decision
 
+  @slice-151
   Scenario: Restoring a backup where the directory already has a store inside it is refused
     Pins that a restore never writes over what is there: an existing store is left exactly as it was.
     Given a backup of a store
@@ -249,6 +261,7 @@ Feature: Operate a store
     Then restoring is rejected because that directory already has a store inside it
     And the store that is there holds what it held before
 
+  @slice-151
   Scenario: Restoring a backup inside a store is refused
     Pins that restoring does not make stores nest any more than setting one up does.
     Given a backup of a store
@@ -257,6 +270,7 @@ Feature: Operate a store
     Then restoring is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
 
+  @slice-151
   Scenario: Restoring a backup in a directory kb cannot write is refused
     Pins that the operator is told the directory cannot be written, and which one, and that nothing is left in it.
     Given a backup of a store
@@ -265,6 +279,7 @@ Feature: Operate a store
     Then restoring is rejected because a store can only be restored in a directory kb can write, and the directory is named
     And that directory still has nothing made in it
 
+  @slice-151
   Scenario: Restoring something that is not a backup kb made is refused
     Pins that only a backup kb made becomes a store: anything else is turned away with nothing left behind.
     Given a file that is not a backup kb made
@@ -273,6 +288,7 @@ Feature: Operate a store
     Then restoring is rejected because it is not a backup
     And that directory still has nothing made in it
 
+  @slice-151
   Scenario: Restoring a backup made by an earlier kb is refused
     Pins that a backup this kb cannot read as a store is never restored as one.
     Given a backup made by an earlier kb
@@ -281,6 +297,7 @@ Feature: Operate a store
     Then restoring is rejected because this kb cannot read a store an earlier kb made
     And that directory still has nothing made in it
 
+  @slice-151
   Scenario: Restoring a backup made by a later kb is refused
     Pins that a backup from a newer kb is never restored by an older one, and the operator is told a later kb is needed.
     Given a backup made by a later kb
@@ -289,6 +306,7 @@ Feature: Operate a store
     Then restoring is rejected because a later version of kb is needed to read it
     And that directory still has nothing made in it
 
+  @slice-152
   Scenario: A restore that was stopped before it finished leaves no store, and the same restore run again restores the backup
     Pins that a restore stopped partway, however it was stopped, never leaves a half-restored store, and nothing it left behind gets in the way of running it again.
     Given a backup of a store holding a type for decisions and a decision
