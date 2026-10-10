@@ -234,6 +234,7 @@ Feature: Define a type
     When the client removes that type
     Then the removal is rejected because something still points at it, naming each of those two artifacts
 
+  @slice-165.1
   Scenario Outline: Removing a type while a version of another type reads one of its versions is refused
     Pins that a type cannot be taken away from under the types that read it: every version of a type is kept as made, so what it reads must stay too.
     Given a type the store holds, with no artifacts of its kind, and a second type whose first version <reads it>
