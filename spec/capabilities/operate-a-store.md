@@ -2,7 +2,7 @@
 id: capability/operate-a-store
 title: Operate a store
 narrator: the operator
-rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule, decision/serving-built, decision/a-server-stamps-with-its-own-clock, decision/0021-kb-served-from-a-container, decision/published-contract-v1-in-0-7-0, decision/seed-may-be-the-root, decision/unwritable-root-refused, decision/0028-backup-and-restore-beside-export]
+rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule, decision/serving-built, decision/a-server-stamps-with-its-own-clock, decision/0021-kb-served-from-a-container, decision/published-contract-v2, decision/seed-may-be-the-root, decision/unwritable-root-refused, decision/0028-backup-and-restore-beside-export, decision/0025-placeholders-are-reported-never-a-fault, decision/0026-import-passes-over-identical-refuses-differing]
 formulated_as: features/operate-a-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/operate-a-store.feature
 
 ## Purpose
 
-From a shell, without any client, the operator sets a store up, empty or seeded from a directory of files, checks the whole store, backs a running store up whole, its history and journal included, restores a backup as a store in an empty place, and serves a store to several callers, starting it first when asked and none is there. The same commands run in kb's image, in a container beside the callers. The command line changes content only through import into a freshly started store (export-and-import-a-store), a seed included, and through restoring a backup; every other change to content goes through a client. Checking the store is a read, and is never refused because another change is being written. This capability is not publishing the image, or the readable, portable copy of a store, which is export (export-and-import-a-store).
+From a shell, without any client, the operator sets a store up, empty or seeded from a directory of files, checks the whole store, backs a running store up whole, its history and journal included, restores a backup as a store in an empty place, and serves a store to several callers, starting it first when asked and none is there. The same commands run in kb's image, in a container beside the callers. The command line changes content only through import into a store (export-and-import-a-store), a seed included, and through restoring a backup; every other change to content goes through a client. Checking the store is a read, and is never refused because another change is being written; it lists placeholders and never fails on one. This capability is not publishing the image, or the readable, portable copy of a store, which is export (export-and-import-a-store).
 
 ## Behaviour
 
@@ -27,8 +27,9 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 - If the seed directory named is not a directory, kb init is refused because files for import are read from a directory, and the directory still has no store inside it.
 - When the operator runs kb init with a seed directory that is the directory the store is started in, or holds it, saying which role they are, there is a store inside that directory holding the files the seed directory held, as kb import lands them into a freshly started store, and nothing kb made while starting it is among them.
 - If the directory a store would be started in cannot be written, kb init, with a seed directory or without, and kb serve with `--start` are refused because a store can only be started in a directory kb can write, naming the directory; nothing is served, and nothing is made in it.
-- When the operator runs kb validate, they are told of everything in the store that does not fit its type, and where, and of everything behind the type it was last checked against.
-- The command line offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a freshly started store, and nothing else that changes what the store holds.
+- When the operator runs kb validate, they are told of everything in the store that does not fit its type, and where, of everything behind the type it conforms to, and of every placeholder with what links to it, each listed apart.
+- When the operator runs kb validate on a store whose only findings are placeholders, the store checks clean.
+- The command line offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a store, and nothing else that changes what the store holds.
 - When the operator backs up a store, the backup holds the store whole, its history and its journal included.
 - When the operator backs up a store, the backup holds the store as it stood at one moment, each set landing meanwhile either in it whole or not at all.
 - While clients are writing to the store, when the operator backs it up, the backup is made and the clients go on writing, none of their changes refused because of the backup.
