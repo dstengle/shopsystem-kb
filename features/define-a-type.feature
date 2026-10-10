@@ -218,6 +218,7 @@ Feature: Define a type
     And the decision still conforms to the type's first version
     And checking the store lists the decision as behind its type, not as a violation
 
+  @slice-163.2
   Scenario: A type is changed and the links of an artifact conforming to its earlier version stay as that version declares
     Pins that changing a type rewrites nothing about the artifacts left at its earlier version: a link their version declares still guards what it points at, and a field only the new version makes a link is not one for them.
     Given a note type the store holds at its first version, whose notes link to a tag and hold a reference as plain text
