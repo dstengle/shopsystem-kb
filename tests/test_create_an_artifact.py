@@ -425,7 +425,7 @@ def _rejected_for_a_title_inside(refused):
     assert "Price reviews, weekly" in refused.faults[0].message
 
 
-CARRIED_BESIDE = {"id": iri("decision", "price-reviews-weekly"), "type": version_iri("decision", 3), "revision": 7}
+CARRIED_BESIDE = {"id": iri("decision", "price-reviews-happen-weekly"), "type": version_iri("decision", 3), "revision": 7}
 
 
 @when(

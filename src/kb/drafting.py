@@ -46,7 +46,6 @@ def _relinked(draft: Draft, artifact_id: values.ArtifactId) -> port.Relink:
     )
 
 
-
 def _drafted(draft: Draft, operations: list) -> list[Change]:
     """Every operation applied in order to a draft, then what the set leaves checked once; refused with every fault,
     in the order of the operations they belong to."""

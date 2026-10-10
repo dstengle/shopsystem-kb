@@ -1,8 +1,7 @@
 """Names: kb's IRI grammar, how an IRI is split into its host and segments, which IRIs one sits under, and a type
-version's IRI read, the place an
-export gives an artifact and the IRI a file's place gives, how a link names a place inside an artifact and a type
-version is referred to, the name an item's title gives, and the numbering that keeps an item's name free. Nothing
-here reads or writes; whether a name is taken is asked of the caller."""
+version's IRI read, the place an export gives an artifact and the IRI a file's place gives, how a link names a place
+inside an artifact and a type version is referred to, the name an item's title gives, and the numbering that keeps an
+item's name free. Nothing here reads or writes; whether a name is taken is asked of the caller."""
 import re
 from typing import Callable, NamedTuple
 
@@ -37,12 +36,6 @@ def above(iri_text) -> tuple[str, ...]:
     at least one out. Whole segments only, and never the IRI itself."""
     host, segments = split(str(iri_text))
     return tuple(SCHEME + "/".join((host, *segments[:count])) for count in range(len(segments) - 1, 0, -1))
-
-
-def under(iri_text, type_iri) -> bool:
-    """Whether an IRI sits under a type's: the type's host and segments open it, whole, and more follow. An IRI
-    equal to the type's does not sit under it."""
-    return str(type_iri) in above(iri_text)
 
 
 def version(text: str) -> tuple[str, int] | None:

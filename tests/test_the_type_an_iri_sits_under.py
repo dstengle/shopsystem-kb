@@ -18,7 +18,7 @@ SECTIONS = [
 
 @pytest.mark.parametrize("given", [DECISION + "/a", DECISION + "/minor/a", DECISION + "/a.b"])
 def test_an_iri_sits_under_one_whose_segments_open_it(given):
-    assert names.under(given, DECISION)
+    assert DECISION in names.above(given)
 
 
 @pytest.mark.parametrize("given", [
@@ -32,7 +32,7 @@ def test_an_iri_sits_under_one_whose_segments_open_it(given):
     "https://other.example/kb/decision/a",
 ])
 def test_an_iri_does_not_sit_under_itself_nor_under_one_sharing_only_part_of_a_segment(given):
-    assert not names.under(given, DECISION)
+    assert DECISION not in names.above(given)
 
 
 def test_the_iris_an_iri_sits_under_are_given_nearest_first():
