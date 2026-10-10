@@ -9,6 +9,11 @@ from calls import (
 from kb import client as kb_client
 
 
+@scenario("query-the-store.feature", "The client follows links narrowed to a path below the type")
+def test_the_client_follows_links_narrowed_to_a_path_below_the_type():
+    pass
+
+
 @scenario("query-the-store.feature", "The client follows the links out of an artifact")
 def test_the_client_follows_the_links_out_of_an_artifact():
     pass

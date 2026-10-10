@@ -11,8 +11,123 @@ from kb import content, client as kb_client
 from kb.contract import kb_pb2
 
 
-@scenario("change-the-store.feature", "The client creates an artifact")
-def test_the_client_creates_an_artifact():
+@scenario("change-the-store.feature", "The client creates an artifact, giving its IRI and the IRI of the version of its type it conforms to")
+def test_the_client_creates_an_artifact_giving_its_iri_and_the_iri_of_the_version_of_its():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact created naming a version of its type is checked against that version")
+def test_an_artifact_created_naming_a_version_of_its_type_is_checked_against_that_version():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing at an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder")
+def test_an_artifact_pointing_at_an_iri_the_store_does_not_hold_under_a_type_it_holds_tha():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing at an IRI the store does not hold, under a type the link does not allow, is refused")
+def test_an_artifact_pointing_at_an_iri_the_store_does_not_hold_under_a_type_the_link_doe():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing at an IRI under a type the store does not hold is refused")
+def test_an_artifact_pointing_at_an_iri_under_a_type_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing into a part a held artifact does not have is refused")
+def test_an_artifact_pointing_into_a_part_a_held_artifact_does_not_have_is_refused():
+    pass
+
+
+@scenario("check-a-change.feature", "An artifact pointing into a part of an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder")
+def test_an_artifact_pointing_into_a_part_of_an_iri_the_store_does_not_hold_under_a_type():
+    pass
+
+
+@scenario("check-a-change.feature", "Creating an artifact at an IRI links already point at fills the placeholder")
+def test_creating_an_artifact_at_an_iri_links_already_point_at_fills_the_placeholder():
+    pass
+
+
+@scenario("check-a-change.feature", "Creating an artifact without the part a link points into leaves that link on a placeholder")
+def test_creating_an_artifact_without_the_part_a_link_points_into_leaves_that_link_on_a_p():
+    pass
+
+
+@scenario("hand-over-content.feature", "Content given to a create that carries what travels beside it is refused")
+def test_content_given_to_a_create_that_carries_what_travels_beside_it_is_refused():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "A part given a name of the client's choosing on create holds that name")
+def test_a_part_given_a_name_of_the_client_s_choosing_on_create_holds_that_name():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A part given no name on create is named by the store from its title or its place")
+def test_a_part_given_no_name_on_create_is_named_by_the_store_from_its_title_or_its_place():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "A part is named by its artifact's IRI, # and its place in it")
+def test_a_part_is_named_by_its_artifact_s_iri_and_its_place_in_it():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title given as the number 12 is still a title")
+def test_a_title_given_as_the_number_12_is_still_a_title():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "A title given as the yes-or-no true is still a title")
+def test_a_title_given_as_the_yes_or_no_true_is_still_a_title():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "An artifact created at an IRI not under its type's IRI is refused")
+def test_an_artifact_created_at_an_iri_not_under_its_type_s_iri_is_refused():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "An artifact created at an IRI of the client's choosing under its type's IRI is held at that IRI")
+def test_an_artifact_created_at_an_iri_of_the_client_s_choosing_under_its_type_s_iri_is_h():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An artifact created at an IRI the store already holds an artifact at is refused")
+def test_an_artifact_created_at_an_iri_the_store_already_holds_an_artifact_at_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An artifact created giving a part a name that is not a plain name is refused")
+def test_an_artifact_created_giving_a_part_a_name_that_is_not_a_plain_name_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An artifact created giving two parts of one collection the same name is refused")
+def test_an_artifact_created_giving_two_parts_of_one_collection_the_same_name_is_refused():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An artifact keeps the IRI it was created with for life")
+def test_an_artifact_keeps_the_iri_it_was_created_with_for_life():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A create naming a type version the store does not hold is refused")
+def test_a_create_naming_a_type_version_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario('name-what-is-asked-for.feature', 'A create naming a version of a type not shaped as a type\'s IRI, "@" and a number is refused')
+def test_a_create_naming_a_version_of_a_type_not_shaped_as_a_type_s_iri_and_a_number_is_r():
+    pass
+
+
+@scenario('name-what-is-asked-for.feature', "A name a call carries is an IRI of kb's grammar")
+def test_a_name_a_call_carries_is_an_iri_of_kb_s_grammar():
     pass
 
 
@@ -23,11 +138,6 @@ def test_an_artifact_created_without_a_title_is_refused():
 
 @scenario("check-a-change.feature", "An artifact missing a required section is refused")
 def test_an_artifact_missing_a_required_section_is_refused():
-    pass
-
-
-@scenario("check-a-change.feature", "An artifact pointing at something that is not there is refused")
-def test_an_artifact_pointing_at_something_that_is_not_there_is_refused():
     pass
 
 
@@ -66,11 +176,6 @@ def test_a_section_with_no_body_is_refused():
 
 @scenario("check-a-change.feature", "A section whose body is empty is kept as it is")
 def test_a_section_whose_body_is_empty_is_kept_as_it_is():
-    pass
-
-
-@scenario("hand-over-content.feature", "Content that settles what only the store settles is refused")
-def test_content_that_settles_what_only_the_store_settles_is_refused():
     pass
 
 
@@ -129,31 +234,6 @@ def test_prose_the_store_could_not_write_back_in_its_one_form_is_refused():
     pass
 
 
-@scenario("name-artifacts-and-items.feature", "The name of a new artifact is made from its title, not asked for")
-def test_the_name_of_a_new_artifact_is_made_from_its_title_not_asked_for():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "A second artifact with a title already used gets a name of its own")
-def test_a_second_artifact_with_a_title_already_used_gets_a_name_of_its_own():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "Two parts with the same title are given names of their own")
-def test_two_parts_with_the_same_title_are_given_names_of_their_own():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "A title with capitals and punctuation gives a plain name")
-def test_a_title_with_capitals_and_punctuation_gives_a_plain_name():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "A title that leaves nothing to make a name from is refused")
-def test_a_title_that_leaves_nothing_to_make_a_name_from_is_refused():
-    pass
-
-
 @scenario("name-artifacts-and-items.feature", "A title that reads as a date is still a title")
 def test_a_title_that_reads_as_a_date_is_still_a_title():
     pass
@@ -161,26 +241,6 @@ def test_a_title_that_reads_as_a_date_is_still_a_title():
 
 @scenario("name-artifacts-and-items.feature", "A title that reads as yes is still a title")
 def test_a_title_that_reads_as_yes_is_still_a_title():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "A title given as a yes-or-no is still a title")
-def test_a_title_given_as_a_yes_or_no_is_still_a_title():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "A title given as a number is still a title")
-def test_a_title_given_as_a_number_is_still_a_title():
-    pass
-
-
-@scenario("name-what-is-asked-for.feature", "A kind that is not a plain name is refused")
-def test_a_kind_that_is_not_a_plain_name_is_refused():
-    pass
-
-
-@scenario("name-what-is-asked-for.feature", "A kind the store holds no type for is refused")
-def test_a_kind_the_store_holds_no_type_for_is_refused():
     pass
 
 
@@ -206,43 +266,10 @@ def _store_with_decision_type(root):
     return client
 
 
-@when(
-    "the client creates a decision with a title, both required sections and two options, saying which role and why",
-    target_fixture="created",
-)
-def _create_decision(client):
-    return create(client, "decision", {
-        "title": "Price reviews happen weekly",
-        "sections": SECTIONS,
-        "options": OPTIONS,
-    }, message="Move price reviews to weekly")
-
-
 @then("the client is given the name the artifact keeps for life and its first version")
 def _given_name_and_first_version(created):
     assert created.id == "decision/price-reviews-happen-weekly"
     assert created.revision == 1
-
-
-@then("the artifact records the version of the type it was checked against")
-def _records_schema_version(client, created):
-    assert read(client, created.id).schema_version == 1
-
-
-@then("reading it back gives what was written, in the order the type declares")
-def _read_back_in_declared_order(root, client, created):
-    stubs = read(client, created.id).parts
-    assert [(stub.collection, stub.id, stub.title) for stub in stubs] == [
-        ("options", "keep-weekly", "Keep weekly"),
-        ("options", "go-monthly", "Go monthly"),
-    ]
-    on_disk = held.artifact(root, "decision/price-reviews-happen-weekly")
-    assert list(on_disk) == ["id", "type", "schema_version", "revision", "title", "sections", "options"]
-    assert on_disk["sections"] == SECTIONS
-    assert on_disk["options"] == [
-        {"id": "keep-weekly", **OPTIONS[0]},
-        {"id": "go-monthly", **OPTIONS[1]},
-    ]
 
 
 @when(
@@ -279,11 +306,6 @@ def _title_is_text_not_a_date(root, client, created):
     assert on_disk["title"] == "2026-09-24"
 
 
-@then("the name the client is given is made from that text")
-def _name_from_that_text(client, created):
-    assert created.id == f"decision/{read(client, created.id).title}"
-
-
 @when(
     "the client creates a decision with both required sections and no title, saying which role and why",
     target_fixture="refused",
@@ -297,45 +319,6 @@ def _rejected_without_a_title(refused):
     assert [(fault.place, fault.rule, fault.message) for fault in refused.faults] == [
         ("title", "title", "an artifact cannot be created without a title"),
     ]
-
-
-@when(
-    "the client creates a decision whose content carries a name and a version for the artifact itself, "
-    "saying which role and why",
-    target_fixture="refused",
-)
-def _create_with_identity_inside(client):
-    return request(client, "decision", "Price reviews happen weekly", {
-        "id": "decision/a-name-of-my-own",
-        "revision": 7,
-        "sections": SECTIONS,
-    }, message="Record it")
-
-
-@then(
-    "the artifact is rejected because content holds only what the type declares, "
-    "and each thing it carried that only the store settles is named back"
-)
-def _rejected_for_identity_inside(refused):
-    assert (refused.id, refused.revision) == ("", 0)
-    assert [(fault.place, fault.rule) for fault in refused.faults] == [("id", "identity"), ("revision", "identity")]
-    assert all(fault.place in fault.message for fault in refused.faults)
-
-
-@then(
-    "the name the client is given is that title in lower case, with each run of anything that is not "
-    "a letter or a digit turned into a single hyphen, and no hyphen at either end"
-)
-def _plain_name(created):
-    assert not created.faults, created.faults
-    assert created.id == "decision/price-reviews-weekly-from-now-on"
-
-
-@then("the artifact is rejected because a title must leave something to make a name from")
-def _rejected_for_an_empty_name(created):
-    assert (created.id, created.revision) == ("", 0)
-    assert [(fault.place, fault.rule) for fault in created.faults] == [("title", "title")]
-    assert "leave something to make a name from" in created.faults[0].message
 
 
 @then("the title reads back as the text that was written, not as a yes or a no")
@@ -477,28 +460,6 @@ def _rejected_for_a_section_missing_a_key(refused):
     assert [(fault.place, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
 
 
-@when(
-    parsers.parse(
-        'the client creates an artifact of the kind "{kind}", with a title and both required sections, '
-        "saying which role and why"
-    ),
-    target_fixture="attempt",
-)
-def _create_of_a_kind(client, tmp_path, kind):
-    before = held.everything_in(tmp_path)
-    response = request(client, kind, "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it")
-    return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
-
-
-@then("the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path")
-def _rejected_as_not_a_plain_kind(attempt):
-    refused = attempt["response"]
-    assert (refused.id, refused.revision) == ("", 0)
-    assert [fault.rule for fault in refused.faults] == ["kind"]
-    assert "never a path" in refused.faults[0].message
-    assert "../schema/decision" in refused.faults[0].message
-
-
 @then("nothing is looked up or written anywhere, inside the store or outside it")
 def _nothing_written_anywhere(attempt):
     assert attempt["after"] == attempt["before"]
@@ -575,19 +536,6 @@ def _rejected_for_a_directive(created):
     )
 
 
-@given(parsers.parse('a store that holds no type called "{kind}"'))
-def _no_type_called(client, kind):
-    assert read(client, f"schema/{kind}").faults
-
-
-@then("the artifact is rejected because a kind must name a type the store holds, and the kind asked for is given back")
-def _rejected_as_an_unknown_kind(attempt):
-    refused = attempt["response"]
-    assert (refused.id, refused.revision) == ("", 0)
-    assert refused.faults[0].rule == "kind"
-    assert refused.faults[0].message == "a kind must name a type the store holds; the store holds no type called 'invoice'"
-
-
 @then("that fault stands on its own, apart from anything wrong with the content")
 def _the_kind_fault_alone(attempt):
     assert [(fault.place, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
@@ -662,70 +610,10 @@ def _store_unchanged(attempt):
     assert attempt["after"] == attempt["before"]
 
 
-@given(parsers.parse('a decision the store already holds, titled "{title}"'), target_fixture="first")
-def _a_decision_already_held(root, client, title):
-    created = request(client, "decision", title, {"sections": SECTIONS}, message="Record it")
-    assert not created.faults, created.faults
-    return {"id": created.id, "title": title, "bytes": held.text(root, created.id)}
-
-
-@when("the client creates another decision with that same title, saying which role and why", target_fixture="created")
-def _create_another_with_that_title(client, first):
-    return request(client, "decision", first["title"], {"sections": [
-        {"title": "Purpose", "body": "Keep the shelf prices honest.\n"},
-        {"title": "Rationale", "body": "Suppliers change their lists every week.\n"},
-    ]}, message="Record it again")
-
-
-@then("the client is given a name of its own for the new decision, the name already taken with a number added")
-def _a_numbered_name(client, first, created):
-    assert not created.faults, created.faults
-    assert (created.id, created.revision) == (f"{first['id']}-2", 1)
-    assert read(client, created.id).title == first["title"]
-
-
-@then("the decision created first keeps the name it had")
-def _the_first_keeps_its_name(root, client, first):
-    kept = read(client, first["id"])
-    assert (kept.id, kept.revision) == (first["id"], 1)
-    assert held.text(root, first['id']) == first["bytes"]
-
-
 TWICE = [
     {"title": "Keep weekly", "body": "Review every Monday."},
     {"title": "Keep weekly", "body": "Review every Monday, before opening."},
 ]
-
-
-@then("the name the client is given is made from that title")
-def _name_from_the_title(created):
-    assert not created.faults, created.faults
-    assert created.id == "decision/price-reviews-happen-weekly"
-
-
-@then("the client never said what the name should be")
-@then("the client never said what either name should be")
-def _no_name_asked_for():
-    assert set(kb_pb2.CreateRequest.DESCRIPTOR.fields_by_name) == {"kind", "title", "content", "signature"}
-    assert all("id" not in part for part in [*SECTIONS, *TWICE])
-
-
-@when(
-    "the client creates a decision carrying two options with the same title, saying which role and why",
-    target_fixture="created",
-)
-def _create_with_two_options_titled_alike(client):
-    return request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS, "options": TWICE})
-
-
-@then("each option is given a name of its own, the second the name of the first with a number added")
-def _options_named_apart(root, client, created):
-    assert not created.faults, created.faults
-    assert [(stub.id, stub.title) for stub in read(client, created.id).parts] == [
-        ("keep-weekly", "Keep weekly"), ("keep-weekly-2", "Keep weekly"),
-    ]
-    on_disk = held.artifact(root, created.id)
-    assert on_disk["options"] == [{"id": "keep-weekly", **TWICE[0]}, {"id": "keep-weekly-2", **TWICE[1]}]
 
 
 @when("the client creates a decision with a rationale and no purpose, saying which role and why", target_fixture="refused")
@@ -742,16 +630,6 @@ def _rejected_for_the_sections(refused):
     assert refused.faults[0].message == (
         "the sections the type requires must all be present, in order; 'Purpose' is missing"
     )
-
-
-@when(
-    "the client creates a decision that supersedes a decision the store does not hold, saying which role and why",
-    target_fixture="refused",
-)
-def _create_superseding_nothing(client):
-    return request(client, "decision", "Price reviews happen weekly", {
-        "supersedes": "decision/prices-are-reviewed-monthly", "sections": SECTIONS,
-    }, message="Record it")
 
 
 @then("the artifact is rejected because a link must land on a node of a kind the type allows")

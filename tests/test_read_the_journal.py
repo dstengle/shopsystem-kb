@@ -12,6 +12,11 @@ from kb import client as kb_client
 from kb.contract import kb_pb2
 
 
+@scenario("keep-the-history.feature", "Each entry read from the history gives its position in the history")
+def test_each_entry_read_from_the_history_gives_its_position_in_the_history():
+    pass
+
+
 @scenario("keep-the-history.feature", "Every change leaves an entry")
 def test_every_change_leaves_an_entry():
     pass

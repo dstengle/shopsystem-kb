@@ -3,13 +3,18 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import DECISION_TYPE, create, define, listing, read, refs, search, start_a_store
+from calls import DECISION_TYPE, create, define, listing, refs, search, start_a_store
 from kb import client as kb_client
 from kb.content import loads
 
 
-@scenario("name-what-is-asked-for.feature", "Asking by a kind the store holds no type for is refused")
-def test_asking_by_a_kind_the_store_holds_no_type_for_is_refused():
+@scenario("name-what-is-asked-for.feature", "Listing, searching, following links or exporting by a kind the store holds no type for is refused")
+def test_listing_searching_following_links_or_exporting_by_a_kind_the_store_holds_no_type():
+    pass
+
+
+@scenario("query-the-store.feature", "The client lists by a path below the type")
+def test_the_client_lists_by_a_path_below_the_type():
     pass
 
 
@@ -99,11 +104,6 @@ CALLS = {
     "follows the links into a decision, only from artifacts of that kind":
         lambda client: refs(client, MONTHLY, 1, inward=True, type_name="invoice"),
 }
-
-
-@given('a store that holds no type called "invoice"')
-def _no_invoice_type(client):
-    assert [fault.rule for fault in read(client, "schema/invoice").faults] == ["not-found"]
 
 
 @when(parsers.re(f"the client (?P<call>{'|'.join(map(re.escape, CALLS))})"), target_fixture="answered")

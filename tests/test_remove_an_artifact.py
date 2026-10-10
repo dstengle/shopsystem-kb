@@ -1,12 +1,17 @@
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    TAG_TYPE, answer, create, creating, define, journal, listing, read, remove, removing, request,
+    TAG_TYPE, answer, create, creating, define, journal, listing, read, remove, removing,
     tagged_decision_type, start_a_store,
 )
 import at_once
 import held
 from kb import client as kb_client
+
+
+@scenario("name-artifacts-and-items.feature", "After an artifact has been removed, a new artifact may be created at its IRI")
+def test_after_an_artifact_has_been_removed_a_new_artifact_may_be_created_at_its_iri():
+    pass
 
 
 @scenario("change-the-store.feature", "The client removes an artifact nothing points at")
@@ -26,11 +31,6 @@ def test_a_link_from_inside_a_part_blocks_a_removal_like_any_other():
 
 @scenario("change-the-store.feature", "A removal and a new link to the same artifact made at once never both land")
 def test_a_removal_and_a_new_link_to_the_same_artifact_made_at_once_never_both_land():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "A name is free again once what held it has been removed")
-def test_a_name_is_free_again_once_what_held_it_has_been_removed():
     pass
 
 
@@ -173,29 +173,6 @@ def _the_steps_link_among_them(client, attempt):
     assert [(fault.artifact, fault.place) for fault in faults] == [(PROCESS, "steps/1/about")]
     assert f"'{LOOSE}'" in faults[0].message
     assert not read(client, LOOSE).faults
-
-
-@given("the client has removed the tag nothing points at")
-def _the_loose_tag_removed(client):
-    response = remove(client, LOOSE, message="Nothing is on clearance")
-    assert not response.faults, response.faults
-
-
-@when("the client creates a tag with the title the removed one had, saying which role and why", target_fixture="created")
-def _create_a_tag_titled_as_the_removed_one(client):
-    return request(client, "tag", "Clearance", {}, message="Clearance is back")
-
-
-@then("the client is given the name the removed tag had, with no number added")
-def _the_same_name(created):
-    assert not created.faults, created.faults
-    assert created.id == LOOSE
-
-
-@then("the new tag is at its first version")
-def _at_its_first_version(client, created):
-    assert created.revision == 1
-    assert read(client, LOOSE).revision == 1
 
 
 TAGGED = "decision/clearance-runs-monthly"

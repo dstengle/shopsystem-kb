@@ -16,8 +16,43 @@ from kb.contract import kb_pb2
 scenarios("sign-a-change.feature")
 
 
-@scenario("change-the-store.feature", "The client changes an artifact")
-def test_the_client_changes_an_artifact():
+@scenario("change-the-store.feature", "A change naming no version of its type keeps the artifact at the version it conforms to")
+def test_a_change_naming_no_version_of_its_type_keeps_the_artifact_at_the_version_it_conf():
+    pass
+
+
+@scenario('change-the-store.feature', "A replacement naming a later version of the artifact's type moves the artifact to it")
+def test_a_replacement_naming_a_later_version_of_the_artifact_s_type_moves_the_artifact_t():
+    pass
+
+
+@scenario('change-the-store.feature', "A replacement naming an earlier version of the artifact's type, or a version of another type, is refused")
+def test_a_replacement_naming_an_earlier_version_of_the_artifact_s_type_or_a_version_of_a():
+    pass
+
+
+@scenario("change-the-store.feature", "The client replaces an artifact")
+def test_the_client_replaces_an_artifact():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type naming a later version, with content that does not fit it, is refused")
+def test_changing_an_artifact_that_is_behind_its_type_naming_a_later_version_with_content():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type naming no version keeps it at the version it conforms to")
+def test_changing_an_artifact_that_is_behind_its_type_naming_no_version_keeps_it_at_the_v():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type naming the latest version, with content that fits it, brings it up to date")
+def test_changing_an_artifact_that_is_behind_its_type_naming_the_latest_version_with_cont():
+    pass
+
+
+@scenario('name-what-is-asked-for.feature', "A change by a name that is not an IRI of kb's grammar writes nothing")
+def test_a_change_by_a_name_that_is_not_an_iri_of_kb_s_grammar_writes_nothing():
     pass
 
 
@@ -46,16 +81,6 @@ def test_two_clients_replace_one_artifact_at_the_same_time_neither_saying_the_ve
     pass
 
 
-@scenario("check-a-change.feature", "Changing an artifact that is behind its type brings it up to date")
-def test_changing_an_artifact_that_is_behind_its_type_brings_it_up_to_date():
-    pass
-
-
-@scenario("check-a-change.feature", "Changing an artifact that is behind its type with content the current version will not have is refused")
-def test_changing_an_artifact_that_is_behind_its_type_with_content_the_current_version_will_not_have_is_refused():
-    pass
-
-
 @scenario("check-a-change.feature", "A change that would break the type leaves the artifact as it was")
 def test_a_change_that_would_break_the_type_leaves_the_artifact_as_it_was():
     pass
@@ -73,11 +98,6 @@ def test_items_sent_back_with_their_names_are_the_same_items_and_one_without_a_n
 
 @scenario("name-artifacts-and-items.feature", "Every way an item's name can be wrong on a change is refused")
 def test_every_way_an_item_s_name_can_be_wrong_on_a_change_is_refused():
-    pass
-
-
-@scenario("name-what-is-asked-for.feature", "A change aimed at a name that is not a plain name writes nothing")
-def test_a_change_aimed_at_a_name_that_is_not_a_plain_name_writes_nothing():
     pass
 
 
@@ -189,18 +209,6 @@ def _holds_what_it_held(root, before):
     assert held.holds(root) == before["held"]
 
 
-@then("the version goes up by one")
-def _version_up_by_one(client, changed):
-    assert changed.revision == 2
-    assert read(client, DECISION).revision == 2
-
-
-@then("the artifact records the current version of its type")
-def _records_the_current_version(root, client):
-    current = held.artifact(root, "schema/decision")["version"]
-    assert read(client, DECISION).schema_version == current
-
-
 def _stale(client):
     """The names the store's check lists as behind their type."""
     return [stale.artifact for stale in check(client).stale]
@@ -214,11 +222,6 @@ def _decision_type_at_version_2(client, schema):
     assert _stale(client) == [DECISION]
 
 
-@given("a decision last checked against an older version of the decision type, which still fits the current version")
-def _behind_a_type_it_still_fits(client):
-    _decision_type_at_version_2(client, DECISION_TYPE["schema"])
-
-
 @given("a decision last checked against an older version of the decision type")
 def _behind_a_type_that_now_wants_an_owner(client):
     schema = copy.deepcopy(DECISION_TYPE["schema"])
@@ -227,44 +230,9 @@ def _behind_a_type_that_now_wants_an_owner(client):
     _decision_type_at_version_2(client, schema)
 
 
-@when(
-    "the client replaces the decision with content that fits the current version of its type, saying which role and why",
-    target_fixture="changed",
-)
-def _replace_with_content_that_fits(client):
-    response = replace(client, DECISION, {"sections": SECTIONS}, message="Bring it up to date")
-    assert not response.faults, response.faults
-    return response
-
-
-@then("the decision records the current version of its type")
-def _records_version_2(client):
-    assert read(client, DECISION).schema_version == 2
-
-
 @then("it is no longer listed as behind its type")
 def _no_longer_stale(client):
     assert DECISION not in _stale(client)
-
-
-@when(
-    "the client replaces the decision with content that does not fit the current version of its type, "
-    "saying which role and why",
-    target_fixture="attempt",
-)
-def _replace_with_content_that_does_not_fit(root, client):
-    before = held.text(root, DECISION)
-    return {"response": replace(client, DECISION, {"sections": SECTIONS}, message="No owner"), "before": before}
-
-
-@then(
-    "the change is rejected because the content does not fit the current version of its type, "
-    "like any change that does not fit"
-)
-def _rejected_by_the_current_version(attempt):
-    refused = attempt["response"]
-    assert refused.revision == 0
-    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "", "required")]
 
 
 @then("it is still listed as behind its type")
@@ -314,21 +282,6 @@ def _rejected_as_not_held(attempt):
 @then("nothing is written anywhere in the store")
 def _nothing_written_in_the_store(attempt):
     assert attempt["after"] == attempt["before"]
-
-
-@when(parsers.parse('the client replaces an artifact named "{name}", saying which role and why'), target_fixture="attempt")
-def _replace_by_a_name(client, tmp_path, name):
-    before = held.everything_in(tmp_path)
-    response = replace(client, name, {"sections": SECTIONS}, message="Change it")
-    return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
-
-
-@then("the change is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
-def _rejected_as_not_a_plain_name(attempt):
-    refused = attempt["response"]
-    assert refused.revision == 0
-    assert [fault.rule for fault in refused.faults] == ["locator"]
-    assert "plain name" in refused.faults[0].message
 
 
 @then("nothing is written anywhere, inside the store or outside it")

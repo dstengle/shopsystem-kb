@@ -16,13 +16,23 @@ scenarios("find-the-store.feature")
 scenarios("read-an-artifact.feature")
 
 
-@scenario("name-what-is-asked-for.feature", "A name that is not a plain name is refused")
-def test_a_name_that_is_not_a_plain_name_is_refused():
+@scenario("name-what-is-asked-for.feature", "A read by a name that is a path on the disk is refused")
+def test_a_read_by_a_name_that_is_a_path_on_the_disk_is_refused():
     pass
 
 
-@scenario("name-what-is-asked-for.feature", "A name that begins at the root of the disk is refused")
-def test_a_name_that_begins_at_the_root_of_the_disk_is_refused():
+@scenario('name-what-is-asked-for.feature', "A read by a name that is not an IRI of kb's grammar is refused")
+def test_a_read_by_a_name_that_is_not_an_iri_of_kb_s_grammar_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A read by an IRI links point at that the store does not hold is refused")
+def test_a_read_by_an_iri_links_point_at_that_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A read by an IRI under no type the store holds is refused")
+def test_a_read_by_an_iri_under_no_type_the_store_holds_is_refused():
     pass
 
 
@@ -253,30 +263,10 @@ def _read_by_the_name(client, name):
     return read(client, name)
 
 
-@then("the read is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
-def _rejected_as_not_a_plain_name(shown):
-    assert [fault.rule for fault in shown.faults] == ["locator"]
-    assert "plain name" in shown.faults[0].message
-
-
 @then("no content comes back, from inside the store or outside it")
 def _no_content_at_all(shown):
     assert (shown.id, shown.title, shown.content) == ("", "", "")
     assert not shown.references and not shown.parts and not shown.inbound
-
-
-@when("the client reads an artifact by a name that begins at the root of the disk", target_fixture="shown")
-def _read_by_an_absolute_name(client, tmp_path):
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "secret.yaml").write_text("title: Not for the store\n")
-    return read(client, str(outside / "secret"))
-
-
-@then("the read is rejected because a name is a kind and a plain name, never a path")
-def _rejected_as_a_path(shown):
-    assert [fault.rule for fault in shown.faults] == ["locator"]
-    assert "never a path" in shown.faults[0].message
 
 
 PLACES = {

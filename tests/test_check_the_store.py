@@ -2,11 +2,35 @@ from pytest_bdd import given, scenario, then
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, create, define,
-    next_version, start_a_store,
+    start_a_store,
 )
 import held
 from kb import client as kb_client
-from kb.contract import kb_pb2
+
+
+@scenario("check-the-store.feature", "A store holding links to IRIs it does not hold lists each placeholder with what links to it")
+def test_a_store_holding_links_to_iris_it_does_not_hold_lists_each_placeholder_with_what():
+    pass
+
+
+@scenario("check-the-store.feature", "A store whose only findings are placeholders reports no violation")
+def test_a_store_whose_only_findings_are_placeholders_reports_no_violation():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact behind its type is checked against the version of its type it conforms to")
+def test_an_artifact_behind_its_type_is_checked_against_the_version_of_its_type_it_confor():
+    pass
+
+
+@scenario("check-the-store.feature", "An artifact that conforms to a version of its type a later version has followed is listed as behind its type")
+def test_an_artifact_that_conforms_to_a_version_of_its_type_a_later_version_has_followed():
+    pass
+
+
+@scenario("query-the-store.feature", "The client asks for the placeholders")
+def test_the_client_asks_for_the_placeholders():
+    pass
 
 
 @scenario("check-the-store.feature", "A store with nothing wrong reports nothing")
@@ -23,16 +47,6 @@ def test_every_violation_is_reported():
     "check-the-store.feature", "An artifact's violations are given in the order its places stand when it reads back"
 )
 def test_an_artifacts_violations_are_given_in_reading_order():
-    pass
-
-
-@scenario("check-the-store.feature", "An artifact behind its type is reported as stale")
-def test_an_artifact_behind_its_type_is_reported_as_stale():
-    pass
-
-
-@scenario("check-the-store.feature", "An artifact behind its type that no longer fits it is reported both ways")
-def test_an_artifact_behind_its_type_that_no_longer_fits_it_is_reported_both_ways():
     pass
 
 
@@ -97,27 +111,6 @@ def _no_violation(checked):
     assert list(checked.stale) == []
 
 
-@given(
-    "a store where a decision was last checked against an older version of the decision type",
-    target_fixture="client",
-)
-def _store_with_a_decision_behind_its_type(root):
-    client = _store_with_a_decision(root)
-    next_version(client, "decision", DECISION_TYPE)
-    return client
-
-
-@given(
-    "a store where a decision was last checked against an older version of the decision type, and no longer fits "
-    "the current version",
-    target_fixture="client",
-)
-def _store_with_a_decision_behind_its_type_that_no_longer_fits(root):
-    client = _store_with_a_decision(root)
-    next_version(client, "decision", DECISION_TYPE, sections=["Purpose", "Rationale", "Review"])
-    return client
-
-
 @then("that decision is listed as behind its type")
 def _listed_as_stale(checked):
     assert [(entry.artifact, entry.schema_version, entry.current) for entry in checked.stale] == [(WEEKLY, 1, 2)]
@@ -126,20 +119,6 @@ def _listed_as_stale(checked):
 @then("it is not reported as a violation")
 def _not_a_violation(checked):
     assert list(checked.violations) == []
-
-
-@then("it is also reported as a violation, naming the artifact, the place in it and the rule broken")
-def _also_a_violation(checked):
-    assert [(fault.artifact, fault.place, fault.rule, fault.message) for fault in checked.violations] == [
-        (WEEKLY, "sections", "sections",
-         "the sections the type requires must all be present, in order; 'Review' is missing"),
-    ]
-
-
-@then("the check itself does not fail")
-def _the_check_does_not_fail(checked):
-    assert isinstance(checked.response, kb_pb2.CheckResponse)
-    assert not checked.faults, checked.faults
 
 
 @given(

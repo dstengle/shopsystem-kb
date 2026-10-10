@@ -11,6 +11,26 @@ from kb.content import loads
 from kb.contract import kb_pb2
 
 
+@scenario("check-a-change.feature", "An item pointing at an IRI under a type the store does not hold is refused")
+def test_an_item_pointing_at_an_iri_under_a_type_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "An added item's title becomes its name, read as text, refused if it leaves nothing")
+def test_an_added_item_s_title_becomes_its_name_read_as_text_refused_if_it_leaves_nothing():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "An item's title with capitals and punctuation gives a plain name")
+def test_an_item_s_title_with_capitals_and_punctuation_gives_a_plain_name():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Two items created with the same title in one collection, neither given a name, are given names of their own")
+def test_two_items_created_with_the_same_title_in_one_collection_neither_given_a_name_are():
+    pass
+
+
 @scenario("change-the-store.feature", "The client adds an item to a collection")
 def test_the_client_adds_an_item_to_a_collection():
     pass
@@ -31,11 +51,6 @@ def test_the_client_adds_an_item_to_a_collection_inside_an_item():
     "Several clients on one machine change one store at the same time, none saying the version it read",
 )
 def test_several_clients_on_one_machine_change_one_store_at_the_same_time_none_saying_the_version_it_read():
-    pass
-
-
-@scenario("check-a-change.feature", "An item pointing at something that is not there is refused")
-def test_an_item_pointing_at_something_that_is_not_there_is_refused():
     pass
 
 
@@ -71,11 +86,6 @@ def test_taking_an_item_out_does_not_rename_the_items_left():
 
 @scenario("name-artifacts-and-items.feature", "Putting items in a different order does not rename them")
 def test_putting_items_in_a_different_order_does_not_rename_them():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "An item's title becomes its name by the same rules as an artifact's title")
-def test_an_item_s_title_becomes_its_name_by_the_same_rules_as_an_artifact_s_title():
     pass
 
 
@@ -349,13 +359,6 @@ def _rejected_for_nothing(attempt):
 @then("nothing is written anywhere in the store")
 def _nothing_written(attempt):
     assert attempt["after"] == attempt["before"]
-
-
-@when("the client adds a step that points at a shared step the store does not hold, saying which role and why", target_fixture="attempt")
-def _add_a_step_pointing_nowhere(client):
-    before = read(client, PROCESS, whole=True)
-    response = add(client, PROCESS, "steps", {"title": "Count the change", "uses": "step/count-the-change"})
-    return {"response": response, "before": before}
 
 
 @then("the item is rejected because a link must land on a node of a kind the type allows")

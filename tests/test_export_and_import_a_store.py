@@ -8,13 +8,43 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
-from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, next_version, replace, start_a_store, check
+from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, replace, start_a_store, check
 from conftest import OPERATOR, _kb, exported
 import held
 from kb import canonical, client as kb_client
 
 FEATURE = "export-and-import-a-store.feature"
 IDENTITY = ["id", "type", "schema_version", "revision", "title"]
+
+
+@scenario("export-and-import-a-store.feature", "Importing a directory holding an artifact the store already holds at the same IRI with other content or another type version is refused")
+def test_importing_a_directory_holding_an_artifact_the_store_already_holds_at_the_same_ir():
+    pass
+
+
+@scenario("export-and-import-a-store.feature", "The operator checks a directory for import holding an artifact the store holds at the same IRI with other content or another type version")
+def test_the_operator_checks_a_directory_for_import_holding_an_artifact_the_store_holds_a():
+    pass
+
+
+@scenario('export-and-import-a-store.feature', "The operator checks a directory for import that holds a type version's file with an error")
+def test_the_operator_checks_a_directory_for_import_that_holds_a_type_version_s_file_with():
+    pass
+
+
+@scenario("export-and-import-a-store.feature", "The operator imports a directory holding a link to an IRI neither the directory nor the store holds, under a type one of them holds that the link field allows")
+def test_the_operator_imports_a_directory_holding_a_link_to_an_iri_neither_the_directory():
+    pass
+
+
+@scenario("export-and-import-a-store.feature", "The operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version")
+def test_the_operator_imports_a_directory_holding_an_artifact_the_store_already_holds_at():
+    pass
+
+
+@scenario("export-and-import-a-store.feature", "The operator imports a directory that checks clean into a store, saying which role they are")
+def test_the_operator_imports_a_directory_that_checks_clean_into_a_store_saying_which_rol():
+    pass
 
 
 @scenario(FEATURE, "The operator exports the store to a directory that is empty or does not exist")
@@ -39,11 +69,6 @@ def test_exporting_to_a_directory_that_holds_anything_is_refused():
 
 @scenario(FEATURE, "The operator checks a directory for import and each error is reported by file and reason")
 def test_each_error_is_reported_by_file_and_reason():
-    pass
-
-
-@scenario(FEATURE, "The operator checks a directory for import that holds a file with an error, and files link to it")
-def test_files_linking_to_a_broken_file_would_be_skipped():
     pass
 
 
@@ -485,18 +510,6 @@ SKIPPED = {
 }
 
 
-@then(parsers.parse(
-    "{skipped} reported as a file that would be skipped, each with the chain of links that leads from it to the "
-    "broken file"
-))
-def _reported_as_skipped(ran, files, skipped):
-    reported = {(line[1], line[2]) for line in _report(ran) if line[0] == "skipped"}
-    expected = {
-        (_file(files[chain[0]]), " -> ".join(_file(files[part]) for part in chain)) for chain in SKIPPED[skipped]
-    }
-    assert reported == expected, ran.stdout
-
-
 @given(
     "a directory for import in which every file is well formed, fits its type and links only to what is there",
     target_fixture="target",
@@ -568,14 +581,6 @@ def _the_copy_is_an_error(ran):
 # export of a store of its own, broken where a step says; the store imported into is read through `held` and its
 # history through the contract.
 
-@scenario(
-    FEATURE,
-    "The operator imports a directory that checks clean into a freshly started store, saying which role they are",
-)
-def test_a_clean_directory_lands_as_one_signed_set():
-    pass
-
-
 def _exported_names(target):
     """The name of every artifact a directory for import holds but the type that describes types, sorted."""
     files = [path.relative_to(target) for path in Path(target).glob("*/*.yaml")]
@@ -583,32 +588,6 @@ def _exported_names(target):
         str(file.with_suffix("")) for file in files
         if file != Path("schema/schema.yaml") and file.parts[0] not in ("journal", ".git")
     )
-
-
-def _decision_at_revision_three(client):
-    """The type for decisions moved on to version 2, then a decision written against it and changed twice."""
-    define(client, DECISION_TYPE)
-    next_version(client, "decision", DECISION_TYPE)
-    content = {"title": "Price reviews happen weekly", "sections": [
-        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-        {"title": "Rationale", "body": "Costs move weekly.\n"},
-    ]}
-    create(client, "decision", content)
-    for body in ("Costs move every week.\n", "Costs move weekly, and so do we.\n"):
-        content["sections"][1]["body"] = body
-        assert not replace(client, WEEKLY, {key: value for key, value in content.items() if key != "title"}).faults
-
-
-@given(
-    "a directory for import that checks clean, holding a type for decisions and a decision at revision 3 written "
-    "against version 2 of the decision type",
-    target_fixture="target",
-)
-def _for_import_with_a_decision_at_revision_three(tmp_path):
-    target = _for_import(tmp_path, _decision_at_revision_three)
-    weekly = _read(target, WEEKLY)
-    assert (weekly["revision"], weekly["schema_version"]) == (3, 2), weekly
-    return target
 
 
 @when("the operator imports the directory, saying which role they are", target_fixture="ran")
@@ -632,28 +611,6 @@ def _lands_as_one_signed_set(ran, root, target):
     assert {(entry.batch, entry.actor.role, entry.message) for entry in entries} == {
         (entries[0].batch, OPERATOR, f"import {target}"),
     }
-
-
-def _identity(artifact):
-    return {key: artifact[key] for key in IDENTITY}
-
-
-@then(
-    "the decision lands under the same name and title, at revision 3, written against version 2 of the decision type"
-)
-def _the_decision_lands_as_it_was(root, target):
-    landed = held.artifact(root, WEEKLY)
-    assert _identity(landed) == {**_identity(_read(target, WEEKLY)), "revision": 3, "schema_version": 2}
-    assert held.text(root, WEEKLY) == (Path(target) / _file(WEEKLY)).read_text(encoding="utf-8")
-
-
-@then(
-    "the type for decisions lands under the same name and title, at the revision and type version the directory gives "
-    "it"
-)
-def _the_type_lands_as_it_was(root, target):
-    assert held.text(root, "schema/decision") == (Path(target) / "schema/decision.yaml").read_text(encoding="utf-8")
-    assert held.artifact(root, "schema/decision")["revision"] == 2
 
 
 @scenario(
@@ -805,30 +762,9 @@ def _told_what_was_skipped(ran, files):
     }, ran.stdout
 
 
-@scenario(FEATURE, "Importing into a store that holds an artifact besides the type that describes types is refused")
-def test_importing_into_a_store_that_is_not_fresh_is_refused():
-    pass
-
-
-@given("a store that has been given a type for decisions since it was started")
-def _store_given_a_type(root, before):
-    define(_started(root), DECISION_TYPE)
-    before.update(started=held.holds(root))
-
-
 @given("a directory for import that checks clean", target_fixture="target")
 def _for_import_that_checks_clean(tmp_path):
     return _for_import(tmp_path, lambda client: define(client, WORK_ITEM_TYPE))
-
-
-@then("the import is rejected because import goes only into a freshly started store")
-def _rejected_as_not_fresh(ran, root, before):
-    assert (ran.returncode, ran.stdout) == (2, "")
-    assert ran.stderr == (
-        "kb import: refused: store: import goes only into a freshly started store; this one holds 1 artifact(s) "
-        "besides the type that describes types\n"
-    )
-    assert held.holds(root) == before["started"]
 
 
 @scenario(FEATURE, "The operator imports the kb directory of an existing store")

@@ -17,6 +17,11 @@ from kb.contract import kb_pb2
 FEATURE = "answer-a-damaged-file.feature"
 
 
+@scenario("answer-a-damaged-file.feature", "A store found that was made by a kb before contract v2 refuses every call and command that needs it")
+def test_a_store_found_that_was_made_by_a_kb_before_contract_v2_refuses_every_call_and_co():
+    pass
+
+
 @scenario(
     FEATURE,
     "A store whose database cannot be read, because it is damaged or missing beside its marker, refuses every call "
@@ -111,28 +116,6 @@ def _rejected_as_unreadable(answered):
         _unreadable(*line.split(": ", 3)[2:4])
 
 
-def _earlier(rule, message):
-    assert rule == "unreadable"
-    assert "made by an earlier version of kb" in message
-
-
-@then("what was asked is rejected because the store was made by an earlier version of kb")
-def _rejected_as_earlier(answered):
-    if hasattr(answered, "faults"):
-        [fault] = answered.faults
-        assert (fault.artifact, fault.place) == ("", "")
-        _earlier(fault.rule, fault.message)
-    else:
-        [line] = answered.stderr.splitlines()
-        _earlier(*line.split(": ", 3)[2:4])
-
-
-@then("the fault says to start a new store and import the old one's files")
-def _says_how_to_move(answered):
-    message = answered.faults[0].message if hasattr(answered, "faults") else answered.stderr
-    assert "start a new store and import the old one's files" in message
-
-
 @then("nothing is written in the store")
 def _nothing_written_in_the_store(root, before):
     assert held.bytes_held(root) == before["held"]
@@ -159,16 +142,6 @@ def _kb_export(root, before, empty, where):
     return _answered(root, before, lambda: _kb("export", str(empty), **where))
 
 
-@given(
-    "a store holding a decision, a process and a tag, made by an earlier kb in a form this kb cannot read",
-    target_fixture="client",
-)
-def _store_made_by_an_earlier_kb(root):
-    client = _store_with_a_decision_a_process_and_a_tag(root)
-    held.made_by_an_earlier_kb(root)
-    return client
-
-
 @given(parsers.re("the store is found (?P<how>upward from the working directory|through KB_ROOT naming it)"),
        target_fixture="client")
 def _store_found(root, tmp_path, monkeypatch, how):
@@ -188,14 +161,6 @@ def _store_found(root, tmp_path, monkeypatch, how):
     'A store whose database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, refuses every call and command that needs it',
 )
 def test_a_store_whose_database_cannot_be_opened_for_writing_because_the_direct():
-    pass
-
-
-@scenario(
-    FEATURE,
-    'A store found that was made by an earlier kb, in a form this kb cannot read, refuses every call and command that needs it',
-)
-def test_a_store_found_that_was_made_by_an_earlier_kb_in_a_form_this_kb_cannot():
     pass
 
 
