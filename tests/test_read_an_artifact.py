@@ -539,6 +539,17 @@ def _everything_in_declared_order(whole):
     assert [option["id"] for option in content["options"]] == ["keep-weekly", "go-monthly"]
 
 
+@then(
+    "beside its content the client is given its IRI, the IRI of the version of the decision type it conforms to, "
+    "its revision and its title"
+)
+def _identity_beside_content(whole):
+    assert (whole.id, whole.type, whole.revision, whole.title) == (
+        DECISION, version_iri("decision"), 1, "Price reviews happen weekly",
+    )
+    assert not {"id", "type", "revision", "title"} & set(loads(whole.content))
+
+
 @then("the older decision is given as the name it is known by, and nothing more")
 def _older_as_a_name(whole):
     assert loads(whole.content)["supersedes"] == OLDER
@@ -604,10 +615,13 @@ def _branches_as_written(whole):
     assert set(steps[0]["branches"]) <= {step["id"] for step in steps}
 
 
-@then("the older decision comes with its name, its kind, its title and the version it is at, ahead of its content")
+@then(
+    "the older decision comes with its IRI, the IRI of the version of the decision type it conforms to, its title "
+    "and its revision, ahead of its content"
+)
 def _older_says_what_it_is(whole):
     older = loads(whole.content)["supersedes"]
-    assert list(older)[:4] == ["id", "type", "revision", "title"]
+    assert list(older) == ["id", "type", "revision", "title", "sections"]
     assert (older["id"], older["type"], older["title"], older["revision"]) == (
         OLDER, version_iri("decision"), "Prices are reviewed monthly", 1,
     )

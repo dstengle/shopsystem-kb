@@ -425,6 +425,32 @@ def _rejected_for_a_title_inside(refused):
     assert "Price reviews, weekly" in refused.faults[0].message
 
 
+CARRIED_BESIDE = {"id": iri("decision", "price-reviews-weekly"), "type": version_iri("decision", 3), "revision": 7}
+
+
+@when(
+    "the client creates a decision whose content carries the artifact's IRI, the version of its type and a revision "
+    "for the artifact itself, saying which role and why",
+    target_fixture="refused",
+)
+def _create_with_what_travels_beside_inside(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        **CARRIED_BESIDE, "sections": SECTIONS,
+    }, message="Move price reviews to weekly")
+
+
+@then("the artifact is rejected because content holds only what the type declares")
+def _rejected_for_what_travels_beside(refused):
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.place, fault.rule) for fault in refused.faults] == [(key, "identity") for key in CARRIED_BESIDE]
+
+
+@then("the artifact's IRI, the version of its type and the revision the content carried are each named back")
+def _each_carried_named_back(refused):
+    for fault, value in zip(refused.faults, CARRIED_BESIDE.values(), strict=True):
+        assert str(value) in fault.message
+
+
 @when(parsers.parse('the client creates a decision titled "{title}", saying which role and why'), target_fixture="created")
 def _create_titled(client, title):
     return request(client, "decision", title, {"sections": SECTIONS}, message="Record it")
