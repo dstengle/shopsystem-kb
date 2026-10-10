@@ -110,24 +110,24 @@ def _told_apart(root: Path) -> None:
     raise LaterKb(root)
 
 
-def start(root: Root, fill: Callable[[Port], None]) -> None:
-    """The store's place made, then its database, filled by `fill`, then its marker, last, so a store is marked only
-    once it is whole. A SQLite that cannot keep a store is refused before anything is made; when making the
-    database or the marker raises, the place is removed and the error raised: a failed start leaves nothing."""
+def start(root: Root, fill: Callable[[Port], None], made: Callable[[Path], None] | None = None) -> None:
+    """The store's place made, then its database, new, or made by `made`, filled by `fill`, then its marker, last, so a
+    store is marked only once it is whole. A SQLite that cannot keep a store is refused before anything is made; when
+    making the database or the marker raises, the place is removed and the error raised: a failed start leaves nothing."""
     sqlite_store.supported()
     place = root.path / MARKER.parent
     place.mkdir()
     try:
-        sqlite_store.make(root.path / DATABASE)
-        with sqlite_store.opened(root.path / DATABASE) as made:
-            fill(made)
+        (made or sqlite_store.make)(root.path / DATABASE)
+        with sqlite_store.opened(root.path / DATABASE) as fresh:
+            fill(fresh)
         (root.path / MARKER).write_text(canonical.dump({"store": STORE_FORM}), encoding="utf-8")
     except (sqlite3.Error, OSError, Unreadable):
         shutil.rmtree(place)
         raise
 
 
-def vacant(root: Root) -> None:
+def vacant(root: Root, verb: str = "started") -> None:
     """Refuse a root a store cannot be started in: one that is not there, is not a directory, has a store inside it or
     anything else in the place a store goes, or is inside a store, or is one kb cannot write. A relative root cannot be resolved once the
     working directory it is read against is itself gone; that is refused too, never raised."""
@@ -143,14 +143,14 @@ def vacant(root: Root) -> None:
     if not root.path.is_dir():
         refuse(f"a store is started in a directory, and {named} is not one")
     if (root.path / MARKER).is_file():
-        refuse(f"a store is never started over another; {named} already has a store inside it")
+        refuse(f"a store is never {verb} over another; {named} already has a store inside it")
     if (root.path / MARKER.parent).exists() or (root.path / MARKER.parent).is_symlink():
         refuse(f"a store goes in a place of its own, and {named} already holds something in that place")
     above = find_above(root.path.resolve().parent)
     if above is not None:
         refuse(f"stores do not nest; {named} is inside the store at {str(above)!r}")
     if not os.access(root.path, os.W_OK | os.X_OK):
-        refuse(f"a store is started in a directory kb can write, and {named} is not one")
+        refuse(f"a store is {verb} in a directory kb can write, and {named} is not one")
 
 
 def find_above(start: Path) -> Path | None:

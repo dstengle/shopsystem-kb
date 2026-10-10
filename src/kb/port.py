@@ -9,6 +9,7 @@ The port refuses with the exceptions named here. None of them is published, and 
 """
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import ContextManager, Protocol
 
 from kb.values import ArtifactId, Kind
@@ -172,6 +173,11 @@ class Port(Protocol):
         A refusal of `land` inside it takes back only that set, and the lock is still held. A block opened inside one
         that holds the lock runs within it. Raises Busy, nothing
         written, when another change holds the write lock longer than the store waits for it."""
+
+    def copied(self, path: Path, form: int) -> None:
+        """The store copied whole, as it stood at one moment, into a new file at path, which says it holds a store of
+        the form given; the copy neither takes nor waits for the write lock. Raises FileExistsError, writing nothing,
+        when anything is at path; a copy that fails leaves nothing there."""
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
              kinds: tuple[Kind, ...] = ()) -> None:

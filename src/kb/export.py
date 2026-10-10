@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from kb import canonical, composition, names, refusals, settled, values
 from kb.port import Port
-from kb.values import Directory, Refused
+from kb.values import Named, Refused
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class Exported:
     faults: list = field(default_factory=list)
 
 
-def written(store: Port, into: Directory) -> None:
+def written(store: Port, into: Named) -> None:
     """Every artifact the store holds, all read at one moment, then written as canonical text into the directory,
     which is made, with any directory above it, when it does not exist. Raises Refused, before the store is read and
     writing nothing, when it is not a directory or holds anything."""
@@ -36,7 +36,7 @@ def _ordered(store: Port, name, artifact: dict) -> dict:
     return settled.order(artifact, composition.declared(store.artifact(type_id)["schema"], store))
 
 
-def _empty(into: Directory) -> None:
+def _empty(into: Named) -> None:
     """Refuse what is not a directory, and a directory that holds anything: an export never writes over what is
     there."""
     if into.path.exists() and not into.path.is_dir():

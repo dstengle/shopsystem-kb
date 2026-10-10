@@ -1,10 +1,10 @@
 """kb's own command line, for the operator: set a store up, empty or seeded from a directory of files, check one,
-export one, check a directory for import, import one into a freshly started store, and serve one to callers over the
-network. Nothing else; every other change to content goes through a client.
+export one, back one up, restore a backup, check a directory for import, import one into a freshly started store, and
+serve one to callers over the network. Nothing else; every other change to content goes through a client.
 
-Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded,
-on kb.staging, or, to serve, on kb.server, a store started first on kb.staging when a start is asked for and the root
-holds none, and taken back there should it then not be served.
+Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded
+or to restore one, on kb.staging, or, to serve, on kb.server, a store started first on kb.staging when a start is asked
+for and the root holds none, and taken back there should it then not be served.
 A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
 exits 1. A store served is served until the process is told to stop, and then exits 0.
 """
@@ -40,6 +40,12 @@ def main(argv=None) -> int:
     how.add_argument(
         "--skip-errors", action="store_true", help="land all but the files with errors and the files leading to them",
     )
+    backing_up = commands.add_parser("backup", help="back the store found here, or the one KB_ROOT names, up whole, "
+                                     "its history and journal included, as one file")
+    backing_up.add_argument("file", help="the file the backup is written as, where nothing is")
+    restoring = commands.add_parser("restore", help="restore a backup as a store in a directory that holds none")
+    restoring.add_argument("file", help="the backup, as kb backup wrote it")
+    restoring.add_argument("root", help="the directory the store is restored inside, as its kb/ subdirectory")
     serving = commands.add_parser("serve", help="serve a store to callers over the network, at the address given")
     serving.add_argument("root", help="the directory the store sits in, as its kb/ subdirectory")
     serving.add_argument("--listen", metavar="HOST:PORT", help="the address to serve at; none is assumed")
@@ -54,6 +60,10 @@ def main(argv=None) -> int:
         return _export(args.directory)
     if args.command == "import":
         return _import_check(args.directory) if args.check else _import(args.directory, args.skip_errors)
+    if args.command == "backup":
+        return _backup(args.file)
+    if args.command == "restore":
+        return _restore(args.file, args.root)
     return _validate()
 
 
@@ -152,6 +162,25 @@ def _export(directory: str) -> int:
     if exported.faults:
         return _refused("export", exported.faults)
     return 0
+
+
+def _backup(file: str) -> int:
+    """Back the store this directory finds up whole, as one file at the place named."""
+    backed_up = kb_client.backup(file)
+    if backed_up.faults:
+        return _refused("backup", backed_up.faults)
+    return 0
+
+
+def _restore(file: str, root: str) -> int:
+    """Restore the backup named as a store inside root; no role is read, since nothing is signed."""
+    try:
+        restored = staging.restored(root, file)
+    except kb.NotStarted as refused:
+        return _refused("restore", refused.faults)
+    except KeyboardInterrupt:
+        return _interrupted()
+    return _refused("restore", restored.faults) if restored.faults else 0
 
 
 def _import_check(directory: str) -> int:
