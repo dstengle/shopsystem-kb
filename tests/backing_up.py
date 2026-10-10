@@ -13,6 +13,7 @@ from calls import (DECISION_TYPE, a_decision_type_and_a_decision, answer, create
                    journal, listing, read, replace, signature, snapshot, start_a_store)
 from conftest import _kb
 from kb import client as kb_client
+from kb import sqlite_search
 from kb.contract import kb_pb2
 
 DECISIONS = ("decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly")
@@ -165,31 +166,65 @@ def _a_store_with_a_decision(root):
     a_decision_type_and_a_decision(kb_client.connect(root))
 
 
+class MidLanding:
+    """A set landing on a thread of its own, held inside its landing transaction once the first of its artifacts is
+    written, the store's write lock held and the rest of the set not yet written, until it is let go."""
+
+    def __init__(self, root, request, monkeypatch):
+        self._written, self._go = threading.Event(), threading.Event()
+        searchable = sqlite_search.searchable
+
+        def written_then_held(db, name, kind, rows):
+            searchable(db, name, kind, rows)
+            if name in LANDING and not self._written.is_set():
+                self._written.set()
+                assert self._go.wait(at_once.PATIENCE), "the landing set was never let go"
+
+        monkeypatch.setattr(sqlite_search, "searchable", written_then_held)
+        self._answers = []
+        self._thread = threading.Thread(target=lambda: self._answers.append(answer(
+            kb_client.connect(root).BatchCreate(request))), daemon=True)
+
+    def hold(self):
+        self._thread.start()
+        assert self._written.wait(at_once.PATIENCE), "the set never began to land"
+
+    def let_go(self):
+        """The set let go to finish landing, once it is held or whatever became of it."""
+        self._go.set()
+
+    def release(self):
+        """The set let go to finish landing; its answer."""
+        self.let_go()
+        self._thread.join(at_once.PATIENCE)
+        assert not self._thread.is_alive(), "the set never finished landing"
+        [landed] = self._answers
+        return landed
+
+
 @given("a client is landing a set that makes three decisions", target_fixture="landing")
-def _landing_three_decisions(root):
-    """A set of three creates, drafted and held at its clock, before it lands."""
+def _landing_three_decisions(root, request, monkeypatch):
+    """A set of three creates, held inside its landing once the first of them is written."""
     items = [created("decision", f"Stock is counted {every}", _sections(f"Stock moves {every}.\n"))
              for every in ("weekly", "monthly", "yearly")]
-    landing = at_once.OnAThread(root, "BatchCreate", kb_pb2.BatchCreateRequest(
-        items=items, signature=signature("Count stock")))
+    landing = MidLanding(root, kb_pb2.BatchCreateRequest(items=items, signature=signature("Count stock")), monkeypatch)
+    request.addfinalizer(landing.let_go)
     landing.hold()
     return landing
 
 
 @when("the operator backs up the store while that set is landing", target_fixture="backup")
 def _backs_up_while_landing(root, tmp_path, landing):
-    """The set let go to land on a thread of its own as the operator backs the store up; the set's answer awaited."""
-    letting_go = threading.Thread(target=landing.release)
-    letting_go.start()
+    """The store backed up while the set is held part written; then the set let go to finish landing."""
     backup = _backed_up(root, tmp_path)
-    letting_go.join(at_once.PATIENCE)
-    assert not letting_go.is_alive(), "the set never finished landing"
+    landed = landing.release()
+    assert not landed.refused, landed.faults
     return backup
 
 
 @then("the backup holds either all three decisions of that set, with their history and journal entries, or none of "
       "them")
-def _all_or_none(backup, root, tmp_path_factory, restored):
+def _all_or_none(backup, root, tmp_path_factory):
     place = tmp_path_factory.mktemp("restored")
     ran = _kb("restore", str(backup["file"]), str(place), cwd=place)
     assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
