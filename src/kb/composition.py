@@ -149,7 +149,14 @@ def artifact_kind(artifact: dict) -> values.Kind:
 
 
 def artifact_schema(artifact: dict, corpus) -> dict:
-    """The type an artifact's kind names, as the corpus holds it. Raises Refused when the corpus holds none."""
+    """The version of its type an artifact conforms to, as the corpus keeps it, its JSON Schema under `schema`: what
+    a read shows of it and takes for a link. Raises Refused when the corpus keeps no such version."""
+    return conformed(artifact, corpus)
+
+
+def latest_schema(artifact: dict, corpus) -> dict:
+    """The version its kind's type stands at now, whichever version the artifact conforms to: what an export and an
+    import read an artifact through. Raises Refused when the corpus holds no such type."""
     return kind_schema(artifact_kind(artifact), corpus)
 
 

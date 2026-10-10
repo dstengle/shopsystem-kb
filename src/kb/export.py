@@ -34,7 +34,7 @@ def written(store: Port, into: Named) -> None:
 
 def _ordered(store: Port, name, artifact: dict) -> dict:
     """The artifact, its entries in the order the current version of its type declares."""
-    return settled.order(artifact, composition.declared(composition.artifact_schema(artifact, store)["schema"], store))
+    return settled.order(artifact, composition.declared(composition.latest_schema(artifact, store)["schema"], store))
 
 
 def _empty(into: Named) -> None:

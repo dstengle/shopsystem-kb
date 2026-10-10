@@ -40,7 +40,7 @@ def apply(draft: Draft, operation) -> Change:
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
-    acted = composition.artifact_schema(left, draft) if change.op == "import" else composition.conformed(left, draft)
+    acted = composition.latest_schema(left, draft) if change.op == "import" else composition.conformed(left, draft)
     return change._replace(revision=left["revision"], type=left["type"], left=left, acted=acted)
 
 

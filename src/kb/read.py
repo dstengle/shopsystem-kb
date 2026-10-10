@@ -57,18 +57,27 @@ class _Kept:
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
-    return _stub(field, store.artifact(target_id), _shown(store, composition.kind_of(target_id, store)))
+    target = store.artifact(target_id)
+    return _stub(field, target, _shown(store, target))
 
 
-def stubs(store: Port, kind: values.Kind, artifact_ids: list[ArtifactId]) -> list[kb_pb2.Stub]:
-    """Artifacts of one kind in brief, as `stub` gives each under no field, their type read once."""
-    shown = _shown(store, kind)
-    return [_stub("", store.artifact(artifact_id), shown) for artifact_id in artifact_ids]
+def stubs(store: Port, artifact_ids: list[ArtifactId]) -> list[kb_pb2.Stub]:
+    """Artifacts in brief, as `stub` gives each under no field, each through the version of the type it
+    conforms to, a version read once."""
+    shown: dict[int, dict] = {}
+    stubbed = []
+    for artifact_id in artifact_ids:
+        found = store.artifact(artifact_id)
+        number = settled.version(found)
+        if number not in shown:
+            shown[number] = _shown(store, found)
+        stubbed.append(_stub("", found, shown[number]))
+    return stubbed
 
 
-def _shown(store: Port, kind: values.Kind) -> dict:
-    """What a kind's type declares, the fields it shows at a glance among it."""
-    return composition.declared(composition.kind_schema(kind, store)["schema"], store)
+def _shown(store: Port, artifact: dict) -> dict:
+    """What the version of its type an artifact conforms to declares, the fields it shows at a glance among it."""
+    return composition.declared(composition.artifact_schema(artifact, store)["schema"], store)
 
 
 def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:

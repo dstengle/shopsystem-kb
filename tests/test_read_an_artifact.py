@@ -5,8 +5,8 @@ import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, answer, create, define, iri, read, replace,
-    start_a_store, tagged_decision_type, type_iri, version_iri,
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, answer, change_type, create, define, iri, read, replace,
+    start_a_store, tagged_decision_type, targets, type_iri, version_iri,
 )
 import held
 import serving
@@ -823,3 +823,69 @@ def opened_roots(monkeypatch):
         return opening(root)
     monkeypatch.setattr(kb_store, "opened", recorded)
     return roots
+
+
+NOTE_TEXT = {"summary": "Pricing notes", "reference": "see the pricing notes"}
+MOVED_ON = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "owner": {"type": "string"},
+        "reference": {
+            "type": "string",
+            "ref": {"targets": targets("decision"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
+        },
+    },
+    "required": ["title"],
+    "summary": ["owner"],
+}
+NOTE = iri("note", "a-note")
+NOTE_READS = {
+    "the note at a glance": lambda client: read(client, NOTE),
+    "the whole note": lambda client: read(client, NOTE, whole=True),
+    "the whole note following its links one step": lambda client: read(client, NOTE, whole=True, depth=1),
+}
+
+
+@given(
+    "a note type whose first version shows a summary at a glance and holds a reference as plain text, and whose second "
+    "version shows an owner at a glance and makes the reference a link"
+)
+def _a_note_type_that_moved_on(client):
+    first = {
+        "title": "Note",
+        "version": 1,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"}, "summary": {"type": "string"}, "reference": {"type": "string"},
+            },
+            "required": ["title"],
+            "summary": ["summary"],
+        },
+    }
+    define(client, first)
+
+
+@given("a note that conforms to the first version, with a summary and a reference")
+def _a_note_at_the_first_version(client):
+    create(client, "note", {"title": "A note", **NOTE_TEXT})
+    response = change_type(client, "note", MOVED_ON)
+    assert not response.faults, response.faults
+
+
+@when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, NOTE_READS))})$"), target_fixture="shown")
+def _read_the_note(client, what):
+    return NOTE_READS[what](client)
+
+
+@then(parsers.re("the note is given as the first version declares, (?P<as_declared>.*)"))
+def _the_note_as_its_version_declares(shown, as_declared):
+    assert not shown.faults, shown.faults
+    assert (shown.id, shown.type) == (NOTE, version_iri("note", 1))
+    if as_declared.startswith("its summary"):
+        assert loads(shown.content) == {"summary": NOTE_TEXT["summary"]}
+        assert not shown.references
+    else:
+        assert loads(shown.content)["reference"] == NOTE_TEXT["reference"]

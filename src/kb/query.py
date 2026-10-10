@@ -14,7 +14,7 @@ def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
     matched = store.ids(asked.kind, asked.fields)
     if asked.ids:
         return kb_pb2.Listed(ids=[str(artifact_id) for artifact_id in matched])
-    return kb_pb2.Listed(stubs=read.stubs(store, asked.kind, matched))
+    return kb_pb2.Listed(stubs=read.stubs(store, matched))
 
 
 def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
