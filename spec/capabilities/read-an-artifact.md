@@ -20,7 +20,7 @@ The client reads an artifact at a glance, one section by its title, or whole. It
 - When the client reads a whole artifact, it is given every field, every section and every part, in the order the type declares.
 - When the client reads a whole artifact, it is given beside its content its IRI, the IRI of the version of its type it conforms to, its revision and its title.
 - When the client reads a whole artifact without asking for its links to be followed, each link comes back as the name of what it points at, and nothing more.
-- When the client reads an artifact holding a link to an IRI the store does not hold, that link comes back marked as landing on nothing held, apart from the links that land.
+- When the client reads an artifact holding a link to an IRI the store does not hold, at any level and following links or not, that link comes back marked as landing on nothing held and is never filled in, while a link that lands carries no such mark.
 - When the client reads a whole artifact following its links one step, each target is given in place of its link, as the store holds it now, and what the target points at is given as names.
 - When the client reads a whole artifact following its links two steps, each target is given in place of its link, and the targets' own links are filled in too.
 - When a read following links meets a target already filled in on the way, that target is given as a name rather than filled in again, so the read ends.

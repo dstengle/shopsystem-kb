@@ -25,7 +25,7 @@ The client names every artifact it creates with an IRI: its type's IRI, a `/`, a
 - If the client creates an artifact giving two parts of one collection the same name, the artifact is refused because a part's name is unique in its collection, naming the name, and nothing is written.
 - If the client creates an artifact giving a part a name that is not a plain name, the artifact is refused because a part's name is a plain name, naming the place, and nothing is written.
 - When the client creates an artifact carrying two items with the same title in one collection, neither given a name, each item is given a name of its own, the second the name of the first with a number added.
-- When a title has capitals and punctuation, the name is the title in lower case, each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end.
+- When an item's title has capitals and punctuation, its name is the title in lower case, each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end.
 - When an artifact's title reads as a date, the title reads back as the text written.
 - When an artifact's title reads as yes, the title reads back as the text written.
 - When an artifact's title is given as the yes-or-no true, the title reads back as the text "true".

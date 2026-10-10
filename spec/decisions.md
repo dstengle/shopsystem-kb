@@ -758,3 +758,13 @@ source: the person's delegation of 2026-10-10
 An IRI not of kb's grammar carries rule `locator`; an IRI not under its type's, and an IRI already held, carry `identity`; a version not held, or not later than the one an artifact conforms to, carries `version`; an import's artifact differing from the one the store holds carries a new rule, `differs`, which joins kb's published rule names.
 date: 2026-10-10
 source: the person's delegation of 2026-10-10
+
+## decision/what-links-to-a-placeholder
+"What links to" a placeholder, wherever a placeholder is listed (the check, kb validate, the query of placeholders), is each link into it: the artifact holding the link and the place in it the link sits at. Chosen over the linking artifacts alone, so a client can find and fill each link.
+date: 2026-10-10
+source: formulation question (check-the-store), answered under the person's delegation of 2026-10-10
+
+## decision/formulation-answers-k2
+Answers to formulation questions on K2 and K3, each tightening a line's wording: an item's title, never an artifact's, gives its name; a type version the store does not hold is refused whether or not it holds the type; a link to an IRI not held is marked and never filled in, at every read level; in a set, a placeholder's type may be one a create in the set makes; an export holds only a type's version files, each with that version's own revision and title; a broken type version takes with it only the artifacts conforming to it and the type versions referring to it by `kb:` reference.
+date: 2026-10-10
+source: formulation questions (name-artifacts-and-items, define-a-type, name-what-is-asked-for, read-an-artifact, make-several-changes-in-one-go, export-and-import-a-store), answered under the person's delegation of 2026-10-10

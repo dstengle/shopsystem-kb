@@ -29,7 +29,7 @@ The client asks for an ordered set of changes of one kind (creates, replacements
 - When the client creates several artifacts in one go, a link anywhere in the set to the IRI another create in it carries lands on the artifact that create makes.
 - When two new artifacts in one set point at each other, each by the IRI the other's create carries, the set lands.
 - When a create in a set gives a part a name of its own choosing, a link anywhere in the set to that artifact's IRI, `#` and that part's place lands on that part.
-- When a link in a set points at an IRI neither the store nor any create in the set holds, under a type the store holds that the link field allows, the set lands and the link lands on a placeholder at that IRI.
+- When a link in a set points at an IRI neither the store nor any create in the set holds, under a type the store holds, or one a create in the set makes, that the link field allows, the set lands and the link lands on a placeholder at that IRI.
 - If two creates in one set carry the same IRI, the set is refused because an IRI names one artifact, naming the IRI, and the store holds none of its changes.
 - When the client creates several artifacts in one go, each create's result gives the artifact's IRI and its first revision, in the order of the set.
 - If a replacement, an addition or a removal in a set says the revision the client read its artifact at, and the artifact stands at another revision when the set lands, the set is refused because the artifact moved since it was read, naming the revision it stands at, and nothing of the set is written.
