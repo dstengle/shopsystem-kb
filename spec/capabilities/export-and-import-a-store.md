@@ -2,7 +2,7 @@
 id: capability/export-and-import-a-store
 title: Export and import a store
 narrator: the operator
-rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git, decision/busy-rule, decision/earlier-store-told-apart, decision/operator-directory-refused-by-shape, decision/0026-import-passes-over-identical-refuses-differing, decision/0024-a-link-may-land-on-a-placeholder, decision/0023-an-artifacts-iri-sits-under-its-types, decision/each-type-version-a-file, decision/import-skips-only-by-type, decision/import-check-reports-differing, decision/rules-for-iri-refusals]
+rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git, decision/busy-rule, decision/earlier-store-told-apart, decision/operator-directory-refused-by-shape, decision/0026-import-passes-over-identical-refuses-differing, decision/0024-a-link-may-land-on-a-placeholder, decision/0023-an-artifacts-iri-sits-under-its-types, decision/each-type-version-a-file, decision/import-skips-only-by-type, decision/import-check-reports-differing, decision/rules-for-iri-refusals, decision/an-artifact-is-read-through-its-version]
 formulated_as: features/export-and-import-a-store.feature
 ---
 
@@ -15,6 +15,7 @@ The operator takes a store out as files people can read and review, checks a dir
 ## Behaviour
 
 - When the operator exports the store to a directory that is empty or does not exist, the directory holds one file for each artifact, at a place that follows the path of its IRI, and for a type one file for each version the store holds and no other, at the type's place, `@` and the version's number, a version's file giving that version's own revision and title, each giving the artifact's identity first (its IRI, the IRI of the version of its type it conforms to, its revision and its title) and then its content, as the store stood at one moment.
+- When the operator exports a store holding an artifact that conforms to an earlier version of its type, that artifact's file gives its content in the order the version it conforms to declares.
 - When the operator opens an exported artifact's file, every piece of prose stands as a block of its own however short, each list is written beneath the name it belongs to, indented under it, no line of prose is broken to fit a width, and nothing in the file tells a reader how to build a value.
 - When two stores given the same content by the same client are exported, their files for it are the same, byte for byte.
 - If the directory named for an export holds anything, the export is refused because export never overwrites, and what the directory holds is left as it was.
@@ -28,6 +29,7 @@ The operator takes a store out as files people can read and review, checks a dir
 - If a directory checked for import holds an error, the check reports failure.
 - When the operator imports a directory that checks clean into a store, saying which role they are, everything in it lands as one set signed by that role, with a message naming the directory, each artifact keeping its IRI, title, revision and type version.
 - When the operator imports a directory that checks clean, each type lands before the artifacts of its kind, and the store's history gains one import entry for each artifact that lands.
+- When the operator imports the export of a store that held an artifact conforming to an earlier version of its type, every version of that type lands as its file gives it, the artifact is checked against the version it conforms to, and afterwards it is read, listed, checked and replaced as it was in the store exported.
 - When the operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version, that artifact is passed over and the rest lands.
 - If the operator imports a directory holding an artifact the store already holds at the same IRI with other content or another type version, the import is refused naming each such IRI, and nothing lands.
 - When the operator imports a directory holding a link to an IRI neither the directory nor the store holds, under a type one of them holds that the link field allows, the import lands and the link lands on a placeholder at that IRI.
