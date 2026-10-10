@@ -404,3 +404,22 @@ def _restore_rejected_as_earlier(ran, backup):
 def _restore_rejected_as_later(ran, backup):
     _refused_restore(ran, "unreadable",
                      f"{str(backup['file'])!r} was made by a later version of kb, which is needed to read it")
+
+
+# A restore stopped before it finished.
+
+@given("a backup of a store holding a type for decisions and a decision", target_fixture="backup")
+def _a_backup_of_a_decision(tmp_path):
+    backed_up = tmp_path / "backed-up"
+    backed_up.mkdir()
+    start_a_store(backed_up)
+    a_decision_type_and_a_decision(kb_client.connect(backed_up))
+    return _backed_up(backed_up, tmp_path)
+
+
+@then("it holds everything the store backed up held, its history and its journal included")
+def _holds_everything_with_history_and_journal(restored):
+    held = everything(restored["from"])
+    assert {"schema/decision", "decision/price-reviews-happen-weekly"} <= set(held)
+    assert everything(restored["place"]) == held
+    assert the_journal(restored["place"]) == the_journal(restored["from"])

@@ -472,6 +472,19 @@ def _no_store_inside(stopped, root):
     assert not held.holds_anything_in_the_place(root)
 
 
+@when("the operator's restore of that backup in that directory is stopped before it finishes",
+      target_fixture="stopped")
+def _restore_stopped(root, backup, restored):
+    """The installed command, killed the moment the directory holds anything and still no store."""
+    restored.update({"place": root, "from": backup.get("store")})
+    return stopping.stopped_restore(root, backup["file"])
+
+
+@when("the operator runs the same restore again", target_fixture="ran")
+def _restore_again(root, backup, tmp_path):
+    return _kb("restore", str(backup["file"]), str(root), cwd=tmp_path)
+
+
 @when("the operator runs the same kb init again", target_fixture="ran")
 def _kb_init_with_a_seed_again(root, seed, tmp_path):
     return _kb_init_with_a_seed(root, seed, tmp_path)

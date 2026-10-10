@@ -23,10 +23,19 @@ def stopped(root, seed, role, how=signal.SIGKILL, ready=begun):
     """`kb init <root> --seed <seed>` under the role, sent `how` once `ready(root)` holds (by default, once root holds
     anything) and root still holds no `kb/`; its exit code and what it wrote to each stream. Fails when it finished,
     or made the store, before it could be stopped."""
+    return _stopped(["init", str(root), "--seed", str(seed)], root, {"KB_ACTOR": role}, how, ready)
+
+
+def stopped_restore(root, backup, how=signal.SIGKILL, ready=begun):
+    """`kb restore <backup> <root>`, no role named, stopped as `stopped` stops a seeded init."""
+    return _stopped(["restore", str(backup), str(root)], root, {}, how, ready)
+
+
+def _stopped(arguments, root, named, how, ready):
     env = {key: value for key, value in os.environ.items() if key not in ("KB_ROOT", "KB_ACTOR")}
     with _interruptible():
         process = subprocess.Popen(
-            [str(KB), "init", str(root), "--seed", str(seed)], env={**env, "KB_ACTOR": role}, cwd=root,
+            [str(KB), *arguments], env={**env, **named}, cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
     try:
@@ -58,7 +67,7 @@ def _readied(root, process, ready):
     """Waits until ready(root) holds; fails if the run ended first or put a store in root before it was seen."""
     deadline = time.monotonic() + PATIENCE
     while not ready(root):
-        assert process.poll() is None, f"kb init ended, {process.returncode}, before it could be stopped"
-        assert time.monotonic() < deadline, "kb init put nothing in the directory"
+        assert process.poll() is None, f"the command ended, {process.returncode}, before it could be stopped"
+        assert time.monotonic() < deadline, "the command put nothing in the directory"
         time.sleep(POLL)
-    assert "kb" not in os.listdir(root), "kb init had placed the store before it could be stopped"
+    assert "kb" not in os.listdir(root), "the command had placed the store before it could be stopped"

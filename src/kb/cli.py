@@ -178,6 +178,8 @@ def _restore(file: str, root: str) -> int:
         restored = staging.restored(root, file)
     except kb.NotStarted as refused:
         return _refused("restore", refused.faults)
+    except KeyboardInterrupt:
+        return _interrupted()
     return _refused("restore", restored.faults) if restored.faults else 0
 
 

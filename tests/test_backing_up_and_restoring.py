@@ -7,6 +7,9 @@ import grpc
 from calls import DECISION_TYPE, check, create, define, start_a_store
 from conftest import _kb
 import serving
+import stopping
+import held
+import signal
 from kb import client as kb_client, store
 from kb.contract import kb_pb2, kb_pb2_grpc
 
@@ -86,3 +89,18 @@ def test_a_backup_cut_short_is_refused_as_unreadable_and_nothing_is_made(tmp_pat
     assert line.startswith("kb restore: refused: unreadable: "), line
     assert "Traceback" not in ran.stderr
     assert list(into.iterdir()) == []
+
+
+def test_a_restore_interrupted_exits_without_a_traceback_and_leaves_no_store(tmp_path, root):
+    """Ctrl-C during `kb restore`: it ends as an interrupt ends a program, non-zero, with no traceback, and leaves
+    nothing, what it staged taken away."""
+    source = tmp_path / "source"
+    source.mkdir()
+    start_a_store(source)
+    define(kb_client.connect(source), DECISION_TYPE)
+    backup = tmp_path / "store.backup"
+    assert _kb("backup", str(backup), cwd=source).returncode == 0
+    ran = stopping.stopped_restore(root, backup, signal.SIGINT)
+    assert ran.returncode == -signal.SIGINT
+    assert "Traceback" not in ran.stderr, ran.stderr
+    assert held.holds_nothing(root)
