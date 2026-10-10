@@ -199,16 +199,18 @@ class Stale(_message.Message):
     def __init__(self, artifact: _Optional[str] = ..., schema_version: _Optional[int] = ..., current: _Optional[int] = ...) -> None: ...
 
 class ReplaceRequest(_message.Message):
-    __slots__ = ("locator", "content", "signature", "revision")
+    __slots__ = ("locator", "content", "signature", "revision", "type")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
     signature: Signature
     revision: int
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
+    type: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., revision: _Optional[int] = ..., type: _Optional[str] = ...) -> None: ...
 
 class Replaced(_message.Message):
     __slots__ = ("revision", "id")
@@ -540,14 +542,16 @@ class BatchCreateResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[BatchCreated, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ReplaceItem(_message.Message):
-    __slots__ = ("locator", "content", "revision")
+    __slots__ = ("locator", "content", "revision", "type")
     LOCATOR_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     content: str
     revision: int
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
+    type: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ..., type: _Optional[str] = ...) -> None: ...
 
 class BatchReplaceRequest(_message.Message):
     __slots__ = ("items", "signature")

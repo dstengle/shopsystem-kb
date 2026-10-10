@@ -80,6 +80,7 @@ message ReplaceRequest
   content = 2 singular string
   signature = 3 singular kb.v2.Signature
   revision = 4 singular int32
+  type = 5 singular string
 message Replaced
   revision = 1 singular int32
   id = 2 singular string
@@ -216,6 +217,7 @@ message ReplaceItem
   locator = 1 singular kb.v2.Locator
   content = 2 singular string
   revision = 3 singular int32
+  type = 4 singular string
 message BatchReplaceRequest
   items = 1 repeated kb.v2.ReplaceItem
   signature = 2 singular kb.v2.Signature

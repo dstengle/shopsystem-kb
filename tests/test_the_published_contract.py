@@ -131,7 +131,7 @@ def test_a_json_schema_keyword_passes_through_as_a_rule_outside_the_pinned_set(t
 
 CHANGES = {
     "Create": ("CreateRequest", {"id", "type", "title", "content", "signature"}, "Created", {"id", "revision"}),
-    "Replace": ("ReplaceRequest", {"locator", "content", "signature", "revision"}, "Replaced", {"id", "revision"}),
+    "Replace": ("ReplaceRequest", {"locator", "content", "signature", "revision", "type"}, "Replaced", {"id", "revision"}),
     "Add": ("AddRequest", {"locator", "content", "signature", "revision"}, "Added", {"artifact", "id", "revision"}),
     "Remove": ("RemoveRequest", {"locator", "signature", "revision"}, "Removed", {"id", "revision"}),
 }

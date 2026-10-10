@@ -200,6 +200,7 @@ message ReplaceRequest {
   string content = 2;  // canonical YAML: fields, sections, parts
   Signature signature = 3;
   int32 revision = 4;  // the revision the client read the artifact at; 0 says none
+  string type = 5;  // the IRI of the type version it is replaced to conform to; empty says it keeps its own
 }
 
 // The artifact replaced, and its version now.
@@ -486,6 +487,7 @@ message ReplaceItem {
   Locator locator = 1;
   string content = 2;  // canonical YAML: fields, sections, parts
   int32 revision = 3;  // the revision the client read the artifact at; 0 says none
+  string type = 4;  // the IRI of the type version it is replaced to conform to; empty says it keeps its own
 }
 
 message BatchReplaceRequest {
