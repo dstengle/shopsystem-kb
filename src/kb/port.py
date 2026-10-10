@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import ContextManager, Protocol
 
-from kb.values import ArtifactId, Kind
+from kb.values import ArtifactId, Kind, Version
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,24 @@ class Linking:
 
 
 @dataclass(frozen=True)
+class Versioned:
+    """What a change to a type says of the version it leaves the type standing at: the version, and the title the
+    version is made with. Its content and its revision are the change's."""
+    version: Version
+    title: str
+
+
+@dataclass(frozen=True)
+class TypeVersion:
+    """A version of a type as the store holds it: the version, and the content, the revision and the title it was
+    made with."""
+    version: Version
+    content: dict
+    revision: int
+    title: str
+
+
+@dataclass(frozen=True)
 class Change:
     """One change of a set: the artifact, its whole content after the change (None for a removal), its links and the
     places of the parts it holds, the revision the change read it at (0 when it was not held), the revision it
@@ -47,7 +65,9 @@ class Change:
     the revision it was read at. The adapter lands none of the set when any of those has since moved. `searched` are
     the rows the artifact is found by, as kb gives them (search.searchable): each `(what, label, words)`, what being
     "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them.
-    `kind` is the kind of the artifact a change leaves, None for a removal."""
+    `kind` is the kind of the artifact a change leaves, None for a removal. `version` is given by a change that
+    leaves a type held: the adapter keeps that version, read by `type_version`, in place of the one the type stood
+    at, and lands it with the set or not at all."""
     artifact: ArtifactId
     content: dict | None
     links: tuple[Link, ...] = ()
@@ -57,6 +77,7 @@ class Change:
     through: tuple[tuple[ArtifactId, int], ...] = ()
     searched: tuple[tuple[str, str, str], ...] = ()
     kind: Kind | None = None
+    version: Versioned | None = None
 
     @property
     def op(self) -> str:
@@ -146,6 +167,10 @@ class Port(Protocol):
 
     def artifact(self, artifact_id: ArtifactId) -> dict:
         """The artifact now. KeyError when it is not held."""
+
+    def type_version(self, version: Version) -> TypeVersion:
+        """The version of a type held at the version's IRI, as it was made. KeyError when none is held there. A
+        version is no artifact: `holds`, `artifact` and `ids` answer nothing of it."""
 
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
         """Every artifact held, or those of one kind whose fields each hold the value given, compared as the text

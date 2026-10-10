@@ -12,7 +12,7 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from kb import sqlite_backup, sqlite_search
+from kb import sqlite_backup, sqlite_search, sqlite_types
 from kb.port import Busy, Change, Entry, Relink, Unreadable
 from kb.sqlite_checks import Checks
 from kb.values import Kind
@@ -46,7 +46,7 @@ CREATE VIRTUAL TABLE search USING fts5 (
 );
 CREATE TABLE searched (row INTEGER PRIMARY KEY, artifact TEXT NOT NULL);
 CREATE INDEX searched_by_artifact ON searched (artifact);
-"""
+""" + sqlite_types.SCHEMA
 
 
 def make(path: Path) -> None:
@@ -206,6 +206,9 @@ class SqliteStore(Checks):
         )
         self._db.executemany("INSERT INTO parts VALUES (?, ?)", [(name, place) for place in set(change.parts)])
         sqlite_search.searchable(self._db, name, kind, change.searched)
+        if change.version is not None:
+            version, title = change.version.version, change.version.title
+            sqlite_types.stood(self._db, name, str(version), version.number, change.revision, title, stored)
 
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""

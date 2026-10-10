@@ -1,14 +1,19 @@
 """Every storage adapter against the same cases of the port, each in a database of its own under its own tmp_path.
 Kinds, shapes and composition stay above the port, so none of them is here."""
+import dataclasses
 import itertools
 import threading
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from calls import TYPES, TYPES_AT, iri, type_iri
+import calls
+import kb
+from calls import TYPE_OF_TYPES, TYPES, TYPES_AT, iri, type_iri
+from kb import client as kb_client
 from kb import port, search, sqlite_store
-from kb.values import ArtifactId, Kind
+from kb import store as stores
+from kb.values import ArtifactId, Kind, Version
 
 ADAPTERS = {"sqlite": (sqlite_store.make, sqlite_store.opened)}
 
@@ -461,3 +466,85 @@ def test_a_block_holding_the_write_lock_is_never_opened_inside_reads_at_one_mome
             with store.exclusive():
                 pass
         assert [short(each) for each in store.ids()] == ["note/a"]
+
+
+def note_type(number, read=0, **content):
+    """A change to the type of notes that leaves it standing at the version numbered, and that version."""
+    version = Version(kind("note"), number)
+    held = {"title": f"Note {number}", "version": number, **content}
+    change = put("schema/note", held, read=read)
+    return dataclasses.replace(change, version=port.Versioned(version, held["title"])), version
+
+
+def test_a_type_version_reads_back_by_its_iri_with_the_content_revision_and_title_it_was_made_with(store):
+    made, first = note_type(1, schema={"n": 123456789012345678901234567890, 1: "a number for a key"})
+    land(store, made)
+    read = store.type_version(first)
+    assert read == port.TypeVersion(first, made.content, 1, "Note 1")
+    assert typed(read.content) == typed(made.content)
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("note"), 2))
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("tag"), 1))
+
+
+def test_ids_do_not_list_type_versions_and_a_version_is_not_held_as_an_artifact(store):
+    made, first = note_type(1)
+    land(store, made, put("note/a", {"title": "A"}))
+    assert [short(each) for each in store.ids()] == ["note/a", "schema/note"]
+    assert [short(each) for each in store.ids(kind("schema"))] == ["schema/note"]
+    assert not store.holds(ArtifactId(str(first)))
+
+
+def test_a_type_changed_stands_at_the_one_version_its_change_left(store):
+    land(store, note_type(1)[0])
+    changed, second = note_type(2, read=1)
+    land(store, changed)
+    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("note"), 1))
+
+
+def test_a_type_version_lands_with_its_set_or_not_at_all(store):
+    made, first = note_type(1)
+    with pytest.raises(port.Conflict):
+        land(store, made, put("note/b", {"title": "B"}, read=4))
+    with pytest.raises(KeyError):
+        store.type_version(first)
+
+
+def test_a_type_version_is_read_at_the_moment_the_block_holds(opener, store):
+    land(store, note_type(1)[0])
+    first = Version(kind("note"), 1)
+    with store.at_one_moment():
+        before = store.type_version(first)
+        with opener() as other:
+            land(other, note_type(2, read=1)[0])
+        assert store.type_version(first) == before
+    with pytest.raises(KeyError):
+        store.type_version(first)
+
+
+def test_the_type_that_describes_types_has_its_version_from_the_start_of_a_store(tmp_path):
+    kb.init(tmp_path, "tester")
+    with stores.opened(tmp_path) as started:
+        held = started.artifact(ArtifactId(TYPE_OF_TYPES))
+        read = started.type_version(Version(Kind(TYPE_OF_TYPES), 1))
+        assert (read.content, read.revision, read.title) == (held, 1, "Schema")
+        assert [str(each) for each in started.ids()] == [TYPE_OF_TYPES]
+
+
+def test_a_type_defined_and_then_changed_through_kb_stands_at_the_version_its_change_left(tmp_path):
+    kb.init(tmp_path, "tester")
+    client = kb_client.connect(tmp_path)
+    calls.define(client, calls.NOTE_TYPE)
+    note, first, second = ArtifactId(type_iri("note")), Version(kind("note"), 1), Version(kind("note"), 2)
+    with stores.opened(tmp_path) as defined:
+        assert defined.type_version(first) == port.TypeVersion(first, defined.artifact(note), 1, "Note")
+    changed = calls.replace_many(client, [calls.replaced(str(note), {"version": 2, "schema": calls.NOTE_TYPE["schema"]})])
+    assert not changed.faults, changed.faults
+    with stores.opened(tmp_path) as moved:
+        assert moved.type_version(second) == port.TypeVersion(second, moved.artifact(note), 2, "Note")
+        with pytest.raises(KeyError):
+            moved.type_version(first)
+        assert [str(each) for each in moved.ids()] == [TYPE_OF_TYPES, str(note)]

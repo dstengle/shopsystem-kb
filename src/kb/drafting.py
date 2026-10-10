@@ -153,12 +153,20 @@ def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
     if change.left is None:
         return port.Change(change.artifact_id, None, read=read, revision=change.revision)
     searched, kind = tuple(search.searchable(change.left)), composition.artifact_kind(change.left)
+    version = _stands_at(change.left) if kind == values.TYPE_KIND else None
     if not last:
         return port.Change(
             change.artifact_id, change.left, read=read, revision=change.revision, searched=searched, kind=kind,
+            version=version,
         )
     return port.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
         tuple(places.parts(change.left)), read, change.revision,
-        draft.as_read(composition.read_through(kind, draft)), searched, kind,
+        draft.as_read(composition.read_through(kind, draft)), searched, kind, version,
     )
+
+
+def _stands_at(held: dict) -> port.Versioned:
+    """The version a type stands at as the port takes it: of the kind its IRI names, the number and the title it
+    holds."""
+    return port.Versioned(values.Version(values.Kind(held["id"]), held["version"]), held["title"])

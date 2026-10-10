@@ -10,10 +10,10 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-from kb import names
+from kb import names, sqlite_types
 from kb.content import text
-from kb.port import Candidate, Linking
-from kb.values import ArtifactId, Kind
+from kb.port import Candidate, Linking, TypeVersion
+from kb.values import ArtifactId, Kind, Version
 
 PAIRS = "~pairs"
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -85,6 +85,13 @@ class Reads:
         if not rows:
             raise KeyError(str(artifact_id))
         return decoded(rows[0][0])
+
+    def type_version(self, version: Version) -> TypeVersion:
+        found = sqlite_types.read(self._db, str(version))
+        if found is None:
+            raise KeyError(str(version))
+        stored, revision, title = found
+        return TypeVersion(version, decoded(stored), revision, title)
 
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
         narrowed = "" if kind is None else " WHERE kind = ?"

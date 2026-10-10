@@ -46,6 +46,7 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
     )
     created = port.Change(
         METASCHEMA_ID, metaschema, revision=1, searched=tuple(search.searchable(metaschema)), kind=values.TYPE_KIND,
+        version=port.Versioned(METASCHEMA_VERSION, METASCHEMA["title"]),
     )
     store.start(root, lambda made: made.land([created], [entry]))
 
