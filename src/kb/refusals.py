@@ -28,6 +28,23 @@ def no_version(version: str) -> kb_pb2.Fault:
     )
 
 
+def not_under(artifact_id: ArtifactId, type_id: ArtifactId) -> kb_pb2.Fault:
+    """A create at an IRI that does not belong to the type it names: the nearest held type it sits under is another,
+    or none."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.IDENTITY,
+        message=f"an artifact's IRI sits under its type's IRI; {str(artifact_id)!r} is not an IRI of {str(type_id)!r}",
+    )
+
+
+def already_held(artifact_id: ArtifactId) -> kb_pb2.Fault:
+    """A create at an IRI the store already holds something at."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.IDENTITY,
+        message=f"an IRI names one artifact; the store already holds one at {str(artifact_id)!r}",
+    )
+
+
 def not_a_collection(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(

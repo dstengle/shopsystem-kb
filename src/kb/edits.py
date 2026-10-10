@@ -61,7 +61,10 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     """A new artifact at the IRI its create gives, conforming to the type version it names, which the draft must
     hold."""
     type_id = composition.version_type(creation.version, draft)
-    faults = [*creation.title_faults, *creation.content.refusal(str(creation.name))]
+    faults = [
+        *_identity(draft, creation.name, type_id), *creation.title_faults,
+        *creation.content.refusal(str(creation.name)),
+    ]
     if faults:
         raise Refused(faults)
     content = copy.deepcopy(creation.content.tree)
@@ -71,6 +74,17 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     artifact = settled.given(content, str(creation.name), str(creation.version), 1, creation.title)
     draft.put(creation.name, settled.order(artifact, declared))
     return creation.name
+
+
+def _identity(draft: Draft, name: ArtifactId, type_id: ArtifactId) -> list:
+    """The faults of the IRI a create gives: an artifact's belongs to the type its create names, the nearest held
+    type it sits under, while a type's is any IRI its client chooses; and the draft holds nothing at it."""
+    faults = []
+    if type_id != values.type_of(values.TYPE_KIND) and composition.nearest_type(name, draft) != type_id:
+        faults.append(refusals.not_under(name, type_id))
+    if draft.holds(name):
+        faults.append(refusals.already_held(name))
+    return faults
 
 
 def _replace(draft: Draft, replacement: changes.Replace) -> Change:

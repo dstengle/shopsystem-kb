@@ -4,7 +4,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, TYPE_OF_TYPES, create, define, iri,
-    next_version, read, request, start_a_store, type_iri, version_iri,
+    next_version, read, replace, request, start_a_store, type_iri, version_iri,
 )
 import held
 from kb import content, client as kb_client
@@ -276,10 +276,11 @@ CHOSEN = iri("decision", "pricing/weekly-reviews")
 
 
 @given(parsers.parse('a store holding a decision type at "{type_iri}"'), target_fixture="client")
-def _store_with_decision_type_at(root, type_iri):
+def _store_with_decision_type_at(root, before, type_iri):
     client = kb_client.connect(root)
     start_a_store(root)
     define(client, DECISION_TYPE, at=type_iri)
+    before.update(held=held.holds(root))
     return client
 
 
@@ -293,6 +294,73 @@ def _decision_held_at(root, created, at):
     assert not created.faults, created.faults
     assert created.id == at
     assert held.holds_artifact(root, at)
+
+
+@then("the artifact is rejected because an artifact's IRI sits under its type's IRI")
+def _rejected_as_not_under_its_type(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [fault.rule for fault in created.faults] == ["identity"]
+    assert created.faults[0].message.startswith("an artifact's IRI sits under its type's IRI")
+
+
+@then(parsers.parse('the refusal names "{at}"'))
+def _the_refusal_names(created, at):
+    [fault] = created.faults
+    assert fault.artifact == at
+    assert repr(at) in fault.message
+
+
+@given(parsers.parse('a decision the store holds at "{at}"'), target_fixture="already")
+def _a_decision_held_at(client, at):
+    """The decision as it reads once held, to compare with what it reads as later."""
+    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS}, at=at)
+    return read(client, at, whole=True)
+
+
+@when(
+    parsers.parse('the client creates another decision at "{at}", saying which role and why'), target_fixture="created",
+)
+def _create_another_at(client, at):
+    return request(client, "decision", "Price reviews happen monthly", {"sections": SECTIONS}, message="Slow down", at=at)
+
+
+@then("the artifact is rejected because an IRI names one artifact")
+def _rejected_as_already_held(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [fault.rule for fault in created.faults] == ["identity"]
+    assert created.faults[0].message.startswith("an IRI names one artifact")
+
+
+@then("the decision already there reads as it did, at the revision it held")
+def _already_there_as_it_was(client, already):
+    assert already.revision == 1
+    assert read(client, already.id, whole=True) == already
+
+
+REVISED = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs now move daily, and weekly is what the shop can staff.\n"},
+]
+
+
+@given(parsers.parse('a decision the store holds at "{at}", changed several times since it was created'))
+def _a_decision_changed_several_times(client, at):
+    create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS}, at=at)
+    for sections in (REVISED, SECTIONS, REVISED):
+        assert not replace(client, at, {"sections": sections}).faults
+
+
+@when(parsers.parse('the client reads the decision at "{at}"'), target_fixture="shown")
+def _read_the_decision_at(client, at):
+    return {"at": at, "read": read(client, at, whole=True)}
+
+
+@then("the client is given the decision, at its latest revision")
+def _given_at_its_latest_revision(shown):
+    given = shown["read"]
+    assert not given.faults, given.faults
+    assert (given.id, given.revision) == (shown["at"], 4)
+    assert given.content == content.dumps({"sections": REVISED})
 
 
 @then("the store made up no other IRI for it")

@@ -1,8 +1,8 @@
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    TAG_TYPE, answer, create, creating, define, iri, journal, listing, read, remove, removing, start_a_store,
-    tagged_decision_type, targets,
+    TAG_TYPE, answer, create, creating, define, iri, journal, listing, read, remove, removing, replace, request,
+    start_a_store, tagged_decision_type, targets,
 )
 import at_once
 import held
@@ -127,6 +127,40 @@ def _rejected_for_nothing(attempt):
 @then("the store holds what it held before")
 def _held_as_before(attempt):
     assert attempt["after"] == attempt["before"]
+
+
+@given(parsers.parse('a store holding a tag type at "{type_iri}"'), target_fixture="client")
+def _store_with_a_tag_type_at(root, type_iri):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, TAG_TYPE, at=type_iri)
+    return client
+
+
+@given(parsers.parse('the client has removed the tag that was held at "{at}"'))
+def _a_tag_removed_from(client, at):
+    create(client, "tag", {"title": "Seasonal"}, at=at)
+    assert not replace(client, at, {}, message="Touch it").faults
+    assert not remove(client, at, message="No more seasons").faults
+
+
+@when(parsers.parse('the client creates a tag at "{at}", saying which role and why'), target_fixture="created")
+def _create_a_tag_at(client, at):
+    return request(client, "tag", "In season", {}, message="Seasons are back", at=at)
+
+
+@then(parsers.parse('the new tag is held at "{at}"'))
+def _new_tag_held_at(root, client, created, at):
+    assert not created.faults, created.faults
+    assert created.id == at
+    assert held.holds_artifact(root, at)
+    assert read(client, at).title == "In season"
+
+
+@then("the new tag is at its first revision")
+def _new_tag_at_its_first_revision(client, created):
+    assert created.revision == 1
+    assert read(client, created.id).revision == 1
 
 
 PROCESS = iri("process", "run-the-clearance-sale")
