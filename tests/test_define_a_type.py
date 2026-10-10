@@ -4,7 +4,7 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, change_type, create, define, iri, kb_ref, listing, next_version, read, refs,
+    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, change_type, check, create, define, iri, kb_ref, listing, next_version, read, refs,
     remove, request, targets, type_iri, version_iri,
 )
 import held
@@ -715,3 +715,38 @@ def _removing_the_tag_rejected(client):
 def _the_reference_is_not_a_link(client):
     assert list(read(client, THE_NOTE).inbound) == []
     assert [each.stub.id for each in refs(client, THE_NOTE, 1, inward=True).reached] == []
+
+
+OWNER_REQUIRED = _with(AS_DEFINED, "owner", required=True)
+
+
+@given(
+    "a decision type the store holds at its first version, which does not require an owner, and a decision with no owner",
+    target_fixture="conforming",
+)
+def _a_decision_with_no_owner(client):
+    return _a_decision_of_the_first_version(client)
+
+
+@when("the client changes the decision type to require an owner", target_fixture="changed")
+def _change_the_type_to_require_an_owner(client):
+    return change_type(client, "decision", OWNER_REQUIRED)
+
+
+@then("the change is accepted as the type's second version")
+def _accepted_as_the_second_version(client, changed):
+    assert not changed.faults, changed.faults
+    _reads_as_made(client, type_iri("decision"), 2, OWNER_REQUIRED)
+
+
+@then("the decision still conforms to the type's first version")
+def _the_decision_still_of_the_first_version(client, conforming):
+    assert read(client, conforming).type == version_iri("decision", 1)
+
+
+@then("checking the store lists the decision as behind its type, not as a violation")
+def _check_lists_it_as_behind(client, conforming):
+    checked = check(client)
+    assert not checked.faults, checked.faults
+    assert list(checked.violations) == []
+    assert [(entry.artifact, entry.schema_version, entry.current) for entry in checked.stale] == [(conforming, 1, 2)]

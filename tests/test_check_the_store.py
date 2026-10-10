@@ -1,8 +1,8 @@
-from pytest_bdd import given, scenario, then
+from pytest_bdd import given, parsers, scenario, then
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, create, define, iri,
-    start_a_store,
+    next_version, start_a_store,
 )
 import held
 from kb import client as kb_client
@@ -111,6 +111,28 @@ def _no_violation(checked):
     assert list(checked.stale) == []
 
 
+@given("a store holding a decision that conforms to the first version of the decision type", target_fixture="client")
+def _store_with_a_decision_of_the_first_version(root):
+    return _store_with_a_decision(root)
+
+
+@given("a second version of the decision type has followed it")
+def _a_second_version_has_followed(client):
+    """The second version requires a section the decision does not have."""
+    followed = next_version(client, "decision", DECISION_TYPE, ["Purpose", "Rationale", "Consequences"])
+    assert not followed.faults, followed.faults
+
+
+@given(parsers.parse("the decision {how}"))
+def _the_decision_fits(root, how):
+    """Made by hand behind the store's back, since the store refuses to write a decision that does not fit."""
+    assert how in ("fits the first version but not the second", "does not fit the first version"), how
+    if how.startswith("does not"):
+        decision = held.artifact(root, WEEKLY)
+        decision["sections"] = decision["sections"][:1]
+        held.plant(root, WEEKLY, decision)
+
+
 @then("that decision is listed as behind its type")
 def _listed_as_stale(checked):
     assert [(entry.artifact, entry.schema_version, entry.current) for entry in checked.stale] == [(WEEKLY, 1, 2)]
@@ -119,6 +141,13 @@ def _listed_as_stale(checked):
 @then("it is not reported as a violation")
 def _not_a_violation(checked):
     assert list(checked.violations) == []
+
+
+@then("it is reported as a violation, naming the artifact, the place in it and the rule broken")
+def _a_violation(checked):
+    assert [(fault.artifact, fault.place, fault.rule) for fault in checked.violations] == [
+        (WEEKLY, "sections", "sections"),
+    ]
 
 
 @given(
