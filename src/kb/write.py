@@ -1,7 +1,7 @@
 """The write path: a set drafted and checked (kb.drafting); only when every change passes is each entry's stamp
 settled by the clock and the set handed to the port, which lands every change and one entry per operation naming the
-set in one transaction. When another change lands between the draft and the landing, an artifact the set changes, a
-type it was read through, or an artifact whose links it reads anew having moved, the port refuses it, and the set is
+set in one transaction. When another change lands between the draft and the landing, an artifact the set changes or a
+type it was read through having moved, the port refuses it, and the set is
 drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again. A
 fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store and recording a
 snapshot land through the port too."""
@@ -87,9 +87,10 @@ def _landing(held: port.Port, drafted: drafting.Drafted, signed: Signed, moments
 def _landed(held: port.Port, drafted: drafting.Drafted, entries: list) -> None:
     """The set handed to the port; a link the port finds into what the set takes out is refused, one fault for each,
     the item named for a part dropped and the artifact for one removed; a link the set hands that the port finds
-    landing on nothing it may land on is refused as validation refuses it."""
+    landing on nothing it may land on is refused as validation refuses it. No link is restated and no kind read
+    anew: the set hands only what it changes."""
     try:
-        held.land(drafted.handed, entries, drafted.relinks, drafted.kinds)
+        held.land(drafted.handed, entries)
     except port.Linked as linked:
         raise Refused([
             refusals.still_linked(_named(drafted.draft, each), each.source, each.place) for each in linked.links

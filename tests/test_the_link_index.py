@@ -1,6 +1,7 @@
-"""The links the store keeps follow the types as they stand: a type changed to make a field a link, or to stop it being
-one, changes what blocks a removal, what is counted as pointing in and what an inward walk reaches; and a set reads
-each artifact's links as the set leaves it. Through the contract, and, for a set of more than one kind of change, which
+"""The links the store keeps are those each artifact's own version of its type declares: a type changed to make a field
+a link, or to stop it being one, changes nothing of what blocks a removal, what is counted as pointing in or what an
+inward walk reaches for an artifact left at its earlier version; and a set reads each artifact's links as the set
+leaves it. Through the contract, and, for a set of more than one kind of change, which
 the contract does not take, through kb.write's own `land`; each store under its own tmp_path."""
 import copy
 
@@ -68,15 +69,14 @@ def _inward(client, name):
     return [each.stub.id for each in walked.reached]
 
 
-def test_a_type_changed_to_make_a_field_a_link_blocks_removing_what_it_points_at(client):
+def test_a_type_changed_to_make_a_field_a_link_leaves_a_note_of_its_earlier_version_holding_plain_text(client):
     _with_a_note_about_a_tag(client, PLAIN)
     _retype(client, LINKING, 2)
-    assert _inbound(client, iri("tag", "pricing")) == [(type_iri("note"), "about", 1)]
-    assert _inward(client, iri("tag", "pricing")) == [iri("note", "weekly")]
-    refused = _delete(client, iri("tag", "pricing"))
-    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
-        (iri("note", "weekly"), "about", "on_delete"),
-    ]
+    assert read(client, iri("note", "weekly")).type == version_iri("note", 1)
+    assert _inbound(client, iri("tag", "pricing")) == []
+    assert _inward(client, iri("tag", "pricing")) == []
+    assert not _delete(client, iri("tag", "pricing")).faults
+    assert [fault.rule for fault in read(client, iri("tag", "pricing")).faults] == ["not-found"]
 
 
 def _landed(root, operations) -> list:
@@ -93,22 +93,34 @@ def _whole(name):
     return values.Locator(values.artifact_id(name), ())
 
 
-def test_a_type_changed_in_the_same_set_as_a_removal_blocks_it(where, client):
+def _stored_links_into(root, name) -> list:
+    """The artifacts the store keeps a link from into the one named."""
+    with store.opened(root) as held:
+        return [str(each.source) for each in held.links_in(values.artifact_id(name))]
+
+
+def test_a_type_changed_in_the_same_set_as_a_removal_does_not_block_it(where, client):
     _with_a_note_about_a_tag(client, PLAIN)
     content = {key: value for key, value in LINKING.items() if key != "title"}
     faults = _landed(where, [
         changes.Replace(_whole(type_iri("note")), values.content(dumps({**content, "version": 2}))),
         changes.Remove(_whole(iri("tag", "pricing"))),
     ])
-    assert faults == [(iri("note", "weekly"), "on_delete")]
+    assert faults == []
+    assert [fault.rule for fault in read(client, iri("tag", "pricing")).faults] == ["not-found"]
+    assert read(client, iri("note", "weekly")).type == version_iri("note", 1)
+    assert _stored_links_into(where, iri("tag", "pricing")) == []
 
 
-def test_a_type_changed_to_stop_a_field_being_a_link_no_longer_blocks_removing_what_it_named(client):
+def test_a_type_changed_to_stop_a_field_being_a_link_still_blocks_removing_what_a_note_of_its_earlier_version_names(client):
     _with_a_note_about_a_tag(client, LINKING)
     _retype(client, PLAIN, 2)
-    assert _inbound(client, iri("tag", "pricing")) == []
-    assert _inward(client, iri("tag", "pricing")) == []
-    assert not _delete(client, iri("tag", "pricing")).faults
+    assert _inbound(client, iri("tag", "pricing")) == [(type_iri("note"), "about", 1)]
+    assert _inward(client, iri("tag", "pricing")) == [iri("note", "weekly")]
+    refused = _delete(client, iri("tag", "pricing"))
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
+        (iri("note", "weekly"), "about", "on_delete"),
+    ]
 
 
 def test_an_artifact_made_and_removed_in_one_set_does_not_hold_up_removing_its_type(where, client):
@@ -119,3 +131,16 @@ def test_an_artifact_made_and_removed_in_one_set_does_not_hold_up_removing_its_t
         changes.Remove(_whole(iri("note", "passing"))),
         changes.Remove(_whole(type_iri("note"))),
     ]) == []
+
+
+def test_an_artifact_made_at_an_earlier_version_in_the_same_set_as_a_removal_links_as_that_version_declares(where, client):
+    """The note's version holds plain text where the type now makes a link, so nothing it carries blocks the removal."""
+    _with_a_note_about_a_tag(client, PLAIN)
+    _retype(client, LINKING, 2)
+    plain = values.artifact_id(iri("note", "plain"))
+    about = values.content(dumps({"about": iri("tag", "pricing")}))
+    assert _landed(where, [
+        changes.Create(plain, values.version(version_iri("note", 1)), "Plain", (), about),
+        changes.Remove(_whole(iri("tag", "pricing"))),
+    ]) == []
+    assert read(client, iri("note", "plain")).type == version_iri("note", 1)

@@ -1,7 +1,9 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
 the operations before it left it, then every artifact the set touched checked once, its content, its links and a type
 as a type, against the store as the whole set leaves it; each change then as the port takes it, with the revisions of
-the types it was read through. A fault anywhere refuses the whole set with every fault found."""
+the types it was read through. Only what the set changes is handed: a type's change restates the links of no
+artifact, which stay as the version it conforms to declares them. A fault anywhere refuses the whole set with every
+fault found."""
 from typing import NamedTuple
 
 from kb import (
@@ -14,36 +16,22 @@ from kb.values import Refused
 
 
 class Drafted(NamedTuple):
-    """A set drafted against the store as it stood: the draft, its changes, their texts, the changes as the port takes
-    them, the links read again of what the set leaves as it is, and the kinds whose links it reads anew."""
+    """A set drafted against the store as it stood: the draft, its changes, their texts, and the changes as the port
+    takes them."""
     draft: Draft
     changes: list[Change]
     texts: list[str | None]
     handed: list[port.Change]
-    relinks: list[port.Relink]
-    kinds: tuple[values.Kind, ...]
 
 
 def drafted(held: port.Port, operations: list) -> Drafted:
-    """The set drafted and serialised against the store as it stands, each change as the port takes it, and the
-    links of what it leaves as it is read again."""
+    """The set drafted and serialised against the store as it stands, each change as the port takes it."""
     draft = Draft(held)
     changes = _drafted(draft, operations)
     texts = _serialised(changes)
     last = {change.artifact_id: index for index, change in enumerate(changes)}
     handed = [_handed(draft, change, last[change.artifact_id] == index) for index, change in enumerate(changes)]
-    relinks = [_relinked(draft, each) for each in draft.stale()]
-    return Drafted(draft, changes, texts, handed, relinks, tuple(draft.reread()))
-
-
-def _relinked(draft: Draft, artifact_id: values.ArtifactId) -> port.Relink:
-    """The links of an artifact the set leaves as it is, read again through the types as the set leaves them, with the
-    revision it was read at and those of the types it was read through that the set leaves as they are."""
-    artifact = draft.artifact(artifact_id)
-    return port.Relink(
-        artifact_id, tuple(links.handed(artifact_id, artifact, draft)), artifact["revision"],
-        draft.as_read(composition.read_through(composition.artifact_kind(artifact), draft)),
-    )
+    return Drafted(draft, changes, texts, handed)
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:

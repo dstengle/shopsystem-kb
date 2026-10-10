@@ -2,7 +2,8 @@
 reads (kb.v2), so of an artifact's composition only its kind's type can move under a change. Through the contract, two
 clients on one machine, each store under its own tmp_path. A change naming no version keeps its artifact at the
 version it conforms to, and a create is held to the version of its type it names, content and links, whatever the
-type stands at or moves to meanwhile; an artifact made while a type is drafted anew is held to the links it makes."""
+type stands at or moves to meanwhile; a type's change restates the links of no artifact, made before it or while it
+was being written."""
 import copy
 
 import pytest
@@ -51,27 +52,37 @@ def test_a_change_naming_no_version_drafted_before_its_type_moved_lands_with_the
     assert [each.stub.id for each in refs(client, iri("tag", "a"), 1, inward=True).reached] == []
 
 
-@pytest.mark.parametrize("moved", sorted(TYPES))
-def test_an_artifact_made_while_a_type_it_reads_is_drafted_anew_is_held_to_its_links(root, moved):
+KEPT = {
+    "a link in the earlier version and not in the later": (LINKED, ABOUT, [iri("note", "before"), iri("note", "meanwhile")]),
+    "a link in the later version and not in the earlier": (ABOUT, LINKED, []),
+}
+
+
+@pytest.mark.parametrize("case", sorted(KEPT))
+def test_artifacts_made_before_and_while_their_type_is_changed_keep_the_links_their_own_version_makes(root, case):
+    """Both notes conform to the earlier version, the one made meanwhile naming it: the change of the type, drafted
+    before that note was made and landed after it, restates the links of neither."""
+    earlier, later, linking = KEPT[case]
     client = kb_client.connect(root)
     start_a_store(root)
-    held_types, next_type = copy.deepcopy(TYPES[moved])
-    for type_content in [TAG_TYPE, *held_types]:
+    for type_content in [TAG_TYPE, _typed("Note", {"about": earlier})]:
         define(client, type_content)
     create(client, "tag", {"title": "A"})
     create(client, "note", {"title": "Before", "about": iri("tag", "a")})
-    moved_id = type_iri(next_type.pop('title').lower())
-    writing = replacing(moved_id, next_type, message="Make it a link")
+    writing = replacing(type_iri("note"), {"schema": _typed("Note", {"about": later})["schema"]}, message="Change it")
 
     def first():
-        made = create(client, "note", {"title": "Meanwhile", "about": iri("tag", "a")})
+        made = request(client, "note", "Meanwhile", {"about": iri("tag", "a")}, version=1)
         assert not made.faults, made.faults
 
     landed = at_once.landed_second(at_once.OnAThread(root, "Replace", writing), first)
     assert not landed.faults, landed.faults
-    assert [each.stub.id for each in refs(client, iri("tag", "a"), 1, inward=True).reached] == [iri("note", "before"), iri("note", "meanwhile")]
+    assert read(client, type_iri("note"), whole=True).revision == 2
+    for name in ("before", "meanwhile"):
+        assert read(client, iri("note", name)).type == version_iri("note", 1)
+    assert [each.stub.id for each in refs(client, iri("tag", "a"), 1, inward=True).reached] == linking
     refused = remove(client, iri("tag", "a"))
-    assert sorted(fault.artifact for fault in refused.faults) == [iri("note", "before"), iri("note", "meanwhile")]
+    assert sorted(fault.artifact for fault in refused.faults) == linking
 
 
 def test_a_create_drafted_naming_a_version_its_type_then_moved_on_from_lands_at_the_version_it_named(root):

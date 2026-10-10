@@ -1,10 +1,11 @@
 """The store as a set's changes would leave it, read like the store: artifacts put here stand over the ones the store
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
-artifact) and the links into an artifact, over the port. A type it reads from the store is kept as first read, so
+artifact) and the links into an artifact, over the port: those of what it put read through the version each conforms
+to, the store's standing for everything else, a type it changed restating none. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
 from kb.port import Linking, Port, TypeVersion
-from kb.values import TYPE_KIND, ArtifactId, Kind, Version
+from kb.values import TYPE_KIND, ArtifactId, Kind, Version, type_of
 
 
 class Draft:
@@ -77,18 +78,26 @@ class Draft:
 
     def links_in(self, target: ArtifactId) -> list[Linking]:
         """Every link into an artifact or a part inside it from an artifact the draft holds, in the order of their
-        names, each artifact's in the order it carries them: the store's, but for what the draft changed and what it
-        reads through a type it changed, which are read here as the draft leaves them."""
-        stale = self.stale()
-        read_here = set(self._pending) | self._removed | set(stale)
+        names, each artifact's in the order it carries them: the store's, as each artifact's own version of its type
+        declares them whatever the draft did to that type, but for what the draft changed, which is read here as the
+        draft leaves it."""
+        read_here = set(self._pending) | self._removed
         held = [each for each in self._store.links_in(target) if each.source not in read_here]
         sources = [(source, artifact) for source, artifact in self._pending.items() if source not in self._removed]
         drafted = [
             Linking(source, link.field, link.place, link.target, link.part)
-            for source, artifact in sources + [(source, self._store.artifact(source)) for source in stale]
-            for link in links.handed(source, artifact, self) if link.target == target and not link.implicit
+            for source, artifact in sources
+            for link in links.handed(source, artifact, self, self._own(artifact))
+            if link.target == target and not link.implicit
         ]
         return sorted(held + drafted, key=lambda each: names.order(each.source))
+
+    def _own(self, artifact: dict) -> dict | None:
+        """The version of its type an artifact the draft put conforms to, as the draft keeps it; None when it keeps
+        none."""
+        version = composition.conforming(artifact)
+        found = composition.kept(type_of(version.kind), version.number, self)
+        return found and found.content
 
     def reread(self) -> list[Kind]:
         """The kinds whose artifacts' links are read through a type the draft changed or removed."""

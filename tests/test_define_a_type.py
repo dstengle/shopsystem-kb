@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, TYPE_OF_TYPES, change_type, create, define, iri, kb_ref, listing, next_version, read, remove,
-    request, targets, type_iri, version_iri,
+    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, change_type, create, define, iri, kb_ref, listing, next_version, read, refs,
+    remove, request, targets, type_iri, version_iri,
 )
 import held
 from kb.content import loads
@@ -672,3 +672,46 @@ def _remove_that_artifact(client, conforming):
     removed = remove(client, conforming)
     assert not removed.faults, removed.faults
     assert [fault.rule for fault in read(client, conforming).faults] == ["not-found"]
+
+
+TAG_LINK = {"targets": targets("tag"), "cardinality": "one", "parts": False, "on_delete": "refuse"}
+NOTE_LINK = {**TAG_LINK, "targets": targets("note")}
+NOTE_LINKING_A_TAG = {"type": "object", "required": ["title"], "properties": {
+    "title": {"type": "string"}, "tag": {"type": "string", "ref": TAG_LINK}, "reference": {"type": "string"},
+}}
+NOTE_REFERRING = {"type": "object", "required": ["title"], "properties": {
+    "title": {"type": "string"}, "tag": {"type": "string"}, "reference": {"type": "string", "ref": NOTE_LINK},
+}}
+THE_TAG, THE_NOTE = iri("tag", "pricing"), iri("note", "weekly")
+
+
+@given("a note type the store holds at its first version, whose notes link to a tag and hold a reference as plain text")
+def _a_note_type_linking_a_tag(client):
+    define(client, TAG_TYPE)
+    define(client, {"title": "Note", "schema": NOTE_LINKING_A_TAG})
+
+
+@given("a tag, and a note conforming to that version that links to the tag and holds a reference")
+def _a_tag_and_a_note_linking_it(client):
+    """The reference names the note itself, which the changed type would make a link to it."""
+    create(client, "tag", {"title": "Pricing"})
+    create(client, "note", {"title": "Weekly", "tag": THE_TAG, "reference": THE_NOTE})
+
+
+@when("the client changes the note type so that notes no longer link to a tag and their reference is a link")
+def _change_the_note_type_to_refer(client):
+    changed = change_type(client, "note", NOTE_REFERRING)
+    assert not changed.faults, changed.faults
+
+
+@then("removing the tag is rejected because something still points at it, naming the note")
+def _removing_the_tag_rejected(client):
+    refused = remove(client, THE_TAG)
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [(THE_NOTE, "on_delete")]
+    assert not read(client, THE_TAG).faults
+
+
+@then("the note's reference is not a link")
+def _the_reference_is_not_a_link(client):
+    assert list(read(client, THE_NOTE).inbound) == []
+    assert [each.stub.id for each in refs(client, THE_NOTE, 1, inward=True).reached] == []
