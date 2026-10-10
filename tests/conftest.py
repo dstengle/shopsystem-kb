@@ -142,7 +142,7 @@ def _check_the_store(client):
 
 @then("the store holds no artifact it did not hold before")
 def _no_new_artifact(root, client, attempt):
-    assert [stub.id for stub in listing(client, "decision", ids_only=True).stubs] == attempt["names"]
+    assert list(listing(client, "decision", ids_only=True).ids) == attempt["names"]
     assert held.holds(root) == attempt["files"]
 
 

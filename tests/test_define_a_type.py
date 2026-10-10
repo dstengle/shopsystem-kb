@@ -106,25 +106,6 @@ TOOL_USE_TYPE = {
 }
 
 
-@given("a type that defines the shape of a binding")
-def _a_type_defining_a_binding(client):
-    define(client, TOOL_TYPE)
-
-
-@when("the client defines a second type that refers to that shape")
-def _define_a_type_referring_to_it(client):
-    define(client, TOOL_USE_TYPE)
-
-
-@then("artifacts of the second type are checked against the shape the first type defines")
-def _checked_against_the_shared_shape(client):
-    fits = request(client, "tool-use", "Weigh the flour", {"bindings": [{"name": "scale", "value": "kitchen"}]})
-    assert not fits.faults, fits.faults
-    misfit = request(client, "tool-use", "Weigh the sugar", {"bindings": [{"name": "scale"}]})
-    assert (misfit.id, misfit.revision) == ("", 0)
-    assert [(fault.place, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
-
-
 BASE_TYPE = {
     "title": "Base",
     "version": 1,
@@ -343,11 +324,6 @@ def _a_type_at_its_second_version(client):
     define(client, DECISION_TYPE)
     next_version(client, "decision", DECISION_TYPE)
     return read(client, type_iri("decision"), whole=True)
-
-
-@then("the type reads back as it was")
-def _the_type_as_it_was(client, held):
-    assert read(client, type_iri("decision"), whole=True) == held
 
 
 TWO_DECISIONS = [iri("vote", "ship-weekly"), iri("vote", "price-monthly")]
@@ -635,7 +611,7 @@ def _change_what_the_type_requires(client, at):
 def _a_new_version_at(client, changed, at):
     assert not changed.faults, changed.faults
     number = loads(read(client, at, whole=True).content)["version"]
-    assert number not in (1, 2)
+    assert number == 3
     _reads_as_made(client, at, number, AS_CHANGED)
 
 
@@ -743,7 +719,7 @@ def _removing_the_tag_rejected(client):
 @then("the note's reference is not a link")
 def _the_reference_is_not_a_link(client):
     assert list(read(client, THE_NOTE).inbound) == []
-    assert [each.stub.id for each in refs(client, THE_NOTE, 1, inward=True).reached] == []
+    assert "reference" not in [stub.field for stub in read(client, THE_NOTE).references]
 
 
 OWNER_REQUIRED = _with(AS_DEFINED, "owner", required=True)

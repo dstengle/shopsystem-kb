@@ -538,7 +538,7 @@ SAYING = {
 
 
 def _names(client):
-    return [stub.id for stub in listing(client, "decision", ids_only=True).stubs]
+    return list(listing(client, "decision", ids_only=True).ids)
 
 
 @when(

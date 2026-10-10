@@ -289,7 +289,7 @@ def _no_entry_for_the_set(client, attempt):
 @when("the client asks, in one go, for a set holding no changes at all, saying which role and why", target_fixture="attempt")
 def _ask_for_an_empty_set(root, client):
     before = {
-        "names": [stub.id for stub in listing(client, "decision", ids_only=True).stubs],
+        "names": list(listing(client, "decision", ids_only=True).ids),
         "files": held.holds(root),
         "entries": len(journal(client).entries),
     }
