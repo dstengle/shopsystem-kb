@@ -1,15 +1,15 @@
-"""A type that changes between a change's draft and its landing: the change is drafted again against the type as it
-now stands, so what it links is held as links. A type built on another names the version of it it reads (kb.v2), so
-of an artifact's composition only its kind's type can move under a change. Through the contract, two clients on one
-machine, each store under its own tmp_path. A create is held to the version of its type it names, content and links,
-whatever its type stands at or moves to meanwhile."""
+"""A type that changes between a change's draft and its landing. A type built on another names the version of it it
+reads (kb.v2), so of an artifact's composition only its kind's type can move under a change. Through the contract, two
+clients on one machine, each store under its own tmp_path. A change naming no version keeps its artifact at the
+version it conforms to, and a create is held to the version of its type it names, content and links, whatever the
+type stands at or moves to meanwhile; an artifact made while a type is drafted anew is held to the links it makes."""
 import copy
 
 import pytest
 
 import at_once
 from calls import (
-    TAG_TYPE, check, create, creating, define, iri, read, refs, remove, replace, replacing, request, start_a_store,
+    TAG_TYPE, create, creating, define, iri, read, refs, remove, replace, replacing, request, start_a_store,
     targets, type_iri, version_iri,
 )
 from kb import client as kb_client
@@ -29,7 +29,8 @@ TYPES = {
 
 
 @pytest.mark.parametrize("moved", sorted(TYPES))
-def test_a_change_drafted_before_a_type_it_reads_moved_lands_with_the_links_the_type_now_makes(root, moved):
+def test_a_change_naming_no_version_drafted_before_its_type_moved_lands_with_the_links_its_own_version_makes(root, moved):
+    """The later version makes `about` a link; the note keeps the version it conforms to, where it is none."""
     client = kb_client.connect(root)
     start_a_store(root)
     held_types, next_type = copy.deepcopy(TYPES[moved])
@@ -46,10 +47,8 @@ def test_a_change_drafted_before_a_type_it_reads_moved_lands_with_the_links_the_
 
     landed = at_once.landed_second(at_once.OnAThread(root, "Replace", made), first)
     assert not landed.faults, landed.faults
-    assert [each.stub.id for each in refs(client, iri("tag", "a"), 1, inward=True).reached] == [iri("note", "x")]
-    assert [fault.rule for fault in remove(client, iri("tag", "a")).faults] == ["on_delete"]
-    validated = check(client)
-    assert (list(validated.violations), list(validated.stale)) == ([], [])
+    assert read(client, iri("note", "x")).type == version_iri("note", 1)
+    assert [each.stub.id for each in refs(client, iri("tag", "a"), 1, inward=True).reached] == []
 
 
 @pytest.mark.parametrize("moved", sorted(TYPES))

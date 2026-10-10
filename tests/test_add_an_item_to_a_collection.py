@@ -5,7 +5,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     PROCESS_TYPE, add, adding, answer, check, create, define, iri, journal, read, replace, start_a_store, targets,
-    type_iri,
+    type_iri, version_iri,
 )
 import at_once
 import held
@@ -381,7 +381,9 @@ def _steps_must_name_a_role(client):
     step["required"] = ["title", "role"]
     assert not replace(client, type_iri("process"), {"version": 2, "schema": staffed}, message="Steps name a role").faults
     staffed_steps = [{**STEPS[0], "role": "opener"}, {**STEPS[1], "role": "opener"}]
-    assert not replace(client, PROCESS, {"steps": staffed_steps}, message="Say who does each step").faults
+    assert not replace(
+        client, PROCESS, {"steps": staffed_steps}, message="Say who does each step", version=version_iri("process", 2),
+    ).faults
 
 
 @when("the client adds a step with no role named, where a step must name a role, saying which role and why", target_fixture="attempt")
@@ -407,7 +409,9 @@ def _steps_carry_checks(client):
     }
     assert not replace(client, type_iri("process"), {"version": 2, "schema": checked}, message="Steps carry checks").faults
     steps = [{**STEPS[0], "checks": [{"title": "Key turns"}]}, {**STEPS[1], "checks": [{"title": "Every bulb lit"}]}]
-    assert not replace(client, PROCESS, {"steps": steps}, message="Give each step its checks").faults
+    assert not replace(
+        client, PROCESS, {"steps": steps}, message="Give each step its checks", version=version_iri("process", 2),
+    ).faults
     return loads(read(client, PROCESS, whole=True).content)
 
 
