@@ -12,7 +12,7 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from kb import sqlite_search
+from kb import sqlite_backup, sqlite_search
 from kb.port import Busy, Change, Entry, Relink, Unreadable
 from kb.sqlite_checks import Checks
 from kb.values import Kind
@@ -75,7 +75,7 @@ def opened(path: Path) -> Iterator["SqliteStore"]:
     except sqlite3.OperationalError as error:
         raise Unreadable(f"{path}: {error}") from None
     try:
-        yield SqliteStore(db)
+        yield SqliteStore(db, path)
     except sqlite3.DatabaseError as error:
         raise (Busy if _busy(error) else Unreadable)(f"{path}: {error}") from error
     finally:
@@ -122,10 +122,11 @@ def _lacking() -> str:
 
 
 class SqliteStore(Checks):
-    """The port over one open connection."""
+    """The port over one open connection to the database at path."""
 
-    def __init__(self, db: sqlite3.Connection):
+    def __init__(self, db: sqlite3.Connection, path: Path):
         super().__init__(db)
+        self._path = path
         self._locked = False
 
     @contextlib.contextmanager
@@ -148,6 +149,9 @@ class SqliteStore(Checks):
             if not committed and self._db.in_transaction:
                 self._db.execute("ROLLBACK")
             self._locked = False
+
+    def copied(self, path: Path, form: int) -> None:
+        sqlite_backup.copied(self._db, path, form, self._path)
 
     def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
              kinds: tuple[Kind, ...] = ()) -> None:

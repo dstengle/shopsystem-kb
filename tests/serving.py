@@ -10,8 +10,12 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+import grpc
+
 from kb import canonical, server
+from kb import client as kb_client
 from kb.addresses import Address
+from kb.contract import kb_pb2, kb_pb2_grpc
 
 KB = Path(sys.executable).with_name("kb")
 STOPPING = 10  # seconds a server is given to stop at the end of a test before it is killed
@@ -68,6 +72,14 @@ def serving(root, request):
     host_and_port = said.split("\t")[-1]
     assert said.startswith("serving\t") and host_and_port.startswith("127.0.0.1:"), said
     return host_and_port
+
+
+def answered_at(root, address):
+    """A caller at the address is answered the store's history, as a client in this process reads it from root."""
+    with grpc.insecure_channel(address) as channel:
+        answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
+    assert answered == kb_client.connect(root).History(kb_pb2.HistoryRequest())
+    assert answered.WhichOneof("outcome") == "result" and answered.result.entries
 
 
 def connection(directory, address):

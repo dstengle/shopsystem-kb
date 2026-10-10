@@ -222,16 +222,22 @@ def root(named: "str | os.PathLike") -> Root:
 
 
 @dataclass(frozen=True)
-class Directory:
-    """A directory the operator names for the store's files, and the name given, which a refusal quotes."""
+class Named:
+    """A directory or a file the operator names for the store's files, and the name given, which a refusal quotes."""
     path: Path
     named: str
 
 
-def directory(text: str) -> Directory:
+def directory(text: str) -> Named:
     """The directory the operator names, as named; relative names stay relative. What stands there is the export's
     to check."""
-    return Directory(Path(text), text)
+    return Named(Path(text), text)
+
+
+def file(text: str) -> Named:
+    """The file the operator names for a backup, as named; relative names stay relative. What stands there is the
+    backup's to check."""
+    return Named(Path(text), text)
 
 
 def _not_a_plain_name(text: str) -> kb_pb2.Fault:

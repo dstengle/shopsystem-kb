@@ -119,6 +119,16 @@ def export_would_overwrite(named: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.ROOT, message=f"an export never overwrites; {named!r} already holds something")
 
 
+def backup_would_overwrite(named: str) -> kb_pb2.Fault:
+    """A place a backup is to be written at where anything already is."""
+    return kb_pb2.Fault(rule=rules.ROOT, message=f"a backup never overwrites; {named!r} already holds something")
+
+
+def backup_cannot_be_written(named: str, problem: str) -> kb_pb2.Fault:
+    """A place a backup cannot be written at: nothing there is the store's own."""
+    return kb_pb2.Fault(rule=rules.ROOT, message=f"a backup cannot be written at {named!r}: {problem}")
+
+
 def unreadable_file(file: str, problem: str) -> kb_pb2.Fault:
     """A file offered for import that cannot be read as YAML 1.2."""
     return kb_pb2.Fault(artifact=file, rule=rules.UNREADABLE, message=f"it cannot be read as YAML 1.2: {problem}")
@@ -173,6 +183,22 @@ def earlier_kb(root: str, files: str) -> kb_pb2.Fault:
         f"the store at {root} was made by an earlier version of kb, in a form this kb cannot read; start a new store "
         f"and import the old one's files, from {files}"
     ))
+
+
+def not_a_backup(file: str) -> kb_pb2.Fault:
+    """A file offered for restore that is not a backup kb made."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"{file!r} is not a backup kb made")
+
+
+def backup_by_earlier_kb(file: str) -> kb_pb2.Fault:
+    """A backup an earlier kb made, which this kb cannot read as a store."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"{file!r} was made by an earlier kb, which this kb cannot read")
+
+
+def backup_by_later_kb(file: str) -> kb_pb2.Fault:
+    """A backup a later kb made, which that kb is needed to read."""
+    return kb_pb2.Fault(
+        rule=rules.UNREADABLE, message=f"{file!r} was made by a later version of kb, which is needed to read it")
 
 
 def later_kb(root: str) -> kb_pb2.Fault:

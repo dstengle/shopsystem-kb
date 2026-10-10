@@ -2,18 +2,17 @@ import shutil
 import signal
 import socket
 
-import grpc
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a_store
 from conftest import OPERATOR, _kb, _store_needing_attention, _store_with_content, exported
 import held
+from backing_up import *  # noqa: F403 (the backup and restore steps, bound by this module's scenarios)
 import serving
 import stopping
 from kb import canonical
 from kb import client as kb_client
-from kb.contract import kb_pb2, kb_pb2_grpc
 
 scenarios("operate-a-store.feature")
 
@@ -125,15 +124,18 @@ def _kb_help(root):
     return _kb("--help", cwd=root)
 
 
-@then("it offers setting a store up, checking and exporting one, and importing into a freshly started store")
-def _offers_four_commands(ran):
+@then("it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing "
+      "into a freshly started store")
+def _offers_six_commands(ran):
     assert (ran.returncode, ran.stderr) == (0, "")
     listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
-    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import,serve}"
+    assert listed.split("\n", 2)[1].strip() == "{init,validate,export,import,backup,restore,serve}"
     lines = " ".join(listed.split())
     assert "init set up a store in a directory" in lines
     assert "validate check the store" in lines
     assert "export write the store" in lines
+    assert "backup back the store found here, or the one KB_ROOT names, up whole" in lines
+    assert "restore restore a backup as a store in a directory" in lines
     assert "import bring a directory of files into a freshly started store" in lines
 
 
@@ -211,15 +213,7 @@ def _served_at_that_address(served):
 
 @then(parsers.parse("a caller reaching that address through {reached} is answered from that store"))
 def _answered_from_that_store(root, port, reached):
-    _answered_at(root, f"{REACHED_THROUGH[reached]}:{port}")
-
-
-def _answered_at(root, address):
-    """A caller at the address is answered the store's history, as a client in this process reads it from root."""
-    with grpc.insecure_channel(address) as channel:
-        answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
-    assert answered == kb_client.connect(root).History(kb_pb2.HistoryRequest())
-    assert answered.WhichOneof("outcome") == "result" and answered.result.entries
+    serving.answered_at(root, f"{REACHED_THROUGH[reached]}:{port}")
 
 
 @when("the operator runs kb serve on that directory without giving an address", target_fixture="ran")
@@ -312,7 +306,7 @@ def _a_store_started(served, root):
 def _that_store_served(served, root):
     said = _said(served)
     assert said.startswith("serving\t127.0.0.1:") and int(said.rpartition(":")[2]) > 0, said
-    _answered_at(root, said.removeprefix("serving\t"))
+    serving.answered_at(root, said.removeprefix("serving\t"))
 
 
 @then("serving is rejected because a store can only be started under a role named through KB_ACTOR")
@@ -476,6 +470,19 @@ def _kb_init_with_a_seed_stopped(root, seed):
 def _no_store_inside(stopped, root):
     assert stopped.returncode == -signal.SIGKILL
     assert not held.holds_anything_in_the_place(root)
+
+
+@when("the operator's restore of that backup in that directory is stopped before it finishes",
+      target_fixture="stopped")
+def _restore_stopped(root, backup, restored):
+    """The installed command, killed the moment the directory holds anything and still no store."""
+    restored.update({"place": root, "from": backup.get("store")})
+    return stopping.stopped_restore(root, backup["file"])
+
+
+@when("the operator runs the same restore again", target_fixture="ran")
+def _restore_again(root, backup, tmp_path):
+    return _kb("restore", str(backup["file"]), str(root), cwd=tmp_path)
 
 
 @when("the operator runs the same kb init again", target_fixture="ran")

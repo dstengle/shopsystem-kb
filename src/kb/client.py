@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from kb import network, refusals, responses, store
+from kb.backups import BackedUp
 from kb.export import Exported
 from kb.importing import Checked
 from kb.contract import kb_pb2
@@ -135,6 +136,11 @@ def import_(directory: str, role: str, skip_errors: bool = False) -> Checked:
     """The operator's import of the directory named into the store this call finds, under the role named, the files
     with errors and those leading to them skipped when asked; not part of the contract."""
     return _operated("import_", Importing(directory, role, skip_errors), Checked)
+
+
+def backup(file: str) -> BackedUp:
+    """The operator's backup of the store this call finds to the file named; not part of the contract."""
+    return _operated("backup", file, BackedUp)
 
 
 def _operated(command: str, request, response):
