@@ -2,7 +2,6 @@ import shutil
 import signal
 import socket
 
-import grpc
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -14,7 +13,6 @@ import serving
 import stopping
 from kb import canonical
 from kb import client as kb_client
-from kb.contract import kb_pb2, kb_pb2_grpc
 
 scenarios("operate-a-store.feature")
 
@@ -215,15 +213,7 @@ def _served_at_that_address(served):
 
 @then(parsers.parse("a caller reaching that address through {reached} is answered from that store"))
 def _answered_from_that_store(root, port, reached):
-    _answered_at(root, f"{REACHED_THROUGH[reached]}:{port}")
-
-
-def _answered_at(root, address):
-    """A caller at the address is answered the store's history, as a client in this process reads it from root."""
-    with grpc.insecure_channel(address) as channel:
-        answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
-    assert answered == kb_client.connect(root).History(kb_pb2.HistoryRequest())
-    assert answered.WhichOneof("outcome") == "result" and answered.result.entries
+    serving.answered_at(root, f"{REACHED_THROUGH[reached]}:{port}")
 
 
 @when("the operator runs kb serve on that directory without giving an address", target_fixture="ran")
@@ -316,7 +306,7 @@ def _a_store_started(served, root):
 def _that_store_served(served, root):
     said = _said(served)
     assert said.startswith("serving\t127.0.0.1:") and int(said.rpartition(":")[2]) > 0, said
-    _answered_at(root, said.removeprefix("serving\t"))
+    serving.answered_at(root, said.removeprefix("serving\t"))
 
 
 @then("serving is rejected because a store can only be started under a role named through KB_ACTOR")

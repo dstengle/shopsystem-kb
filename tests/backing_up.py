@@ -2,12 +2,18 @@
 
 What a backup holds is read only through the contract: the backup restored by the operator's `kb restore` in a
 directory of its own, and that store read as a client reads any store."""
+import threading
+
 import pytest
 from pytest_bdd import given, then, when
 
-from calls import DECISION_TYPE, create, define, journal, listing, read, replace, snapshot, start_a_store
+import at_once
+import serving
+from calls import (DECISION_TYPE, a_decision_type_and_a_decision, answer, create, created, creating, define,
+                   journal, listing, read, replace, signature, snapshot, start_a_store)
 from conftest import _kb
 from kb import client as kb_client
+from kb.contract import kb_pb2
 
 DECISIONS = ("decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly")
 
@@ -140,3 +146,148 @@ def _history_ends_with_the_replace(restored):
     last = the_journal(restored["from"])[-1]
     assert (last.op, last.artifact, last.revision) == ("write", DECISIONS[0], 2), last
     assert the_journal(restored["place"])[-1] == last
+
+
+# A backup made while the store is written to.
+
+LANDING = ("decision/stock-is-counted-weekly", "decision/stock-is-counted-monthly", "decision/stock-is-counted-yearly")
+
+
+@given("a store holding a type for decisions")
+def _a_store_with_the_decision_type(root):
+    start_a_store(root)
+    define(kb_client.connect(root), DECISION_TYPE)
+
+
+@given("a store holding a type for decisions and a decision")
+def _a_store_with_a_decision(root):
+    start_a_store(root)
+    a_decision_type_and_a_decision(kb_client.connect(root))
+
+
+@given("a client is landing a set that makes three decisions", target_fixture="landing")
+def _landing_three_decisions(root):
+    """A set of three creates, drafted and held at its clock, before it lands."""
+    items = [created("decision", f"Stock is counted {every}", _sections(f"Stock moves {every}.\n"))
+             for every in ("weekly", "monthly", "yearly")]
+    landing = at_once.OnAThread(root, "BatchCreate", kb_pb2.BatchCreateRequest(
+        items=items, signature=signature("Count stock")))
+    landing.hold()
+    return landing
+
+
+@when("the operator backs up the store while that set is landing", target_fixture="backup")
+def _backs_up_while_landing(root, tmp_path, landing):
+    """The set let go to land on a thread of its own as the operator backs the store up; the set's answer awaited."""
+    letting_go = threading.Thread(target=landing.release)
+    letting_go.start()
+    backup = _backed_up(root, tmp_path)
+    letting_go.join(at_once.PATIENCE)
+    assert not letting_go.is_alive(), "the set never finished landing"
+    return backup
+
+
+@then("the backup holds either all three decisions of that set, with their history and journal entries, or none of "
+      "them")
+def _all_or_none(backup, root, tmp_path_factory, restored):
+    place = tmp_path_factory.mktemp("restored")
+    ran = _kb("restore", str(backup["file"]), str(place), cwd=place)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    landed, entries = everything(root), the_journal(root)
+    assert set(LANDING) <= set(landed)
+    if set(LANDING) <= set(everything(place)):
+        assert (everything(place), the_journal(place)) == (landed, entries)
+        assert _histories(place, LANDING) == _histories(root, LANDING)
+    else:
+        before = {name: content for name, content in landed.items() if name not in LANDING}
+        assert everything(place) == before
+        assert the_journal(place) == [entry for entry in entries if entry.artifact not in LANDING]
+
+
+def _histories(root, names):
+    client = kb_client.connect(root)
+    return {name: journal(client, artifact=name).response for name in names}
+
+
+class Writers:
+    """Clients in this program, each writing decisions on a thread of its own, one after another, until stopped;
+    every answer each was given kept, and a signal each time one is answered."""
+
+    def __init__(self, root, count):
+        self._root, self._stopping, self._answered = root, threading.Event(), threading.Condition()
+        self.answers = [[] for _ in range(count)]
+        self._threads = [threading.Thread(target=self._write, args=(writer,), daemon=True) for writer in range(count)]
+        for thread in self._threads:
+            thread.start()
+
+    def _write(self, writer):
+        client = kb_client.connect(self._root)
+        while not self._stopping.is_set():
+            written = len(self.answers[writer])
+            answered = answer(client.Create(creating("decision", f"Writer {writer} decides {written}",
+                                                     _sections(f"Writer {writer} wrote it.\n"), "Write a decision")))
+            with self._answered:
+                self.answers[writer].append(answered)
+                self._answered.notify_all()
+
+    def counts(self):
+        with self._answered:
+            return [len(answers) for answers in self.answers]
+
+    def each_answered_beyond(self, counts):
+        """Waits until every writer has been answered more often than the counts given."""
+        with self._answered:
+            assert self._answered.wait_for(
+                lambda: all(len(answers) > count for answers, count in zip(self.answers, counts)), at_once.PATIENCE,
+            ), f"the writers stopped writing: {self.counts()} answers, {counts} before"
+
+    def stop(self):
+        self._stopping.set()
+        for thread in self._threads:
+            thread.join(at_once.PATIENCE)
+        assert not any(thread.is_alive() for thread in self._threads), "a writer never finished"
+
+
+@given("clients are writing decisions to the store", target_fixture="writers")
+def _clients_writing(root, request):
+    """Three clients writing, each answered at least once before the step ends; stopped when the test ends."""
+    writers = Writers(root, 3)
+    request.addfinalizer(writers.stop)
+    writers.each_answered_beyond([0, 0, 0])
+    return writers
+
+
+@then("the backup is made")
+def _backup_made(backup):
+    assert (backup["ran"].returncode, backup["ran"].stderr) == (0, ""), backup["ran"].stderr
+    assert backup["file"].is_file()
+
+
+@then("the clients go on writing")
+def _clients_go_on(writers):
+    """Each writer is answered again after the backup was made."""
+    writers.each_answered_beyond(writers.counts())
+
+
+@then("none of their changes is refused because of the backup")
+def _none_refused(writers):
+    writers.stop()
+    refused = [answer.faults for answers in writers.answers for answer in answers if answer.refused]
+    assert refused == []
+
+
+@then("the backup is not refused because the store was busy with another change")
+def _backup_not_busy(backup):
+    assert "busy" not in backup["ran"].stderr
+    assert backup["ran"].returncode == 0, backup["ran"].stderr
+
+
+@given("a server serves that store", target_fixture="address")
+def _a_server_serves_it(root, request):
+    """`kb serve` run on the store; the address it serves at."""
+    return serving.serving(root, request)
+
+
+@then("the server goes on serving: a caller reaching it is answered from that store")
+def _server_goes_on(root, address):
+    serving.answered_at(root, address)
