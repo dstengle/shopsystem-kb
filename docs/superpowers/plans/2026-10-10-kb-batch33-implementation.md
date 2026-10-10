@@ -319,3 +319,28 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 - [ ] **Steps:** this task lands in about 8 files but is one removal that must compile whole, so it is one dispatch; if the implementer finds it cannot finish in one, it replies `PARTIAL` at a point where the suite passes what it passed.
 - [ ] **Verify:** the Check above, with the search's output in the report.
 - [ ] **Checkpoint:** `plan status 163.3 green`, then `plan log "Suite: ..."`.
+
+---
+
+Task 11 was added on 2026-10-10 from slice 165's review (decision/a-referred-type-is-not-removed). It runs after Task 7.
+
+15. **A referred type is not removed** (define-a-type's Behaviour line on removing a type another type's version reads). A removal of a type is refused, with the reason and rule a removal carries while artifacts of its kind exist ("something still points at it"), when any held version of another type refers to a shape one of its versions defines by a `kb:` reference, or is built on one of its versions. The refusal names each such type once, by the type's IRI, in kb's order of names, beside the artifacts of its kind if there are any. An earlier version counts: a type whose first version read it and whose second does not still stands in the way, since every version is kept as made. A type that only its own versions read is removed as before.
+
+### Task 11: Slice 165.1. A type another type's version reads is not removed
+
+Review: per-task
+Model: opus
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-165.1`, 1 scenario outline, 2 collected): define-a-type / Removing a type while a version of another type reads one of its versions is refused (refers to a shape; is built on).
+- [ ] **Why it is red today:** the outline has no steps. Behind them, the removal lands; afterwards a create or replacement through the referring version, and the check of the whole store, answer with the store's own fault (`store: ... Unresolvable`).
+- [ ] **Where the change lands** (3 production, 2 test):
+  - `src/kb/composition.py`: which held versions of which types read a given type (it already owns "which kinds' types read a given type"; every kept version is asked, not only the one a type stands at).
+  - `src/kb/edits.py` (a removal's refusal) and, if the fault needs making, `src/kb/refusals.py`; the port and adapter only if the versions of every type cannot be read through what the port gives today, and then as a read in `port.py` and `sqlite_types.py`.
+  - `tests/test_define_a_type.py` (the steps), `tests/test_a_type_moving_under_a_change.py`.
+  - CLAUDE.md's rows for what changes.
+- [ ] **Decisions applied:** 15, 11.
+- [ ] **Tests the decisions break:** `tests/test_a_type_moving_under_a_change.py`, the case slice 165 added that removes a base type another type's version is built on and asserts the removal lands (about lines 233-249): decision 15. Rewritten to assert the removal is refused naming the referring type, and that the type built on it still creates and checks. None else: the scout for slice 165 and its reviewer found no other test removing a referred type; another that breaks is a `BLOCKED` reply naming it.
+- [ ] **Steps to reuse:** `test_define_a_type.py`'s `_a_type_and_two_artifacts`, `_remove_the_type` and the Then of "Removing a type while the store holds artifacts of its kind is refused"; `_a_base_type`; slice 165's reference steps.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m slice-165.1` gives 2 passed; a plain test through the contract that after the refused removal the whole-store check answers with no fault of the store's own; `make test` shows no new failure.
+- [ ] **Checkpoint:** `plan status 165.1 green`, then `plan log "Suite: ..."`.
