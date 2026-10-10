@@ -2,8 +2,9 @@
 
 Above the port stay names, content checks, sections and items, signatures, faults and the contract. Below it an
 adapter keeps the artifacts, their content at every revision, the links both ways, the search rows and the history,
-and lands a set of changes whole or not at all. An adapter knows nothing of types: a change says the kind of its
-artifact, its type's IRI, and a link says which kinds it may land on.
+and lands a set of changes whole or not at all. An adapter keeps the versions of a type it is handed, each
+as made, and knows nothing of what a type declares: a change says the kind of its artifact, its type's IRI, and a link
+says which kinds it may land on.
 
 The port refuses with the exceptions named here. None of them is published, and kb translates them above the port.
 """

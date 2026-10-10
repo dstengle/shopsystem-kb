@@ -30,8 +30,10 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
 
 def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict | None = None) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
-    the kinds its field allows, read through the type given, the version a create names, or, given none, through the
-    artifact's type as the corpus holds it; none when the corpus holds no such type. Every artifact carries one
+    the kinds its field allows, read through the type given, the version the artifact conforms to, or, given none,
+    through its kind's type as the corpus holds it, the latest version: the import relies on that, its files read
+    against their kind's type as the set leaves it, and the draft falls back to it for an artifact whose own version
+    it does not keep. None but the implicit one when the corpus holds no such type. Every artifact carries one
     implicit link, first, to the artifact of its type. A value that could name nothing, which a type changed after it
     was written can leave in a link field, is not handed."""
     kind = composition.artifact_kind(artifact)
