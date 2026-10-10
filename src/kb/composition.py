@@ -1,6 +1,6 @@
 """A type read through what it is built on: the schemas of its composition, base first, the type version a kb:
-reference names, the type a kind names, and the kind an artifact is of. kb's own keywords are read through the
-composition, so a type built on a base carries the base's first."""
+reference names, the type a kind names, the nearest held type an IRI sits under, and the kind an artifact is of. kb's
+own keywords are read through the composition, so a type built on a base carries the base's first."""
 from typing import NamedTuple
 
 from referencing.exceptions import NoSuchResource
@@ -86,6 +86,16 @@ def version_type(version: values.Version, corpus) -> values.ArtifactId:
     if not held(Reference(values.type_of(version.kind), True, version.number), corpus):
         raise values.Refused([refusals.no_version(str(version))])
     return values.type_of(version.kind)
+
+
+def nearest_type(artifact_id: values.ArtifactId, corpus) -> values.ArtifactId | None:
+    """The type an IRI belongs to: the nearest IRI it sits under that the corpus holds a type at. None when it sits
+    under no held type."""
+    for above in names.above(artifact_id):
+        type_id = values.ArtifactId(above)
+        if corpus.holds(type_id) and settled.typed(corpus.artifact(type_id)):
+            return type_id
+    return None
 
 
 def kind_of(artifact_id: values.ArtifactId, corpus) -> values.Kind:
