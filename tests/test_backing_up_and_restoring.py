@@ -145,3 +145,50 @@ def test_a_copy_that_fails_in_the_backups_place_is_refused_naming_it_and_leaves_
     [line] = ran.stderr.splitlines()
     assert line.startswith(f"kb backup: refused: root: a backup cannot be written at {str(place)!r}: "), line
     assert not place.exists()
+
+
+def _a_store_damaged_inside(root):
+    """A store of sixty decisions whose database opens, its first page whole, but whose pages in the middle are
+    written over by hand behind its back."""
+    start_a_store(root)
+    client = kb_client.connect(root)
+    define(client, DECISION_TYPE)
+    for each in range(60):
+        create(client, "decision", {**WEEKLY, "title": f"Price reviews happen weekly {each}"})
+    database = Path(root) / "kb" / "store.sqlite3"
+    whole = bytearray(database.read_bytes())
+    middle = len(whole) // 2
+    whole[middle:middle + 4 * 4096] = b"\xa5" * (4 * 4096)
+    database.write_bytes(bytes(whole))
+
+
+def test_a_store_whose_database_is_damaged_inside_is_refused_a_backup_as_validate_is_and_nothing_is_left(
+        tmp_path, root):
+    _a_store_damaged_inside(root)
+    validated = _kb("validate", cwd=root)
+    assert validated.returncode == 2 and "unreadable: " in validated.stderr, validated.stderr
+    place = tmp_path / "store.backup"
+    ran = _kb("backup", str(place), cwd=root)
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr.replace("kb backup:", "kb validate:", 1) == validated.stderr
+    assert not place.exists()
+
+
+def test_a_backup_damaged_inside_is_refused_as_unreadable_and_nothing_is_made(tmp_path, root):
+    start_a_store(root)
+    client = kb_client.connect(root)
+    define(client, DECISION_TYPE)
+    for each in range(60):
+        create(client, "decision", {**WEEKLY, "title": f"Price reviews happen weekly {each}"})
+    backup = tmp_path / "store.backup"
+    assert _kb("backup", str(backup), cwd=root).returncode == 0
+    whole = bytearray(backup.read_bytes())
+    middle = len(whole) // 2
+    whole[middle:middle + 4 * 4096] = b"\xa5" * (4 * 4096)
+    backup.write_bytes(bytes(whole))
+    into = tmp_path / "restored"
+    into.mkdir()
+    ran = _kb("restore", str(backup), str(into), cwd=tmp_path)
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr == f"kb restore: refused: unreadable: {str(backup)!r} is not a backup kb made\n", ran.stderr
+    assert list(into.iterdir()) == []

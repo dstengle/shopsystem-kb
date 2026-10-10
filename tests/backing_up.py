@@ -376,7 +376,7 @@ def _refused_restore(ran, rule, message):
 
 @then("restoring is rejected because that directory already has a store inside it")
 def _restore_rejected_as_already_a_store(ran, root):
-    _refused_restore(ran, "root", f"a store is never started over another; {str(root)!r} already has a store inside it")
+    _refused_restore(ran, "root", f"a store is never restored over another; {str(root)!r} already has a store inside it")
 
 
 @then("restoring is rejected because that directory is inside a store")

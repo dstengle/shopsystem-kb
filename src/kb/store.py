@@ -119,8 +119,8 @@ def start(root: Root, fill: Callable[[Port], None], made: Callable[[Path], None]
     place.mkdir()
     try:
         (made or sqlite_store.make)(root.path / DATABASE)
-        with sqlite_store.opened(root.path / DATABASE) as made:
-            fill(made)
+        with sqlite_store.opened(root.path / DATABASE) as fresh:
+            fill(fresh)
         (root.path / MARKER).write_text(canonical.dump({"store": STORE_FORM}), encoding="utf-8")
     except (sqlite3.Error, OSError, Unreadable):
         shutil.rmtree(place)
@@ -143,7 +143,7 @@ def vacant(root: Root, verb: str = "started") -> None:
     if not root.path.is_dir():
         refuse(f"a store is started in a directory, and {named} is not one")
     if (root.path / MARKER).is_file():
-        refuse(f"a store is never started over another; {named} already has a store inside it")
+        refuse(f"a store is never {verb} over another; {named} already has a store inside it")
     if (root.path / MARKER.parent).exists() or (root.path / MARKER.parent).is_symlink():
         refuse(f"a store goes in a place of its own, and {named} already holds something in that place")
     above = find_above(root.path.resolve().parent)
