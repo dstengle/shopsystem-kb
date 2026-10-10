@@ -199,6 +199,7 @@ class SqliteStore(Checks):
             (name, landed, step, change.revision, stored),
         )
         if stored is None:
+            sqlite_types.removed(self._db, name)
             return
         kind = change.kind.name
         self._db.execute(

@@ -67,7 +67,8 @@ class Change:
     "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them.
     `kind` is the kind of the artifact a change leaves, None for a removal. `version` is given by a change that
     leaves a type held: the adapter keeps that version, read by `type_version`, beside the versions of the type it
-    already keeps, each as it was made, and lands it with the set or not at all."""
+    already keeps, each as it was made, and lands it with the set or not at all; a removal takes with it, in its
+    set's landing, every version kept of what it removes."""
     artifact: ArtifactId
     content: dict | None
     links: tuple[Link, ...] = ()
