@@ -3,7 +3,10 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import PROCESS_TYPE, add, adding, answer, create, define, journal, read, replace, start_a_store, check
+from calls import (
+    PROCESS_TYPE, add, adding, answer, check, create, define, iri, journal, read, replace, start_a_store, targets,
+    type_iri,
+)
 import at_once
 import held
 from kb import client as kb_client
@@ -126,17 +129,17 @@ FINDING_TYPE = {
             "title": {"type": "string"},
             "check": {
                 "type": "string",
-                "ref": {"targets": ["checklist"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
+                "ref": {"targets": targets("checklist"), "cardinality": "one", "parts": True, "on_delete": "refuse"},
             },
         },
         "required": ["title"],
     },
 }
-CHECKLIST = "checklist/closing-checks"
-FINDING = "finding/the-till-was-short"
+CHECKLIST = iri("checklist", "closing-checks")
+FINDING = iri("finding", "the-till-was-short")
 CHECKS = [{"says": "Lights off"}, {"says": "Till counted"}, {"says": "Door locked"}]
-PROCESS = "process/open-the-shop"
-SHARED = "step/count-the-till"
+PROCESS = iri("process", "open-the-shop")
+SHARED = iri("step", "count-the-till")
 STEPS = [
     {"id": "unlock-the-door", "title": "Unlock the door", "body": "Front door first."},
     {"id": "turn-on-the-lights", "title": "Turn on the lights", "body": "Shop floor, then the stockroom."},
@@ -346,14 +349,14 @@ def _process_as_it_was(client, attempt):
 @when("the client adds a step to a process by a name the store holds nothing under, saying which role and why", target_fixture="attempt")
 def _add_to_nothing(root, client):
     before = held.holds(root)
-    response = add(client, "process/close-the-shop", "steps", {"title": "Lock the door"})
+    response = add(client, iri("process", "close-the-shop"), "steps", {"title": "Lock the door"})
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the item is rejected because the store holds nothing by that name, and the name asked for is given back")
 def _rejected_for_nothing(attempt):
-    assert [(fault.artifact, fault.rule) for fault in attempt["response"].faults] == [("process/close-the-shop", "not-found")]
-    assert "'process/close-the-shop'" in attempt["response"].faults[0].message
+    assert [(fault.artifact, fault.rule) for fault in attempt["response"].faults] == [(iri("process", "close-the-shop"), "not-found")]
+    assert repr(iri("process", "close-the-shop")) in attempt["response"].faults[0].message
 
 
 @then("nothing is written anywhere in the store")
@@ -366,7 +369,7 @@ def _rejected_for_its_link(attempt):
     assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
         (PROCESS, "steps/2/uses", "ref"),
     ]
-    assert "'step/count-the-change'" in attempt["response"].faults[0].message
+    assert repr(iri("step", "count-the-change")) in attempt["response"].faults[0].message
 
 
 def _steps_must_name_a_role(client):
@@ -376,7 +379,7 @@ def _steps_must_name_a_role(client):
     step = staffed["parts"]["steps"]["items"]
     step["properties"]["role"] = {"type": "string"}
     step["required"] = ["title", "role"]
-    assert not replace(client, "schema/process", {"version": 2, "schema": staffed}, message="Steps name a role").faults
+    assert not replace(client, type_iri("process"), {"version": 2, "schema": staffed}, message="Steps name a role").faults
     staffed_steps = [{**STEPS[0], "role": "opener"}, {**STEPS[1], "role": "opener"}]
     assert not replace(client, PROCESS, {"steps": staffed_steps}, message="Say who does each step").faults
 
@@ -402,7 +405,7 @@ def _steps_carry_checks(client):
     checked["parts"]["steps"]["items"]["parts"] = {
         "checks": {"items": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}},
     }
-    assert not replace(client, "schema/process", {"version": 2, "schema": checked}, message="Steps carry checks").faults
+    assert not replace(client, type_iri("process"), {"version": 2, "schema": checked}, message="Steps carry checks").faults
     steps = [{**STEPS[0], "checks": [{"title": "Key turns"}]}, {**STEPS[1], "checks": [{"title": "Every bulb lit"}]}]
     assert not replace(client, PROCESS, {"steps": steps}, message="Give each step its checks").faults
     return loads(read(client, PROCESS, whole=True).content)

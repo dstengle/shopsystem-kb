@@ -25,7 +25,7 @@ def _created(outcome) -> bool:
 
 def _named(draft: Draft, change: Change, minted: dict) -> Change:
     """A create's artifact with each link to a key holding the name that key stands for."""
-    schema = composition.kind_schema(change.artifact_id.kind, draft)["schema"]
+    schema = composition.artifact_schema(change.left, draft)["schema"]
     left = links.rewritten(change.left, schema, draft, lambda link: _target(link.target, minted))
     draft.put(change.artifact_id, left)
     return change._replace(left=left)

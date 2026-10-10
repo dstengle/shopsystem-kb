@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from kb import names
 from kb.content import text
 from kb.port import Candidate, Linking
-from kb.values import ArtifactId, Kind, artifact_id
+from kb.values import ArtifactId, Kind
 
 PAIRS = "~pairs"
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -51,7 +51,7 @@ def moment(at: datetime) -> int:
 
 
 def ordered(written: list[str]) -> list[ArtifactId]:
-    return [artifact_id(name) for name in sorted(written, key=names.order)]
+    return [ArtifactId(name) for name in sorted(written, key=names.order)]
 
 
 class Reads:
@@ -97,21 +97,26 @@ class Reads:
     def _links_into(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None,
                     implicit: bool = True) -> list[Linking]:
         """The links landing on an artifact or a part inside it; the implicit ones too, unless left out."""
+        return [each for each, _ in self._kinded(artifact_id, field, kind, implicit)]
+
+    def _kinded(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None,
+                implicit: bool = True) -> list[tuple[Linking, str]]:
+        """The links landing on an artifact or a part inside it, each with the kind of the artifact holding it."""
         rows = self._rows(
-            "SELECT source, field, place, target, part, ordinal FROM links WHERE target = ?"
+            "SELECT links.source, field, place, target, part, ordinal, artifacts.kind FROM links"
+            " LEFT JOIN artifacts ON artifacts.id = links.source WHERE target = ?"
             + ("" if implicit else " AND implicit = 0"), str(artifact_id),
         )
         rows.sort(key=lambda row: (names.order(row[0]), row[5]))
-        found = [_linking(*row[:5]) for row in rows]
         return [
-            each for each in found
-            if (not field or each.field == field) and (kind is None or each.source.kind == kind)
+            (_linking(*row[:5]), row[6]) for row in rows
+            if (not field or row[1] == field) and (kind is None or row[6] == kind.name)
         ]
 
     def inbound(self, artifact_id: ArtifactId) -> dict[tuple[str, str], int]:
         counts, counted = {}, set()
-        for each in self.links_in(artifact_id):
-            key = (each.source.kind.name, each.field)
+        for each, of_kind in self._kinded(artifact_id, implicit=False):
+            key = (of_kind, each.field)
             if (key, each.source) not in counted:
                 counted.add((key, each.source))
                 counts[key] = counts.get(key, 0) + 1
@@ -126,7 +131,7 @@ class Reads:
         rows.sort(key=lambda row: (names.order(row[0]), row[4]))
         wanted = {what for what, asked in (("section", sections), ("field", fields)) if asked}
         return [
-            Candidate(artifact_id(name), label if what == "section" else "", label if what == "field" else "")
+            Candidate(ArtifactId(name), label if what == "section" else "", label if what == "field" else "")
             for name, of_kind, what, label, _ in rows
             if what in wanted and (kind is None or of_kind == kind.name)
         ]
@@ -151,7 +156,7 @@ class Reads:
 
 
 def _linking(source: str, field: str, place: str, target: str, part: str) -> Linking:
-    return Linking(artifact_id(source), field, place, artifact_id(target), part)
+    return Linking(ArtifactId(source), field, place, ArtifactId(target), part)
 
 
 def _holds(artifact: dict, fields: dict[str, str]) -> bool:

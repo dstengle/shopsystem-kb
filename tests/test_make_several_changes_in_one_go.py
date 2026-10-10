@@ -5,7 +5,8 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, add_many, added,
-    create, create_many, created, define, journal, listing, next_version, read, refs, remove_many, removed, replace, replace_many, replaced, start_a_store,
+    create, create_many, created, define, iri, journal, listing, next_version, read, refs, remove_many, removed,
+    replace, replace_many, replaced, start_a_store, type_iri,
 )
 import held
 from kb import client as kb_client
@@ -14,8 +15,8 @@ from kb.contract import kb_pb2
 
 scenarios("make-several-changes-in-one-go.feature")
 
-DECISION = "decision/price-reviews-happen-weekly"
-WORK_ITEM = "work-item/move-the-review-to-mondays"
+DECISION = iri("decision", "price-reviews-happen-weekly")
+WORK_ITEM = iri("work-item", "move-the-review-to-mondays")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -32,7 +33,7 @@ def _store_with_a_decision_type_and_a_work_item(root):
     return client
 
 
-NEW_WORK_ITEM = "work-item/review-prices-on-mondays"
+NEW_WORK_ITEM = iri("work-item", "review-prices-on-mondays")
 
 
 @when(
@@ -107,7 +108,7 @@ def _a_set_with_a_bad_second_change():
     return Set([
         created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
         created("decision", "Prices are reviewed monthly", {"sections": []}),
-    ], {("decision/prices-are-reviewed-monthly", "sections")})
+    ], {(iri("decision", "prices-are-reviewed-monthly"), "sections")})
 
 
 @when("the client asks for the set, saying which role and why", target_fixture="attempt")
@@ -136,10 +137,11 @@ def _decision_type_in_reading_order(client):
     target_fixture="bad_set",
 )
 def _a_set_with_a_misordered_second_change():
+    """Of the decision type's second version, which declares the fields first."""
     return Set([
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-        created("decision", "Prices are reviewed monthly", MISORDERED_DECISION),
-    ], {("decision/prices-are-reviewed-monthly", rule) for _, rule in READING_ORDER})
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, version=2),
+        created("decision", "Prices are reviewed monthly", MISORDERED_DECISION, version=2),
+    ], {(iri("decision", "prices-are-reviewed-monthly"), rule) for _, rule in READING_ORDER})
 
 
 @then(
@@ -161,14 +163,14 @@ def _a_set_with_two_bad_changes():
     return Set([
         created("decision", "Price reviews happen weekly", {"sections": []}),
         created("decision", "Prices are reviewed monthly", {"sections": []}),
-    ], {("decision/price-reviews-happen-weekly", "sections"), ("decision/prices-are-reviewed-monthly", "sections")})
+    ], {(iri("decision", "price-reviews-happen-weekly"), "sections"), (iri("decision", "prices-are-reviewed-monthly"), "sections")})
 
 
 @then("the first change's fault comes back before the second change's fault")
 def _the_first_changes_fault_first(attempt):
     refused = attempt["response"]
     assert list(dict.fromkeys(fault.artifact for fault in refused.faults)) == [
-        "decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly",
+        iri("decision", "price-reviews-happen-weekly"), iri("decision", "prices-are-reviewed-monthly"),
     ]
     assert [fault.artifact for fault in refused.faults] == sorted(fault.artifact for fault in refused.faults)
 
@@ -176,7 +178,7 @@ def _the_first_changes_fault_first(attempt):
 @then("the store holds neither change")
 def _neither_change_held(client, attempt):
     assert attempt["after"] == attempt["before"]
-    for name in (DECISION, "decision/prices-are-reviewed-monthly"):
+    for name in (DECISION, iri("decision", "prices-are-reviewed-monthly")):
         assert [fault.rule for fault in read(client, name).faults] == ["not-found"]
 
 
@@ -223,7 +225,7 @@ def _two_versions_on(client):
     assert read(client, WORK_ITEM).revision == 3
 
 
-MONTHLY = "decision/prices-are-reviewed-monthly"
+MONTHLY = iri("decision", "prices-are-reviewed-monthly")
 
 
 def _nothing_by_that_name(client):
@@ -328,7 +330,7 @@ def _lands_pointing_by_key(client, applied):
     assert not read(client, DECISION).faults
 
 
-WEEKLY, DAILY = DECISION, "decision/price-reviews-happen-daily"
+WEEKLY, DAILY = DECISION, iri("decision", "price-reviews-happen-daily")
 
 
 @given("the decision type lets a decision point at another decision")
@@ -383,7 +385,7 @@ def _work_items_carry_tasks(client):
         "properties": {"title": {"type": "string"}, "decision": DECISION_TYPE["schema"]["properties"]["supersedes"]},
         "required": ["title"],
     }}}
-    assert not replace(client, "schema/work-item", {"version": 2, "schema": schema}).faults
+    assert not replace(client, type_iri("work-item"), {"version": 2, "schema": schema}).faults
 
 
 LINKED_TO_THE_KEY = {
@@ -447,7 +449,7 @@ def _a_result_for_each_create(applied):
 def _each_result_names_its_decision(client, applied):
     assert [read(client, result.id).title for result in applied.results] == THREE_TITLES
     assert [result.id for result in applied.results] == [
-        "decision/price-reviews-happen-weekly", "decision/prices-are-rounded-to-the-cent", "decision/discounts-end-on-sundays",
+        iri("decision", "price-reviews-happen-weekly"), iri("decision", "prices-are-rounded-to-the-cent"), iri("decision", "discounts-end-on-sundays"),
     ]
 
 
@@ -517,7 +519,7 @@ def _the_reference_given_back(attempt):
     assert attempt["reference"] in attempt["response"].faults[0].message
 
 
-SECOND_WORK_ITEM = "work-item/print-the-new-price-labels"
+SECOND_WORK_ITEM = iri("work-item", "print-the-new-price-labels")
 
 
 @given("the store also holds a second work item, and work items carry a collection of tasks")

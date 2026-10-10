@@ -1,15 +1,66 @@
-"""How the steps call the contract: one helper per rpc, the types the Backgrounds define, and the one reading of a
-moment a step names."""
+"""How the steps call the contract: one helper per rpc, the types the Backgrounds define, the IRIs the steps name
+artifacts and types by, and the one reading of a moment a step names. A kind is given to a helper by its short name,
+`decision` for the type at `https://shop.example/kb/decision`, or by its type's IRI; `schema` names the type that
+describes types. An artifact a step creates without stating an IRI sits under its type's IRI at the name its title
+gives."""
 import copy
 import re
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import kb
-from kb.content import dumps
+from kb.content import dumps, loads
 from kb.contract import kb_pb2
 
 CLIENT = kb_pb2.Actor(role="client")
+
+TYPES_AT = "https://shop.example/kb/"
+TYPE_OF_TYPES = "https://missingmass.io/kb/type"
+TYPES = "schema"
+
+
+def type_iri(kind):
+    """The IRI of the type of a kind given by its short name, or the IRI itself when it is one."""
+    if kind.startswith("https://"):
+        return kind
+    return TYPE_OF_TYPES if kind == TYPES else TYPES_AT + kind
+
+
+def version_iri(kind, number=1):
+    """The IRI of a version of a kind's type."""
+    return f"{type_iri(kind)}@{number}"
+
+
+def iri(kind, name):
+    """The IRI of an artifact of a kind, under its type's IRI at the name given; a type's, of kind `schema`, is the
+    IRI of the kind it is named for."""
+    return type_iri(name) if kind == TYPES else f"{type_iri(kind)}/{name}"
+
+
+def slug(title):
+    """The name a title gives: lower-cased, every run of anything else a hyphen, none at either end."""
+    return re.sub(r"[^a-z0-9]+", "-", str(title).lower()).strip("-")
+
+
+def named(kind, title):
+    """The IRI an artifact of a kind a step creates sits at when the step states none: the name its title gives."""
+    return iri(kind, slug(title))
+
+
+def filed(name, version=None):
+    """Where an export puts an artifact, below its directory: the host and path of its IRI, `.yaml`; for a type, the
+    version given, its IRI followed by `@` and the version's number."""
+    return name.removeprefix("https://") + (f"@{version}" if version else "") + ".yaml"
+
+
+def kb_ref(kind, number=1, fragment=""):
+    """A `kb:` reference to a version of a kind's type, and to a shape inside it when a fragment is given."""
+    return f"kb:{version_iri(kind, number)}{fragment}"
+
+
+def targets(*kinds):
+    """The kinds a link field may point at, each by its type's IRI."""
+    return [type_iri(kind) for kind in kinds]
 
 READING = re.compile(r"(?P<day>\d{4}-\d{2}-\d{2}) at (?P<time>\d{2}:\d{2})(?P<zone>.*)")
 ZONES = {
@@ -28,7 +79,7 @@ DECISION_TYPE = {
             "title": {"type": "string"},
             "supersedes": {
                 "type": "string",
-                "ref": {"targets": ["decision"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+                "ref": {"targets": targets("decision"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
             },
         },
         "required": ["title"],
@@ -75,7 +126,7 @@ WORK_ITEM_TYPE = {
             "decisions": {
                 "type": "array",
                 "items": {"type": "string"},
-                "ref": {"targets": ["decision"], "cardinality": "many", "parts": False, "on_delete": "refuse"},
+                "ref": {"targets": targets("decision"), "cardinality": "many", "parts": False, "on_delete": "refuse"},
             },
         },
         "required": ["title"],
@@ -92,7 +143,7 @@ NOTE_TYPE = {
             "title": {"type": "string"},
             "about": {
                 "type": "string",
-                "ref": {"targets": ["decision"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
+                "ref": {"targets": targets("decision"), "cardinality": "one", "parts": True, "on_delete": "refuse"},
             },
         },
         "required": ["title"],
@@ -121,7 +172,7 @@ def tagged_decision_type():
     decision_type["schema"]["properties"]["tags"] = {
         "type": "array",
         "items": {"type": "string"},
-        "ref": {"targets": ["tag"], "cardinality": "many", "parts": False, "on_delete": "refuse"},
+        "ref": {"targets": targets("tag"), "cardinality": "many", "parts": False, "on_delete": "refuse"},
     }
     return decision_type
 
@@ -180,10 +231,15 @@ def signature(message, actor=CLIENT):
     return kb_pb2.Signature(role=actor.role, execution=actor.execution, message=message)
 
 
-def creating(type_name, title, content, message="Create an artifact", actor=CLIENT):
-    """A CreateRequest: the title beside the content, which is canonical text already when it is a string."""
+def creating(type_name, title, content, message="Create an artifact", actor=CLIENT, at=None, version=1):
+    """A CreateRequest: at the IRI given, or the one its title gives under its type's, conforming to the version of
+    its type given, the first unless another is, the title beside the content, which is canonical text already when it
+    is a string."""
     text = content if isinstance(content, str) else dumps(content)
-    return kb_pb2.CreateRequest(kind=type_name, title=title, content=text, signature=signature(message, actor))
+    return kb_pb2.CreateRequest(
+        id=at or named(type_name, title), type=version_iri(type_name, version), title=str(title), content=text,
+        signature=signature(message, actor),
+    )
 
 
 def replacing(artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0):
@@ -212,16 +268,26 @@ def removing(artifact_id, message="Remove an artifact", actor=CLIENT, revision=0
     )
 
 
-def request(client, type_name, title, content, message="Create an artifact", actor=CLIENT):
-    """A Create as the client sends it: the title beside the content. Returns the answer, faults and all."""
-    return answer(client.Create(creating(type_name, title, content, message, actor)))
+def request(client, type_name, title, content, message="Create an artifact", actor=CLIENT, at=None, version=None):
+    """A Create as the client sends it: the title beside the content, naming the version its type stands at unless
+    another is given. Returns the answer, faults and all."""
+    number = held_version(client, type_name) if version is None else version
+    return answer(client.Create(creating(type_name, title, content, message, actor, at, number)))
 
 
-def create(client, type_name, content, message="Create an artifact", actor=CLIENT):
+def held_version(client, kind):
+    """The version a kind's type stands at, as the client reads it; the first when the store holds no such type."""
+    read_back = client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=type_iri(kind)), whole=kb_pb2.ReadRequest.Whole()))
+    if read_back.WhichOneof("outcome") != "result":
+        return 1
+    return loads(read_back.result.content).get("version", 1)
+
+
+def create(client, type_name, content, message="Create an artifact", actor=CLIENT, at=None):
     """Create from a dict written the way a user writes a file, title inside; the title is lifted out and sent beside."""
     content = dict(content)
     title = content.pop("title", "")
-    response = request(client, type_name, title, content, message, actor)
+    response = request(client, type_name, title, content, message, actor, at)
     assert not response.faults, response.faults
     return response
 
@@ -235,9 +301,10 @@ def a_decision_type_and_a_decision(client):
     ]})
 
 
-def define(client, type_content):
-    """Define a type: a Create of type `schema`."""
-    return create(client, "schema", type_content, message=f"Define {type_content['title']}")
+def define(client, type_content, at=None):
+    """Define a type: a Create of the type that describes types, at the IRI given, or the one its title gives under
+    the steps' types."""
+    return create(client, TYPES, type_content, message=f"Define {type_content['title']}", at=at)
 
 
 def read(client, artifact_id, whole=False, depth=0, section=""):
@@ -251,9 +318,14 @@ def read(client, artifact_id, whole=False, depth=0, section=""):
     return answer(client.Read(asked))
 
 
-def created(type_name, title, content, key=""):
-    """A create inside a BatchCreate: the title beside the content, and the key it carries, if any."""
-    return kb_pb2.CreateItem(kind=type_name, title=title, content=dumps(content), key=key)
+def created(type_name, title, content, key="", at=None, version=1):
+    """A create inside a BatchCreate: at the IRI given, or the one its title gives under its type's, conforming to
+    the version of its type given, the first unless another is, the title beside the content, and the key it carries,
+    if any."""
+    return kb_pb2.CreateItem(
+        id=at or named(type_name, title), type=version_iri(type_name, version), title=str(title),
+        content=dumps(content), key=key,
+    )
 
 
 def replaced(artifact_id, content, revision=0):
@@ -342,7 +414,7 @@ def search(client, text, type_name="", everywhere=False):
     when type_name is given."""
     request = kb_pb2.SearchRequest(text=text)
     if type_name:
-        request.kind = type_name
+        request.kind = type_iri(type_name)
     if everywhere:
         request.scope = kb_pb2.SearchRequest.ALL
     return answer(client.Search(request))
@@ -354,7 +426,8 @@ def refs(client, artifact_id, depth, inward=False, via="", type_name="", place="
     given."""
     direction = kb_pb2.FollowRequest.IN if inward else kb_pb2.FollowRequest.OUT
     return answer(client.Follow(kb_pb2.FollowRequest(
-        locator=kb_pb2.Locator(id=artifact_id, place=place), depth=depth, direction=direction, via=via, kind=type_name,
+        locator=kb_pb2.Locator(id=artifact_id, place=place), depth=depth, direction=direction, via=via,
+        kind=type_iri(type_name) if type_name else "",
     )))
 
 
@@ -375,7 +448,7 @@ PROCESS_TYPE = {
                         "branches": {"type": "array", "items": {"type": "string"}},
                         "uses": {
                             "type": "string",
-                            "ref": {"targets": ["step"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+                            "ref": {"targets": targets("step"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
                         },
                         "settings": {"type": "object"},
                     },
@@ -390,7 +463,7 @@ PROCESS_TYPE = {
 def listing(client, type_name, fields=None, ids_only=False):
     """The artifacts of a kind, those whose fields hold the values given, as stubs or as names only."""
     form = kb_pb2.ListRequest.IDS if ids_only else kb_pb2.ListRequest.STUBS
-    return answer(client.List(kb_pb2.ListRequest(kind=type_name, fields=fields or {}, form=form)))
+    return answer(client.List(kb_pb2.ListRequest(kind=type_iri(type_name), fields=fields or {}, form=form)))
 
 
 def check(client):
@@ -404,7 +477,7 @@ def next_version(client, kind, type_content, sections=None):
     schema = copy.deepcopy(type_content["schema"])
     if sections is not None:
         schema["sections"] = [{"title": title} for title in sections]
-    return replace(client, f"schema/{kind}", {"version": type_content["version"] + 1, "schema": schema},
+    return replace(client, type_iri(kind), {"version": type_content["version"] + 1, "schema": schema},
                  message=f"Revise {type_content['title']}")
 
 

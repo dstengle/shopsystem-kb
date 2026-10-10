@@ -35,7 +35,7 @@ def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
             for field, other_id in step(store, locator):
                 if str(other_id) in seen or (asked.via and field != asked.via):
                     continue
-                if asked.kind is not None and other_id.kind != asked.kind:
+                if asked.kind is not None and composition.kind_of(other_id, store) != asked.kind:
                     continue
                 seen.add(str(other_id))
                 taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
@@ -93,7 +93,7 @@ def _outward(store: Port, locator: Locator) -> list[tuple[str, ArtifactId]]:
     """Each link out of an artifact, or out of the place inside it the locator names, as the field and the name it
     points at."""
     artifact = store.artifact(locator.id)
-    schema = composition.kind_schema(locator.id.kind, store)["schema"]
+    schema = composition.artifact_schema(artifact, store)["schema"]
     found = links.inside(artifact, schema, store, places.node(artifact, locator))
     return [(link.field, values.artifact_id(link.target)) for link in found]
 
@@ -110,6 +110,6 @@ def _entry(entry: dict) -> kb_pb2.Entry:
     return kb_pb2.Entry(
         id=entry["id"], at=entry["at"], actor=kb_pb2.Actor(**entry["actor"]), op=entry["op"],
         artifact=entry.get("artifact", ""), place=entry.get("path", ""), revision=entry.get("revision", 0),
-        schema_version=entry.get("schema_version", 0), digest=entry.get("digest", ""), message=entry["message"],
+        type=entry.get("type", ""), digest=entry.get("digest", ""), message=entry["message"],
         batch=entry["batch"], read=[kb_pb2.Snapshotted(**each) for each in entry.get("read", [])],
     )

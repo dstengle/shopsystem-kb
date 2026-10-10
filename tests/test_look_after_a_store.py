@@ -5,7 +5,7 @@ import socket
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a_store
+from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, filed, iri, start_a_store, type_iri
 from conftest import OPERATOR, _kb, _store_needing_attention, _store_with_content, exported
 import held
 from backing_up import *  # noqa: F403 (the backup and restore steps, bound by this module's scenarios)
@@ -51,7 +51,7 @@ def _a_store_inside(ran, root):
 @then("a client can begin defining its own types in it straight away")
 def _client_defines_a_type(root):
     defined = define(kb_client.connect(root), DECISION_TYPE)
-    assert (defined.id, defined.revision) == ("schema/decision", 1)
+    assert (defined.id, defined.revision) == (type_iri("decision"), 1)
 
 
 @then("setting the store up is rejected because the role must be named through KB_ACTOR")
@@ -82,9 +82,9 @@ def _init_rejected_as_inside_a_store(ran, root, before):
 
 
 REPORT = (
-    "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t<the validator's message>\n"
-    "stale\tdecision/price-reviews-happen-weekly\tchecked against version 1 of its type, which is at 2\n"
-    "stale\tdecision/prices-are-reviewed-monthly\tchecked against version 1 of its type, which is at 2\n"
+    f"violation\t{iri('decision', 'prices-are-reviewed-monthly')}\tsections/0\trequired\t<the validator's message>\n"
+    f"stale\t{iri('decision', 'price-reviews-happen-weekly')}\tchecked against version 1 of its type, which is at 2\n"
+    f"stale\t{iri('decision', 'prices-are-reviewed-monthly')}\tchecked against version 1 of its type, which is at 2\n"
 )
 
 
@@ -500,7 +500,7 @@ def _a_seed_that_checks_clean(tmp_path):
 @given("a seed directory holding one file whose content does not fit its type", target_fixture="seed")
 def _a_seed_with_one_unfit_file(tmp_path):
     seed = exported(tmp_path, a_decision_type_and_a_decision)
-    unfit = seed / "decision" / "price-reviews-happen-weekly.yaml"
+    unfit = seed / filed(iri("decision", "price-reviews-happen-weekly"))
     decision = canonical.entries(unfit.read_text(encoding="utf-8"))
     decision["sections"] = decision["sections"][:1]
     unfit.write_text(canonical.dump(decision), encoding="utf-8")

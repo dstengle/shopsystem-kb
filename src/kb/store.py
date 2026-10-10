@@ -22,7 +22,7 @@ from kb.values import Refused
 MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
 CONNECTION = MARKER.parent / "server.yaml"
-STORE_FORM = 1
+STORE_FORM = 2
 STAGING = ".kb-starting"
 
 

@@ -35,77 +35,77 @@ class KbStub:
             channel: A grpc.Channel.
         """
         self.Create = channel.unary_unary(
-                '/kb.v1.Kb/Create',
+                '/kb.v2.Kb/Create',
                 request_serializer=kb_dot_contract_dot_kb__pb2.CreateRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.CreateResponse.FromString,
                 _registered_method=True)
         self.Read = channel.unary_unary(
-                '/kb.v1.Kb/Read',
+                '/kb.v2.Kb/Read',
                 request_serializer=kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
                 _registered_method=True)
         self.Check = channel.unary_unary(
-                '/kb.v1.Kb/Check',
+                '/kb.v2.Kb/Check',
                 request_serializer=kb_dot_contract_dot_kb__pb2.CheckRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.CheckResponse.FromString,
                 _registered_method=True)
         self.Replace = channel.unary_unary(
-                '/kb.v1.Kb/Replace',
+                '/kb.v2.Kb/Replace',
                 request_serializer=kb_dot_contract_dot_kb__pb2.ReplaceRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ReplaceResponse.FromString,
                 _registered_method=True)
         self.History = channel.unary_unary(
-                '/kb.v1.Kb/History',
+                '/kb.v2.Kb/History',
                 request_serializer=kb_dot_contract_dot_kb__pb2.HistoryRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.HistoryResponse.FromString,
                 _registered_method=True)
         self.Search = channel.unary_unary(
-                '/kb.v1.Kb/Search',
+                '/kb.v2.Kb/Search',
                 request_serializer=kb_dot_contract_dot_kb__pb2.SearchRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.SearchResponse.FromString,
                 _registered_method=True)
         self.Follow = channel.unary_unary(
-                '/kb.v1.Kb/Follow',
+                '/kb.v2.Kb/Follow',
                 request_serializer=kb_dot_contract_dot_kb__pb2.FollowRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.FollowResponse.FromString,
                 _registered_method=True)
         self.List = channel.unary_unary(
-                '/kb.v1.Kb/List',
+                '/kb.v2.Kb/List',
                 request_serializer=kb_dot_contract_dot_kb__pb2.ListRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.ListResponse.FromString,
                 _registered_method=True)
         self.Snapshot = channel.unary_unary(
-                '/kb.v1.Kb/Snapshot',
+                '/kb.v2.Kb/Snapshot',
                 request_serializer=kb_dot_contract_dot_kb__pb2.SnapshotRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.SnapshotResponse.FromString,
                 _registered_method=True)
         self.Add = channel.unary_unary(
-                '/kb.v1.Kb/Add',
+                '/kb.v2.Kb/Add',
                 request_serializer=kb_dot_contract_dot_kb__pb2.AddRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.AddResponse.FromString,
                 _registered_method=True)
         self.Remove = channel.unary_unary(
-                '/kb.v1.Kb/Remove',
+                '/kb.v2.Kb/Remove',
                 request_serializer=kb_dot_contract_dot_kb__pb2.RemoveRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.RemoveResponse.FromString,
                 _registered_method=True)
         self.BatchCreate = channel.unary_unary(
-                '/kb.v1.Kb/BatchCreate',
+                '/kb.v2.Kb/BatchCreate',
                 request_serializer=kb_dot_contract_dot_kb__pb2.BatchCreateRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.BatchCreateResponse.FromString,
                 _registered_method=True)
         self.BatchReplace = channel.unary_unary(
-                '/kb.v1.Kb/BatchReplace',
+                '/kb.v2.Kb/BatchReplace',
                 request_serializer=kb_dot_contract_dot_kb__pb2.BatchReplaceRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.BatchReplaceResponse.FromString,
                 _registered_method=True)
         self.BatchAdd = channel.unary_unary(
-                '/kb.v1.Kb/BatchAdd',
+                '/kb.v2.Kb/BatchAdd',
                 request_serializer=kb_dot_contract_dot_kb__pb2.BatchAddRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.BatchAddResponse.FromString,
                 _registered_method=True)
         self.BatchRemove = channel.unary_unary(
-                '/kb.v1.Kb/BatchRemove',
+                '/kb.v2.Kb/BatchRemove',
                 request_serializer=kb_dot_contract_dot_kb__pb2.BatchRemoveRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.BatchRemoveResponse.FromString,
                 _registered_method=True)
@@ -284,9 +284,9 @@ def add_KbServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'kb.v1.Kb', rpc_method_handlers)
+            'kb.v2.Kb', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('kb.v1.Kb', rpc_method_handlers)
+    server.add_registered_method_handlers('kb.v2.Kb', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -307,7 +307,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Create',
+            '/kb.v2.Kb/Create',
             kb_dot_contract_dot_kb__pb2.CreateRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.CreateResponse.FromString,
             options,
@@ -334,7 +334,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Read',
+            '/kb.v2.Kb/Read',
             kb_dot_contract_dot_kb__pb2.ReadRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.ReadResponse.FromString,
             options,
@@ -361,7 +361,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Check',
+            '/kb.v2.Kb/Check',
             kb_dot_contract_dot_kb__pb2.CheckRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.CheckResponse.FromString,
             options,
@@ -388,7 +388,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Replace',
+            '/kb.v2.Kb/Replace',
             kb_dot_contract_dot_kb__pb2.ReplaceRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.ReplaceResponse.FromString,
             options,
@@ -415,7 +415,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/History',
+            '/kb.v2.Kb/History',
             kb_dot_contract_dot_kb__pb2.HistoryRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.HistoryResponse.FromString,
             options,
@@ -442,7 +442,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Search',
+            '/kb.v2.Kb/Search',
             kb_dot_contract_dot_kb__pb2.SearchRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.SearchResponse.FromString,
             options,
@@ -469,7 +469,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Follow',
+            '/kb.v2.Kb/Follow',
             kb_dot_contract_dot_kb__pb2.FollowRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.FollowResponse.FromString,
             options,
@@ -496,7 +496,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/List',
+            '/kb.v2.Kb/List',
             kb_dot_contract_dot_kb__pb2.ListRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.ListResponse.FromString,
             options,
@@ -523,7 +523,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Snapshot',
+            '/kb.v2.Kb/Snapshot',
             kb_dot_contract_dot_kb__pb2.SnapshotRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.SnapshotResponse.FromString,
             options,
@@ -550,7 +550,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Add',
+            '/kb.v2.Kb/Add',
             kb_dot_contract_dot_kb__pb2.AddRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.AddResponse.FromString,
             options,
@@ -577,7 +577,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/Remove',
+            '/kb.v2.Kb/Remove',
             kb_dot_contract_dot_kb__pb2.RemoveRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.RemoveResponse.FromString,
             options,
@@ -604,7 +604,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/BatchCreate',
+            '/kb.v2.Kb/BatchCreate',
             kb_dot_contract_dot_kb__pb2.BatchCreateRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.BatchCreateResponse.FromString,
             options,
@@ -631,7 +631,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/BatchReplace',
+            '/kb.v2.Kb/BatchReplace',
             kb_dot_contract_dot_kb__pb2.BatchReplaceRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.BatchReplaceResponse.FromString,
             options,
@@ -658,7 +658,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/BatchAdd',
+            '/kb.v2.Kb/BatchAdd',
             kb_dot_contract_dot_kb__pb2.BatchAddRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.BatchAddResponse.FromString,
             options,
@@ -685,7 +685,7 @@ class Kb:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/kb.v1.Kb/BatchRemove',
+            '/kb.v2.Kb/BatchRemove',
             kb_dot_contract_dot_kb__pb2.BatchRemoveRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.BatchRemoveResponse.FromString,
             options,

@@ -6,8 +6,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from calls import TYPES, TYPES_AT, iri, type_iri
 from kb import port, search, sqlite_store
-from kb.values import Kind, artifact_id
+from kb.values import ArtifactId, Kind
 
 ADAPTERS = {"sqlite": (sqlite_store.make, sqlite_store.opened)}
 
@@ -31,13 +32,33 @@ def store(opener):
 
 
 def name(text):
-    return artifact_id(text)
+    """The IRI the cases name an artifact by, `<kind>/<name>`, stands for: `schema/<kind>` a type's."""
+    kind_name, _, slug = text.partition("/")
+    return ArtifactId(iri(kind_name, slug))
+
+
+def short(artifact_id):
+    """An IRI as the cases name it."""
+    under = str(artifact_id).removeprefix(TYPES_AT)
+    return under if "/" in under else f"{TYPES}/{under}"
+
+
+def kind(kind_name):
+    """A kind as the port takes it, its type's IRI."""
+    return Kind(type_iri(kind_name))
+
+
+def kind_of(text):
+    """The kind of the artifact the cases name."""
+    return kind(text.partition("/")[0])
 
 
 def put(text, content, read=0, links=(), parts=()):
     """A change landing content, with the rows it is found by as kb gives them."""
     searched = tuple(search.searchable(content))
-    return port.Change(name(text), content, tuple(links), tuple(parts), read, read + 1, searched=searched)
+    return port.Change(
+        name(text), content, tuple(links), tuple(parts), read, read + 1, searched=searched, kind=kind_of(text),
+    )
 
 
 def removal(text, read):
@@ -45,7 +66,7 @@ def removal(text, read):
 
 
 def link(field, place, target, kinds, part=""):
-    return port.Link(field, place, name(target), part, tuple(kinds))
+    return port.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds))
 
 
 def entry(entry_id, at=T0, seq=1, batch="", artifact="", role="tester", execution=""):
@@ -72,7 +93,7 @@ def typed(value):
 
 def written(store):
     """Everything the store holds that a refused set could have touched."""
-    return [(str(each), store.artifact(each)) for each in store.ids()], store.history()
+    return [(short(each), store.artifact(each)) for each in store.ids()], store.history()
 
 
 def test_a_new_database_holds_nothing_and_a_landed_create_reads_back_equal(store):
@@ -96,10 +117,10 @@ def test_holds(store):
 def test_names_come_back_in_one_order(store):
     for text in ("work-item/y", "note/pricea", "note/price", "work/x", "note/price-b", "note/price-2"):
         land(store, put(text, {"title": text}))
-    assert [str(each) for each in store.ids()] == [
+    assert [short(each) for each in store.ids()] == [
         "note/price-2", "note/price-b", "note/price", "note/pricea", "work/x", "work-item/y",
     ]
-    assert [str(each) for each in store.ids(Kind("work"))] == ["work/x"]
+    assert [short(each) for each in store.ids(kind("work"))] == ["work/x"]
 
 
 def test_a_set_lands_whole_or_not_at_all(store):
@@ -107,7 +128,7 @@ def test_a_set_lands_whole_or_not_at_all(store):
         land(store, put("note/a", {"title": "A"}), put("note/b", {"title": "B"}, read=4))
     assert written(store) == ([], [])
     land(store, put("note/a", {"title": "A"}), put("note/b", {"title": "B"}))
-    assert [str(each) for each in store.ids()] == ["note/a", "note/b"]
+    assert [short(each) for each in store.ids()] == ["note/a", "note/b"]
 
 
 def test_a_replacement_read_at_a_moved_revision_is_refused_and_writes_nothing(store):
@@ -126,9 +147,9 @@ def test_a_change_read_through_a_type_that_has_since_moved_is_refused_and_writes
     before = written(store)
     through = ((name("schema/note"), 1), (name("schema/tag"), 1))
     with pytest.raises(port.Conflict):
-        land(store, put("note/a", {"title": "A"}), port.Change(name("note/b"), {"title": "B"}, through=through))
+        land(store, put("note/a", {"title": "A"}), port.Change(name("note/b"), {"title": "B"}, through=through, kind=kind("note")))
     assert written(store) == before
-    land(store, port.Change(name("note/b"), {"title": "B"}, revision=1, through=((name("schema/note"), 2),)))
+    land(store, port.Change(name("note/b"), {"title": "B"}, revision=1, through=((name("schema/note"), 2),), kind=kind("note")))
     assert store.holds(name("note/b"))
 
 def _race(opener, *sets):
@@ -156,10 +177,10 @@ def test_an_artifact_of_a_kind_read_anew_that_the_set_does_not_restate_is_refuse
     before = written(store)
     restating_a = [port.Relink(name("note/a"), (), 1)]
     with pytest.raises(port.Conflict):
-        store.land([put("schema/note", {"v": 2}, read=1)], [entry("short")], restating_a, (Kind("note"),))
+        store.land([put("schema/note", {"v": 2}, read=1)], [entry("short")], restating_a, (kind("note"),))
     assert written(store) == before
     store.land([put("schema/note", {"v": 2}, read=1), put("note/c", {})], [entry("whole")],
-               [*restating_a, port.Relink(name("note/b"), (), 1)], (Kind("note"),))
+               [*restating_a, port.Relink(name("note/b"), (), 1)], (kind("note"),))
     assert store.artifact(name("schema/note")) == {"v": 2}
 
 
@@ -170,7 +191,7 @@ def test_a_block_holding_the_write_lock_keeps_its_sets_a_refused_one_taken_back_
             land(store, put("note/b", {"title": "B"}, read=3))
         land(store, put("note/c", {"title": "C"}))
     with opener() as other:
-        assert [str(each) for each in other.ids()] == ["note/a", "note/c"]
+        assert [short(each) for each in other.ids()] == ["note/a", "note/c"]
 
 
 def test_nothing_lands_from_another_connection_while_a_block_holds_the_write_lock(opener, store):
@@ -186,9 +207,9 @@ def test_nothing_lands_from_another_connection_while_a_block_holds_the_write_loc
         thread = threading.Thread(target=other_lands)
         thread.start()
         assert not landed.wait(0.3)
-        assert [str(each) for each in store.ids()] == ["note/a"]
+        assert [short(each) for each in store.ids()] == ["note/a"]
     thread.join()
-    assert [str(each) for each in store.ids()] == ["note/a", "note/b"]
+    assert [short(each) for each in store.ids()] == ["note/a", "note/b"]
 
 
 def test_a_block_that_raises_keeps_nothing_it_landed(opener, store):
@@ -231,7 +252,7 @@ def test_two_new_artifacts_in_one_set_that_link_each_other_land(store):
     land(store,
          put("note/a", {"to": "note/b"}, links=[link("to", "to", "note/b", ["note"])]),
          put("note/b", {"to": "note/a"}, links=[link("to", "to", "note/a", ["note"])]))
-    assert [str(each.source) for each in store.links_in(name("note/a"))] == ["note/b"]
+    assert [short(each.source) for each in store.links_in(name("note/a"))] == ["note/b"]
 
 
 def test_removing_an_artifact_something_outside_the_set_links_into_is_refused_naming_each_link(store):
@@ -280,11 +301,11 @@ def test_names_by_kind_with_field_equality_on_the_text_form(store):
          put("note/a", {"n": 123456789012345678901234567890, "flag": True, "count": 3, "on": "2026-10-01"}),
          put("note/b", {"n": 1, "flag": False, "count": 3}),
          put("work/c", {"count": 3}))
-    note = Kind("note")
-    assert [str(each) for each in store.ids(note, {"n": "123456789012345678901234567890"})] == ["note/a"]
-    assert [str(each) for each in store.ids(note, {"flag": "true"})] == ["note/a"]
-    assert [str(each) for each in store.ids(note, {"count": "3"})] == ["note/a", "note/b"]
-    assert [str(each) for each in store.ids(note, {"count": "3", "on": "2026-10-01"})] == ["note/a"]
+    note = kind("note")
+    assert [short(each) for each in store.ids(note, {"n": "123456789012345678901234567890"})] == ["note/a"]
+    assert [short(each) for each in store.ids(note, {"flag": "true"})] == ["note/a"]
+    assert [short(each) for each in store.ids(note, {"count": "3"})] == ["note/a", "note/b"]
+    assert [short(each) for each in store.ids(note, {"count": "3", "on": "2026-10-01"})] == ["note/a"]
     assert store.ids(note, {"absent": ""}) == []
 
 
@@ -298,8 +319,8 @@ def test_links_in_narrowed_by_field_and_source_kind_into_parts_too(store):
         port.Linking(name("note/n"), "about", "about", into, ""),
         port.Linking(name("work/w"), "uses", "uses", into, "options/a"),
     ]
-    assert [str(each.source) for each in store.links_in(into, field="uses")] == ["work/w"]
-    assert [str(each.source) for each in store.links_in(into, kind=Kind("note"))] == ["note/n"]
+    assert [short(each.source) for each in store.links_in(into, field="uses")] == ["work/w"]
+    assert [short(each.source) for each in store.links_in(into, kind=kind("note"))] == ["note/n"]
 
 
 def test_inbound_counts_by_source_kind_and_field_each_source_counted_once(store):
@@ -309,7 +330,7 @@ def test_inbound_counts_by_source_kind_and_field_each_source_counted_once(store)
          put("note/one", {}, links=[about("about/0"), about("about/1", "options/a")]),
          put("note/two", {}, links=[about("about/0")]),
          put("work/w", {}, links=[link("uses", "uses", "decision/d", ["decision"])]))
-    assert store.inbound(name("decision/d")) == {("note", "about"): 2, ("work", "uses"): 1}
+    assert store.inbound(name("decision/d")) == {(type_iri("note"), "about"): 2, (type_iri("work"), "uses"): 1}
 
 
 def test_search_candidates_per_section_and_per_field_keeping_the_section_title(store):
@@ -324,8 +345,8 @@ def test_search_candidates_per_section_and_per_field_keeping_the_section_title(s
         port.Candidate(name("note/a"), "When", ""), port.Candidate(name("note/a"), "", "summary"),
         port.Candidate(name("work/c"), "", "summary"),
     ]
-    assert store.search(weekly, kind=Kind("note"), fields=False) == [port.Candidate(name("note/a"), "When", "")]
-    assert store.search(weekly, sections=False, kind=Kind("work")) == [port.Candidate(name("work/c"), "", "summary")]
+    assert store.search(weekly, kind=kind("note"), fields=False) == [port.Candidate(name("note/a"), "When", "")]
+    assert store.search(weekly, sections=False, kind=kind("work")) == [port.Candidate(name("work/c"), "", "summary")]
     assert store.search(search.terms("done")) == [port.Candidate(name("note/b"), "", "title")]
     assert store.search(search.terms("foo_bar")) == [port.Candidate(name("note/b"), "", "body_note")]
     assert store.search(search.terms("foo")) == []
@@ -354,9 +375,9 @@ def test_an_artifact_changed_and_then_removed_leaves_no_row_matching_its_words(s
 
 def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_first(store):
     later, half = T0 + timedelta(hours=2), T0 + timedelta(milliseconds=500)
-    store.land([], [entry("late", at=later, artifact="note/a", role="writer")])
-    store.land([], [entry("first", seq=1, batch="pair", artifact="note/a", execution="run-1"),
-                    entry("second", seq=2, batch="pair", artifact="note/b", execution="run-1")])
+    store.land([], [entry("late", at=later, artifact=str(name("note/a")), role="writer")])
+    store.land([], [entry("first", seq=1, batch="pair", artifact=str(name("note/a")), execution="run-1"),
+                    entry("second", seq=2, batch="pair", artifact=str(name("note/b")), execution="run-1")])
     store.land([], [entry("half", at=half, role="writer")])
     ids = lambda **filters: [record["id"] for record in store.history(**filters)]
     assert ids() == ["first", "second", "half", "late"]
@@ -370,8 +391,8 @@ def test_history_filtered_by_artifact_role_piece_of_work_moment_and_set_oldest_f
 
 
 def test_a_read_narrowed_to_one_artifact_keeps_landing_order_whatever_else_it_carries(store):
-    store.land([], [entry("late", at=T0 + timedelta(hours=2), artifact="note/a", role="writer")])
-    store.land([], [entry("early", at=T0, artifact="note/a", role="writer")])
+    store.land([], [entry("late", at=T0 + timedelta(hours=2), artifact=str(name("note/a")), role="writer")])
+    store.land([], [entry("early", at=T0, artifact=str(name("note/a")), role="writer")])
     ids = lambda **filters: [record["id"] for record in store.history(artifact=name("note/a"), **filters)]
     assert ids(since=T0) == ["late", "early"]
     assert ids(role="writer") == ["late", "early"]
@@ -388,16 +409,16 @@ def test_an_entry_id_already_held_is_refused(store):
 def test_links_restated_without_a_new_revision_at_the_revision_read(store):
     land(store, put("tag/t", {}), put("note/n", {"about": "tag/t"}))
     store.land([], [entry("restated")], [port.Relink(name("note/n"), (link("about", "about", "tag/t", ["tag"]),), 1)])
-    assert [str(each.source) for each in store.links_in(name("tag/t"))] == ["note/n"]
+    assert [short(each.source) for each in store.links_in(name("tag/t"))] == ["note/n"]
     with pytest.raises(port.Linked):
         land(store, removal("tag/t", 1))
     unlanded = port.Relink(name("note/n"), (link("about", "about", "tag/gone", ["tag"]),), 1)
     store.land([], [entry("dangling")], [unlanded])
-    assert [str(each.source) for each in store.links_in(name("tag/gone"))] == ["note/n"]
+    assert [short(each.source) for each in store.links_in(name("tag/gone"))] == ["note/n"]
     with pytest.raises(port.Conflict):
         store.land([], [entry("moved")], [port.Relink(name("note/n"), (), 2)])
     assert store.artifact(name("note/n")) == {"about": "tag/t"} and store.history(batch="moved") == []
-    assert [str(each) for each in store.ids()] == ["note/n", "tag/t"]
+    assert [short(each) for each in store.ids()] == ["note/n", "tag/t"]
 
 
 def test_a_relink_read_through_a_type_that_has_since_moved_is_refused_and_writes_nothing(store):
@@ -417,19 +438,19 @@ def test_reads_at_one_moment_see_the_store_as_it_stood_whatever_lands_meanwhile(
         with opener() as other:
             land(other, put("note/a", {"title": "A", "v": 2}, read=1), put("note/b", {"title": "B"}))
         assert (store.ids(), store.artifact(name("note/a"))) == (first, {"title": "A"})
-    assert [str(each) for each in store.ids()] == ["note/a", "note/b"]
+    assert [short(each) for each in store.ids()] == ["note/a", "note/b"]
 
 
 def test_reads_at_one_moment_inside_a_block_holding_the_write_lock_run_within_it(opener, store):
     with store.exclusive():
         land(store, put("note/a", {"title": "A"}))
         with store.at_one_moment():
-            assert [str(each) for each in store.ids()] == ["note/a"]
+            assert [short(each) for each in store.ids()] == ["note/a"]
         land(store, put("note/b", {"title": "B"}))
         with opener() as other:
             assert other.ids() == []
     with opener() as other:
-        assert [str(each) for each in other.ids()] == ["note/a", "note/b"]
+        assert [short(each) for each in other.ids()] == ["note/a", "note/b"]
 
 
 def test_a_block_holding_the_write_lock_is_never_opened_inside_reads_at_one_moment(store):
@@ -439,4 +460,4 @@ def test_a_block_holding_the_write_lock_is_never_opened_inside_reads_at_one_mome
         with pytest.raises(RuntimeError):
             with store.exclusive():
                 pass
-        assert [str(each) for each in store.ids()] == ["note/a"]
+        assert [short(each) for each in store.ids()] == ["note/a"]

@@ -3,7 +3,7 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import DECISION_TYPE, create, define, listing, refs, search, start_a_store
+from calls import DECISION_TYPE, create, define, iri, listing, refs, search, start_a_store, version_iri
 from kb import client as kb_client
 from kb.content import loads
 
@@ -37,9 +37,9 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep the shop running.\n"},
     {"title": "Rationale", "body": "It was agreed.\n"},
 ]
-WEEKLY = "decision/price-reviews-happen-weekly"
-MONTHLY = "decision/prices-are-reviewed-monthly"
-THURSDAYS = "decision/restock-on-thursdays"
+WEEKLY = iri("decision", "price-reviews-happen-weekly")
+MONTHLY = iri("decision", "prices-are-reviewed-monthly")
+THURSDAYS = iri("decision", "restock-on-thursdays")
 
 
 @given("a store holding three decisions, one of them superseded", target_fixture="client")
@@ -66,10 +66,10 @@ def _list_the_decisions(client):
 @then("the client is given a stub of each of the three")
 def _a_stub_of_each(listed):
     assert not listed.faults, listed.faults
-    assert [(stub.id, stub.kind, stub.title, loads(stub.fields)) for stub in listed.stubs] == [
-        (WEEKLY, "decision", "Price reviews happen weekly", {"supersedes": MONTHLY, "status": "accepted"}),
-        (MONTHLY, "decision", "Prices are reviewed monthly", {"status": "superseded"}),
-        (THURSDAYS, "decision", "Restock on Thursdays", {"status": "accepted"}),
+    assert [(stub.id, stub.type, stub.title, loads(stub.fields)) for stub in listed.stubs] == [
+        (WEEKLY, version_iri("decision"), "Price reviews happen weekly", {"supersedes": MONTHLY, "status": "accepted"}),
+        (MONTHLY, version_iri("decision"), "Prices are reviewed monthly", {"status": "superseded"}),
+        (THURSDAYS, version_iri("decision"), "Restock on Thursdays", {"status": "accepted"}),
     ]
 
 

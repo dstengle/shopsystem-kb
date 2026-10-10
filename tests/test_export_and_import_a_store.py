@@ -8,13 +8,16 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
-from calls import DECISION_TYPE, WORK_ITEM_TYPE, create, define, journal, replace, start_a_store, check
+from calls import (
+    DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, check, create, define, filed, iri, journal, replace, start_a_store,
+    type_iri, version_iri,
+)
 from conftest import OPERATOR, _kb, exported
 import held
 from kb import canonical, client as kb_client
 
 FEATURE = "export-and-import-a-store.feature"
-IDENTITY = ["id", "type", "schema_version", "revision", "title"]
+IDENTITY = ["id", "type", "revision", "title"]
 
 
 @scenario("export-and-import-a-store.feature", "Importing a directory holding an artifact the store already holds at the same IRI with other content or another type version is refused")
@@ -116,7 +119,7 @@ def _decisions_and_a_work_item(client):
             {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ]})
-    create(client, "work-item", {"title": "Move the review to Mondays", "decisions": ["decision/price-reviews-happen-weekly"]})
+    create(client, "work-item", {"title": "Move the review to Mondays", "decisions": [iri("decision", "price-reviews-happen-weekly")]})
 
 
 @given(parsers.parse("a directory for the export that {state}"), target_fixture="target")
@@ -139,7 +142,7 @@ def _files(target):
 @then("the directory holds one file for each artifact in the store, under a folder named for its kind")
 def _one_file_for_each_artifact(ran, root, target):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
-    assert _files(target) == sorted(f"{name}.yaml" for name in held.names(root))
+    assert _files(target) == sorted(_held_file(root, name) for name in held.names(root))
     assert {path.parent.name for path in Path(target).rglob("*.yaml")} == {"schema", "decision", "work-item"}
 
 
@@ -153,7 +156,7 @@ def _types_under_the_folder_for_types(target):
 @then("each file gives the artifact's identity first, its name, kind, type version, revision and title, and then its content")
 def _identity_first(root, target):
     for name in held.names(root):
-        written = _loaded((Path(target) / f"{name}.yaml").read_text(encoding="utf-8"))
+        written = _loaded((Path(target) / _held_file(root, name)).read_text(encoding="utf-8"))
         assert list(written)[:len(IDENTITY)] == IDENTITY, name
         assert written == held.artifact(root, name)
 
@@ -161,7 +164,7 @@ def _identity_first(root, target):
 @then("every file shows the store as it stood at one moment")
 def _as_the_store_stood(root, target):
     for name in held.names(root):
-        assert (Path(target) / f"{name}.yaml").read_text(encoding="utf-8") == held.text(root, name), name
+        assert (Path(target) / _held_file(root, name)).read_text(encoding="utf-8") == held.text(root, name), name
 
 
 LONG = (
@@ -195,7 +198,7 @@ def _decision_with_options_exported(root, tmp_path):
 
 @when("the operator opens the decision's exported file", target_fixture="opened")
 def _open_the_decision(target):
-    return (Path(target) / "decision" / "price-reviews-happen-weekly.yaml").read_text(encoding="utf-8")
+    return (Path(target) / _file(iri("decision", "price-reviews-happen-weekly"))).read_text(encoding="utf-8")
 
 
 def _bodies(value):
@@ -262,13 +265,13 @@ def _two_stores_exported(tmp_path):
 
 @when("the operator compares the two exported decision files", target_fixture="compared")
 def _compare_the_decision_files(targets):
-    return [(target / "decision" / "price-reviews-happen-weekly.yaml").read_bytes() for target in targets]
+    return [(target / _file(iri("decision", "price-reviews-happen-weekly"))).read_bytes() for target in targets]
 
 
 @then("the two files are the same, byte for byte")
 def _same_bytes(compared):
     first, second = compared
-    assert first.startswith(b"id: decision/price-reviews-happen-weekly\n")
+    assert first.startswith(f"id: {iri('decision', 'price-reviews-happen-weekly')}\n".encode())
     assert first == second
 
 
@@ -285,8 +288,9 @@ def _store_holding_a_decision(root):
 @given("a directory that already holds a file", target_fixture="target")
 def _directory_holding_a_file(tmp_path, before):
     target = tmp_path / "exported"
-    (target / "decision").mkdir(parents=True)
-    (target / "decision" / "price-reviews-happen-weekly.yaml").write_text("notes the export must not write over\n")
+    written = target / _file(iri("decision", "price-reviews-happen-weekly"))
+    written.parent.mkdir(parents=True)
+    written.write_text("notes the export must not write over\n")
     before.update(target=held.everything_in(target))
     return target
 
@@ -305,9 +309,9 @@ def _directory_as_it_was(target, before):
 # The operator's check of a directory for import. Each directory is a real export of a store of its own, then broken
 # in the one way a step names; the files are the operator's input, written and read here as files.
 
-WEEKLY = "decision/price-reviews-happen-weekly"
-MONTHLY = "decision/prices-are-reviewed-monthly"
-MONDAYS = "work-item/move-the-review-to-mondays"
+WEEKLY = iri("decision", "price-reviews-happen-weekly")
+MONTHLY = iri("decision", "prices-are-reviewed-monthly")
+MONDAYS = iri("work-item", "move-the-review-to-mondays")
 
 
 def _for_import(tmp_path, fill=None):
@@ -316,25 +320,31 @@ def _for_import(tmp_path, fill=None):
     return exported(tmp_path, fill or _decisions_and_a_work_item)
 
 
-def _file(name):
-    """The file the export layout gives an artifact's name."""
-    return f"{name}.yaml"
+def _file(name, version=None):
+    """The file the export layout gives an artifact's IRI, or a type's version."""
+    return filed(name, version)
 
 
-def _read(target, name):
-    return canonical.entries((Path(target) / _file(name)).read_text(encoding="utf-8"))
+def _read(target, name, version=None):
+    return canonical.entries((Path(target) / _file(name, version)).read_text(encoding="utf-8"))
 
 
-def _put(target, artifact):
-    """An artifact written as an export writes it, in canonical form, at its place in the layout."""
-    path = Path(target) / _file(artifact["id"])
-    path.parent.mkdir(exist_ok=True)
+def _put(target, artifact, version=None):
+    """An artifact written as an export writes it, in canonical form, at its place in the layout: a type at the place
+    of the version given."""
+    path = Path(target) / _file(artifact["id"], version)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(canonical.dump(artifact), encoding="utf-8")
 
 
 def _artifact(name, title, **content):
-    kind = name.partition("/")[0]
-    return {"id": name, "type": kind, "schema_version": 1, "revision": 1, "title": title, **content}
+    """An artifact at its first revision, of the first version of the type whose IRI it sits under."""
+    return {"id": name, "type": f"{name.rsplit('/', 1)[0]}@1", "revision": 1, "title": title, **content}
+
+
+def _titled(name):
+    """The title an artifact's name was made from."""
+    return name.rsplit("/", 1)[1].replace("-", " ").capitalize()
 
 
 def _unreadable(target):
@@ -355,9 +365,9 @@ def _not_canonical(target):
 
 
 def _no_type_for_the_kind(target):
-    for name in ("memo/first-memo", "memo/second-memo"):
-        _put(target, _artifact(name, name.partition("/")[2].replace("-", " ").capitalize()))
-    return {"memo/first-memo.yaml": "kind", "memo/second-memo.yaml": "kind"}
+    for name in (iri("memo", "first-memo"), iri("memo", "second-memo")):
+        _put(target, _artifact(name, _titled(name)))
+    return {_file(iri("memo", "first-memo")): "kind", _file(iri("memo", "second-memo")): "kind"}
 
 
 def _not_fitting(target):
@@ -372,9 +382,9 @@ def _not_fitting(target):
 
 def _linking_to_nothing(target):
     mondays = _read(target, MONDAYS)
-    _put(target, {**mondays, "decisions": [WEEKLY, "decision/nothing-by-this-name"]})
-    _put(target, _artifact("work-item/review-on-fridays", "Review on Fridays", decisions=["decision/nor-this"]))
-    return {_file(MONDAYS): "ref", "work-item/review-on-fridays.yaml": "ref"}
+    _put(target, {**mondays, "decisions": [WEEKLY, iri("decision", "nothing-by-this-name")]})
+    _put(target, _artifact(iri("work-item", "review-on-fridays"), "Review on Fridays", decisions=[iri("decision", "nor-this")]))
+    return {_file(MONDAYS): "ref", _file(iri("work-item", "review-on-fridays")): "ref"}
 
 
 FAULTS = {
@@ -427,7 +437,7 @@ def _the_two_types(client):
 
 def _decision(name, **fields):
     """A decision that fits its type, carrying the fields given."""
-    return _artifact(name, name.partition("/")[2].replace("-", " ").capitalize(), **fields, sections=[
+    return _artifact(name, _titled(name), **fields, sections=[
         {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
         {"title": "Rationale", "body": "Costs move weekly.\n"},
     ])
@@ -435,38 +445,38 @@ def _decision(name, **fields):
 
 def _a_file_with_an_error(target):
     """A decision missing the section its type requires second."""
-    broken = _decision("decision/broken")
+    broken = _decision(iri("decision", "broken"))
     broken["sections"] = broken["sections"][:1]
     _put(target, broken)
-    return "decision/broken"
+    return iri("decision", "broken")
 
 
 def _a_broken_decision_type(target):
     """The type for decisions with a version that is not a number, which the type that describes types refuses."""
-    _put(target, {**_read(target, "schema/decision"), "version": "one"})
-    return "schema/decision"
+    _put(target, {**_read(target, type_iri("decision"), 1), "version": "one"}, 1)
+    return type_iri("decision")
 
 
 def _linking_directly(target, broken):
-    _put(target, _decision("decision/linking", supersedes=broken))
-    return {"linking": "decision/linking"}
+    _put(target, _decision(iri("decision", "linking"), supersedes=broken))
+    return {"linking": iri("decision", "linking")}
 
 
 def _linking_through_a_second(target, broken):
-    _put(target, _decision("decision/second", supersedes=broken))
-    _put(target, _artifact("work-item/first", "First", decisions=["decision/second"]))
-    return {"second": "decision/second", "first": "work-item/first"}
+    _put(target, _decision(iri("decision", "second"), supersedes=broken))
+    _put(target, _artifact(iri("work-item", "first"), "First", decisions=[iri("decision", "second")]))
+    return {"second": iri("decision", "second"), "first": iri("work-item", "first")}
 
 
 def _a_decision_of_the_broken_type(target, broken):
-    _put(target, _decision("decision/of-the-type"))
-    return {"decision": "decision/of-the-type"}
+    _put(target, _decision(iri("decision", "of-the-type")))
+    return {"decision": iri("decision", "of-the-type")}
 
 
 def _a_work_item_to_a_decision_of_the_broken_type(target, broken):
-    _put(target, _decision("decision/of-the-type"))
-    _put(target, _artifact("work-item/to-the-decision", "To the decision", decisions=["decision/of-the-type"]))
-    return {"decision": "decision/of-the-type", "work item": "work-item/to-the-decision"}
+    _put(target, _decision(iri("decision", "of-the-type")))
+    _put(target, _artifact(iri("work-item", "to-the-decision"), "To the decision", decisions=[iri("decision", "of-the-type")]))
+    return {"decision": iri("decision", "of-the-type"), "work item": iri("work-item", "to-the-decision")}
 
 
 BROKEN = {
@@ -555,7 +565,7 @@ def _store_as_before(ran, root, before):
 @given("a freshly started store")
 def _a_freshly_started_store(root, before):
     _started(root)
-    before.update({"started": held.holds(root), "type of types": held.text(root, "schema/schema")})
+    before.update({"started": held.holds(root), "type of types": held.text(root, TYPE_OF_TYPES)})
 
 
 @given(
@@ -565,16 +575,16 @@ def _a_freshly_started_store(root, before):
 def _for_import_with_a_differing_type_of_types(tmp_path):
     """A clean export whose copy of the type that describes types has a field of its own added."""
     target = _for_import(tmp_path)
-    copy = _read(target, "schema/schema")
+    copy = _read(target, TYPE_OF_TYPES, 1)
     copy["schema"]["properties"]["owner"] = {"type": "string"}
-    _put(target, copy)
+    _put(target, copy, 1)
     return target
 
 
 @then("the file holding that copy is reported as an error, naming the file")
 def _the_copy_is_an_error(ran):
     assert ran.returncode == 1, ran.stderr
-    assert [line[1] for line in _report(ran) if line[0] == "error"] == ["schema/schema.yaml"], ran.stdout
+    assert [line[1] for line in _report(ran) if line[0] == "error"] == [_file(TYPE_OF_TYPES, 1)], ran.stdout
 
 
 # The operator's import of a directory into a freshly started store. Each directory is, as for the check, a real
@@ -582,12 +592,19 @@ def _the_copy_is_an_error(ran):
 # history through the contract.
 
 def _exported_names(target):
-    """The name of every artifact a directory for import holds but the type that describes types, sorted."""
-    files = [path.relative_to(target) for path in Path(target).glob("*/*.yaml")]
+    """The IRI of every artifact a directory for import holds but the type that describes types, sorted: the host and
+    path its file's place gives, a type's without its version."""
+    files = [str(path.relative_to(target)) for path in Path(target).rglob("*.yaml")]
     return sorted(
-        str(file.with_suffix("")) for file in files
-        if file != Path("schema/schema.yaml") and file.parts[0] not in ("journal", ".git")
+        "https://" + file.removesuffix(".yaml").partition("@")[0] for file in files
+        if file != _file(TYPE_OF_TYPES, 1) and "/" in file and file.split("/")[0] not in ("journal", ".git")
     )
+
+
+def _held_file(root, name):
+    """The file an export of the store at root gives an artifact it holds: a type's at the version it stands at."""
+    artifact = held.artifact(root, name)
+    return _file(name, artifact["version"] if artifact["type"].startswith(f"{TYPE_OF_TYPES}@") else None)
 
 
 @when("the operator imports the directory, saying which role they are", target_fixture="ran")
@@ -605,7 +622,7 @@ def _imported(root):
 @then("everything in the directory lands as one set, signed by that role, with a message naming the directory")
 def _lands_as_one_signed_set(ran, root, target):
     assert (ran.returncode, ran.stderr) == (0, "")
-    assert held.names(root) == sorted([*_exported_names(target), "schema/schema"])
+    assert held.names(root) == sorted([*_exported_names(target), TYPE_OF_TYPES])
     entries = _imported(root)
     assert sorted(entry.artifact for entry in entries) == _exported_names(target)
     assert {(entry.batch, entry.actor.role, entry.message) for entry in entries} == {
@@ -638,7 +655,7 @@ def _one_import_entry_each(ran, root):
     assert (ran.returncode, ran.stderr) == (0, "")
     entries = _imported(root)
     assert sorted(entry.artifact for entry in entries) == sorted(
-        ["schema/decision", "schema/work-item", WEEKLY, MONTHLY, MONDAYS],
+        [type_iri("decision"), type_iri("work-item"), WEEKLY, MONTHLY, MONDAYS],
     )
     assert {entry.op for entry in entries} == {"import"}
 
@@ -680,25 +697,25 @@ def test_importing_with_errors_skipped():
     pass
 
 
-STANDALONE = "work-item/stands-alone"
+STANDALONE = iri("work-item", "stands-alone")
 
 
 def _with_an_error_and_one_linking(target):
     _a_file_with_an_error(target)
-    _linking_directly(target, "decision/broken")
-    return {"decision/broken": "error", "decision/linking": "decision/linking -> decision/broken"}
+    _linking_directly(target, iri("decision", "broken"))
+    return {iri("decision", "broken"): "error", iri("decision", "linking"): "decision/linking -> decision/broken"}
 
 
 def _with_an_error_and_two_linking(target):
     left_out = _with_an_error_and_one_linking(target)
-    _put(target, _decision("decision/onward", supersedes="decision/linking"))
-    return {**left_out, "decision/onward": "decision/onward -> decision/linking -> decision/broken"}
+    _put(target, _decision(iri("decision", "onward"), supersedes=iri("decision", "linking")))
+    return {**left_out, iri("decision", "onward"): "decision/onward -> decision/linking -> decision/broken"}
 
 
 def _with_a_broken_type_and_a_decision(target):
     _a_broken_decision_type(target)
-    _put(target, _decision("decision/of-the-type"))
-    return {"schema/decision": "error", "decision/of-the-type": "decision/of-the-type -> schema/decision"}
+    _put(target, _decision(iri("decision", "of-the-type")))
+    return {type_iri("decision"): "error", iri("decision", "of-the-type"): "decision/of-the-type -> schema/decision"}
 
 
 TOGETHER_WITH = {
@@ -732,14 +749,14 @@ def _kb_import_skipping_errors(root, target):
 @then("the type for work items and the work item land")
 def _the_work_item_lands(ran, root, target):
     assert (ran.returncode, ran.stderr) == (0, "")
-    for name in ("schema/work-item", STANDALONE):
-        assert held.text(root, name) == (Path(target) / _file(name)).read_text(encoding="utf-8")
+    for name in (type_iri("work-item"), STANDALONE):
+        assert held.text(root, name) == (Path(target) / _held_file(root, name)).read_text(encoding="utf-8")
 
 
 LEFT_OUT = {
-    "the decision with an error and the decision that links to it": ["decision/broken", "decision/linking"],
-    "the three decisions": ["decision/broken", "decision/linking", "decision/onward"],
-    "the type for decisions and the decision": ["schema/decision", "decision/of-the-type"],
+    "the decision with an error and the decision that links to it": [iri("decision", "broken"), iri("decision", "linking")],
+    "the three decisions": [iri("decision", "broken"), iri("decision", "linking"), iri("decision", "onward")],
+    "the type for decisions and the decision": [type_iri("decision"), iri("decision", "of-the-type")],
 }
 
 
@@ -747,7 +764,7 @@ LEFT_OUT = {
 def _left_out(root, target, files, left_out):
     assert sorted(LEFT_OUT[left_out]) == sorted(files)
     landing = sorted(set(_exported_names(target)) - set(files))
-    assert held.names(root) == sorted([*landing, "schema/schema"])
+    assert held.names(root) == sorted([*landing, TYPE_OF_TYPES])
     assert sorted(entry.artifact for entry in _imported(root)) == landing
 
 
@@ -817,9 +834,9 @@ def _kb_import_the_kb_directory(root, target):
 def _land_as_from_an_export(ran, root, target):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
     names = _exported_names(target)
-    assert held.names(root) == sorted([*names, "schema/schema"])
+    assert held.names(root) == sorted([*names, TYPE_OF_TYPES])
     for name in names:
-        assert held.text(root, name) == (Path(target) / _file(name)).read_text(encoding="utf-8"), name
+        assert held.text(root, name) == (Path(target) / _held_file(root, name)).read_text(encoding="utf-8"), name
 
 
 @then("its history and its store marker are passed over, neither landing in the store")
@@ -898,14 +915,14 @@ def _kb_import_there(where, tmp_path):
 @then("the store KB_ROOT names is the one exported")
 def _that_store_exported(ran, root, where):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
-    assert _files(where["target"]) == sorted(f"{name}.yaml" for name in held.names(root))
+    assert _files(where["target"]) == sorted(_held_file(root, name) for name in held.names(root))
 
 
 @then("the store found above where they are working is the one imported into")
 @then("the store KB_ROOT names is the one imported into")
 def _that_store_imported_into(ran, root, where):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
-    assert held.names(root) == sorted([*_exported_names(where["target"]), "schema/schema"])
+    assert held.names(root) == sorted([*_exported_names(where["target"]), TYPE_OF_TYPES])
 
 
 @then(parsers.parse(
@@ -951,11 +968,11 @@ def _for_import_all_broken(tmp_path):
     own."""
     target = _for_import(tmp_path)
     _a_broken_decision_type(target)
-    for name in ("schema/work-item", WEEKLY, MONTHLY, MONDAYS):
-        (Path(target) / _file(name)).write_text(f"id: {name}\ntitle: [never closed\n", encoding="utf-8")
-    copy = _read(target, "schema/schema")
+    for name, version in ((type_iri("work-item"), 1), (WEEKLY, None), (MONTHLY, None), (MONDAYS, None)):
+        (Path(target) / _file(name, version)).write_text(f"id: {name}\ntitle: [never closed\n", encoding="utf-8")
+    copy = _read(target, TYPE_OF_TYPES, 1)
     copy["schema"]["properties"]["owner"] = {"type": "string"}
-    _put(target, copy)
+    _put(target, copy, 1)
     return target
 
 
@@ -963,7 +980,8 @@ def _for_import_all_broken(tmp_path):
 def _rejected_as_nothing_would_land(ran):
     assert ran.returncode == 2
     assert {line[1] for line in _report(ran) if line[0] == "error"} == {
-        _file(name) for name in ("schema/schema", "schema/decision", "schema/work-item", WEEKLY, MONTHLY, MONDAYS)
+        *(_file(name, 1) for name in (TYPE_OF_TYPES, type_iri("decision"), type_iri("work-item"))),
+        *(_file(name) for name in (WEEKLY, MONTHLY, MONDAYS)),
     }, ran.stdout
     assert ran.stderr == (
         "kb import: refused: operations: nothing in the directory would land, and nothing was written\n"
@@ -982,20 +1000,20 @@ def test_a_matching_type_of_types_is_passed_over():
 )
 def _for_import_with_a_matching_type_of_types(tmp_path, root):
     target = _for_import(tmp_path, lambda client: define(client, DECISION_TYPE))
-    assert (Path(target) / "schema/schema.yaml").read_text(encoding="utf-8") == held.text(root, "schema/schema")
+    assert (Path(target) / _file(TYPE_OF_TYPES, 1)).read_text(encoding="utf-8") == held.text(root, TYPE_OF_TYPES)
     return target
 
 
 @then("the directory's copy of the type that describes types is passed over")
 def _the_copy_is_passed_over(ran, root):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
-    assert [entry.artifact for entry in _imported(root)] == ["schema/decision"]
+    assert [entry.artifact for entry in _imported(root)] == [type_iri("decision")]
 
 
 @then("the store's type that describes types is kept as it was")
 def _the_type_of_types_kept(root, before):
-    assert held.text(root, "schema/schema") == before["type of types"]
-    entries = journal(kb_client.connect(root), artifact="schema/schema").entries
+    assert held.text(root, TYPE_OF_TYPES) == before["type of types"]
+    entries = journal(kb_client.connect(root), artifact=TYPE_OF_TYPES).entries
     assert [(entry.op, entry.message) for entry in entries] == [("create", "initialise store")]
 
 
@@ -1013,18 +1031,18 @@ def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the
     client = kb_client.connect(source)
     define(client, {"title": "Note", **typed(["a", "b"], 1)})
     create(client, "note", {"title": "X", "b": "second", "a": "first"})
-    replace(client, "schema/note", typed(["b", "a"], 2))
+    replace(client, type_iri("note"), typed(["b", "a"], 2))
     assert list(check(client).violations) == []
     monkeypatch.setenv("KB_ROOT", str(source))
     assert kb_client.export(str(exported)).faults == []
-    text = (exported / "note" / "x.yaml").read_text(encoding="utf-8")
+    text = (exported / _file(iri("note", "x"))).read_text(encoding="utf-8")
     assert list(_loaded(text)) == [*IDENTITY, "b", "a"]
-    assert (_loaded(text)["schema_version"], _loaded(text)["revision"]) == (1, 1)
+    assert (_loaded(text)["type"], _loaded(text)["revision"]) == (version_iri("note", 1), 1)
     monkeypatch.setenv("KB_ROOT", str(target))
     checked = kb_client.import_check(str(exported))
     assert (checked.faults, list(checked.errors), list(checked.skipped)) == ([], [], [])
     assert kb_client.import_(str(exported), OPERATOR).faults == []
-    assert held.artifact(target, "note/x")["b"] == "second"
+    assert held.artifact(target, iri("note", "x"))["b"] == "second"
 
 
 @scenario(
@@ -1081,7 +1099,7 @@ def _import_run_again(root, target, holding):
     holding.let_go()
     again = _kb_import(root, target)
     assert (again.returncode, again.stderr) == (0, "")
-    assert held.names(root) == sorted([*_exported_names(target), "schema/schema"])
+    assert held.names(root) == sorted([*_exported_names(target), TYPE_OF_TYPES])
 
 
 @when("the operator exports the store to an empty directory", target_fixture="ran")
@@ -1094,10 +1112,10 @@ def _kb_export_to_an_empty_directory(root, tmp_path):
 @then("the export is written")
 def _the_export_is_written(root, ran):
     assert sorted(str(path.relative_to(ran["target"])) for path in ran["target"].rglob("*.yaml")) == sorted(
-        f"{name}.yaml" for name in held.names(root)
+        _held_file(root, name) for name in held.names(root)
     )
     for name in held.names(root):
-        assert (ran["target"] / f"{name}.yaml").read_text(encoding="utf-8") == held.text(root, name)
+        assert (ran["target"] / _held_file(root, name)).read_text(encoding="utf-8") == held.text(root, name)
 
 
 @then("the export is not refused because the store was busy with another change")

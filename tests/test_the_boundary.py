@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from calls import TAG_TYPE, create, define, read, request, start_a_store, starting
+from calls import TAG_TYPE, TYPE_OF_TYPES, create, define, iri, read, request, start_a_store, starting, type_iri
 import held
 from kb import client as kb_client, drafting, sqlite_store
 
@@ -22,7 +22,7 @@ def _creating(client):
 
 
 def test_a_client_given_a_root_that_holds_no_store_is_told_so_and_nothing_is_made_there(root):
-    answered = read(kb_client.connect(root), "tag/kept")
+    answered = read(kb_client.connect(root), iri("tag", "kept"))
     assert [(fault.rule, str(root) in fault.message) for fault in answered.faults] == [("store", True)]
     assert "holds no store" in answered.faults[0].message
     assert list(root.iterdir()) == []
@@ -31,7 +31,7 @@ def test_a_client_given_a_root_that_holds_no_store_is_told_so_and_nothing_is_mad
 def test_a_client_given_a_root_whose_marker_stands_without_its_database_is_told_the_database_cannot_be_read(root):
     _started(root)
     held.take_away_the_database(root)
-    answered = read(kb_client.connect(root), "tag/kept")
+    answered = read(kb_client.connect(root), iri("tag", "kept"))
     assert [fault.rule for fault in answered.faults] == ["unreadable"]
 
 
@@ -44,7 +44,7 @@ def test_a_clock_that_raises_is_a_clock_fault_naming_no_artifact_and_writing_not
     answered = _creating(kb_client.connect(root, clock=clock))
     assert [(fault.rule, fault.artifact, fault.place) for fault in answered.faults] == [("clock", "", "")]
     assert held.holds(root) == before
-    assert held.names(root) == sorted(["schema/schema", "schema/tag", "tag/kept"])
+    assert held.names(root) == sorted([TYPE_OF_TYPES, type_iri("tag"), iri("tag", "kept")])
 
 
 ESCAPING = {

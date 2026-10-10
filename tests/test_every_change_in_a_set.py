@@ -7,12 +7,14 @@ import copy
 
 import pytest
 
-from calls import DECISION_TYPE, create, create_many, created, define, read, replace_many, replaced, start_a_store
+from calls import (
+    DECISION_TYPE, create, create_many, created, define, iri, read, replace_many, replaced, start_a_store, type_iri,
+)
 from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps
 from kb.signatures import Signed
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -93,14 +95,14 @@ def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(client):
     first["schema"]["properties"]["owner"] = {"type": "string"}
     second["schema"]["properties"]["outcome"] = {"type": "string"}
     content = [{key: value for key, value in each.items() if key != "title"} for each in (first, second)]
-    response = replace_many(client, [replaced("schema/decision", each) for each in content])
-    assert _faults(response) == [("schema/decision", "version", "version")]
-    assert read(client, "schema/decision").revision == 1
+    response = replace_many(client, [replaced(type_iri("decision"), each) for each in content])
+    assert _faults(response) == [(type_iri("decision"), "version", "version")]
+    assert read(client, type_iri("decision")).revision == 1
 
 
 @pytest.mark.parametrize("earlier, faults", [
-    ({"version": "two"}, [("schema/decision", "version", "type")]),
-    ({"schema": None}, [("schema/decision", "", "required"), ("schema/decision", "version", "version")]),
+    ({"version": "two"}, [(type_iri("decision"), "version", "type")]),
+    ({"schema": None}, [(type_iri("decision"), "", "required"), (type_iri("decision"), "version", "version")]),
 ])
 def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(client, earlier, faults):
     content = {key: value for key, value in DECISION_TYPE.items() if key != "title"}
@@ -108,9 +110,9 @@ def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(c
     changed["version"] = 2
     changed["schema"]["properties"]["owner"] = {"type": "string"}
     first = {key: value for key, value in {**content, **earlier}.items() if value is not None}
-    response = replace_many(client, [replaced("schema/decision", first), replaced("schema/decision", changed)])
+    response = replace_many(client, [replaced(type_iri("decision"), first), replaced(type_iri("decision"), changed)])
     assert _faults(response) == faults
-    assert read(client, "schema/decision").revision == 1
+    assert read(client, type_iri("decision")).revision == 1
 
 
 def test_a_key_carried_twice_is_refused_beside_every_other_fault_of_the_set(client):
@@ -118,14 +120,14 @@ def test_a_key_carried_twice_is_refused_beside_every_other_fault_of_the_set(clie
         created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
         created("decision", "Price reviews happen daily", {"sections": SECTIONS[:1]}, key="pricing"),
     ])
-    assert _faults(refused) == [("decision/price-reviews-happen-daily", "sections", "sections"), ("", "", "ref")]
+    assert _faults(refused) == [(iri("decision", "price-reviews-happen-daily"), "sections", "sections"), ("", "", "ref")]
     assert "'pricing'" in refused.faults[1].message
 
 
 def test_a_key_carried_twice_is_refused_when_one_of_its_creates_does_not_convert(client):
     refused = create_many(client, [
         created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
-        created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing"),
+        created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing", at=iri("decision", "daily")),
     ])
-    assert [fault.rule for fault in refused.faults] == ["kind", "ref"]
+    assert [fault.rule for fault in refused.faults] == ["locator", "ref"]
     assert "'pricing'" in refused.faults[1].message

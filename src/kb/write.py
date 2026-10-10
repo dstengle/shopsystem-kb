@@ -15,6 +15,7 @@ from kb.roots import Root
 from kb.values import ArtifactId, Refused
 
 METASCHEMA_ID = values.type_of(values.TYPE_KIND)
+METASCHEMA_VERSION = values.Version(values.TYPE_KIND, METASCHEMA["version"])
 
 
 class Result(NamedTuple):
@@ -36,16 +37,16 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
     stamp = journal.first(clock)
     store.vacant(root)
     metaschema = settled.order(
-        settled.given(
-            settled.content(METASCHEMA), str(METASCHEMA_ID), METASCHEMA_ID.kind.name, 1, 1, METASCHEMA["title"],
-        ),
+        settled.given(settled.content(METASCHEMA), str(METASCHEMA_ID), str(METASCHEMA_VERSION), 1, METASCHEMA["title"]),
         METASCHEMA["schema"],
     )
     entry = journal.change(
         signed=Signed(actor, "initialise store"), op="create", artifact=str(METASCHEMA_ID), path="", revision=1,
-        schema_version=1, text=canonical.dump(metaschema), stamp=stamp,
+        type=str(METASCHEMA_VERSION), text=canonical.dump(metaschema), stamp=stamp,
     )
-    created = port.Change(METASCHEMA_ID, metaschema, revision=1, searched=tuple(search.searchable(metaschema)))
+    created = port.Change(
+        METASCHEMA_ID, metaschema, revision=1, searched=tuple(search.searchable(metaschema)), kind=values.TYPE_KIND,
+    )
     store.start(root, lambda made: made.land([created], [entry]))
 
 
@@ -74,7 +75,7 @@ def _landing(held: port.Port, drafted: drafting.Drafted, signed: Signed, moments
     entries = [
         journal.change(
             signed=signed, op=change.op, artifact=str(change.artifact_id), path=change.path, revision=change.revision,
-            schema_version=change.schema_version, text=text, stamp=stamp, batch=batch,
+            type=change.type, text=text, stamp=stamp, batch=batch,
         )
         for change, text, stamp in zip(drafted.changes, drafted.texts, stamps, strict=True)
     ]

@@ -3,8 +3,8 @@ import re
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, create, define, next_version, read,
-    request, start_a_store,
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, TYPE_OF_TYPES, create, define, iri,
+    next_version, read, request, start_a_store, type_iri, version_iri,
 )
 import held
 from kb import content, client as kb_client
@@ -268,8 +268,71 @@ def _store_with_decision_type(root):
 
 @then("the client is given the name the artifact keeps for life and its first version")
 def _given_name_and_first_version(created):
-    assert created.id == "decision/price-reviews-happen-weekly"
+    assert created.id == iri("decision", "price-reviews-happen-weekly")
     assert created.revision == 1
+
+
+CHOSEN = iri("decision", "pricing/weekly-reviews")
+
+
+@given(parsers.parse('a store holding a decision type at "{type_iri}"'), target_fixture="client")
+def _store_with_decision_type_at(root, type_iri):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE, at=type_iri)
+    return client
+
+
+@when(parsers.parse('the client creates a decision at "{at}", saying which role and why'), target_fixture="created")
+def _create_at(client, at):
+    return request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it", at=at)
+
+
+@then(parsers.parse('the decision is held at "{at}"'))
+def _decision_held_at(root, created, at):
+    assert not created.faults, created.faults
+    assert created.id == at
+    assert held.holds_artifact(root, at)
+
+
+@then("the store made up no other IRI for it")
+def _no_other_iri(root, created):
+    assert held.names(root) == sorted([TYPE_OF_TYPES, type_iri("decision"), created.id])
+
+
+@when(
+    "the client creates a decision, giving the IRI it chose for it, the IRI of that version of the decision type, a "
+    "title, both required sections and two options, saying which role and why",
+    target_fixture="created",
+)
+def _create_at_a_chosen_iri(client):
+    """The options written before the sections, so the order the type declares is not the order written."""
+    return request(
+        client, "decision", "Price reviews happen weekly", {"options": OPTIONS, "sections": SECTIONS},
+        message="Move price reviews to weekly", at=CHOSEN, version=1,
+    )
+
+
+@then("the client is given the IRI it chose and the decision's first revision")
+def _given_the_chosen_iri_and_first_revision(created):
+    assert not created.faults, created.faults
+    assert (created.id, created.revision) == (CHOSEN, 1)
+
+
+@then("the store holds the decision at that IRI")
+def _held_at_that_iri(root):
+    assert held.holds_artifact(root, CHOSEN)
+
+
+@then("the decision records that version of the decision type")
+def _records_that_version(client):
+    assert read(client, CHOSEN).type == version_iri("decision", 1)
+
+
+@then("reading it back gives what was written, in the order that version declares")
+def _reads_back_in_declared_order(client):
+    named_options = [{"id": "keep-weekly", **OPTIONS[0]}, {"id": "go-monthly", **OPTIONS[1]}]
+    assert read(client, CHOSEN, whole=True).content == content.dumps({"sections": SECTIONS, "options": named_options})
 
 
 @when(
@@ -311,7 +374,7 @@ def _title_is_text_not_a_date(root, client, created):
     target_fixture="refused",
 )
 def _create_without_a_title(client):
-    return request(client, "decision", "", {"sections": SECTIONS}, message="Record it")
+    return request(client, "decision", "", {"sections": SECTIONS}, message="Record it", at=iri("decision", "untitled"))
 
 
 @then("the artifact is rejected because an artifact cannot be created without a title")
@@ -587,7 +650,7 @@ def _a_title_that_is_a_number():
 def _create_with_two_faults(client, tmp_path):
     before = held.everything_in(tmp_path)
     response = request(client, "decision", "Price reviews happen weekly", {
-        "supersedes": "decision/prices-are-reviewed-monthly",
+        "supersedes": iri("decision", "prices-are-reviewed-monthly"),
         "sections": [SECTIONS[1]],
     }, message="Record it")
     return {
@@ -601,7 +664,7 @@ def _rejected_with_both_faults(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
     assert sorted((fault.artifact, fault.place, fault.rule) for fault in refused.faults) == [
-        ("decision/price-reviews-happen-weekly", path, rule) for path, rule in attempt["faults"]
+        (iri("decision", "price-reviews-happen-weekly"), path, rule) for path, rule in attempt["faults"]
     ]
 
 
@@ -625,7 +688,7 @@ def _create_without_a_purpose(client):
 def _rejected_for_the_sections(refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
-        ("decision/price-reviews-happen-weekly", "sections", "sections"),
+        (iri("decision", "price-reviews-happen-weekly"), "sections", "sections"),
     ]
     assert refused.faults[0].message == (
         "the sections the type requires must all be present, in order; 'Purpose' is missing"
@@ -636,7 +699,7 @@ def _rejected_for_the_sections(refused):
 def _rejected_for_the_link(refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
-        ("decision/price-reviews-happen-weekly", "supersedes", "ref"),
+        (iri("decision", "price-reviews-happen-weekly"), "supersedes", "ref"),
     ]
     assert refused.faults[0].message.startswith("a link must land on a node of a kind the type allows")
 
@@ -766,7 +829,7 @@ def _rejected_as_prose_that_is_no_block(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.artifact, fault.rule, fault.place) for fault in refused.faults] == [
-        ("decision/price-reviews-happen-weekly", "content", "sections/1/body"),
+        (iri("decision", "price-reviews-happen-weekly"), "content", "sections/1/body"),
     ]
     assert refused.faults[0].message.startswith(
         "every piece of prose is written as a block, and this prose could not be written back as one"
@@ -841,7 +904,7 @@ def _create_a_misordered_decision(root, client):
 def _rejected_with_every_fault(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
-    assert {fault.artifact for fault in refused.faults} == {"decision/price-reviews-happen-weekly"}
+    assert {fault.artifact for fault in refused.faults} == {iri("decision", "price-reviews-happen-weekly")}
     assert sorted((fault.place, fault.rule) for fault in refused.faults) == sorted(READING_ORDER)
 
 

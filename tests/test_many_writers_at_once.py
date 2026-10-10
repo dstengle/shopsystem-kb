@@ -8,7 +8,8 @@ import pytest
 
 import at_once
 from calls import (
-    DECISION_TYPE, add, adding, create, define, journal, read, removing, replace, replaced, replacing, start_a_store,
+    DECISION_TYPE, add, adding, create, define, iri, journal, read, removing, replace, replaced, replacing,
+    start_a_store,
 )
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -32,7 +33,7 @@ def test_every_change_of_many_writers_to_one_artifact_lands_and_the_history_keep
         own = kb_client.connect(root)
         start.wait()
         for count in range(EACH):
-            added = add(own, "log/daily", "lines", {"title": f"Writer {writer} item {count}"})
+            added = add(own, iri("log", "daily"), "lines", {"title": f"Writer {writer} item {count}"})
             faults.extend(added.faults)
 
     threads = [threading.Thread(target=write, args=(writer,)) for writer in range(WRITERS)]
@@ -41,12 +42,12 @@ def test_every_change_of_many_writers_to_one_artifact_lands_and_the_history_keep
     for thread in threads:
         thread.join()
     assert faults == []
-    assert read(client, "log/daily").revision == 1 + WRITERS * EACH
-    revisions = [entry.revision for entry in journal(client, artifact="log/daily").entries]
+    assert read(client, iri("log", "daily")).revision == 1 + WRITERS * EACH
+    revisions = [entry.revision for entry in journal(client, artifact=iri("log", "daily")).entries]
     assert revisions == list(range(1, 2 + WRITERS * EACH))
 
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"}, {"title": "Rationale", "body": "Weekly.\n"},
 ]

@@ -18,24 +18,35 @@ class Refused(ValueError):
 
 @dataclass(frozen=True)
 class Kind:
+    """A kind, named by its type's IRI."""
     name: str
 
 
 @dataclass(frozen=True)
 class ArtifactId:
-    kind: Kind
-    slug: str
+    """An artifact, named by its IRI."""
+    iri: str
 
     def __str__(self) -> str:
-        return names.written(self.kind.name, self.slug)
+        return self.iri
+
+
+@dataclass(frozen=True)
+class Version:
+    """A version of a type: the kind it is of, and its number."""
+    kind: Kind
+    number: int
+
+    def __str__(self) -> str:
+        return names.versioned(self.kind.name, self.number)
 
 
 TYPE_KIND = Kind(names.TYPES)
 
 
 def type_of(kind: Kind) -> ArtifactId:
-    """The name of the type the artifacts of a kind are of."""
-    return ArtifactId(TYPE_KIND, kind.name)
+    """The type the artifacts of a kind are of, held at the kind's IRI."""
+    return ArtifactId(kind.name)
 
 
 @dataclass(frozen=True)
@@ -45,19 +56,30 @@ class Locator:
 
 
 def kind(text: str) -> Kind:
-    if not names.plain(text):
+    """A kind as a request names it: its type's IRI, of kb's grammar."""
+    if not names.iri(text):
         raise Refused([kb_pb2.Fault(
-            rule=rules.KIND,
-            message=f"a kind is a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not",
+            rule=rules.LOCATOR, message=f"a kind is named by its type's IRI, an IRI of kb's grammar; {text!r} is not",
         )])
     return Kind(text)
 
 
 def artifact_id(text: str) -> ArtifactId:
-    kind_name, slug = names.parted(text)
-    if not (names.plain(kind_name) and names.plain(slug)):
-        raise Refused([_not_a_plain_name(text)])
-    return ArtifactId(Kind(kind_name), slug)
+    """An artifact's IRI as a request names it, of kb's grammar, which holds neither a version nor a place."""
+    if not names.iri(text):
+        raise Refused([kb_pb2.Fault(artifact=text, rule=rules.LOCATOR, message=(
+            f"a name is an IRI of kb's grammar, https://, a host and plain segments, never a path; {text!r} is not"
+        ))])
+    return ArtifactId(text)
+
+
+def version(text: str) -> Version:
+    """A type version's IRI as a request names it: a type's IRI, `@` and the version's number."""
+    found = names.version(text)
+    if found is None:
+        raise Refused([kb_pb2.Fault(artifact=text, rule=rules.LOCATOR,
+            message=f"a version of a type is named by the type's IRI, @ and its number; {text!r} is not")])
+    return Version(Kind(found[0]), found[1])
 
 
 def locator(request: kb_pb2.Locator) -> Locator:
@@ -104,18 +126,12 @@ def in_utc(moment: datetime) -> datetime:
     return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
 
 
-def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
-    """The name kb gives an artifact of this kind from its title, and the name its faults are said of; None, with the
-    title's faults, when it gives none. A title is required and must leave a name."""
-    slug = names.slug(title)
-    at = names.written(kind.name, slug)
-    if not title:
-        message = "an artifact cannot be created without a title"
-    elif not slug:
-        message = _leaves_nothing(title)
-    else:
-        return ArtifactId(kind, slug), at, ()
-    return None, at, (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE, message=message),)
+def titled(title: str, at: str) -> tuple:
+    """The faults of an artifact's title, said of the IRI given: a title is required."""
+    if title:
+        return ()
+    return (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE,
+                         message="an artifact cannot be created without a title"),)
 
 
 def key(text: str) -> str:
@@ -192,8 +208,3 @@ def _titled(tree: dict) -> Content:
     if not names.slug(title):
         return Content(tree, (("title", rules.TITLE, _leaves_nothing(title)),))
     return Content({**tree, "title": title})
-
-
-def _not_a_plain_name(text: str) -> kb_pb2.Fault:
-    return kb_pb2.Fault(artifact=text, rule=rules.LOCATOR,
-        message=f"a name is a kind and a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not")

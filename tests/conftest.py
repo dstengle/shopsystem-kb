@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version, start_a_store, check
+from calls import (
+    CLIENT, DECISION_TYPE, check, create, define, iri, journal, listing, moment, next_version, start_a_store,
+)
 import held
 from kb import cli, client as kb_client, served, store
 
@@ -217,9 +219,9 @@ def _store_needing_attention(root):
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ]})
     next_version(client, "decision", DECISION_TYPE)
-    monthly = held.artifact(root, "decision/prices-are-reviewed-monthly")
+    monthly = held.artifact(root, iri("decision", "prices-are-reviewed-monthly"))
     del monthly["sections"][0]["body"]
-    held.plant(root, "decision/prices-are-reviewed-monthly", monthly)
+    held.plant(root, iri("decision", "prices-are-reviewed-monthly"), monthly)
     return root
 
 

@@ -9,7 +9,7 @@ from jsonschema_specifications import REGISTRY as SPECIFICATIONS
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
-from kb import links, places, refusals, rules, values
+from kb import links, places, refusals, rules, settled, values
 from kb.composition import composition, declared, type_schema
 from kb.contract import kb_pb2
 
@@ -70,8 +70,8 @@ METASCHEMAS = Registry().with_resources(
 
 def registry(corpus) -> Registry:
     """The 2020-12 metaschema and its vocabularies, the nine resources kb takes from the specifications package it
-    declares (`METASCHEMAS`), and every type the corpus holds, found by the URI kb:schema/<type> when a schema refers
-    to it, and only then."""
+    declares (`METASCHEMAS`), and every type the corpus holds, found by the URI kb:<type IRI>@<n> of the version it
+    stands at when a schema refers to it, and only then."""
     def retrieve(uri: str):
         return DRAFT202012.create_resource(type_schema(uri, corpus))
     return METASCHEMAS.combine(Registry(retrieve=retrieve))
@@ -79,7 +79,7 @@ def registry(corpus) -> Registry:
 
 def validate(artifact_id: str, content: dict, schema: dict, corpus) -> list[kb_pb2.Fault]:
     """Every violation, as artifact, path, rule, message, JSON Schema's and kb's own rules' together. A
-    kb:schema/<type> reference resolves against the corpus.
+    kb:<type IRI>@<n> reference resolves against the corpus, to the version it holds.
 
     kb's own rules read a node only where JSON Schema found it in the shape they read it in.
     """
@@ -126,7 +126,7 @@ def _lands(target: str, ref: dict, corpus) -> bool:
         return False
     if link.place and not ref.get("parts"):
         return False
-    if link.id.kind.name not in ref["targets"] or not corpus.holds(link.id):
+    if not corpus.holds(link.id) or settled.kind(corpus.artifact(link.id)) not in ref["targets"]:
         return False
     return not link.place or places.holds_part(corpus.artifact(link.id), link.place)
 

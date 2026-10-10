@@ -2,7 +2,7 @@
 store at all or a whole one."""
 import signal
 
-from calls import DECISION_TYPE, a_decision_type_and_a_decision, define
+from calls import DECISION_TYPE, TYPE_OF_TYPES, a_decision_type_and_a_decision, define, iri, type_iri
 from conftest import OPERATOR, _kb, exported
 import grpc
 
@@ -24,7 +24,7 @@ def test_a_seed_directory_that_is_the_directory_set_up_leaves_no_half_store(tmp_
         assert held.everything_in(root) == before
     else:
         assert held.apart_from_the_store(root) == before["apart"]
-        assert held.names(root) == ["decision/price-reviews-happen-weekly", "schema/decision", "schema/schema"]
+        assert held.names(root) == sorted([iri("decision", "price-reviews-happen-weekly"), type_iri("decision"), TYPE_OF_TYPES])
 
 
 def test_a_seeded_setup_in_a_directory_the_operator_cannot_write_is_refused_and_leaves_it_as_it_was(tmp_path, root):
@@ -79,7 +79,7 @@ def test_a_seeded_setup_after_one_was_killed_lands_the_seed_and_leaves_nothing_s
     ran = _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
     assert (ran.returncode, ran.stderr) == (0, "")
     assert sorted(path.name for path in root.iterdir()) == ["kb"]
-    assert held.names(root) == ["decision/price-reviews-happen-weekly", "schema/decision", "schema/schema"]
+    assert held.names(root) == sorted([iri("decision", "price-reviews-happen-weekly"), type_iri("decision"), TYPE_OF_TYPES])
 
 
 def test_serving_with_start_after_a_seeded_setup_was_killed_starts_and_serves_a_store_as_if_nothing_were_there(
@@ -92,7 +92,7 @@ def test_serving_with_start_after_a_seeded_setup_was_killed_starts_and_serves_a_
     said = serving.started(root, request, "127.0.0.1:0", "--start", env={"KB_ACTOR": OPERATOR}).said()
     assert said.startswith("serving\t127.0.0.1:"), said
     assert sorted(path.name for path in root.iterdir()) == ["kb"]
-    assert held.names(root) == ["schema/schema"]
+    assert held.names(root) == [TYPE_OF_TYPES]
     with grpc.insecure_channel(said.removeprefix("serving\t")) as channel:
         answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
     assert [entry.actor.role for entry in answered.result.entries] == [OPERATOR]

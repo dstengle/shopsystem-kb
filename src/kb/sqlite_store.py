@@ -200,7 +200,7 @@ class SqliteStore(Checks):
         )
         if stored is None:
             return
-        kind = change.artifact.kind.name
+        kind = change.kind.name
         self._db.execute(
             "INSERT INTO artifacts (id, kind, revision, content) VALUES (?, ?, ?, ?)", (name, kind, change.revision, stored),
         )

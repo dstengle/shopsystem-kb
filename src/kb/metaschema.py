@@ -1,9 +1,10 @@
-"""The one type a new store holds: the type that describes what a type is.
+"""The one type a new store holds: the type that describes what a type is, written at `names.TYPES`
+(https://missingmass.io/kb/type) at its first version.
 
-A schema artifact carries the type's human name as its title, an integer
-version, and under `schema` a JSON Schema 2020-12 document plus the kb
-keywords (`ref`, `parts`, `sections`, `summary`), which the JSON Schema
-metaschema lets through as annotations.
+A type carries its human name as its title, an integer version, and under
+`schema` a JSON Schema 2020-12 document plus the kb keywords (`ref`,
+`parts`, `sections`, `summary`), which the JSON Schema metaschema lets
+through as annotations.
 """
 
 METASCHEMA = {

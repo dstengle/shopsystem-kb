@@ -1,13 +1,18 @@
-// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (decision/published-contract-v1).
+// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (decision/published-contract-v2).
 //
 // Artifact content crosses as canonical YAML text beside the fixed
 // identity fields, since content shape is schema-defined at runtime.
+// Every artifact, part and type is named by an https IRI of kb's grammar:
+// an artifact's chosen by its client under its type's IRI, a part's its
+// artifact's IRI, `#` and its place, a type version's its type's IRI, `@`
+// and its number. A kind is named by its type's IRI. The type that
+// describes types is https://missingmass.io/kb/type.
 // Every response is its result or a refusal holding every fault, never
 // both; a refusal means nothing was written. A store is started off the
 // wire, by `kb.init` in the client's own process; no rpc starts one.
 syntax = "proto3";
 
-package kb.v1;
+package kb.v2;
 
 
 service Kb {
@@ -60,16 +65,20 @@ message Refusal {
   repeated Fault faults = 1;
 }
 
-// A new artifact of a kind. The title travels here, never inside the
-// content.
+// A new artifact at the IRI its client chose, conforming to the version
+// of its type named by that version's IRI. The title travels here, never
+// inside the content.
 message CreateRequest {
-  string kind = 1;
+  reserved 1;
+  reserved "kind";
+  string id = 5;  // the artifact's IRI
+  string type = 6;  // the IRI of the type version it conforms to
   string title = 2;
   string content = 3;  // canonical YAML: fields, sections, parts
   Signature signature = 4;
 }
 
-// The name kb gave the artifact, and its version.
+// The artifact's IRI, and its revision.
 message Created {
   string id = 1;
   int32 revision = 2;
@@ -109,9 +118,10 @@ message ReadRequest {
 // with a stub of each reference target and of each part, and inbound
 // counts.
 message Artifact {
+  reserved 2, 3;
+  reserved "kind", "schema_version";
   string id = 1;
-  string kind = 2;
-  int32 schema_version = 3;
+  string type = 10;  // the IRI of the type version it conforms to
   int32 revision = 4;
   string title = 5;
   string content = 6;  // canonical YAML
@@ -130,9 +140,11 @@ message ReadResponse {
 }
 
 message Stub {
+  reserved 3;
+  reserved "kind";
   string field = 1;
   string id = 2;
-  string kind = 3;
+  string type = 6;  // the IRI of the type version it conforms to
   string title = 4;
   string fields = 5;   // canonical YAML
 }
@@ -144,7 +156,7 @@ message PartStub {
 }
 
 message InboundCount {
-  string kind = 1;
+  string kind = 1;  // the type's IRI
   string field = 2;
   int32 count = 3;
 }
@@ -220,6 +232,8 @@ message HistoryRequest {
 // change made alone names itself as its batch. A snapshot's entry has op
 // `snapshot`, lists what was read, and names no artifact of its own.
 message Entry {
+  reserved 8;
+  reserved "schema_version";
   string id = 1;
   string at = 2;
   Actor actor = 3;
@@ -227,7 +241,7 @@ message Entry {
   string artifact = 5;
   string place = 6;
   int32 revision = 7;
-  int32 schema_version = 8;
+  string type = 13;  // the IRI of the type version the artifact conforms to
   string digest = 9;
   string message = 10;
   string batch = 11;
@@ -247,7 +261,7 @@ message Entries {
   repeated Entry entries = 1;
 }
 
-// A refusal: a name that is not a plain name, a time that cannot be read,
+// A refusal: a name that is not an IRI, a time that cannot be read,
 // or no store found.
 message HistoryResponse {
   oneof outcome {
@@ -284,7 +298,7 @@ message Found {
   repeated Match matches = 1;
 }
 
-// A refusal: a kind that is not a plain name, a kind the store holds no
+// A refusal: a kind that is not a type's IRI, a kind the store holds no
 // type for, or no store found.
 message SearchResponse {
   oneof outcome {
@@ -327,8 +341,8 @@ message Followed {
   repeated Reached reached = 1;
 }
 
-// A refusal: a bad locator, a name the store lacks, a kind that is not a
-// plain name, or no store found.
+// A refusal: a bad locator, a name the store lacks, a kind that is not
+// a type's IRI, or no store found.
 message FollowResponse {
   oneof outcome {
     Followed result = 1;
@@ -355,7 +369,7 @@ message Listed {
   repeated string ids = 2;
 }
 
-// A refusal: a kind that is not a plain name, a kind the store holds no
+// A refusal: a kind that is not a type's IRI, a kind the store holds no
 // type for, or no store found.
 message ListResponse {
   oneof outcome {
@@ -378,7 +392,7 @@ message Recorded {
 }
 
 // A refusal: an unsigned snapshot, or one naming no piece of work, a name
-// that is not a plain name, a name the store lacks, or no store found;
+// that is not an IRI, a name the store lacks, or no store found;
 // nothing was written.
 message SnapshotResponse {
   oneof outcome {
@@ -439,11 +453,14 @@ message RemoveResponse {
 // A set of creates, landing in order as one change, or none does. A
 // create may carry a key of the client's choosing, unique in the set; a
 // link written `@` and the key, anywhere in the set, names the artifact
-// that create makes, and kb puts the name it gives that artifact in its
+// that create makes, and kb puts that artifact's IRI in its
 // place before anything is checked. A key names a whole artifact, never
 // a place inside one.
 message CreateItem {
-  string kind = 1;
+  reserved 1;
+  reserved "kind";
+  string id = 5;  // the artifact's IRI
+  string type = 6;  // the IRI of the type version it conforms to
   string title = 2;
   string content = 3;  // canonical YAML: fields, sections, parts
   string key = 4;

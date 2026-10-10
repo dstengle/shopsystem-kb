@@ -4,15 +4,17 @@ store taking changes again; and a second server on a served store is refused bef
 (the plan's decisions 1 to 4)."""
 import pytest
 
-from calls import (CLIENT, TAG_TYPE, answer, create, creating, define, replacing, removing, signature,
-                   start_a_store)
+from calls import (
+    CLIENT, TAG_TYPE, answer, create, created, creating, define, iri, replacing, removing, signature, start_a_store,
+    type_iri,
+)
 from conftest import _kb
 import held
 import serving
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-KEPT = "tag/kept"
+KEPT = iri("tag", "kept")
 
 
 def _started(root):
@@ -34,7 +36,7 @@ WRITING = {
                                      signature=_signed()),
     "Remove": lambda: removing(KEPT),
     "BatchCreate": lambda: kb_pb2.BatchCreateRequest(
-        items=[kb_pb2.CreateItem(kind="tag", title="New", content="{}\n")], signature=_signed()),
+        items=[created("tag", "New", {})], signature=_signed()),
     "BatchReplace": lambda: kb_pb2.BatchReplaceRequest(
         items=[kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=KEPT), content="summary: Still kept.\n")],
         signature=_signed()),
@@ -52,7 +54,7 @@ READING = {
     "History": lambda: kb_pb2.HistoryRequest(),
     "Search": lambda: kb_pb2.SearchRequest(text="kept"),
     "Follow": lambda: kb_pb2.FollowRequest(locator=kb_pb2.Locator(id=KEPT)),
-    "List": lambda: kb_pb2.ListRequest(kind="tag"),
+    "List": lambda: kb_pb2.ListRequest(kind=type_iri("tag")),
 }
 
 

@@ -17,11 +17,11 @@ from typing import Callable
 
 import grpc
 
-from kb import names, served, store
+from kb import served, store
 from kb.addresses import Address
 from kb.contract import kb_pb2, kb_pb2_grpc
 from kb.servicer import KbServicer, boundary
-from kb.values import artifact_id
+from kb.values import TYPE_KIND, type_of
 
 WORKERS = 8  # calls answered at once
 GRACE = 3  # seconds the calls in flight are given to finish when the server stops
@@ -42,7 +42,7 @@ class _Opening:
     @boundary(Opened)
     def opened(self, request, held):
         """The store opened and read, which a damaged database is found by only once it is."""
-        held.holds(artifact_id(names.written(names.TYPES, names.TYPES)))
+        held.holds(type_of(TYPE_KIND))
         return Opened()
 
 

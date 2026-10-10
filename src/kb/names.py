@@ -1,49 +1,76 @@
-"""Names: the grammar of an artifact's and an item's name, how an artifact's name is written and read, how a link
-names a place inside one and a type is referred to, the name a title gives, and the numbering that keeps a name free.
-Nothing here reads or writes; whether a name is taken is asked of the caller."""
+"""Names: kb's IRI grammar, how an IRI is split into its host and segments and a type version's IRI read, the place an
+export gives an artifact and the IRI a file's place gives, how a link names a place inside an artifact and a type
+version is referred to, the name an item's title gives, and the numbering that keeps an item's name free. Nothing
+here reads or writes; whether a name is taken is asked of the caller."""
 import re
 from typing import Callable, NamedTuple
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+_DOTTED = r"[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*"
+IRI = re.compile(rf"https://(?P<host>{_DOTTED})(?P<path>(?:/{_DOTTED})+)")
+VERSION = re.compile(r"(?P<iri>[^@]+)@(?P<number>[1-9][0-9]*)")
+LONGEST = 512
+SCHEME = "https://"
+FILE = ".yaml"
 
 KEYED = "@"
+VERSIONED = "@"
 
-TYPES = "schema"
+TYPES = "https://missingmass.io/kb/type"
 TYPE_URI = "kb:"
 
 
-def written(kind: str, slug: str) -> str:
-    """An artifact's name as it is written: its kind, a slash, and its own name."""
-    return f"{kind}/{slug}"
+def iri(text: str) -> bool:
+    """Whether text is an IRI of kb's grammar: `https://`, a host of plain names joined by single dots, and one or
+    more segments, each plain names joined by single dots; at most LONGEST characters; no `@` and no `#`."""
+    return len(text) <= LONGEST and IRI.fullmatch(text) is not None
 
 
-def parted(text: str) -> tuple[str, str]:
-    """A written name read back as its kind and its own name, neither yet checked."""
-    kind, _, slug = text.partition("/")
-    return kind, slug
+def split(iri_text: str) -> tuple[str, tuple[str, ...]]:
+    """An IRI of kb's grammar read as its host and its segments."""
+    host, *segments = iri_text.removeprefix(SCHEME).split("/")
+    return host, tuple(segments)
 
 
-def order(artifact_id) -> tuple[str, str]:
-    """The one order artifacts' names are given in: by kind, then by `<slug>.yaml`, compared as the paths of the
-    files a store once kept them in compared, so `work/...` comes before `work-item/...`, and `price-2` before
-    `price`."""
+def version(text: str) -> tuple[str, int] | None:
+    """A type version's IRI read as the type's IRI and the version's number; None for text that is not one."""
+    found = VERSION.fullmatch(text)
+    if found is None or not iri(found["iri"]) or len(text) > LONGEST:
+        return None
+    return found["iri"], int(found["number"])
+
+
+def versioned(type_iri: str, number: int) -> str:
+    """A type version's IRI: the type's IRI, `@` and the version's number."""
+    return f"{type_iri}{VERSIONED}{number}"
+
+
+def order(artifact_id) -> tuple[str, ...]:
+    """The one order artifacts' IRIs are given in: as the places the export layout gives them compare, step by
+    step."""
     return place(artifact_id)
 
 
-def place(artifact_id) -> tuple[str, str]:
-    """The place the export layout gives an artifact, as steps below the directory: its kind, then `<slug>.yaml`;
-    the inverse of `filed`."""
-    kind, slug = parted(str(artifact_id))
-    return kind, f"{slug}.yaml"
+def place(artifact_id, number: int | None = None) -> tuple[str, ...]:
+    """The place the export layout gives an artifact, as steps below the directory: the host and the segments of its
+    IRI, the last written `<segment>.yaml`, or, for a type's version, `<segment>@<n>.yaml`; the inverse of
+    `filed`."""
+    host, segments = split(str(artifact_id))
+    last = segments[-1] if number is None else versioned(segments[-1], number)
+    return (host, *segments[:-1], f"{last}{FILE}")
 
 
-def filed(steps: tuple[str, ...]) -> str | None:
-    """The written name of the artifact the export layout puts at a file's place, `<kind>/<slug>.yaml`, given the
-    place's steps below the directory; None for a place where the layout puts no artifact."""
-    if len(steps) != 2 or not steps[1].endswith(".yaml"):
+def filed(steps: tuple[str, ...]) -> tuple[str, int | None] | None:
+    """The IRI of the artifact the export layout puts at a file's place, given the place's steps below the directory,
+    and the version's number when the place is a type version's, None when it is not; None for a place where the
+    layout puts no artifact."""
+    if len(steps) < 2 or not steps[-1].endswith(FILE):
         return None
-    kind, slug = steps[0], steps[1].removesuffix(".yaml")
-    return written(kind, slug) if plain(kind) and plain(slug) else None
+    written = SCHEME + "/".join((*steps[:-1], steps[-1].removesuffix(FILE)))
+    found = version(written)
+    if found is not None:
+        return found
+    return (written, None) if iri(written) else None
 
 
 def linked(text: str) -> tuple[str, str]:
@@ -69,7 +96,7 @@ def steps(text: str) -> tuple[str, ...]:
 
 
 def referred(ref: str) -> tuple[str, str] | None:
-    """What a `kb:` reference names: the written name of a type, and what follows it from `#` on, empty when the
+    """What a `kb:` reference names: the IRI of a type's version, and what follows it from `#` on, empty when the
     reference is to the whole type. None for a reference that is not kb's."""
     if not ref.startswith(TYPE_URI):
         return None
@@ -111,7 +138,7 @@ def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dic
     item in turn, at every depth. parts is the collections the node's type declares, and inner gives those an item's
     type declares from the collection's declaration. An item is named from its title when the title is text, a
     number, true or false, as an artifact's is, otherwise from its place in the collection, counted from 1, with a
-    number added as an artifact's name has when an item beside it already has that name. On a write an item already
+    number added when an item beside it already has that name. On a write an item already
     carrying a name is the item of that name, moved or changed where it stands, and keeps it; a name is minted once
     and never worked out again. An item that is not a set of named entries carries no name, and is passed over, as is
     a collection that is not a list."""

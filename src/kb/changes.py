@@ -8,18 +8,16 @@ from kb import rules, signatures, values
 from kb.contract import kb_pb2
 from kb.requests import Refusal
 from kb.signatures import Signed
-from kb.values import ArtifactId, Content, Kind, Locator, Refused
+from kb.values import ArtifactId, Content, Locator, Refused, Version
 
 
 @dataclass(frozen=True)
 class Create:
-    """A new artifact: its kind, its title, the name the title gives (None when it gives none, the title's faults
-    saying why), the name its faults are said of until it has one, its content, and the key it carries in a set,
-    empty for none."""
-    kind: Kind
+    """A new artifact: the IRI its client chose, the type version it conforms to, its title and the title's faults,
+    its content, and the key it carries in a set, empty for none."""
+    name: ArtifactId
+    version: Version
     title: str
-    name: ArtifactId | None
-    at: str
     title_faults: tuple
     content: Content
     key: str = ""
@@ -50,7 +48,7 @@ class Remove:
 
 def creating(request: kb_pb2.CreateRequest) -> tuple[list, Signed]:
     """A Create as the domain takes it: a set of one, signed."""
-    return _one(request.signature, lambda: _create(request.kind, request.title, request.content))
+    return _one(request.signature, lambda: _create(request.id, request.type, request.title, request.content))
 
 
 def replacing(request: kb_pb2.ReplaceRequest) -> tuple[list, Signed]:
@@ -72,7 +70,7 @@ def creating_many(request: kb_pb2.BatchCreateRequest) -> tuple[list, Signed]:
     """A BatchCreate as the domain takes it: a set of creates, signed; a key two or more of its creates carry, whether
     or not they convert, refused beside every other fault of the set, after them."""
     converted, signed = _many(request.signature, [
-        lambda item=item: _create(item.kind, item.title, item.content, item.key) for item in request.items
+        lambda item=item: _create(item.id, item.type, item.title, item.content, item.key) for item in request.items
     ])
     twice = _carried_twice([item.key for item in request.items])
     return converted + ([Refusal(twice)] if twice else []), signed
@@ -143,10 +141,20 @@ def _each(conversions) -> list:
     return converted
 
 
-def _create(kind_name: str, title: str, content: str, key: str = "") -> Create:
-    kind = values.kind(kind_name)
-    name, at, title_faults = values.named(kind, title)
-    return Create(kind, title, name, at, title_faults, values.content(content), values.key(key))
+def _create(iri: str, type_version: str, title: str, content: str, key: str = "") -> Create:
+    """A create's IRI and type version, both faults when both fail, then the rest."""
+    name, version, faults = None, None, []
+    try:
+        name = values.artifact_id(iri)
+    except Refused as refused:
+        faults += refused.faults
+    try:
+        version = values.version(type_version)
+    except Refused as refused:
+        faults += refused.faults
+    if faults:
+        raise Refused(faults)
+    return Create(name, version, title, values.titled(title, iri), values.content(content), values.key(key))
 
 
 def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0) -> Replace:

@@ -1,11 +1,11 @@
-"""A type read through what it is built on: the schemas of its composition, base first, the type a kb: reference
-names, and the type a kind names. kb's own keywords are read through the composition, so a type built on a base
-carries the base's first."""
+"""A type read through what it is built on: the schemas of its composition, base first, the type version a kb:
+reference names, the type a kind names, and the kind an artifact is of. kb's own keywords are read through the
+composition, so a type built on a base carries the base's first."""
 from typing import NamedTuple
 
 from referencing.exceptions import NoSuchResource
 
-from kb import names, refusals, values
+from kb import names, refusals, settled, values
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -22,32 +22,39 @@ def composition(schema: dict, corpus) -> list[dict]:
 
 
 class Reference(NamedTuple):
-    """What a kb: reference names: the type, None when it names no type at all, and whether it is to the whole type
-    rather than to a shape inside it."""
+    """What a kb: reference names: the type and the number of its version, the type None when it names no type
+    version at all, and whether it is to the whole type rather than to a shape inside it."""
     type_id: values.ArtifactId | None
     whole: bool
+    number: int = 0
 
 
 def reference(ref: str) -> Reference | None:
-    """What a kb: reference names, the type's name checked as any other name is. None for a reference that is not
-    kb's."""
+    """What a kb: reference names, the type version's IRI read as kb's grammar reads one. None for a reference that
+    is not kb's."""
     referred = names.referred(ref)
     if referred is None:
         return None
     name, fragment = referred
-    try:
-        type_id = values.artifact_id(name)
-    except values.Refused:
-        type_id = None
-    if type_id is not None and type_id.kind != values.TYPE_KIND:
-        type_id = None
-    return Reference(type_id, not fragment)
+    found = names.version(name)
+    if found is None:
+        return Reference(None, not fragment)
+    return Reference(values.ArtifactId(found[0]), not fragment, found[1])
+
+
+def held(referred: Reference, corpus) -> bool:
+    """Whether the corpus holds the type version a kb: reference names: a type at its IRI, standing at that
+    version."""
+    if referred.type_id is None or not corpus.holds(referred.type_id):
+        return False
+    found = corpus.artifact(referred.type_id)
+    return settled.kind(found) == values.TYPE_KIND.name and found.get("version") == referred.number
 
 
 def type_schema(uri: str, corpus) -> dict:
-    """The JSON Schema of the type a kb: URI names. NoSuchResource if it names none the corpus holds."""
+    """The JSON Schema of the type version a kb: URI names. NoSuchResource if it names none the corpus holds."""
     referred = reference(uri)
-    if referred is None or referred.type_id is None or not corpus.holds(referred.type_id):
+    if referred is None or not held(referred, corpus):
         raise NoSuchResource(ref=uri)
     return corpus.artifact(referred.type_id)["schema"]
 
@@ -71,6 +78,29 @@ def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
     if not corpus.holds(type_id):
         raise values.Refused([refusals.no_type(kind.name)])
     return type_id
+
+
+def version_type(version: values.Version, corpus) -> values.ArtifactId:
+    """The type a create's type version is of, standing at that version. Raises Refused when the corpus holds no
+    such version."""
+    if not held(Reference(values.type_of(version.kind), True, version.number), corpus):
+        raise values.Refused([refusals.no_version(str(version))])
+    return values.type_of(version.kind)
+
+
+def kind_of(artifact_id: values.ArtifactId, corpus) -> values.Kind:
+    """The kind of an artifact the corpus holds, as the type version it conforms to says."""
+    return artifact_kind(corpus.artifact(artifact_id))
+
+
+def artifact_kind(artifact: dict) -> values.Kind:
+    """The kind of an artifact, as the type version it conforms to says."""
+    return values.Kind(settled.kind(artifact))
+
+
+def artifact_schema(artifact: dict, corpus) -> dict:
+    """The type an artifact's kind names, as the corpus holds it. Raises Refused when the corpus holds none."""
+    return kind_schema(artifact_kind(artifact), corpus)
 
 
 def kind_schema(kind: values.Kind, corpus) -> dict:
@@ -103,7 +133,7 @@ def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], cor
         if type_id in seen or not corpus.holds(type_id):
             return False
         return any(reads(each, seen | {type_id}) for each in referred(corpus.artifact(type_id).get("schema")))
-    return [values.Kind(type_id.slug) for type_id in types if reads(type_id, frozenset())]
+    return [values.Kind(str(type_id)) for type_id in types if reads(type_id, frozenset())]
 
 
 def referred(node):

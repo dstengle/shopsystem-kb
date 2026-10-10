@@ -5,8 +5,8 @@ the types it was read through. A fault anywhere refuses the whole set with every
 from typing import NamedTuple
 
 from kb import (
-    canonical, composition, definitions, edits, fault_order, keys, links, places, port, refusals, requests, search, settled,
-    validation, values,
+    canonical, composition, definitions, edits, fault_order, keys, links, names, places, port, refusals, requests,
+    search, settled, validation, values,
 )
 from kb.draft import Draft
 from kb.edits import Change
@@ -42,8 +42,9 @@ def _relinked(draft: Draft, artifact_id: values.ArtifactId) -> port.Relink:
     artifact = draft.artifact(artifact_id)
     return port.Relink(
         artifact_id, tuple(links.handed(artifact_id, artifact, draft)), artifact["revision"],
-        draft.as_read(composition.read_through(artifact_id.kind, draft)),
+        draft.as_read(composition.read_through(composition.artifact_kind(artifact), draft)),
     )
+
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:
@@ -80,7 +81,8 @@ def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
             for each in draft.links_in(outcome.artifact_id) if each.source != outcome.artifact_id
         ]
     faults = [*outcome.faults, *_fits(draft, outcome)]
-    if not faults and last[outcome.artifact_id] is outcome and outcome.artifact_id.kind == values.TYPE_KIND:
+    typed = composition.artifact_kind(outcome.left) == values.TYPE_KIND
+    if not faults and last[outcome.artifact_id] is outcome and typed:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return _in_order(draft, outcome, faults)
 
@@ -109,9 +111,10 @@ def _typed(draft: Draft, change: Change) -> dict:
     """The type a change is checked against: its kind's as the set leaves it, or, for an artifact the set later removes
     when it leaves no such type, as the change acted on it. Raises Refused when an artifact the set leaves has no
     type."""
-    if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(change.artifact_id.kind)):
+    kind = composition.artifact_kind(change.left)
+    if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(kind)):
         return change.acted
-    return composition.kind_schema(change.artifact_id.kind, draft)
+    return composition.kind_schema(kind, draft)
 
 
 def _versioned(draft: Draft, change: Change, last: bool) -> Change:
@@ -121,12 +124,11 @@ def _versioned(draft: Draft, change: Change, last: bool) -> Change:
     if change.left is None or change.op == "import":
         return change
     schema = _typed(draft, change)
-    left = settled.order(
-        {**change.left, "schema_version": schema["version"]}, composition.declared(schema["schema"], draft),
-    )
+    version = names.versioned(settled.kind(change.left), schema["version"])
+    left = settled.order({**change.left, "type": version}, composition.declared(schema["schema"], draft))
     if last:
         draft.put(change.artifact_id, left)
-    return change._replace(schema_version=schema["version"], left=left)
+    return change._replace(type=version, left=left)
 
 
 def _serialised(changes: list[Change]) -> list[str | None]:
@@ -151,11 +153,13 @@ def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
     read = 0 if change.op == "import" else change.revision - 1
     if change.left is None:
         return port.Change(change.artifact_id, None, read=read, revision=change.revision)
-    searched = tuple(search.searchable(change.left))
+    searched, kind = tuple(search.searchable(change.left)), composition.artifact_kind(change.left)
     if not last:
-        return port.Change(change.artifact_id, change.left, read=read, revision=change.revision, searched=searched)
+        return port.Change(
+            change.artifact_id, change.left, read=read, revision=change.revision, searched=searched, kind=kind,
+        )
     return port.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
         tuple(places.parts(change.left)), read, change.revision,
-        draft.as_read(composition.read_through(change.artifact_id.kind, draft)), searched,
+        draft.as_read(composition.read_through(kind, draft)), searched, kind,
     )

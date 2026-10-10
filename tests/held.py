@@ -179,7 +179,7 @@ def make_read_only(root, what):
 
 def made_by_an_earlier_kb(root):
     """Make the store in `root` the way kb 0.3.0 kept one: its marker holding the contract, every artifact a canonical
-    file at kb/<kind>/<slug>.yaml, the history in kb/journal/, a git repository in kb/.git/, and no database. A
+    file below kb/ at the host and path of its name, the history in kb/journal/, a git repository in kb/.git/, and no database. A
     store this kb started there is taken apart into it; where none was started, it is a store of nothing."""
     place = _place(root)
     files = {name: text(root, name) for name in names(root)} if (place / _DATABASE).exists() else {}
@@ -187,8 +187,9 @@ def made_by_an_earlier_kb(root):
     for leftover in place.glob(f"{_DATABASE}*"):
         leftover.unlink()
     for name, canonical_text in files.items():
-        (place / f"{name}.yaml").parent.mkdir(exist_ok=True)
-        (place / f"{name}.yaml").write_text(canonical_text, encoding="utf-8")
+        filed = place / f"{name.removeprefix('https://')}.yaml"
+        filed.parent.mkdir(parents=True, exist_ok=True)
+        filed.write_text(canonical_text, encoding="utf-8")
     for directory, name, data in (("journal", "0001.yaml", "entry: first\n"), (".git", "HEAD", "ref: refs/heads/main\n")):
         (place / directory).mkdir(exist_ok=True)
         (place / directory / name).write_text(data, encoding="utf-8")

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from kb import (
-    canonical, composition, definitions, links, names, offers, refusals, rules, settled, validation, values, write,
+    canonical, composition, definitions, file_refusals, links, names, offers, rules, settled, validation, values, write,
 )
 from kb.draft import Draft
 from kb.edits import Import
@@ -80,10 +80,10 @@ def _imported(store: Port, directory: Named, signed: Signed, skip_errors: bool, 
     offered = offers.offered(directory, passed_over)
     report = _examined(store, offered)
     if report.errors and not skip_errors:
-        return Checked([refusals.check_failed(len(report.errors))], report.errors, report.skipped)
+        return Checked([file_refusals.check_failed(len(report.errors))], report.errors, report.skipped)
     landing = _landing(offered, report)
     if not landing:
-        return Checked([refusals.nothing_lands()], report.errors, report.skipped)
+        return Checked([file_refusals.nothing_lands()], report.errors, report.skipped)
     write.land(store, [Import(name, landing[name].artifact) for name in in_order(landing)], signed)
     return report
 
@@ -92,7 +92,7 @@ def _fresh(store: Port) -> None:
     """Refuse a store that holds any artifact besides the type that describes types: import never merges."""
     held = [name for name in store.ids() if name != METASCHEMA_ID]
     if held:
-        raise Refused([refusals.not_fresh(len(held))])
+        raise Refused([file_refusals.not_fresh(len(held))])
 
 
 def _landing(offered: list[Offered], report: Checked) -> dict[ArtifactId, Offered]:
@@ -116,9 +116,9 @@ def in_order(by_name: dict[ArtifactId, Offered]) -> list[ArtifactId]:
         for under in sorted(_beneath(by_name[name], by_name), key=names.order):
             visit(under, seen | {name})
         ordered.append(name)
-    for name in sorted((name for name in by_name if name.kind == TYPE_KIND), key=names.order):
+    for name in sorted((name for name in by_name if by_name[name].typed), key=names.order):
         visit(name, frozenset())
-    return ordered + sorted((name for name in by_name if name.kind != TYPE_KIND), key=names.order)
+    return ordered + sorted((name for name in by_name if not by_name[name].typed), key=names.order)
 
 
 def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set) -> list:
@@ -129,17 +129,18 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     if each.artifact is None:
         return []
     if each.name == METASCHEMA_ID:
-        return [] if each.text == canonical.dump(store.artifact(METASCHEMA_ID)) else [refusals.not_canonical(
+        return [] if each.text == canonical.dump(store.artifact(METASCHEMA_ID)) else [file_refusals.not_canonical(
             each.file, "the type that describes types is the store's own, and this copy differs from it",
         )]
     if _held_back(each, by_name):
         return []
-    if not draft.holds(values.type_of(each.name.kind)):
-        return [refusals.no_type_offered(each.file, each.name.kind.name)]
-    schema = composition.kind_schema(each.name.kind, draft)["schema"]
+    kind = composition.artifact_kind(each.artifact)
+    if not draft.holds(values.type_of(kind)):
+        return [file_refusals.no_type_offered(each.file, kind.name)]
+    schema = composition.kind_schema(kind, draft)["schema"]
     content = settled.checked(each.artifact)
     found = [*_form(draft, each, schema), *_fit(draft, each, content, schema, unread)]
-    if not found and each.name.kind == TYPE_KIND:
+    if not found and each.typed:
         found = definitions.faults(each.name, content, draft)
     return found
 
@@ -149,8 +150,8 @@ def _form(draft: Draft, each: Offered, schema: dict) -> list:
     try:
         written = canonical.dump(settled.order(each.artifact, composition.declared(schema, draft)))
     except canonical.NotCanonical as fault:
-        return [refusals.not_canonical(each.file, str(fault))]
-    return [] if written == each.text else [refusals.not_canonical(each.file, "its text is not the text kb writes")]
+        return [file_refusals.not_canonical(each.file, str(fault))]
+    return [] if written == each.text else [file_refusals.not_canonical(each.file, "its text is not the text kb writes")]
 
 
 def _fit(draft: Draft, each: Offered, content: dict, schema: dict, unread: set) -> list:
@@ -198,8 +199,10 @@ def _leads_to(draft: Draft, each: Offered, by_name: dict) -> list[ArtifactId]:
 def _beneath(each: Offered, by_name: dict) -> list[ArtifactId]:
     """The type files the directory brings that a file is read through: its type's, other than the store's own type
     of types, and, for a type, those its schema is built on or refers to by a kb: reference."""
-    found = [values.type_of(each.name.kind)]
-    if each.name.kind == TYPE_KIND and isinstance(each.artifact, dict):
+    if each.artifact is None:
+        return []
+    found = [values.type_of(composition.artifact_kind(each.artifact))]
+    if each.typed:
         found += composition.referred(each.artifact.get("schema"))
     return [name for name in dict.fromkeys(found) if name != METASCHEMA_ID and name in by_name]
 

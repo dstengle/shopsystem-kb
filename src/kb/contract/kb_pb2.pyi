@@ -52,16 +52,18 @@ class Refusal(_message.Message):
     def __init__(self, faults: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ...) -> None: ...
 
 class CreateRequest(_message.Message):
-    __slots__ = ("kind", "title", "content", "signature")
-    KIND_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("id", "type", "title", "content", "signature")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
-    kind: str
+    id: str
+    type: str
     title: str
     content: str
     signature: Signature
-    def __init__(self, kind: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
 
 class Created(_message.Message):
     __slots__ = ("id", "revision")
@@ -105,10 +107,9 @@ class ReadRequest(_message.Message):
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., summary: _Optional[_Union[ReadRequest.Summary, _Mapping]] = ..., whole: _Optional[_Union[ReadRequest.Whole, _Mapping]] = ..., section: _Optional[_Union[ReadRequest.Section, _Mapping]] = ...) -> None: ...
 
 class Artifact(_message.Message):
-    __slots__ = ("id", "kind", "schema_version", "revision", "title", "content", "references", "parts", "inbound")
+    __slots__ = ("id", "type", "revision", "title", "content", "references", "parts", "inbound")
     ID_FIELD_NUMBER: _ClassVar[int]
-    KIND_FIELD_NUMBER: _ClassVar[int]
-    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
@@ -116,15 +117,14 @@ class Artifact(_message.Message):
     PARTS_FIELD_NUMBER: _ClassVar[int]
     INBOUND_FIELD_NUMBER: _ClassVar[int]
     id: str
-    kind: str
-    schema_version: int
+    type: str
     revision: int
     title: str
     content: str
     references: _containers.RepeatedCompositeFieldContainer[Stub]
     parts: _containers.RepeatedCompositeFieldContainer[PartStub]
     inbound: _containers.RepeatedCompositeFieldContainer[InboundCount]
-    def __init__(self, id: _Optional[str] = ..., kind: _Optional[str] = ..., schema_version: _Optional[int] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ...) -> None: ...
 
 class ReadResponse(_message.Message):
     __slots__ = ("result", "refusal")
@@ -135,18 +135,18 @@ class ReadResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Artifact, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class Stub(_message.Message):
-    __slots__ = ("field", "id", "kind", "title", "fields")
+    __slots__ = ("field", "id", "type", "title", "fields")
     FIELD_FIELD_NUMBER: _ClassVar[int]
     ID_FIELD_NUMBER: _ClassVar[int]
-    KIND_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
     field: str
     id: str
-    kind: str
+    type: str
     title: str
     fields: str
-    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ..., kind: _Optional[str] = ..., title: _Optional[str] = ..., fields: _Optional[str] = ...) -> None: ...
+    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., fields: _Optional[str] = ...) -> None: ...
 
 class PartStub(_message.Message):
     __slots__ = ("collection", "id", "title")
@@ -241,7 +241,7 @@ class HistoryRequest(_message.Message):
     def __init__(self, artifact: _Optional[str] = ..., role: _Optional[str] = ..., execution: _Optional[str] = ..., since: _Optional[str] = ..., batch: _Optional[str] = ...) -> None: ...
 
 class Entry(_message.Message):
-    __slots__ = ("id", "at", "actor", "op", "artifact", "place", "revision", "schema_version", "digest", "message", "batch", "read")
+    __slots__ = ("id", "at", "actor", "op", "artifact", "place", "revision", "type", "digest", "message", "batch", "read")
     ID_FIELD_NUMBER: _ClassVar[int]
     AT_FIELD_NUMBER: _ClassVar[int]
     ACTOR_FIELD_NUMBER: _ClassVar[int]
@@ -249,7 +249,7 @@ class Entry(_message.Message):
     ARTIFACT_FIELD_NUMBER: _ClassVar[int]
     PLACE_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
-    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     DIGEST_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     BATCH_FIELD_NUMBER: _ClassVar[int]
@@ -261,12 +261,12 @@ class Entry(_message.Message):
     artifact: str
     place: str
     revision: int
-    schema_version: int
+    type: str
     digest: str
     message: str
     batch: str
     read: _containers.RepeatedCompositeFieldContainer[Snapshotted]
-    def __init__(self, id: _Optional[str] = ..., at: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., op: _Optional[str] = ..., artifact: _Optional[str] = ..., place: _Optional[str] = ..., revision: _Optional[int] = ..., schema_version: _Optional[int] = ..., digest: _Optional[str] = ..., message: _Optional[str] = ..., batch: _Optional[str] = ..., read: _Optional[_Iterable[_Union[Snapshotted, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., at: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., op: _Optional[str] = ..., artifact: _Optional[str] = ..., place: _Optional[str] = ..., revision: _Optional[int] = ..., type: _Optional[str] = ..., digest: _Optional[str] = ..., message: _Optional[str] = ..., batch: _Optional[str] = ..., read: _Optional[_Iterable[_Union[Snapshotted, _Mapping]]] = ...) -> None: ...
 
 class Snapshotted(_message.Message):
     __slots__ = ("artifact", "revision", "digest")
@@ -504,16 +504,18 @@ class RemoveResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Removed, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class CreateItem(_message.Message):
-    __slots__ = ("kind", "title", "content", "key")
-    KIND_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("id", "type", "title", "content", "key")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     KEY_FIELD_NUMBER: _ClassVar[int]
-    kind: str
+    id: str
+    type: str
     title: str
     content: str
     key: str
-    def __init__(self, kind: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., key: _Optional[str] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., key: _Optional[str] = ...) -> None: ...
 
 class BatchCreateRequest(_message.Message):
     __slots__ = ("items", "signature")

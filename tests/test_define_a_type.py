@@ -2,9 +2,13 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, create, define, listing, next_version, read, remove, request, replace
+from calls import (
+    DECISION_TYPE, TYPE_OF_TYPES, create, define, iri, kb_ref, listing, next_version, read, remove, replace,
+    request, targets, type_iri, version_iri,
+)
 import held
 from kb.content import loads
+from kb.metaschema import METASCHEMA
 
 scenarios("define-a-type.feature")
 
@@ -18,7 +22,7 @@ NOTE_TYPE = {
             "body": {"type": "string"},
             "relates_to": {
                 "type": "string",
-                "ref": {"targets": ["note"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+                "ref": {"targets": targets("note"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
             },
         },
         "required": ["title"],
@@ -48,9 +52,9 @@ def _define_note(client):
 
 @then("the type is an artifact the client can read back like any other")
 def _read_back_like_any_other(client, defined):
-    assert defined.id == "schema/note"
+    assert defined.id == type_iri("note")
     note_type = read(client, defined.id)
-    assert (note_type.id, note_type.kind, note_type.title) == ("schema/note", "schema", "Note")
+    assert (note_type.id, note_type.type, note_type.title) == (type_iri("note"), version_iri(TYPE_OF_TYPES), "Note")
     assert note_type.revision == 1
 
 
@@ -65,7 +69,7 @@ def _create_a_note(client):
         ],
         "attachments": [{"title": "Sketch", "url": "https://example.test/sketch"}],
     })
-    assert note.id == "note/first-note"
+    assert note.id == iri("note", "first-note")
     assert note.revision == 1
 
 
@@ -94,7 +98,7 @@ TOOL_USE_TYPE = {
         "type": "object",
         "properties": {
             "title": {"type": "string"},
-            "bindings": {"type": "array", "items": {"$ref": "kb:schema/tool#/$defs/binding"}},
+            "bindings": {"type": "array", "items": {"$ref": kb_ref("tool", 1, "#/$defs/binding")}},
         },
         "required": ["title"],
     },
@@ -135,7 +139,7 @@ DECISION_ON_BASE_TYPE = {
     "title": "Decision",
     "version": 1,
     "schema": {
-        "allOf": [{"$ref": "kb:schema/base"}],
+        "allOf": [{"$ref": kb_ref("base")}],
         "type": "object",
         "properties": {"title": {"type": "string"}, "outcome": {"type": "string"}},
         "required": ["title"],
@@ -188,10 +192,10 @@ def _define_a_malformed_type(client):
 def _rejected_by_the_metaschema(client, refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
-        ("schema/shelf-label", "schema/type", "anyOf"),
+        (type_iri("shelf-label"), "schema/type", "anyOf"),
     ]
     assert "'label' is not valid" in refused.faults[0].message
-    assert [fault.rule for fault in read(client, "schema/shelf-label").faults] == ["not-found"]
+    assert [fault.rule for fault in read(client, type_iri("shelf-label")).faults] == ["not-found"]
 
 
 NEVER_CHECKABLE = {
@@ -199,11 +203,11 @@ NEVER_CHECKABLE = {
         "type": "object",
         "properties": {
             "title": {"type": "string"},
-            "bindings": {"type": "array", "items": {"$ref": "kb:schema/nothing#/$defs/binding"}},
+            "bindings": {"type": "array", "items": {"$ref": kb_ref("nothing", 1, "#/$defs/binding")}},
         },
     }),
     "names itself as the type it is built on": ("Decision", {
-        "allOf": [{"$ref": "kb:schema/decision"}],
+        "allOf": [{"$ref": kb_ref("decision")}],
         "type": "object",
         "properties": {"title": {"type": "string"}},
     }),
@@ -253,7 +257,7 @@ def _nothing_written(attempt):
     assert attempt["after"] == attempt["before"]
 
 
-LINK = {"type": "string", "ref": {"targets": ["tag"], "cardinality": "one", "parts": False, "on_delete": "refuse"}}
+LINK = {"type": "string", "ref": {"targets": targets("tag"), "cardinality": "one", "parts": False, "on_delete": "refuse"}}
 
 BASES = {
     "a collection of notes every artifact may carry": {
@@ -300,7 +304,7 @@ def _a_link_through_the_base_refused(client):
     refused = request(client, "decision", "Price reviews happen weekly", {"about": other.id, "sections": RATIONALE})
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
-        ("decision/price-reviews-happen-weekly", "about", "ref"),
+        (iri("decision", "price-reviews-happen-weekly"), "about", "ref"),
     ]
 
 
@@ -308,19 +312,19 @@ def _a_link_through_the_base_refused(client):
 def _a_type_at_its_second_version(client):
     define(client, DECISION_TYPE)
     next_version(client, "decision", DECISION_TYPE)
-    return read(client, "schema/decision", whole=True)
+    return read(client, type_iri("decision"), whole=True)
 
 
 @when("the client changes what that type requires, leaving its version at two", target_fixture="changed")
 def _change_the_type_leaving_its_version(client):
     schema = {**DECISION_TYPE["schema"], "required": ["title", "supersedes"]}
-    return replace(client, "schema/decision", {"version": 2, "schema": schema}, message="Revise Decision")
+    return replace(client, type_iri("decision"), {"version": 2, "schema": schema}, message="Revise Decision")
 
 
 @then("the change is rejected because a type's version goes up whenever the type changes")
 def _rejected_for_the_version_kept(changed):
     assert [(fault.artifact, fault.place, fault.rule) for fault in changed.faults] == [
-        ("schema/decision", "version", "version"),
+        (type_iri("decision"), "version", "version"),
     ]
     assert changed.faults[0].message.startswith("a type's version goes up whenever the type changes")
     assert changed.revision == 0
@@ -328,10 +332,10 @@ def _rejected_for_the_version_kept(changed):
 
 @then("the type reads back as it was")
 def _the_type_as_it_was(client, held):
-    assert read(client, "schema/decision", whole=True) == held
+    assert read(client, type_iri("decision"), whole=True) == held
 
 
-TWO_DECISIONS = ["vote/ship-weekly", "vote/price-monthly"]
+TWO_DECISIONS = [iri("vote", "ship-weekly"), iri("vote", "price-monthly")]
 
 
 @given("a type the store holds, and two artifacts of its kind")
@@ -346,7 +350,7 @@ def _a_type_and_two_artifacts(client):
 @when("the client removes that type", target_fixture="attempt")
 def _remove_the_type(root, client):
     before = held.holds(root)
-    return {"response": remove(client, "schema/vote"), "before": before, "after": held.holds(root)}
+    return {"response": remove(client, type_iri("vote")), "before": before, "after": held.holds(root)}
 
 
 @then("the removal is rejected because something still points at it, naming each of those two artifacts")
@@ -355,7 +359,7 @@ def _rejected_naming_each(client, attempt):
     assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [
         (name, "", "on_delete") for name in sorted(TWO_DECISIONS)
     ]
-    assert all("'schema/vote'" in fault.message for fault in faults)
+    assert all(repr(type_iri("vote")) in fault.message for fault in faults)
     assert attempt["after"] == attempt["before"]
     assert list(listing(client, "vote", ids_only=True).ids) == sorted(TWO_DECISIONS)
 
@@ -473,7 +477,53 @@ def _define_a_type_using(client, keyword):
 @then("the type is accepted")
 def _the_type_is_accepted(defined):
     assert not defined.faults, defined.faults
-    assert (defined.id, defined.revision) == ("schema/note", 1)
+    assert defined.revision == 1
+
+
+@when(
+    parsers.re(r'the client defines a type, giving it the IRI "(?P<at>[^"]+)"(?:, which does not sit under "[^"]+")?'),
+    target_fixture="defined",
+)
+def _define_a_type_at(client, at):
+    return request(client, "schema", DECISION_TYPE["title"], {key: DECISION_TYPE[key] for key in ("version", "schema")},
+                   message="Define Decision", at=at)
+
+
+@then(parsers.parse('the type is held at "{at}"'))
+def _type_held_at(client, at):
+    held_type = read(client, at)
+    assert not held_type.faults, held_type.faults
+    assert (held_type.id, held_type.type) == (at, version_iri(TYPE_OF_TYPES))
+
+
+@then(parsers.parse('its version is held at "{at}", "@" and the version\'s number'))
+def _version_held_at(client, at):
+    """The version is the number the type stands at; a create naming that version's IRI is refused for nothing but
+    the title it leaves out, never for its version, and writes nothing."""
+    number = loads(read(client, at, whole=True).content)["version"]
+    probe = request(client, at, "", {}, at=f"{at}/probe", version=number)
+    assert [fault.rule for fault in probe.faults] == ["title"]
+
+
+@then(parsers.parse('an artifact created of that type has an IRI under "{at}"'))
+def _artifact_under(client, at):
+    made = request(client, at, "Price reviews happen weekly", {"sections": [
+        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+        {"title": "Rationale", "body": "Costs move weekly.\n"},
+    ]}, version=1)
+    assert not made.faults, made.faults
+    assert made.id.startswith(at + "/")
+
+
+@when(parsers.parse('the client reads "{at}"'), target_fixture="read_back")
+def _client_reads(client, at):
+    return read(client, at, whole=True)
+
+
+@then("it reads back the type that describes types")
+def _the_type_of_types(read_back):
+    assert (read_back.id, read_back.type, read_back.title) == (TYPE_OF_TYPES, version_iri(TYPE_OF_TYPES), METASCHEMA["title"])
+    assert loads(read_back.content) == {key: value for key, value in METASCHEMA.items() if key != "title"}
 
 
 WRITTEN_ORDER = [
@@ -511,7 +561,7 @@ def _define_a_type_with_several_faults(root, client):
 def _rejected_with_every_fault(attempt):
     refused = attempt["response"]
     assert (refused.id, refused.revision) == ("", 0)
-    assert {fault.artifact for fault in refused.faults} == {"schema/note"}
+    assert {fault.artifact for fault in refused.faults} == {type_iri("note")}
     assert sorted((fault.place, fault.rule) for fault in refused.faults) == sorted(WRITTEN_ORDER)
 
 

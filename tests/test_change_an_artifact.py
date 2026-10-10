@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, NOTE_TYPE, add, define, create, create_many, created, journal, listing, read, refs, remove,
-    replacing, request, replace, answer, start_a_store, check,
+    CLIENT, DECISION_TYPE, NOTE_TYPE, add, answer, check, create, create_many, created, define, iri, journal,
+    listing, read, refs, remove, replace, replacing, request, start_a_store, type_iri, version_iri,
 )
 import at_once
 import held
@@ -111,7 +111,7 @@ def test_every_way_the_place_a_change_is_aimed_at_can_be_wrong_is_refused():
     pass
 
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -119,6 +119,7 @@ SECTIONS = [
 
 
 @given("a store holding a decision with a purpose and a rationale, at its first version", target_fixture="client")
+@given("a store holding a decision with a purpose and a rationale, at its first revision", target_fixture="client")
 def _store_with_a_decision(root):
     client = kb_client.connect(root)
     start_a_store(root)
@@ -174,8 +175,8 @@ def _the_rest_as_before(changed):
     assert {key: value for key, value in after.items() if key != "sections"} == {
         key: value for key, value in before.items() if key != "sections"
     }
-    assert [(seen.id, seen.kind, seen.title, seen.schema_version) for seen in (changed["before"], changed["after"])] == [
-        (DECISION, "decision", "Price reviews happen weekly", 1),
+    assert [(seen.id, seen.type, seen.title) for seen in (changed["before"], changed["after"])] == [
+        (DECISION, version_iri("decision"), "Price reviews happen weekly"),
     ] * 2
 
 
@@ -185,6 +186,13 @@ def _replace_the_decision(client):
         SECTIONS[0], {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
     ]}, message="Say why weekly")
     return response
+
+
+@then("the decision's revision goes up by one")
+def _revision_up_by_one(client, changed):
+    assert not changed.faults, changed.faults
+    assert changed.revision == 2
+    assert read(client, DECISION).revision == 2
 
 
 @given("the client was readied with a clock that fails when it is asked the time", target_fixture="client")
@@ -216,9 +224,9 @@ def _stale(client):
 
 def _decision_type_at_version_2(client, schema):
     """The decision type changed to its second version, so the decision, checked against the first, is behind it."""
-    changed = replace(client, "schema/decision", {"version": 2, "schema": schema}, message="Decision type, version 2")
+    changed = replace(client, type_iri("decision"), {"version": 2, "schema": schema}, message="Decision type, version 2")
     assert not changed.faults, changed.faults
-    assert read(client, DECISION).schema_version == 1
+    assert read(client, DECISION).type == version_iri("decision", 1)
     assert _stale(client) == [DECISION]
 
 
@@ -267,7 +275,7 @@ def _rejected_for_a_version_inside(attempt):
 )
 def _replace_a_name_the_store_lacks(root, client):
     before = held.holds(root)
-    response = replace(client, "decision/nothing-of-the-sort", {"sections": SECTIONS}, message="Change it")
+    response = replace(client, iri("decision", "nothing-of-the-sort"), {"sections": SECTIONS}, message="Change it")
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
@@ -275,8 +283,8 @@ def _replace_a_name_the_store_lacks(root, client):
 def _rejected_as_not_held(attempt):
     refused = attempt["response"]
     assert refused.revision == 0
-    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [("decision/nothing-of-the-sort", "not-found")]
-    assert "decision/nothing-of-the-sort" in refused.faults[0].message
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [(iri("decision", "nothing-of-the-sort"), "not-found")]
+    assert iri("decision", "nothing-of-the-sort") in refused.faults[0].message
 
 
 @then("nothing is written anywhere in the store")
@@ -416,7 +424,7 @@ def _keeps_its_name(changed):
 def _still_lands(client):
     assert list(check(client).violations) == []
     inward = refs(client, DECISION, 1, inward=True)
-    assert [(reached.stub.id, reached.route[0].field) for reached in inward.reached] == [("note/why-monthly", "about")]
+    assert [(reached.stub.id, reached.route[0].field) for reached in inward.reached] == [(iri("note", "why-monthly"), "about")]
 
 
 @when(
@@ -534,7 +542,7 @@ def _rejected_while_pointed_at(root, attempt):
 @then("the client is given each link into that option")
 def _each_link_into_the_option(attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.place) for fault in faults] == [("note/why-weekly", "about")]
+    assert [(fault.artifact, fault.place) for fault in faults] == [(iri("note", "why-weekly"), "about")]
     assert f"'{LINKED_OPTION}'" in faults[0].message
 
 

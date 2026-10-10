@@ -11,12 +11,13 @@ def everything(store: Port) -> kb_pb2.Checked:
     violations, stale, schemas = [], [], {}
     for artifact_id in store.ids():
         artifact = store.artifact(artifact_id)
-        if artifact_id.kind not in schemas:
-            schemas[artifact_id.kind] = composition.kind_schema(artifact_id.kind, store)
-        schema = schemas[artifact_id.kind]
-        if artifact["schema_version"] < schema["version"]:
+        kind = composition.artifact_kind(artifact)
+        if kind not in schemas:
+            schemas[kind] = composition.kind_schema(kind, store)
+        schema = schemas[kind]
+        if settled.version(artifact) < schema["version"]:
             stale.append(kb_pb2.Stale(
-                artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
+                artifact=str(artifact_id), schema_version=settled.version(artifact), current=schema["version"],
             ))
         found = validation.validate(str(artifact_id), settled.checked(artifact), schema["schema"], store)
         violations += fault_order.ordered(

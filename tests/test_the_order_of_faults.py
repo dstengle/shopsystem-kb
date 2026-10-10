@@ -4,7 +4,7 @@ before the collections. Through Create and Check, and for a type, through its de
 tmp_path."""
 import pytest
 
-from calls import check, create, define, request, start_a_store
+from calls import check, create, define, kb_ref, request, start_a_store
 import held
 from kb import client as kb_client
 
@@ -68,9 +68,9 @@ def test_an_ordinary_list_fields_entries_come_in_number_order(client):
 
 
 def test_a_types_members_naming_no_type_come_in_number_order(client):
-    members = [{"$ref": "kb:schema/note"}] * 11
-    members[2] = {"$ref": "kb:schema/nothing"}
-    members[10] = {"$ref": "kb:schema/nowhere"}
+    members = [{"$ref": kb_ref("note")}] * 11
+    members[2] = {"$ref": kb_ref("nothing")}
+    members[10] = {"$ref": kb_ref("nowhere")}
     refused = request(client, "schema", "Memo", {"version": 1, "schema": {"allOf": members}}, message="Define Memo")
     assert _faults(refused.faults) == [("schema/allOf/2/$ref", "shape"), ("schema/allOf/10/$ref", "shape")]
 
@@ -88,7 +88,7 @@ def test_a_check_gives_an_artifacts_violations_in_reading_order(root, client, ca
         {"title": "Context", "body": "Why.\n"},
     ]})
     stored = held.artifact(root, made.id)
-    identity = {key: stored[key] for key in ("id", "type", "schema_version", "revision", "title")}
+    identity = {key: stored[key] for key in ("id", "type", "revision", "title")}
     held.plant(root, made.id, {**identity, **content})
     assert _faults(check(client).violations) == expected
 
@@ -100,7 +100,7 @@ def test_a_types_faults_come_in_the_order_it_is_written_whatever_order_they_are_
     schema = {
         "type": "object",
         "properties": {**TITLE, "about": {"type": "object", "sections": [{"title": "Context"}]}},
-        "allOf": [{"$ref": "kb:schema/nothing"}],
+        "allOf": [{"$ref": kb_ref("nothing")}],
         "not": {"summary": ["title"]},
     }
     refused = request(client, "schema", "Memo", {"version": 1, "schema": schema}, message="Define Memo")

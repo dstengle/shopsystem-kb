@@ -5,10 +5,10 @@ shown at a glance are refused at the top of a collection's items; collections at
 contract, each store under its own tmp_path."""
 import pytest
 
-from calls import define, request, start_a_store
+from calls import define, iri, kb_ref, request, start_a_store, targets
 from kb import client as kb_client
 
-LINK = {"type": "string", "ref": {"targets": ["tag"], "cardinality": "one", "parts": False, "on_delete": "refuse"}}
+LINK = {"type": "string", "ref": {"targets": targets("tag"), "cardinality": "one", "parts": False, "on_delete": "refuse"}}
 TITLE = {"title": {"type": "string"}}
 
 
@@ -35,7 +35,7 @@ def test_kbs_keyword_names_as_data_are_never_refused(client):
     nested = {"type": "object", "properties": {
         "ref": {"type": "string"}, "parts": {"type": "string"}, "sections": {"type": "string"},
         "summary": {"type": "string", "enum": ["ref", "parts"]},
-        "shape": {"type": "object", "default": {"ref": {"targets": ["tag"]}}, "examples": [{"parts": {}, "sections": []}]},
+        "shape": {"type": "object", "default": {"ref": {"targets": targets("tag")}}, "examples": [{"parts": {}, "sections": []}]},
     }}
     schema = _object(
         {"about": nested, "link": {**LINK, "ref": {**LINK["ref"], "parts": True}}},
@@ -44,25 +44,25 @@ def test_kbs_keyword_names_as_data_are_never_refused(client):
     )
     assert _faults(_define(client, schema)) == []
     made = request(client, "note", "First", {
-        "about": {"ref": "a", "parts": "b", "sections": "c", "summary": "ref", "shape": {"ref": {"targets": []}}},
+        "about": {"ref": "a", "parts": "b", "sections": "c", "summary": "ref", "shape": {"ref": {"targets": targets()}}},
         "sections": [{"title": "Context", "body": "Why.\n", "sections": [{"title": "Background", "body": "Then.\n"}]}],
     })
     assert not made.faults, made.faults
 
 
 READ_UNDER_A_TOP_ALL_OF = {
-    "a link field": ({"allOf": [_object({"about": LINK})]}, {"about": "tag/nothing"}, "about"),
+    "a link field": ({"allOf": [_object({"about": LINK})]}, {"about": iri("tag", "nothing")}, "about"),
     "a collection's link field": (
         {"allOf": [{"type": "object", "properties": TITLE, "parts": {"a": {"items": _object({"about": LINK})}}}]},
-        {"a": [{"title": "One", "about": "tag/nothing"}]}, "a/0/about",
+        {"a": [{"title": "One", "about": iri("tag", "nothing")}]}, "a/0/about",
     ),
     "a collection's items' own allOf": (
         _object({}, parts={"a": {"items": {"allOf": [_object({"about": LINK})]}}}),
-        {"a": [{"title": "One", "about": "tag/nothing"}]}, "a/0/about",
+        {"a": [{"title": "One", "about": iri("tag", "nothing")}]}, "a/0/about",
     ),
     "two levels of collections": (
         _object({}, parts={"a": {"items": _object({}, parts={"b": {"items": _object({"about": LINK})}})}}),
-        {"a": [{"title": "One", "b": [{"title": "Two", "about": "tag/nothing"}]}]}, "a/0/b/0/about",
+        {"a": [{"title": "One", "b": [{"title": "Two", "about": iri("tag", "nothing")}]}]}, "a/0/b/0/about",
     ),
 }
 
@@ -85,7 +85,7 @@ def test_collections_and_glance_fields_under_a_top_all_of_are_accepted(client):
 
 def test_a_collections_items_given_by_a_whole_type_are_not_walked_into(client):
     define(client, {"title": "Checklist", "version": 1, "schema": _object({}, sections=[{"title": "Steps"}])})
-    assert _faults(_define(client, _object({}, parts={"lists": {"items": {"$ref": "kb:schema/checklist"}}}))) == []
+    assert _faults(_define(client, _object({}, parts={"lists": {"items": {"$ref": kb_ref("checklist")}}}))) == []
 
 
 MISPLACED = {

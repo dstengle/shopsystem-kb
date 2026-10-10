@@ -25,7 +25,7 @@ def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
-    return _stub(field, store.artifact(target_id), _shown(store, target_id.kind))
+    return _stub(field, store.artifact(target_id), _shown(store, composition.kind_of(target_id, store)))
 
 
 def stubs(store: Port, kind: values.Kind, artifact_ids: list[ArtifactId]) -> list[kb_pb2.Stub]:
@@ -41,7 +41,7 @@ def _shown(store: Port, kind: values.Kind) -> dict:
 
 def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
     return kb_pb2.Stub(
-        field=field, id=target["id"], kind=target["type"], title=target["title"],
+        field=field, id=target["id"], type=target["type"], title=target["title"],
         fields=dumps(_summary_fields(target, shown)),
     )
 
@@ -62,7 +62,7 @@ def _section(store: Port, locator: Locator, title: str) -> kb_pb2.Artifact:
 
 def _summary(store: Port, locator: Locator) -> kb_pb2.Artifact:
     found = store.artifact(locator.id)
-    schema = composition.kind_schema(locator.id.kind, store)["schema"]
+    schema = composition.artifact_schema(found, store)["schema"]
     declared = composition.declared(schema, store)
     response = _response(found, dumps(_summary_fields(found, declared)))
     for link in links.carried(found, schema, store):
@@ -77,7 +77,7 @@ def _summary(store: Port, locator: Locator) -> kb_pb2.Artifact:
 
 def _response(found: dict, content: str) -> kb_pb2.Artifact:
     return kb_pb2.Artifact(
-        id=found["id"], kind=found["type"], schema_version=found["schema_version"], revision=found["revision"],
+        id=found["id"], type=found["type"], revision=found["revision"],
         title=found["title"], content=content,
     )
 
@@ -94,7 +94,7 @@ def _resolved(store: Port, artifact_id: ArtifactId, depth: int, on_path: set) ->
             return target
         return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
     resolved = dict(found)
-    carried = links.carried(found, composition.kind_schema(artifact_id.kind, store)["schema"], store)
+    carried = links.carried(found, composition.artifact_schema(found, store)["schema"], store)
     for field in {link.field for link in carried if link.own}:
         value = found[field]
         resolved[field] = [fill(target) for target in value] if isinstance(value, list) else fill(value)

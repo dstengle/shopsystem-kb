@@ -35,11 +35,12 @@ def handed(artifact_id: values.ArtifactId, artifact: dict, corpus) -> list[port.
     the kinds its field allows, read through the artifact's type as the corpus holds it; none when the corpus holds
     no such type. Every artifact carries one implicit link, first, to the artifact of its type. A value that could name nothing, which a type changed after it was written can leave in a link
     field, is not handed."""
-    typed = values.type_of(artifact_id.kind)
+    kind = composition.artifact_kind(artifact)
+    typed = values.type_of(kind)
     implicit = port.Link("", "", typed, "", (values.TYPE_KIND.name,), implicit=True)
     if not corpus.holds(typed):
         return [implicit]
-    schema = composition.kind_schema(artifact_id.kind, corpus)["schema"]
+    schema = composition.kind_schema(kind, corpus)["schema"]
     found = [implicit]
     for link in carried(artifact, schema, corpus):
         if not isinstance(link.target, str):

@@ -59,7 +59,8 @@ class Checks(Reads):
             raise Linked(linked)
 
     def _lands(self, link) -> bool:
-        if link.target.kind.name not in link.kinds or not self.holds(link.target):
+        rows = self._rows("SELECT kind FROM artifacts WHERE id = ?", str(link.target))
+        if not rows or rows[0][0] not in link.kinds:
             return False
         return not link.part or link.part in self._parts(link.target)
 

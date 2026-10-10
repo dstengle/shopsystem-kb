@@ -7,7 +7,7 @@ directory is refused. Nothing here checks an artifact against a type."""
 from pathlib import Path
 from dataclasses import dataclass, field
 
-from kb import canonical, names, refusals, served, settled, store, values
+from kb import canonical, file_refusals, names, served, settled, store
 from kb.roots import Named
 from kb.values import ArtifactId, Refused
 
@@ -20,20 +20,27 @@ KEPT = (
 
 @dataclass
 class Offered:
-    """One file as read: its place, the name the layout gives it (None where the layout puts no artifact), its text
-    and, when it reads as an artifact at its place, that artifact; and its errors."""
+    """One file as read: its place, the IRI the layout gives it (None where the layout puts no artifact) and the
+    number of the version a type's place gives (None for any other artifact's), its text and, when it reads as an
+    artifact at its place, that artifact; and its errors."""
     file: str
     name: ArtifactId | None
+    number: int | None = None
     text: str = ""
     artifact: dict | None = None
     errors: list = field(default_factory=list)
+
+    @property
+    def typed(self) -> bool:
+        """Whether the file's place is a type version's."""
+        return self.number is not None
 
 
 def offered(directory: Named, passed_over: Path | None = None) -> list[Offered]:
     """Every file below the directory, read, in the order of the places the layout gives them; those under the place
     passed over, if one is given, are not. Raises Refused when the name names no directory."""
     if not directory.path.is_dir():
-        raise Refused([refusals.not_an_import_directory(directory.named)])
+        raise Refused([file_refusals.not_an_import_directory(directory.named)])
     return [_offered(directory, steps) for steps in _files(directory, passed_over)]
 
 
@@ -53,37 +60,39 @@ def _under(file: Path, place: Path | None) -> bool:
 
 
 def _offered(directory: Named, steps: tuple[str, ...]) -> Offered:
-    """A file read as YAML 1.2, and as an artifact at the place the layout gives its name and kind."""
+    """A file read as YAML 1.2, and as an artifact at the place the layout gives its IRI, and a type's version."""
     file, written = "/".join(steps), names.filed(steps)
-    offered = Offered(file, values.artifact_id(written) if written is not None else None)
+    offered = Offered(file, *((ArtifactId(written[0]), written[1]) if written is not None else (None, None)))
     try:
         offered.text = directory.path.joinpath(*steps).read_bytes().decode("utf-8")
         loaded = canonical.load(offered.text)
     except OSError as error:
-        offered.errors.append(refusals.unreadable_file(file, f"it cannot be opened: {error.strerror or error}"))
+        offered.errors.append(file_refusals.unreadable_file(file, f"it cannot be opened: {error.strerror or error}"))
         return offered
     except UnicodeDecodeError:
-        offered.errors.append(refusals.unreadable_file(file, "it is not text in UTF-8"))
+        offered.errors.append(file_refusals.unreadable_file(file, "it is not text in UTF-8"))
         return offered
     except canonical.NotCanonical as fault:
-        offered.errors.append(refusals.unreadable_file(file, str(fault)))
+        offered.errors.append(file_refusals.unreadable_file(file, str(fault)))
         return offered
-    problem = _misplaced(written, loaded)
+    problem = _misplaced(offered, loaded)
     if problem is not None:
-        offered.errors.append(refusals.not_canonical(file, problem))
+        offered.errors.append(file_refusals.not_canonical(file, problem))
     else:
         offered.artifact = loaded
     return offered
 
 
-def _misplaced(written: str | None, loaded) -> str | None:
-    """Why what a file holds is not an artifact at its place, or None when it is."""
-    if written is None:
-        return "an artifact is filed as <kind>/<slug>.yaml, and nothing else is offered for import"
+def _misplaced(offered: Offered, loaded) -> str | None:
+    """Why what a file holds is not an artifact at its place, or None when it is: its IRI the one its place gives,
+    and a type's version the one its place gives, at a type version's place, and no other artifact there."""
+    if offered.name is None:
+        return ("an artifact is filed as <host>/<segment>/.../<segment>.yaml, a type's version as "
+                "<host>/.../<segment>@<n>.yaml, and nothing else is offered for import")
     if not isinstance(loaded, dict) or not settled.identified(loaded):
         return f"an artifact opens with {', '.join(settled.IDENTITY)}, in that order, and this file does not"
-    kind = names.parted(written)[0]
-    if (loaded["id"], loaded["type"]) != (written, kind):
-        return (f"its place names {written!r}, of kind {kind!r}, and it holds {loaded['id']!r}, "
-                f"of kind {loaded['type']!r}")
+    if loaded["id"] != str(offered.name):
+        return f"its place names {str(offered.name)!r}, and it holds {loaded['id']!r}"
+    if settled.typed(loaded) != offered.typed or (offered.typed and loaded.get("version") != offered.number):
+        return "a type is filed at its version's place, <segment>@<n>.yaml, and nothing else is"
     return None

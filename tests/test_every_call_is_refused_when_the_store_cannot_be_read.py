@@ -5,15 +5,15 @@ boundary. A call added to the service without a row fails `test_every_rpc_has_a_
 import pytest
 
 import held
-from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, added, create, create_many, created, define, journal
+from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, added, create, create_many, created, define, iri, journal
 from calls import listing, read, refs, remove, remove_many, removed, replace, replace_many, replaced, request
 from calls import search, snapshot, start_a_store, add, add_many, check
 from conftest import OPERATOR, _kb
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-DECISION = "decision/price-reviews-happen-weekly"
-PROCESS = "process/open-the-shop"
+DECISION = iri("decision", "price-reviews-happen-weekly")
+PROCESS = iri("process", "open-the-shop")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},

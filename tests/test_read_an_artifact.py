@@ -4,7 +4,10 @@ import grpc
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
+from calls import (
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, answer, create, define, iri, read, replace,
+    start_a_store, tagged_decision_type, type_iri, version_iri,
+)
 import held
 import serving
 from kb import client as kb_client
@@ -51,9 +54,9 @@ def test_a_read_that_names_a_place_the_artifact_does_not_hold_is_refused():
     pass
 
 
-OLDER = "decision/prices-are-reviewed-monthly"
-DECISION = "decision/price-reviews-happen-weekly"
-PROCESS = "process/open-the-shop"
+OLDER = iri("decision", "prices-are-reviewed-monthly")
+DECISION = iri("decision", "price-reviews-happen-weekly")
+PROCESS = iri("process", "open-the-shop")
 OLDER_SECTIONS = [
     {"title": "Purpose", "body": "Keep prices current.\n"},
     {"title": "Rationale", "body": "Monthly was enough once.\n"},
@@ -100,14 +103,14 @@ def _read_at_a_glance(client):
 
 @then("the client is given its name, its kind, its title and the few fields the type shows at a glance")
 def _identity_and_summary_fields(summary):
-    assert (summary.id, summary.kind, summary.title) == (DECISION, "decision", "Price reviews happen weekly")
+    assert (summary.id, summary.type, summary.title) == (DECISION, version_iri("decision"), "Price reviews happen weekly")
     assert loads(summary.content) == {"supersedes": OLDER}
 
 
 @then("a stub of each thing it points at and of each of its parts")
 def _stubs(summary):
-    assert {(stub.field, stub.id, stub.kind, stub.title) for stub in summary.references} == {
-        ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
+    assert {(stub.field, stub.id, stub.type, stub.title) for stub in summary.references} == {
+        ("supersedes", OLDER, version_iri("decision"), "Prices are reviewed monthly"),
     }
     assert [(stub.collection, stub.id, stub.title) for stub in summary.parts] == [
         ("options", "keep-weekly", "Keep weekly"),
@@ -118,7 +121,7 @@ def _stubs(summary):
 @then("how many things point at it, counted by their kind and by the link they use")
 def _inbound_counts(summary):
     assert [(count.kind, count.field, count.count) for count in summary.inbound] == [
-        ("work-item", "decisions", 2),
+        (type_iri("work-item"), "decisions", 2),
     ]
 
 
@@ -249,13 +252,13 @@ def _given_the_decision_answered(shown, channels, served, how):
 
 @when("the client reads an artifact by a name the store holds nothing under", target_fixture="shown")
 def _read_a_name_the_store_lacks(client):
-    return read(client, "decision/nothing-of-the-sort")
+    return read(client, iri("decision", "nothing-of-the-sort"))
 
 
 @then("the read is rejected because the store holds nothing by that name, and the name asked for is given back")
 def _rejected_as_not_held(shown):
-    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [("decision/nothing-of-the-sort", "not-found")]
-    assert "decision/nothing-of-the-sort" in shown.faults[0].message
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(iri("decision", "nothing-of-the-sort"), "not-found")]
+    assert iri("decision", "nothing-of-the-sort") in shown.faults[0].message
 
 
 @when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="shown")
@@ -468,8 +471,8 @@ def _never_readied_again(readied):
     assert readied["used"] is readied["client"]
 
 
-DAILY = "decision/stock-is-counted-daily"
-NIGHTLY = "decision/stock-is-counted-nightly"
+DAILY = iri("decision", "stock-is-counted-daily")
+NIGHTLY = iri("decision", "stock-is-counted-nightly")
 COUNTING = [
     {"title": "Purpose", "body": "Know what is on the shelves.\n"},
     {"title": "Rationale", "body": "Counting catches shrinkage early.\n"},
@@ -526,8 +529,8 @@ def _read_the_whole_decision(client):
 
 @then("the client is given every field, every section and every part, in the order the type declares")
 def _everything_in_declared_order(whole):
-    assert (whole.id, whole.kind, whole.schema_version, whole.revision, whole.title) == (
-        DECISION, "decision", 1, 1, "Price reviews happen weekly",
+    assert (whole.id, whole.type, whole.revision, whole.title) == (
+        DECISION, version_iri("decision"), 1, "Price reviews happen weekly",
     )
     content = loads(whole.content)
     assert list(content) == ["supersedes", "sections", "options"]
@@ -580,7 +583,7 @@ def _older_filled_in(whole):
 @then("the tag is given in place of the link inside the older decision")
 def _tag_filled_in(whole):
     assert loads(whole.content)["supersedes"]["tags"] == [
-        {"id": "tag/pricing", "type": "tag", "schema_version": 1, "revision": 1, "title": "pricing"},
+        {"id": iri("tag", "pricing"), "type": version_iri("tag"), "revision": 1, "title": "pricing"},
     ]
 
 
@@ -604,9 +607,9 @@ def _branches_as_written(whole):
 @then("the older decision comes with its name, its kind, its title and the version it is at, ahead of its content")
 def _older_says_what_it_is(whole):
     older = loads(whole.content)["supersedes"]
-    assert list(older)[:5] == ["id", "type", "schema_version", "revision", "title"]
+    assert list(older)[:4] == ["id", "type", "revision", "title"]
     assert (older["id"], older["type"], older["title"], older["revision"]) == (
-        OLDER, "decision", "Prices are reviewed monthly", 1,
+        OLDER, version_iri("decision"), "Prices are reviewed monthly", 1,
     )
 
 

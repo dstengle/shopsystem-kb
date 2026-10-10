@@ -1,7 +1,7 @@
 from pytest_bdd import given, scenario, then
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, create, define,
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, create, define, iri,
     start_a_store,
 )
 import held
@@ -56,7 +56,7 @@ SECTIONS = [
 ]
 
 
-WEEKLY = "decision/price-reviews-happen-weekly"
+WEEKLY = iri("decision", "price-reviews-happen-weekly")
 
 
 def _store_with_a_decision(root):
@@ -89,9 +89,9 @@ def _store_with_two_faults(root):
     decision = held.artifact(root, WEEKLY)
     decision["sections"] = decision["sections"][:1]
     held.plant(root, WEEKLY, decision)
-    work_item = held.artifact(root, "work-item/move-the-review-to-mondays")
-    work_item["decisions"] = ["decision/prices-are-reviewed-monthly"]
-    held.plant(root, "work-item/move-the-review-to-mondays", work_item)
+    work_item = held.artifact(root, iri("work-item", "move-the-review-to-mondays"))
+    work_item["decisions"] = [iri("decision", "prices-are-reviewed-monthly")]
+    held.plant(root, iri("work-item", "move-the-review-to-mondays"), work_item)
     return client
 
 
@@ -100,7 +100,7 @@ def _both_reported(checked):
     assert not checked.faults, checked.faults
     assert [(fault.artifact, fault.place, fault.rule) for fault in checked.violations] == [
         (WEEKLY, "sections", "sections"),
-        ("work-item/move-the-review-to-mondays", "decisions/0", "ref"),
+        (iri("work-item", "move-the-review-to-mondays"), "decisions/0", "ref"),
     ]
 
 
@@ -142,7 +142,7 @@ def _the_store_holds_a_misordered_decision(root, client):
     """Made by hand behind the store's back, since the store refuses to write it."""
     created = create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
     stored = held.artifact(root, created.id)
-    identity = {key: stored[key] for key in ("id", "type", "schema_version", "revision", "title")}
+    identity = {key: stored[key] for key in ("id", "type", "revision", "title")}
     held.plant(root, created.id, {**identity, **MISORDERED_DECISION})
 
 

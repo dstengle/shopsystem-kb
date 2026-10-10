@@ -2,7 +2,7 @@
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
 artifact) and the links into an artifact, over the port. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
-from kb import composition, links, names
+from kb import composition, links, names, settled
 from kb.port import Linking, Port
 from kb.values import TYPE_KIND, ArtifactId, Kind
 
@@ -13,13 +13,21 @@ class Draft:
         self._pending: dict[ArtifactId, dict] = {}
         self._removed: set[ArtifactId] = set()
         self._types: dict[ArtifactId, dict] = {}
+        self._changed: set[ArtifactId] = set()
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
         self._removed.discard(artifact_id)
         self._pending[artifact_id] = artifact
+        self._note(artifact_id, artifact)
 
     def remove(self, artifact_id: ArtifactId) -> None:
+        self._note(artifact_id, self.artifact(artifact_id))
         self._removed.add(artifact_id)
+
+    def _note(self, artifact_id: ArtifactId, artifact: dict) -> None:
+        """A type the draft changes or removes noted as changed."""
+        if settled.typed(artifact):
+            self._changed.add(artifact_id)
 
     def holds(self, artifact_id: ArtifactId) -> bool:
         if artifact_id in self._removed:
@@ -29,11 +37,12 @@ class Draft:
     def artifact(self, artifact_id: ArtifactId) -> dict:
         if artifact_id in self._pending:
             return self._pending[artifact_id]
-        if artifact_id.kind != TYPE_KIND:
-            return self._store.artifact(artifact_id)
-        if artifact_id not in self._types:
-            self._types[artifact_id] = self._store.artifact(artifact_id)
-        return self._types[artifact_id]
+        if artifact_id in self._types:
+            return self._types[artifact_id]
+        found = self._store.artifact(artifact_id)
+        if settled.typed(found):
+            self._types[artifact_id] = found
+        return found
 
     def as_read(self, type_ids: list[ArtifactId]) -> tuple[tuple[ArtifactId, int], ...]:
         """Each type given that the draft read from the store and leaves as it is, with the revision it was read at."""
@@ -59,7 +68,7 @@ class Draft:
 
     def reread(self) -> list[Kind]:
         """The kinds whose artifacts' links are read through a type the draft changed or removed."""
-        changed = {each for each in set(self._pending) | self._removed if each.kind == TYPE_KIND}
+        changed = set(self._changed)
         if not changed:
             return []
         types = sorted(set(self._store.ids(TYPE_KIND)) | changed, key=names.order)

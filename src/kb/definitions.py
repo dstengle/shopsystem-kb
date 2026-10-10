@@ -24,7 +24,7 @@ def _shapes(type_id: ArtifactId, schema, draft) -> list[kb_pb2.Fault]:
             continue
         if named.type_id == type_id and named.whole:
             found.append(type_refusals.built_on_itself(type_id, place, ref))
-        elif named.type_id is None or not draft.holds(named.type_id):
+        elif not composition.held(named, draft):
             found.append(type_refusals.no_such_shape(type_id, place, ref))
     return found
 

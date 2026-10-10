@@ -6,7 +6,7 @@ import copy
 
 import pytest
 
-from calls import remove, replace, request, start_a_store, read, refs
+from calls import iri, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri
 from kb import changes, client as kb_client, signatures, store, values, write
 from kb.content import dumps
 from kb.signatures import Signed
@@ -15,7 +15,7 @@ PLAIN = {"title": "Note", "version": 1, "schema": {
     "type": "object", "properties": {"title": {"type": "string"}, "about": {"type": "string"}}, "required": ["title"],
 }}
 LINKING = copy.deepcopy(PLAIN)
-LINKING["schema"]["properties"]["about"]["ref"] = {"targets": ["tag"], "cardinality": "one", "parts": False,
+LINKING["schema"]["properties"]["about"]["ref"] = {"targets": targets("tag"), "cardinality": "one", "parts": False,
                                                     "on_delete": "refuse"}
 TAG = {"title": "Tag", "version": 1, "schema": {"type": "object", "properties": {"title": {"type": "string"}}}}
 
@@ -28,7 +28,7 @@ def _create(client, kind, title, content):
 
 def _retype(client, defined, version):
     content = {key: value for key, value in defined.items() if key != "title"}
-    written = replace(client, "schema/note", {**content, "version": version}, message="m")
+    written = replace(client, type_iri("note"), {**content, "version": version}, message="m")
     assert not written.faults, written.faults
 
 
@@ -55,7 +55,7 @@ def _with_a_note_about_a_tag(client, note_type):
     _create(client, "schema", TAG["title"], {key: value for key, value in TAG.items() if key != "title"})
     _create(client, "schema", note_type["title"], {key: value for key, value in note_type.items() if key != "title"})
     _create(client, "tag", "Pricing", {})
-    _create(client, "note", "Weekly", {"about": "tag/pricing"})
+    _create(client, "note", "Weekly", {"about": iri("tag", "pricing")})
 
 
 def _inbound(client, name):
@@ -71,11 +71,11 @@ def _inward(client, name):
 def test_a_type_changed_to_make_a_field_a_link_blocks_removing_what_it_points_at(client):
     _with_a_note_about_a_tag(client, PLAIN)
     _retype(client, LINKING, 2)
-    assert _inbound(client, "tag/pricing") == [("note", "about", 1)]
-    assert _inward(client, "tag/pricing") == ["note/weekly"]
-    refused = _delete(client, "tag/pricing")
+    assert _inbound(client, iri("tag", "pricing")) == [(type_iri("note"), "about", 1)]
+    assert _inward(client, iri("tag", "pricing")) == [iri("note", "weekly")]
+    refused = _delete(client, iri("tag", "pricing"))
     assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
-        ("note/weekly", "about", "on_delete"),
+        (iri("note", "weekly"), "about", "on_delete"),
     ]
 
 
@@ -97,26 +97,25 @@ def test_a_type_changed_in_the_same_set_as_a_removal_blocks_it(where, client):
     _with_a_note_about_a_tag(client, PLAIN)
     content = {key: value for key, value in LINKING.items() if key != "title"}
     faults = _landed(where, [
-        changes.Replace(_whole("schema/note"), values.content(dumps({**content, "version": 2}))),
-        changes.Remove(_whole("tag/pricing")),
+        changes.Replace(_whole(type_iri("note")), values.content(dumps({**content, "version": 2}))),
+        changes.Remove(_whole(iri("tag", "pricing"))),
     ])
-    assert faults == [("note/weekly", "on_delete")]
+    assert faults == [(iri("note", "weekly"), "on_delete")]
 
 
 def test_a_type_changed_to_stop_a_field_being_a_link_no_longer_blocks_removing_what_it_named(client):
     _with_a_note_about_a_tag(client, LINKING)
     _retype(client, PLAIN, 2)
-    assert _inbound(client, "tag/pricing") == []
-    assert _inward(client, "tag/pricing") == []
-    assert not _delete(client, "tag/pricing").faults
+    assert _inbound(client, iri("tag", "pricing")) == []
+    assert _inward(client, iri("tag", "pricing")) == []
+    assert not _delete(client, iri("tag", "pricing")).faults
 
 
 def test_an_artifact_made_and_removed_in_one_set_does_not_hold_up_removing_its_type(where, client):
     _create(client, "schema", PLAIN["title"], {key: value for key, value in PLAIN.items() if key != "title"})
-    note = values.kind("note")
-    name, at, faults = values.named(note, "Passing")
+    passing = values.artifact_id(iri("note", "passing"))
     assert _landed(where, [
-        changes.Create(note, "Passing", name, at, faults, values.content(dumps({}))),
-        changes.Remove(_whole("note/passing")),
-        changes.Remove(_whole("schema/note")),
+        changes.Create(passing, values.version(version_iri("note")), "Passing", (), values.content(dumps({}))),
+        changes.Remove(_whole(iri("note", "passing"))),
+        changes.Remove(_whole(type_iri("note"))),
     ]) == []

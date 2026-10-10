@@ -1,8 +1,8 @@
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    TAG_TYPE, answer, create, creating, define, journal, listing, read, remove, removing,
-    tagged_decision_type, start_a_store,
+    TAG_TYPE, answer, create, creating, define, iri, journal, listing, read, remove, removing, start_a_store,
+    tagged_decision_type, targets,
 )
 import at_once
 import held
@@ -39,9 +39,9 @@ def test_removing_something_the_store_does_not_hold_is_refused():
     pass
 
 
-LOOSE = "tag/clearance"
-HELD = "tag/pricing"
-DECISION = "decision/price-reviews-happen-weekly"
+LOOSE = iri("tag", "clearance")
+HELD = iri("tag", "pricing")
+DECISION = iri("decision", "price-reviews-happen-weekly")
 
 
 @given("a store holding a tag nothing points at", target_fixture="client")
@@ -114,14 +114,14 @@ def _every_blocking_link(attempt):
 @when("the client removes an artifact by a name the store holds nothing under, saying which role and why", target_fixture="attempt")
 def _remove_nothing(root, client):
     before = held.holds(root)
-    response = remove(client, "tag/seasonal", message="No more seasons")
+    response = remove(client, iri("tag", "seasonal"), message="No more seasons")
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the removal is rejected because the store holds nothing by that name, and the name asked for is given back")
 def _rejected_for_nothing(attempt):
-    assert [(fault.artifact, fault.rule) for fault in attempt["response"].faults] == [("tag/seasonal", "not-found")]
-    assert "'tag/seasonal'" in attempt["response"].faults[0].message
+    assert [(fault.artifact, fault.rule) for fault in attempt["response"].faults] == [(iri("tag", "seasonal"), "not-found")]
+    assert repr(iri("tag", "seasonal")) in attempt["response"].faults[0].message
 
 
 @then("the store holds what it held before")
@@ -129,7 +129,7 @@ def _held_as_before(attempt):
     assert attempt["after"] == attempt["before"]
 
 
-PROCESS = "process/run-the-clearance-sale"
+PROCESS = iri("process", "run-the-clearance-sale")
 TAGGED_PROCESS_TYPE = {
     "title": "Process",
     "version": 1,
@@ -143,7 +143,7 @@ TAGGED_PROCESS_TYPE = {
                 "title": {"type": "string"},
                 "about": {
                     "type": "string",
-                    "ref": {"targets": ["tag"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+                    "ref": {"targets": targets("tag"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
                 },
             },
             "required": ["title"],
@@ -175,7 +175,7 @@ def _the_steps_link_among_them(client, attempt):
     assert not read(client, LOOSE).faults
 
 
-TAGGED = "decision/clearance-runs-monthly"
+TAGGED = iri("decision", "clearance-runs-monthly")
 
 
 @given(

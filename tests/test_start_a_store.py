@@ -4,7 +4,9 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import DECISION_TYPE, check, define, journal, listing, moment, read, start_a_store, starting
+from calls import (
+    DECISION_TYPE, TYPE_OF_TYPES, check, define, journal, listing, moment, read, start_a_store, starting, type_iri, version_iri,
+)
 import held
 from kb import client as kb_client
 
@@ -44,14 +46,14 @@ def _start_a_store(root, readied_clock):
 
 @then("the store holds the one type that describes what a type is")
 def _holds_the_metaschema(client):
-    schema = read(client, "schema/schema")
-    assert schema.id == "schema/schema"
-    assert schema.kind == "schema"
+    schema = read(client, TYPE_OF_TYPES)
+    assert schema.id == TYPE_OF_TYPES
+    assert schema.type == version_iri(TYPE_OF_TYPES)
 
 
 @then("the store holds no other type and no content")
 def _holds_nothing_else(root):
-    assert held.names(root) == ["schema/schema"]
+    assert held.names(root) == [TYPE_OF_TYPES]
 
 
 @then("the client can define its own types straight away")
@@ -61,7 +63,7 @@ def _can_define_a_type(client):
         "version": 1,
         "schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]},
     })
-    assert defined.id == "schema/note"
+    assert defined.id == type_iri("note")
     assert defined.revision == 1
 
 
@@ -70,8 +72,8 @@ def _can_define_a_type(client):
     "with a fingerprint of what was written"
 )
 def _the_entry_is_the_metaschema_write(root, entry):
-    assert (entry.op, entry.artifact, entry.place, entry.revision) == ("create", "schema/schema", "", 1)
-    assert entry.digest == held.fingerprint(root, "schema/schema")
+    assert (entry.op, entry.artifact, entry.place, entry.revision) == ("create", TYPE_OF_TYPES, "", 1)
+    assert entry.digest == held.fingerprint(root, TYPE_OF_TYPES)
 
 
 @when("the client starts a store there without saying which role it is", target_fixture="refused")
@@ -125,7 +127,7 @@ def _start_a_store_in_the_named_directory(root):
 def _made_where_named(started, root):
     assert not started.faults, started.faults
     assert held.holds_a_store(root)
-    assert "schema/schema" in held.names(root)
+    assert TYPE_OF_TYPES in held.names(root)
 
 
 @then("the store the client was working in is left as it was")
@@ -222,7 +224,7 @@ def _other_files_left_alone(client, root):
     apart = held.apart_from_the_store(root)
     for name, data in UNRELATED.items():
         assert apart[Path(name)] == data
-    assert held.names(root) == ["schema/schema"]
+    assert held.names(root) == [TYPE_OF_TYPES]
     checked = check(client)
     assert (checked.faults, list(checked.violations), list(checked.stale)) == ([], [], [])
 
@@ -300,10 +302,10 @@ def _readied_where_there_was_none(tmp_path, monkeypatch):
 @then("the client can read and write in it straight away")
 def _reads_and_writes_there(readied, root, monkeypatch):
     monkeypatch.chdir(root)
-    assert read(readied, "schema/schema").id == "schema/schema"
+    assert read(readied, TYPE_OF_TYPES).id == TYPE_OF_TYPES
     defined = define(readied, DECISION_TYPE)
     assert not defined.faults, defined.faults
-    assert read(readied, "schema/decision").revision == 1
+    assert read(readied, type_iri("decision")).revision == 1
 
 
 def test_a_relative_root_from_a_removed_working_directory_is_refused_not_raised(tmp_path, monkeypatch):
@@ -389,4 +391,4 @@ def _list_the_kind_of_types(client):
 @then("the client is given the one type that describes what a type is, and no other type")
 def _given_only_the_metaschema(listed):
     assert not listed.refused, listed.faults
-    assert list(listed.ids) == ["schema/schema"]
+    assert list(listed.ids) == [TYPE_OF_TYPES]

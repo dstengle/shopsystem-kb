@@ -1,6 +1,6 @@
 """Pins what kb publishes to a client through the contract alone (adrs/0018): `kb.content`'s `loads`, `dumps`,
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
-None; `kb.contract.kb_pb2`'s being importable, as package `kb.v1`; the changes `Create`, `Replace`, `Add` and `Remove`,
+None; `kb.contract.kb_pb2`'s being importable, as package `kb.v2`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
 `place`; the reads `Read`, `List`, `Follow`, `Search` and `History`, the signed `Snapshot` and the `Check`, each
 answering its result or a refusal; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 import kb
-from calls import DECISION_TYPE, add_many, added, create, define, request
+from calls import DECISION_TYPE, add_many, added, create, define, iri, request
 from kb import client as kb_client, rules
 from kb import content as kb_content
 from kb import testing as kb_testing
@@ -130,7 +130,7 @@ def test_a_json_schema_keyword_passes_through_as_a_rule_outside_the_pinned_set(t
 
 
 CHANGES = {
-    "Create": ("CreateRequest", {"kind", "title", "content", "signature"}, "Created", {"id", "revision"}),
+    "Create": ("CreateRequest", {"id", "type", "title", "content", "signature"}, "Created", {"id", "revision"}),
     "Replace": ("ReplaceRequest", {"locator", "content", "signature", "revision"}, "Replaced", {"id", "revision"}),
     "Add": ("AddRequest", {"locator", "content", "signature", "revision"}, "Added", {"artifact", "id", "revision"}),
     "Remove": ("RemoveRequest", {"locator", "signature", "revision"}, "Removed", {"id", "revision"}),
@@ -141,8 +141,8 @@ def _fields(name):
     return set(kb_pb2.DESCRIPTOR.message_types_by_name[name].fields_by_name)
 
 
-def test_the_contract_is_version_one():
-    assert kb_pb2.DESCRIPTOR.package == "kb.v1"
+def test_the_contract_is_version_two():
+    assert kb_pb2.DESCRIPTOR.package == "kb.v2"
 
 
 @pytest.mark.parametrize("rpc", sorted(CHANGES))
@@ -162,14 +162,14 @@ def test_the_small_values_name_kinds_and_places_in_the_specs_words():
     assert _fields("Refusal") == {"faults"}
     assert _fields("Locator") == {"id", "place"}
     assert _fields("Fault") == {"artifact", "place", "rule", "message"}
-    assert _fields("Stub") == {"field", "id", "kind", "title", "fields"}
+    assert _fields("Stub") == {"field", "id", "type", "title", "fields"}
     assert _fields("InboundCount") == {"kind", "field", "count"}
     assert "place" in _fields("Entry") and "path" not in _fields("Entry")
 
 
 READS = {
     "Read": ("ReadRequest", {"locator", "summary", "whole", "section"}, "Artifact", {
-        "id", "kind", "schema_version", "revision", "title", "content", "references", "parts", "inbound",
+        "id", "type", "revision", "title", "content", "references", "parts", "inbound",
     }),
     "List": ("ListRequest", {"kind", "fields", "form"}, "Listed", {"stubs", "ids"}),
     "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind"}, "Followed", {"reached"}),
@@ -227,11 +227,11 @@ def test_each_item_an_add_many_adds_names_the_artifact_it_went_to(tmp_path):
         sections = [{"title": "Purpose", "body": "Why.\n"}, {"title": "Rationale", "body": "Because.\n"}]
         create(client, "decision", {"title": title, "sections": sections})
     landed = add_many(client, [
-        added("decision/weekly", "options", {"title": "Go monthly"}),
-        added("decision/daily", "options", {"title": "Go hourly"}),
+        added(iri("decision", "weekly"), "options", {"title": "Go monthly"}),
+        added(iri("decision", "daily"), "options", {"title": "Go hourly"}),
     ])
     assert [(each.artifact, each.id, each.revision) for each in landed.results] == [
-        ("decision/weekly", "go-monthly", 2), ("decision/daily", "go-hourly", 2),
+        (iri("decision", "weekly"), "go-monthly", 2), (iri("decision", "daily"), "go-hourly", 2),
     ]
 
 

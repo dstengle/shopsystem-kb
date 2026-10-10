@@ -2,8 +2,8 @@
 
 Above the port stay names, content checks, sections and items, signatures, faults and the contract. Below it an
 adapter keeps the artifacts, their content at every revision, the links both ways, the search rows and the history,
-and lands a set of changes whole or not at all. An adapter knows nothing of kinds or types: a link says which kinds
-it may land on, and the kind of an artifact is the first part of its name.
+and lands a set of changes whole or not at all. An adapter knows nothing of types: a change says the kind of its
+artifact, its type's IRI, and a link says which kinds it may land on.
 
 The port refuses with the exceptions named here. None of them is published, and kb translates them above the port.
 """
@@ -46,7 +46,8 @@ class Change:
     leaves it at, and the types it was checked and its links read through that the set does not change, each with
     the revision it was read at. The adapter lands none of the set when any of those has since moved. `searched` are
     the rows the artifact is found by, as kb gives them (search.searchable): each `(what, label, words)`, what being
-    "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them."""
+    "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them.
+    `kind` is the kind of the artifact a change leaves, None for a removal."""
     artifact: ArtifactId
     content: dict | None
     links: tuple[Link, ...] = ()
@@ -55,6 +56,7 @@ class Change:
     revision: int = 0
     through: tuple[tuple[ArtifactId, int], ...] = ()
     searched: tuple[tuple[str, str, str], ...] = ()
+    kind: Kind | None = None
 
     @property
     def op(self) -> str:
