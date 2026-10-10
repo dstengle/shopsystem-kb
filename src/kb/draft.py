@@ -46,20 +46,20 @@ class Draft:
         return found
 
     def type_version(self, version: Version) -> TypeVersion:
-        """A version of a type as the draft leaves it: the type the draft put, when it stands at that version, over
-        the version the store keeps, which is kept as first read. KeyError when the draft removed the type or leaves
-        it at another version."""
+        """A version of a type as the draft leaves it: the type the draft put, when it stands at that version; any
+        other version, and every version of a type the draft did not put, as the store keeps it, a type's kept as
+        first read. KeyError when the draft removed the type, or neither it nor the store holds that version."""
         type_id = ArtifactId(version.kind.name)
         if type_id in self._removed:
             raise KeyError(str(version))
-        if type_id in self._pending:
-            put = self._pending[type_id]
-            if put.get("version") != version.number:
-                raise KeyError(str(version))
+        put = self._pending.get(type_id)
+        if put is None:
+            found = self._store.type_version(version)
+            self._types.setdefault(type_id, found.content)
+            return found
+        if put.get("version") == version.number:
             return TypeVersion(version, put, put["revision"], put["title"])
-        found = self._store.type_version(version)
-        self._types.setdefault(type_id, found.content)
-        return found
+        return self._store.type_version(version)
 
     def numbered(self, type_id: ArtifactId) -> int:
         """The number the next version of a type is made at, and counted as made: 1 for a type the draft does not

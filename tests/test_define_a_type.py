@@ -1,9 +1,10 @@
+import copy
 import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, TYPE_OF_TYPES, create, define, iri, kb_ref, listing, next_version, read, remove, replace,
+    DECISION_TYPE, TYPE_OF_TYPES, change_type, create, define, iri, kb_ref, listing, next_version, read, remove,
     request, targets, type_iri, version_iri,
 )
 import held
@@ -560,3 +561,114 @@ def _two_faults_at_the_link_field_in_rule_order(attempt):
     assert [fault.rule for fault in attempt["response"].faults if fault.place == "schema/properties/relates_to"] == [
         "ref", "targets",
     ]
+
+
+def _with(schema, field, required=False):
+    """A type's schema with one more field, required when it is said to be."""
+    changed = copy.deepcopy(schema)
+    changed["properties"][field] = {"type": "string"}
+    if required:
+        changed["required"] = [*changed["required"], field]
+    return changed
+
+
+AS_DEFINED = DECISION_TYPE["schema"]
+AS_FIRST_CHANGED = _with(AS_DEFINED, "owner")
+AS_CHANGED = _with(AS_FIRST_CHANGED, "status", required=True)
+
+
+def _reads_as_made(client, at, number, schema):
+    """The version of the type at an IRI with the number given reads at its own IRI with the schema, the number, the
+    revision and the title it was made with."""
+    made = read(client, f"{at}@{number}", whole=True)
+    assert not made.faults, made.faults
+    assert (made.id, made.type, made.title, made.revision) == (
+        f"{at}@{number}", version_iri(TYPE_OF_TYPES), DECISION_TYPE["title"], number,
+    )
+    assert loads(made.content) == {"version": number, "schema": schema}
+
+
+@given(parsers.parse('a type the store holds at "{at}", changed once since it was defined'), target_fixture="at")
+def _a_type_changed_once(client, at):
+    defined = request(client, "schema", DECISION_TYPE["title"], {"schema": AS_DEFINED}, message="Define Decision", at=at)
+    assert not defined.faults, defined.faults
+    changed = change_type(client, at, AS_FIRST_CHANGED)
+    assert not changed.faults, changed.faults
+    return at
+
+
+@when("the client changes what that type requires", target_fixture="changed")
+def _change_what_the_type_requires(client, at):
+    return change_type(client, at, AS_CHANGED)
+
+
+@then(parsers.parse('the change makes a new version at "{at}", "@" and the new version\'s number'))
+def _a_new_version_at(client, changed, at):
+    assert not changed.faults, changed.faults
+    number = loads(read(client, at, whole=True).content)["version"]
+    assert number not in (1, 2)
+    _reads_as_made(client, at, number, AS_CHANGED)
+
+
+@then("the version the type was defined with reads back as it was made")
+def _the_defined_version_as_made(client, at):
+    _reads_as_made(client, at, 1, AS_DEFINED)
+
+
+@then("the version its first change made reads back as it was made")
+def _the_first_changes_version_as_made(client, at):
+    _reads_as_made(client, at, 2, AS_FIRST_CHANGED)
+
+
+@when("the client changes that type", target_fixture="changed")
+def _change_that_type(client):
+    """The type as it stands, one more field in its schema and no number sent."""
+    standing = loads(read(client, type_iri("decision"), whole=True).content)["schema"]
+    return change_type(client, "decision", _with(standing, "reviewer"))
+
+
+@then("the new version is the type's third")
+def _the_new_version_is_the_third(client, changed):
+    assert not changed.faults, changed.faults
+    assert loads(read(client, type_iri("decision"), whole=True).content)["version"] == 3
+    _reads_as_made(client, type_iri("decision"), 3, _with(AS_DEFINED, "reviewer"))
+    assert [fault.rule for fault in read(client, version_iri("decision", 4)).faults] == ["not-found"]
+
+
+def _a_decision_of_the_first_version(client):
+    define(client, DECISION_TYPE)
+    return create(client, "decision", {"title": "Price reviews happen weekly", "sections": BASE_SECTIONS}).id
+
+
+@given("a type the store holds at its first version, and an artifact conforming to that version", target_fixture="conforming")
+def _a_type_and_an_artifact_of_its_first_version(client):
+    return _a_decision_of_the_first_version(client)
+
+
+@then("the store still holds the type's first version")
+def _the_first_version_still_held(client):
+    _reads_as_made(client, type_iri("decision"), 1, AS_DEFINED)
+
+
+@then("the artifact still conforms to the type's first version")
+def _the_artifact_still_of_the_first_version(client, changed, conforming):
+    assert not changed.faults, changed.faults
+    assert read(client, conforming).type == version_iri("decision", 1)
+
+
+@given(
+    "a type the store holds at its second version, and the only artifact conforming to its first version",
+    target_fixture="conforming",
+)
+def _a_type_moved_on_from_its_only_artifact(client):
+    conforming = _a_decision_of_the_first_version(client)
+    changed = change_type(client, "decision", AS_FIRST_CHANGED)
+    assert not changed.faults, changed.faults
+    return conforming
+
+
+@when("the client removes that artifact")
+def _remove_that_artifact(client, conforming):
+    removed = remove(client, conforming)
+    assert not removed.faults, removed.faults
+    assert [fault.rule for fault in read(client, conforming).faults] == ["not-found"]

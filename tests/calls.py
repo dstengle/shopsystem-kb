@@ -480,6 +480,12 @@ def next_version(client, kind, type_content, sections=None):
                  message=f"Revise {type_content['title']}")
 
 
+def change_type(client, type_name, schema, message="Change a type"):
+    """Write the type of a kind, or at an IRI, back with the schema given and no number: the store numbers the
+    version the change makes. Returns the Replace's answer."""
+    return replace(client, type_iri(type_name), {"schema": schema}, message=message)
+
+
 class MovingClock:
     """A clock for a dated scenario: it reads `at`, moving on a second at each reading so no two entries share a
     moment; a step sets `at` to make a change on another day. `today` is the day the scenario named."""
