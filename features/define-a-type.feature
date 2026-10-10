@@ -233,3 +233,15 @@ Feature: Define a type
     Given a type the store holds, and two artifacts of its kind
     When the client removes that type
     Then the removal is rejected because something still points at it, naming each of those two artifacts
+
+  Scenario Outline: Removing a type while a version of another type reads one of its versions is refused
+    Pins that a type cannot be taken away from under the types that read it: every version of a type is kept as made, so what it reads must stay too.
+    Given a type the store holds, with no artifacts of its kind, and a second type whose first version <reads it>
+    When the client removes the first type
+    Then the removal is rejected because something still points at it, naming the second type
+    And the store still holds the first type and its versions
+
+    Examples:
+      | reads it                                               |
+      | refers to a shape the first type's first version defines |
+      | is built on the first type's first version              |
