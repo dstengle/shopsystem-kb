@@ -2,14 +2,13 @@
 
 A scenario nobody binds is run by nothing, so a feature file can grow scenarios the suite never mentions. This reads the
 scenario titles from the feature files themselves and the ones bound from the test modules' own bound scenarios (what
-`scenarios(...)` and `@scenario(...)` register for each test function), so a bound title that does not exist is not hiding
+`scenarios(...)` and `@scenario(...)` leave on each test function), so a bound title that does not exist is not hiding
 a missing one."""
 import importlib
 from collections import Counter
 from pathlib import Path
 
 from pytest_bdd.parser import FeatureParser
-from pytest_bdd.scenario import scenario_wrapper_template_registry
 
 TESTS = Path(__file__).resolve().parent
 FEATURES = TESTS.parent / "features"
@@ -30,7 +29,7 @@ def bound():
     for path in sorted(TESTS.glob("test_*.py")):
         module = importlib.import_module(path.stem)
         for value in vars(module).values():
-            scenario = getattr(value, "__scenario__", None) or (scenario_wrapper_template_registry.get(value) if callable(value) else None)
+            scenario = getattr(value, "__scenario__", None)
             if scenario is not None:
                 found.append((Path(scenario.feature.filename).name, scenario.name))
     return found
