@@ -1,0 +1,3 @@
+# 0027 Each version of a type is an IRI of its own
+
+2026-10-10. A type has a stable IRI, the root its artifacts' IRIs sit under, and each of its versions an IRI of its own, the type's IRI with `@` and the version (`…/shopsystem/capability@2`). A version is fixed once made, and a change to a type is a new version; several versions of a type are held while artifacts conform to them. An artifact names the version it conforms to by its IRI, in place of `schema_version`, and moves to a later version by a write checked against it, keeping its own IRI. A link's targets name the type, any version. Moving content between versions is not part of this. Refines 0023. The user's decision.
