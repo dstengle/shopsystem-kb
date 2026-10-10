@@ -242,13 +242,13 @@ def creating(type_name, title, content, message="Create an artifact", actor=CLIE
     )
 
 
-def replacing(artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0):
+def replacing(artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0, version=""):
     """A ReplaceRequest for a whole artifact, or for the node at path inside it, saying the revision the client read
-    the artifact at when revision is given."""
+    the artifact at when revision is given, and naming a version of its type, by its IRI, when version is given."""
     text = content if isinstance(content, str) else dumps(content)
     return kb_pb2.ReplaceRequest(
         locator=kb_pb2.Locator(id=artifact_id, place=path), content=text, signature=signature(message, actor),
-        revision=revision,
+        revision=revision, type=version,
     )
 
 
@@ -327,10 +327,12 @@ def created(type_name, title, content, at=None, version=1):
     )
 
 
-def replaced(artifact_id, content, revision=0):
+def replaced(artifact_id, content, revision=0, version=""):
     """A replacement of a whole artifact inside a BatchReplace, saying the revision the client read it at when revision
-    is given."""
-    return kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), revision=revision)
+    is given, and naming a version of its type, by its IRI, when version is given."""
+    return kb_pb2.ReplaceItem(
+        locator=kb_pb2.Locator(id=artifact_id), content=dumps(content), revision=revision, type=version,
+    )
 
 
 def create_many(client, items, message="Make several changes", actor=CLIENT):
@@ -371,11 +373,11 @@ def remove_many(client, items, message="Make several changes", actor=CLIENT):
     return answer(client.BatchRemove(kb_pb2.BatchRemoveRequest(items=items, signature=signature(message, actor))))
 
 
-def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0):
+def replace(client, artifact_id, content, message="Change an artifact", actor=CLIENT, path="", revision=0, version=""):
     """A Replace of a whole artifact, or of the node at path inside it, under the client's role unless another actor
-    is given, saying the revision the client read it at when revision is given. Returns the answer, faults and
-    all."""
-    return answer(client.Replace(replacing(artifact_id, content, message, actor, path, revision)))
+    is given, saying the revision the client read it at when revision is given, and naming a version of its type, by
+    its IRI, when version is given. Returns the answer, faults and all."""
+    return answer(client.Replace(replacing(artifact_id, content, message, actor, path, revision, version)))
 
 
 def add(client, artifact_id, collection, content, message="Add an item", actor=CLIENT, revision=0):

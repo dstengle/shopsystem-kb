@@ -107,15 +107,16 @@ def _fits(draft: Draft, change: Change) -> list:
 
 
 def _typed(draft: Draft, change: Change) -> dict:
-    """The type a change is checked against: for a create, the version it names, whatever its type stands at; else
-    its kind's as the set leaves it; or, for an artifact the set later removes when it leaves no such type, as the
-    change acted on it. Raises Refused when an artifact the set leaves has no type."""
+    """The type a change is checked against: the version of its type its artifact conforms to as the change left it
+    (the one a create or a replacement names, else the one it conformed to), whatever its type stands at; for an
+    import, its kind's as the set leaves it; or, for an artifact the set later removes when it leaves no such type,
+    as the change acted on it. Raises Refused when an artifact the set leaves has no type."""
     kind = composition.artifact_kind(change.left)
     if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(kind)):
         return change.acted
-    if change.op == "create":
-        return composition.conformed(change.left, draft)
-    return composition.kind_schema(kind, draft)
+    if change.op == "import":
+        return composition.kind_schema(kind, draft)
+    return composition.conformed(change.left, draft)
 
 
 def _versioned(draft: Draft, change: Change, last: bool) -> Change:

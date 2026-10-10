@@ -28,6 +28,15 @@ def no_version(version: str) -> kb_pb2.Fault:
     )
 
 
+def not_later(artifact_id: ArtifactId, version: str, conforms: str) -> kb_pb2.Fault:
+    """A replacement naming a version its artifact cannot move to: an earlier one, another type's, or one not held."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.VERSION,
+        message=f"an artifact moves only to a later version of its own type that the store holds; {version!r} is "
+        f"not one for an artifact conforming to {conforms!r}",
+    )
+
+
 def not_under(artifact_id: ArtifactId, type_id: ArtifactId) -> kb_pb2.Fault:
     """A create at an IRI that does not belong to the type it names: the nearest held type it sits under is another,
     or none."""

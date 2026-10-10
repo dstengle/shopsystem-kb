@@ -100,7 +100,7 @@ def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
 
 
 def version_schema(version: values.Version, corpus) -> dict:
-    """The version of a type a create names, as the corpus keeps it, its JSON Schema under `schema`, whatever version
+    """The version of a type a create or a replacement names, as the corpus keeps it, its JSON Schema under `schema`, whatever version
     the type stands at now. Raises Refused when the corpus holds no such version."""
     found = kept(values.type_of(version.kind), version.number, corpus)
     if found is None:
@@ -108,10 +108,24 @@ def version_schema(version: values.Version, corpus) -> dict:
     return found.content
 
 
+def conforming(artifact: dict) -> values.Version:
+    """The version of its type an artifact conforms to, as the artifact names it."""
+    return values.Version(artifact_kind(artifact), settled.version(artifact))
+
+
 def conformed(artifact: dict, corpus) -> dict:
     """The version of its type an artifact conforms to, as the corpus keeps it. Raises Refused when the corpus holds
     no such version."""
-    return version_schema(values.Version(artifact_kind(artifact), settled.version(artifact)), corpus)
+    return version_schema(conforming(artifact), corpus)
+
+
+def moves_to(artifact: dict, version: values.Version, corpus) -> bool:
+    """Whether an artifact may move to a version: one the corpus keeps, of the artifact's own type, and not earlier
+    than the one it conforms to."""
+    stands = conforming(artifact)
+    if version.kind != stands.kind or version.number < stands.number:
+        return False
+    return kept(values.type_of(version.kind), version.number, corpus) is not None
 
 
 def nearest_type(artifact_id: values.ArtifactId, corpus) -> values.ArtifactId | None:

@@ -40,7 +40,7 @@ def apply(draft: Draft, operation) -> Change:
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
-    acted = composition.conformed(left, draft) if change.op == "create" else composition.artifact_schema(left, draft)
+    acted = composition.artifact_schema(left, draft) if change.op == "import" else composition.conformed(left, draft)
     return change._replace(revision=left["revision"], type=left["type"], left=left, acted=acted)
 
 
@@ -107,8 +107,18 @@ def _replace(draft: Draft, replacement: changes.Replace) -> Change:
     content, current = copy.deepcopy(replacement.content.tree), draft.artifact(locator.id)
     if locator.place:
         content = _placed(current, locator, content)
-    faults = _revise(draft, locator.id, current, content)
+    faults = _revise(draft, locator.id, current, content, _ends_at(draft, locator.id, current, replacement.version))
     return Change("write", locator.id, names.placed(locator.place), faults=faults)
+
+
+def _ends_at(draft: Draft, artifact_id: ArtifactId, current: dict, named: values.Version | None) -> values.Version:
+    """The version of its type a replaced artifact ends at: the one it conforms to when its replacement names none,
+    else the one named, refused unless the artifact may move to it."""
+    if named is None:
+        return composition.conforming(current)
+    if not composition.moves_to(current, named, draft):
+        raise Refused([refusals.not_later(artifact_id, str(named), str(composition.conforming(current)))])
+    return named
 
 
 def _append(draft: Draft, addition: changes.Add) -> Change:
@@ -128,14 +138,14 @@ def _append(draft: Draft, addition: changes.Add) -> Change:
         raise Refused([refusals.not_a_collection(locator)])
     item = copy.deepcopy(addition.item.tree)
     spot.holder.setdefault(spot.key, []).append(item)
-    faults = _revise(draft, locator.id, current, content)
+    faults = _revise(draft, locator.id, current, content, composition.conforming(current))
     return Change("append", locator.id, names.placed((*locator.place, item["id"])), item["id"], faults=faults)
 
 
 def _collections_at(draft: Draft, locator: values.Locator) -> dict:
-    """The collections the type declares where the locator's last step stands: the artifact's own, or those of the
+    """The collections the version of its type the artifact conforms to declares where the locator's last step stands: the artifact's own, or those of the
     item type of each collection the place passes through on the way."""
-    declared = composition.declared(composition.artifact_schema(draft.artifact(locator.id), draft)["schema"], draft)
+    declared = composition.declared(composition.conformed(draft.artifact(locator.id), draft)["schema"], draft)
     for collection in locator.place[:-1:2]:
         part = declared["parts"].get(collection)
         if part is None:
@@ -165,12 +175,13 @@ def _as_read(draft: Draft, artifact_id: ArtifactId, expected: int | None) -> Non
         raise Refused([refusals.moved(artifact_id, revision)])
 
 
-def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> tuple:
-    """The artifact's next version put in the draft: its new items named, its version up by one, its title kept, and
-    a type given the number of the version this change makes. Returns the faults of the names its items hand back
-    that the artifact did not hold, with any of which no item is named."""
+def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict, version: values.Version) -> tuple:
+    """The artifact's next revision put in the draft, conforming to the version of its type given: its new items
+    named, its revision up by one, its title kept, and a type given the number of the version this change makes.
+    Returns the faults of the names its items hand back that the artifact did not hold, with any of which no item is
+    named."""
     kind = composition.artifact_kind(current)
-    schema = composition.kind_schema(kind, draft)
+    schema = composition.version_schema(version, draft)
     declared = composition.declared(schema["schema"], draft)
     held = names.held(declared["parts"], current)
     misnamed = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
@@ -178,8 +189,7 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
         names.items(declared["parts"], content, True, _item_parts(draft))
     if kind == values.TYPE_KIND:
         _numbered(draft, artifact_id, content)
-    version = names.versioned(kind.name, schema["version"])
-    artifact = settled.given(content, current["id"], version, current["revision"] + 1, current["title"])
+    artifact = settled.given(content, current["id"], str(version), current["revision"] + 1, current["title"])
     draft.put(artifact_id, settled.order(artifact, declared))
     return tuple(misnamed)
 

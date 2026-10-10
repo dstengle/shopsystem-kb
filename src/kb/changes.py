@@ -25,10 +25,12 @@ class Create:
 
 @dataclass(frozen=True)
 class Replace:
-    """A replacement, and the revision the client read its artifact at, None when it said none."""
+    """A replacement, the revision the client read its artifact at, None when it said none, and the version of its
+    type it names for its artifact to move to, None when it names none."""
     locator: Locator
     content: Content
     expected: int | None = None
+    version: Version | None = None
 
 
 @dataclass(frozen=True)
@@ -53,7 +55,9 @@ def creating(request: kb_pb2.CreateRequest) -> tuple[list, Signed]:
 
 def replacing(request: kb_pb2.ReplaceRequest) -> tuple[list, Signed]:
     """A Replace as the domain takes it: a set of one, signed."""
-    return _one(request.signature, lambda: _replace(request.locator, request.content, request.revision))
+    return _one(
+        request.signature, lambda: _replace(request.locator, request.content, request.revision, request.type),
+    )
 
 
 def adding(request: kb_pb2.AddRequest) -> tuple[list, Signed]:
@@ -78,7 +82,7 @@ def creating_many(request: kb_pb2.BatchCreateRequest) -> tuple[list, Signed]:
 def replacing_many(request: kb_pb2.BatchReplaceRequest) -> tuple[list, Signed]:
     """A BatchReplace as the domain takes it: a set of replacements, signed."""
     return _many(request.signature, [
-        lambda item=item: _replace(item.locator, item.content, item.revision) for item in request.items
+        lambda item=item: _replace(item.locator, item.content, item.revision, item.type) for item in request.items
     ])
 
 
@@ -146,9 +150,11 @@ def _create(iri: str, type_version: str, title: str, content: str, again: bool =
     return Create(name, version, title, values.titled(title, iri), values.content(content), carried)
 
 
-def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0) -> Replace:
+def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0, type_version: str = "") -> Replace:
+    """A replacement, the version of its type it names read as a create's is; one naming none names no version."""
     locator = values.locator(requested)
-    return Replace(locator, values.content(content, at_root=not locator.place), values.expected(revision))
+    version = values.version(type_version) if type_version else None
+    return Replace(locator, values.content(content, at_root=not locator.place), values.expected(revision), version)
 
 
 def _add(requested: kb_pb2.Locator, content: str, revision: int = 0) -> Add:
