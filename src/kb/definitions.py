@@ -1,5 +1,5 @@
-"""A type checked as it is written, as the whole set leaves the types: every shape it refers to belongs to a type the
-store holds, it is not built on itself, kb's own keywords stand only where kb reads them, and every link field kb
+"""A type checked as it is written, as the whole set leaves the types: every shape it refers to belongs to a version of
+a type the store holds, whichever version that type stands at, it is not built on itself, kb's own keywords stand only where kb reads them, and every link field kb
 reads states its whole shape. What a type could never check an artifact against is refused here, once, rather than by
 every create that uses it."""
 from kb import composition, keywords, type_refusals
@@ -16,7 +16,7 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
 
 
 def _shapes(type_id: ArtifactId, schema, draft) -> list[kb_pb2.Fault]:
-    """Every kb: reference that names no type the draft holds, or names the type itself as its base."""
+    """Every kb: reference that names no type version the draft holds, or names the type itself as its base."""
     found = []
     for place, ref in _refs(schema, "schema"):
         named = composition.reference(ref)

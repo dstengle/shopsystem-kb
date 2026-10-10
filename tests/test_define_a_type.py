@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, change_type, check, create, define, iri, kb_ref, listing, next_version, read, refs,
-    remove, request, targets, type_iri, version_iri,
+    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, change_type, check, create, define, iri, kb_ref, listing,
+    next_version, read, refs, remove, request, targets, type_iri, version_iri,
 )
 import held
 from kb.content import loads
@@ -199,33 +199,64 @@ def _rejected_by_the_metaschema(client, refused):
     assert [fault.rule for fault in read(client, type_iri("shelf-label")).faults] == ["not-found"]
 
 
+def _binding_type(*required):
+    """A type that defines the shape of a binding, which must give each of what is named."""
+    return {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"], "$defs": {"binding": {
+        "type": "object", "properties": {"name": {"type": "string"}, "port": {"type": "integer"}},
+        "required": list(required),
+    }}}
+
+
+def _a_binding_type_at_its_second_version(client):
+    define(client, {"title": "Tool", "schema": _binding_type("name")})
+    changed = change_type(client, "tool", _binding_type("name", "port"))
+    assert not changed.faults, changed.faults
+    assert loads(read(client, type_iri("tool"), whole=True).content)["version"] == 2
+
+
+def _referring_to(ref):
+    return {"type": "object", "properties": {
+        "title": {"type": "string"}, "bindings": {"type": "array", "items": {"$ref": ref}},
+    }}
+
+
+NOT_HELD_AT_ALL, THE_THIRD = kb_ref("nothing", 1, "#/$defs/binding"), kb_ref("tool", 3, "#/$defs/binding")
+A_VERSION_HELD = "a shape a type refers to must belong to a type version the store holds"
+
+# What each type that could never check an artifact is: its title, its schema, and the fault it is refused with, the
+# place, the rule and what the message says of it.
 NEVER_CHECKABLE = {
-    "refers to a shape from a type the store does not hold": ("Tool use", {
-        "type": "object",
-        "properties": {
-            "title": {"type": "string"},
-            "bindings": {"type": "array", "items": {"$ref": kb_ref("nothing", 1, "#/$defs/binding")}},
-        },
-    }),
-    "names itself as the type it is built on": ("Decision", {
-        "allOf": [{"$ref": kb_ref("decision")}],
-        "type": "object",
-        "properties": {"title": {"type": "string"}},
-    }),
-    "declares a link field without saying which kinds it may point at": ("Note", {
-        "type": "object",
-        "properties": {
+    "refers to a shape from a version of a type the store does not hold at all": (
+        "Tool use", _referring_to(NOT_HELD_AT_ALL),
+        ("schema/properties/bindings/items/$ref", "shape", f"{A_VERSION_HELD}; {NOT_HELD_AT_ALL!r} does not"),
+    ),
+    "refers to a shape from the third version of the binding type": (
+        "Tool use", _referring_to(THE_THIRD),
+        ("schema/properties/bindings/items/$ref", "shape", f"{A_VERSION_HELD}; {THE_THIRD!r} does not"),
+    ),
+    "names itself as the type it is built on": (
+        "Decision", {"allOf": [{"$ref": kb_ref("decision")}], "type": "object", "properties": {"title": {"type": "string"}}},
+        ("schema/allOf/0/$ref", "built-on", "a type cannot be built on itself"),
+    ),
+    "declares a link field without saying which kinds it may point at": (
+        "Note", {"type": "object", "properties": {
             "title": {"type": "string"},
             "relates_to": {"type": "string", "ref": {"cardinality": "one", "parts": False, "on_delete": "refuse"}},
-        },
-    }),
+        }},
+        ("schema/properties/relates_to", "targets", "a link field says which kinds it may point at; 'relates_to' does not"),
+    ),
 }
+
+
+@given("a binding type the store holds at its second version")
+def _a_binding_type_held_at_its_second_version(client):
+    _a_binding_type_at_its_second_version(client)
 
 
 @when(parsers.re(f"the client defines a type that (?P<fault>{'|'.join(map(re.escape, NEVER_CHECKABLE))})"), target_fixture="attempt")
 def _define_a_type_never_checkable(root, client, fault):
     before = held.holds(root)
-    title, schema = NEVER_CHECKABLE[fault]
+    title, schema, _ = NEVER_CHECKABLE[fault]
     response = request(client, "schema", title, {"version": 1, "schema": schema}, message=f"Define {title}")
     return {"response": response, "before": before, "after": held.holds(root)}
 
@@ -237,20 +268,18 @@ def _type_rejected(attempt, rule, path, message):
     assert faults[0].message.startswith(message)
 
 
-@then("the type is rejected because a shape a type refers to must belong to a type the store holds")
-def _rejected_for_a_shape_not_held(attempt):
-    _type_rejected(attempt, "shape", "schema/properties/bindings/items/$ref",
-                   "a shape a type refers to must belong to a type the store holds")
+@then("the type is rejected because it could never check an artifact")
+def _rejected_as_never_checkable(attempt):
+    """With one fault, of one of the three rules kb gives a type that could never check an artifact."""
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [fault.rule in ("shape", "built-on", "targets") for fault in refused.faults] == [True]
 
 
-@then("the type is rejected because a type cannot be built on itself")
-def _rejected_for_building_on_itself(attempt):
-    _type_rejected(attempt, "built-on", "schema/allOf/0/$ref", "a type cannot be built on itself")
-
-
-@then("the type is rejected because a link field says which kinds it may point at")
-def _rejected_for_a_link_without_kinds(attempt):
-    _type_rejected(attempt, "targets", "schema/properties/relates_to", "a link field says which kinds it may point at")
+@then(parsers.re(f"the refusal names that the type (?P<fault>{'|'.join(map(re.escape, NEVER_CHECKABLE))})"))
+def _the_refusal_names_the_fault(attempt, fault):
+    place, rule, message = NEVER_CHECKABLE[fault][2]
+    _type_rejected(attempt, rule, place, message)
 
 
 @then("nothing is written anywhere in the store")
@@ -750,3 +779,75 @@ def _check_lists_it_as_behind(client, conforming):
     assert not checked.faults, checked.faults
     assert list(checked.violations) == []
     assert [(entry.artifact, entry.schema_version, entry.current) for entry in checked.stale] == [(conforming, 1, 2)]
+
+
+OF_THE_FIRST, OF_THE_SECOND = iri("decision", "price-reviews-happen-weekly"), iri("decision", "stock-is-counted-monthly")
+
+
+@given(
+    "a decision type the store holds at its second version, a decision conforming to its first version and a decision "
+    "conforming to its second"
+)
+def _a_decision_of_each_version(client):
+    _a_decision_of_the_first_version(client)
+    changed = change_type(client, "decision", AS_FIRST_CHANGED)
+    assert not changed.faults, changed.faults
+    made = request(client, "decision", "Stock is counted monthly", {"owner": "shopkeeper", "sections": BASE_SECTIONS}, version=2)
+    assert not made.faults, made.faults
+    assert [read(client, each).type for each in (OF_THE_FIRST, OF_THE_SECOND)] == [
+        version_iri("decision", 1), version_iri("decision", 2),
+    ]
+
+
+@given("a type whose link field names the kinds it may point at by the decision type's IRI")
+def _a_type_linking_decisions_by_their_types_iri(client):
+    assert WORK_ITEM_TYPE["schema"]["properties"]["decisions"]["ref"]["targets"] == [type_iri("decision")]
+    define(client, WORK_ITEM_TYPE)
+
+
+@when("the client creates an artifact of that type pointing through that field at both decisions", target_fixture="pointing")
+def _create_pointing_at_both(client):
+    return request(client, "work-item", "Review the prices", {"decisions": [OF_THE_FIRST, OF_THE_SECOND]})
+
+
+@then("the artifact is created")
+def _the_artifact_is_created(pointing):
+    assert not pointing.faults, pointing.faults
+    assert (pointing.id, pointing.revision) == (iri("work-item", "review-the-prices"), 1)
+
+
+@then("it points at both decisions")
+def _it_points_at_both(client, pointing):
+    reached = refs(client, pointing.id, 1, via="decisions").reached
+    assert [each.stub.id for each in reached] == [OF_THE_FIRST, OF_THE_SECOND]
+    for each in (OF_THE_FIRST, OF_THE_SECOND):
+        assert [fault.artifact for fault in remove(client, each).faults] == [pointing.id]
+
+
+@given(
+    "a type that defines the shape of a binding, whose first version requires a binding to give a name, and whose "
+    "second version requires a name and a port"
+)
+def _a_binding_type_changed_to_require_a_port(client):
+    _a_binding_type_at_its_second_version(client)
+
+
+@when("the client defines a second type that refers to the binding's shape, naming the first version of that type by its IRI")
+def _define_a_type_reading_the_first_version(client):
+    assert TOOL_USE_TYPE["schema"]["properties"]["bindings"]["items"] == {"$ref": f"kb:{type_iri('tool')}@1#/$defs/binding"}
+    define(client, TOOL_USE_TYPE)
+
+
+@then("an artifact of the second type whose binding gives a name and no port is accepted")
+def _a_binding_with_no_port_accepted(client):
+    fits = request(client, "tool-use", "Weigh the flour", {"bindings": [{"name": "scale"}]})
+    assert not fits.faults, fits.faults
+    assert fits.revision == 1
+
+
+@then("an artifact of the second type whose binding gives no name is rejected because it does not fit its type")
+def _a_binding_with_no_name_rejected(client):
+    misfit = request(client, "tool-use", "Weigh the sugar", {"bindings": [{"port": 8080}]})
+    assert (misfit.id, misfit.revision) == ("", 0)
+    assert [(fault.place, fault.rule) for fault in misfit.faults] == [("bindings/0", "required")]
+    assert "'name' is a required property" in misfit.faults[0].message

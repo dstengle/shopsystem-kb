@@ -32,9 +32,12 @@ class OnAThread:
         self._client = kb_client.connect(root, clock=self._clock)
         self._rpc, self._request = rpc, request
         self._response = None
+        self.drafts = 0
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def _clock(self) -> datetime:
+        """kb reads the clock once after each draft of a change, so its readings count the drafts."""
+        self.drafts += 1
         self._waiting.set()
         if not self._go.wait(PATIENCE):
             raise TimeoutError("the held change was never let go")

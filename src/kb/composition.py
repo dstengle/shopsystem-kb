@@ -1,6 +1,7 @@
 """A type read through what it is built on: the schemas of its composition, base first, the type version a kb:
-reference names, the type a kind names, the nearest held type an IRI sits under, and the kind an artifact is of. kb's
-own keywords are read through the composition, so a type built on a base carries the base's first."""
+reference names, read as that version was made whatever its type stands at now, the type a kind names, the nearest
+held type an IRI sits under, and the kind an artifact is of. kb's own keywords are read through the composition, so a
+type built on a base carries the base's first."""
 from typing import NamedTuple
 
 from referencing.exceptions import NoSuchResource
@@ -63,15 +64,16 @@ def current(type_id: values.ArtifactId, corpus) -> port.TypeVersion:
 
 
 def held(referred: Reference, corpus) -> bool:
-    """Whether the corpus holds the type version a kb: reference names: a type at its IRI, standing at that
-    version."""
+    """Whether the corpus holds the type version a kb: reference names: a type at its IRI, and that version of it
+    kept, whichever version the type stands at."""
     if referred.type_id is None:
         return False
     return kept(referred.type_id, referred.number, corpus) is not None
 
 
 def type_schema(uri: str, corpus) -> dict:
-    """The JSON Schema of the type version a kb: URI names. NoSuchResource if it names none the corpus holds."""
+    """The JSON Schema of the type version a kb: URI names, as that version was made. NoSuchResource if it names
+    none the corpus holds."""
     referred = reference(uri)
     if referred is None or not held(referred, corpus):
         raise NoSuchResource(ref=uri)
@@ -100,8 +102,8 @@ def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
 
 
 def version_schema(version: values.Version, corpus) -> dict:
-    """The version of a type a create or a replacement names, as the corpus keeps it, its JSON Schema under `schema`, whatever version
-    the type stands at now. Raises Refused when the corpus holds no such version."""
+    """The version of a type a create or a replacement names, as the corpus keeps it, its JSON Schema under
+    `schema`, whatever version the type stands at now. Raises Refused when the corpus holds no such version."""
     found = kept(values.type_of(version.kind), version.number, corpus)
     if found is None:
         raise values.Refused([refusals.no_version(str(version))])
@@ -166,38 +168,38 @@ def kind_schema(kind: values.Kind, corpus) -> dict:
     return current(kind_type(kind, corpus), corpus).content
 
 
-def read_through(kind: values.Kind, corpus) -> list[values.ArtifactId]:
-    """The types an artifact of a kind is checked and its links read through: its kind's type and every type a kb:
-    reference names, in that type's schema or in one it names, each once; those the corpus holds."""
-    found = []
+def read_through(kind: values.Kind, schema, corpus) -> list[values.ArtifactId]:
+    """The types an artifact of a kind is checked and its links read through, given the schema of the version of its
+    type it is read through: its kind's type, and every type a kb: reference names, in that schema or in the version
+    of a type one names, each followed at the version named, never the one its type stands at; each type once, a
+    reference to a version the corpus does not keep passed over."""
+    found, followed = [values.type_of(kind)], set()
 
-    def visit(type_id: values.ArtifactId) -> None:
-        if type_id in found or not corpus.holds(type_id):
-            return
-        found.append(type_id)
-        for each in referred(schema_of(type_id, corpus)):
-            visit(each)
-    visit(values.type_of(kind))
+    def visit(node) -> None:
+        for named in references(node):
+            at = (named.type_id, named.number)
+            version = None if at in followed else kept(*at, corpus)
+            followed.add(at)
+            if version is not None:
+                found.extend(each for each in [named.type_id] if each not in found)
+                visit(version.content.get("schema"))
+    visit(schema)
     return found
 
 
-def schema_of(type_id: values.ArtifactId, corpus) -> dict | None:
-    """The schema of the type held at an IRI, read through the version it stands at; None when what is held there
-    is not a type."""
-    try:
-        return current(type_id, corpus).content.get("schema")
-    except KeyError:
-        return None
-
-
-def referred(node):
-    """Every type a kb: reference anywhere in a schema names."""
+def references(node):
+    """Every type version a kb: reference anywhere in a schema names."""
     if isinstance(node, dict):
         for key, value in node.items():
             named = reference(value) if key == "$ref" and isinstance(value, str) else None
             if named is not None and named.type_id is not None:
-                yield named.type_id
-            yield from referred(value)
+                yield named
+            yield from references(value)
     elif isinstance(node, list):
         for value in node:
-            yield from referred(value)
+            yield from references(value)
+
+
+def referred(node):
+    """Every type a kb: reference anywhere in a schema names."""
+    return (named.type_id for named in references(node))

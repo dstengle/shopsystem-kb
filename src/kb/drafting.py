@@ -139,7 +139,8 @@ def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
     """A change as the port takes it, read at the revision before the one it leaves, or, for an import, as not held:
     its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
     artifact, its links and the places of its parts as the set leaves them, read through the type it was checked
-    against, with the revisions of the types it is read through that the set leaves as they are."""
+    against, with the revisions of the types that version is read through, each kb: reference followed at the version
+    it names, that the set leaves as they are."""
     read = 0 if change.op == "import" else change.revision - 1
     if change.left is None:
         return port.Change(change.artifact_id, None, read=read, revision=change.revision)
@@ -150,15 +151,15 @@ def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
             change.artifact_id, change.left, read=read, revision=change.revision, searched=searched, kind=kind,
             version=version,
         )
+    typed = _typed(draft, change)
     return port.Change(
-        change.artifact_id, change.left,
-        tuple(links.handed(change.artifact_id, change.left, draft, _typed(draft, change))),
+        change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft, typed)),
         tuple(places.parts(change.left)), read, change.revision,
-        draft.as_read(composition.read_through(kind, draft)), searched, kind, version,
+        draft.as_read(composition.read_through(kind, typed["schema"], draft)), searched, kind, version,
     )
 
 
 def _stands_at(held: dict) -> port.Versioned:
-    """The version a type stands at as the port takes it: of the kind its IRI names, the number and the title it
-    holds."""
+    """The version a type's change makes as the port takes it: of the kind its IRI names, the number and the title
+    it holds."""
     return port.Versioned(values.Version(values.Kind(held["id"]), held["version"]), held["title"])

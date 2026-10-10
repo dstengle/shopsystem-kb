@@ -1,6 +1,6 @@
 """The refusals of a type as it is written, each with its rule and its message, from plain values: a shape it refers
-to that no held type has, a type built on itself, one of kb's keywords where kb does not read it, a link field that
-leaves out part of its shape or says what kb does not know."""
+to that no held version of a type has, a type built on itself, one of kb's keywords where kb does not read it, a
+link field that leaves out part of its shape or says what kb does not know."""
 from kb import rules
 from kb.contract import kb_pb2
 from kb.values import ArtifactId
@@ -9,7 +9,7 @@ from kb.values import ArtifactId
 def no_such_shape(type_id: ArtifactId, place: str, ref: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=str(type_id), place=place, rule=rules.SHAPE,
-        message=f"a shape a type refers to must belong to a type the store holds; {ref!r} does not",
+        message=f"a shape a type refers to must belong to a type version the store holds; {ref!r} does not",
     )
 
 
