@@ -1,7 +1,7 @@
 """The SQLite adapter's type versions: a table of their own beside `artifacts`, each row a version of a type under the
 version's IRI, as a change hands it, with the type's IRI, the number, and the revision, the title and the content the
-version was made with. Until the store numbers a type's versions a type has the one row, the version it stands at,
-written in place of the row it had."""
+version was made with. A version lands beside the earlier ones of its type, which stay as they were made; which of
+them the type stands at is the type's own row's to say, in `artifacts`."""
 import sqlite3
 
 SCHEMA = """
@@ -13,13 +13,14 @@ CREATE INDEX type_versions_by_type ON type_versions (type);
 """
 
 
-def stood(db: sqlite3.Connection, type_id: str, version: str, number: int, revision: int, title: str,
+def made(db: sqlite3.Connection, type_id: str, version: str, number: int, revision: int, title: str,
           stored: str) -> None:
-    """The version a type stands at, in place of the one it stood at. The number is handed as its digits, which
-    SQLite keeps as an integer when it can hold it: one of any size is still a client's to give."""
-    db.execute("DELETE FROM type_versions WHERE type = ?", (type_id,))
+    """A version of a type, beside every version of it already held at another IRI; one handed at an IRI a version
+    is held at (a number the type keeps or goes back to, or a type removed and held again) is written in its place.
+    The number is handed as its digits, which SQLite keeps as an integer when it can hold it: one of any size is
+    still a client's to give."""
     db.execute(
-        "INSERT INTO type_versions (id, type, number, revision, title, content) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO type_versions (id, type, number, revision, title, content) VALUES (?, ?, ?, ?, ?, ?)",
         (version, type_id, str(number), revision, title, stored),
     )
 

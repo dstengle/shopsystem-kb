@@ -66,8 +66,8 @@ class Change:
     the rows the artifact is found by, as kb gives them (search.searchable): each `(what, label, words)`, what being
     "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them.
     `kind` is the kind of the artifact a change leaves, None for a removal. `version` is given by a change that
-    leaves a type held: the adapter keeps that version, read by `type_version`, in place of the one the type stood
-    at, and lands it with the set or not at all."""
+    leaves a type held: the adapter keeps that version, read by `type_version`, beside the versions of the type it
+    already keeps, each as it was made, and lands it with the set or not at all."""
     artifact: ArtifactId
     content: dict | None
     links: tuple[Link, ...] = ()

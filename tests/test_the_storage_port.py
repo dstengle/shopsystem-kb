@@ -548,3 +548,78 @@ def test_a_type_defined_and_then_changed_through_kb_stands_at_the_version_its_ch
         with pytest.raises(KeyError):
             moved.type_version(first)
         assert [str(each) for each in moved.ids()] == [TYPE_OF_TYPES, str(note)]
+
+
+def test_two_versions_of_a_type_landed_in_turn_both_read_back_as_each_was_made(store):
+    made, first = note_type(1, schema={"n": 1})
+    land(store, made)
+    changed, second = note_type(2, read=1, schema={"n": 2, "more": [1.0, True]})
+    land(store, changed)
+    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+    assert typed(store.type_version(first).content) == typed(made.content)
+    assert store.artifact(name("schema/note")) == changed.content
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("note"), 3))
+
+
+def test_two_versions_of_a_type_landed_in_one_set_are_both_held(store):
+    made, first = note_type(1)
+    changed, second = note_type(2, read=1)
+    land(store, made, changed)
+    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+
+
+def test_ids_list_a_type_once_however_many_versions_of_it_are_held(store):
+    land(store, note_type(1)[0], put("note/a", {"title": "A"}))
+    land(store, note_type(2, read=1)[0])
+    assert [short(each) for each in store.ids()] == ["note/a", "schema/note"]
+    assert [short(each) for each in store.ids(kind("schema"))] == ["schema/note"]
+    assert not any(store.holds(ArtifactId(str(Version(kind("note"), number)))) for number in (1, 2))
+
+
+def test_a_set_refused_for_a_moved_revision_lands_no_version_and_leaves_the_earlier_as_it_was_made(store):
+    made, first = note_type(1)
+    land(store, made, put("note/a", {"title": "A"}))
+    before = written(store), store.type_version(first)
+    with pytest.raises(port.Conflict):
+        land(store, note_type(2, read=1)[0], put("note/a", {"title": "A", "v": 2}, read=4))
+    assert (written(store), store.type_version(first)) == before
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("note"), 2))
+
+
+def test_a_set_refused_for_a_link_that_does_not_land_lands_no_version_and_leaves_the_earlier_as_it_was_made(store):
+    made, first = note_type(1)
+    land(store, made)
+    before = written(store), store.type_version(first)
+    astray = put("note/wrong", {}, links=[link("about", "about", "decision/gone", ["decision"])])
+    with pytest.raises(port.Unlanded):
+        land(store, note_type(2, read=1)[0], astray)
+    assert (written(store), store.type_version(first)) == before
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("note"), 2))
+
+
+def test_a_set_taken_back_inside_a_block_holding_the_write_lock_takes_its_version_back_alone(store):
+    with store.exclusive():
+        made, first = note_type(1)
+        land(store, made)
+        with pytest.raises(port.Conflict):
+            land(store, note_type(2, read=1)[0], put("note/b", {"title": "B"}, read=4))
+        kept, third = note_type(3, read=1)
+        land(store, kept)
+    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(third) == port.TypeVersion(third, kept.content, 2, "Note 3")
+    with pytest.raises(KeyError):
+        store.type_version(Version(kind("note"), 2))
+
+
+def test_a_type_removed_and_held_again_at_a_number_it_had_lands_with_the_version_it_is_then_made_with(store):
+    land(store, note_type(1, schema={"n": 1})[0])
+    land(store, removal("schema/note", 1))
+    again, first = note_type(1, schema={"n": 2})
+    land(store, again)
+    assert store.artifact(name("schema/note")) == again.content
+    assert store.type_version(first) == port.TypeVersion(first, again.content, 1, "Note 1")

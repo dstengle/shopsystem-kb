@@ -208,7 +208,7 @@ class SqliteStore(Checks):
         sqlite_search.searchable(self._db, name, kind, change.searched)
         if change.version is not None:
             version, title = change.version.version, change.version.title
-            sqlite_types.stood(self._db, name, str(version), version.number, change.revision, title, stored)
+            sqlite_types.made(self._db, name, str(version), version.number, change.revision, title, stored)
 
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""
