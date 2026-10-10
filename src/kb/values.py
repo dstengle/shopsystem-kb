@@ -82,6 +82,20 @@ def version(text: str) -> Version:
     return Version(Kind(found[0]), found[1])
 
 
+def named(text: str) -> Version | None:
+    """The version of its type a change names; None when it names none, as an empty name says."""
+    return version(text) if text else None
+
+
+def read(request: kb_pb2.Locator) -> tuple[Locator, Version | None]:
+    """What a read names: an artifact and a place in it, or, when its name is a type version's IRI, the type's
+    locator and that version."""
+    found = names.version(request.id)
+    if found is None:
+        return locator(request), None
+    return _located(found[0], request.place), Version(Kind(found[0]), found[1])
+
+
 def locator(request: kb_pb2.Locator) -> Locator:
     """A locator's name and its place, each checked; both faults when both fail."""
     return _located(request.id, request.place)

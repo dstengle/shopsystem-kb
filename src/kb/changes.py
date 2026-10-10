@@ -153,7 +153,7 @@ def _create(iri: str, type_version: str, title: str, content: str, again: bool =
 def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0, type_version: str = "") -> Replace:
     """A replacement, the version of its type it names read as a create's is; one naming none names no version."""
     locator = values.locator(requested)
-    version = values.version(type_version) if type_version else None
+    version = values.named(type_version)
     return Replace(locator, values.content(content, at_root=not locator.place), values.expected(revision), version)
 
 
