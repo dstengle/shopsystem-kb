@@ -11,6 +11,13 @@ Feature: Keep the history
     Then there is one entry for each change
     And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, the message given, and which set of changes it landed with
 
+  Scenario: Each entry read from the history gives its position in the history
+    Pins that every entry the history gives says where it stands in the history, so a client has something to hold that names that point.
+    Given today is 2026-09-23
+    And a store where the shopkeeper created a decision on 2026-09-21 and an agent working on a named piece of work changed it today
+    When the client reads the history
+    Then each entry the client is given gives its position in the history
+
   @slice-35
   Scenario: The journal alone shows what landed together
     Pins that the journal is self-sufficient about grouping: what landed together is visible in the entries themselves, with a lone change its own set, so nothing outside has to be consulted.

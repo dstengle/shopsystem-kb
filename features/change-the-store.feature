@@ -2,14 +2,14 @@
 Feature: Change the store
   Narrator: the client
 
-  @slice-1
-  Scenario: The client creates an artifact
-    Pins the walking skeleton's write: a create goes through checking to disk and comes back as a name the client can use, with the content reading back in the order the type declares.
+  Scenario: The client creates an artifact, giving its IRI and the IRI of the version of its type it conforms to
+    Pins the write at its simplest: the client chooses where the artifact lives and which version of its type it answers to, and gets that place back with the artifact's first revision.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision with a title, both required sections and two options, saying which role and why
-    Then the client is given the name the artifact keeps for life and its first version
-    And the artifact records the version of the type it was checked against
-    And reading it back gives what was written, in the order the type declares
+    When the client creates a decision, giving the IRI it chose for it, the IRI of that version of the decision type, a title, both required sections and two options, saying which role and why
+    Then the client is given the IRI it chose and the decision's first revision
+    And the store holds the decision at that IRI
+    And the decision records that version of the decision type
+    And reading it back gives what was written, in the order that version declares
 
   @slice-1.6
   Scenario: An artifact created without a title is refused
@@ -18,13 +18,46 @@ Feature: Change the store
     When the client creates a decision with both required sections and no title, saying which role and why
     Then the artifact is rejected because an artifact cannot be created without a title
 
-  @slice-23
-  Scenario: The client changes an artifact
-    Pins what a successful write leaves behind: the version counts up by one and the artifact records which version of its type it was checked against.
-    Given a store holding a decision with a purpose and a rationale, at its first version
+  Scenario: The client replaces an artifact
+    Pins what a successful replacement leaves behind: the artifact's revision counts up by one.
+    Given a store holding a decision with a purpose and a rationale, at its first revision
     When the client replaces the decision, saying which role and why
-    Then the version goes up by one
-    And the artifact records the current version of its type
+    Then the decision's revision goes up by one
+
+  Scenario Outline: A change naming no version of its type keeps the artifact at the version it conforms to
+    Pins that a later version of a type never takes an artifact over by itself: until a change names one, the artifact stays at its own version and is held to that version's rules.
+    Given a store holding two versions of a decision type, the later one also requiring a consequence the earlier does not have
+    And a decision conforming to the earlier version, with a purpose, a rationale and two options
+    When the client <change> with no consequence, naming no version of the decision type, saying which role and why
+    Then the change lands
+    And the decision still records the earlier version of the decision type
+
+    Examples:
+      | change                         |
+      | replaces the decision          |
+      | adds an option to the decision |
+
+  Scenario: A replacement naming a later version of the artifact's type moves the artifact to it
+    Pins how an artifact moves on to a later version of its type: the client names that version, the content is held to it, and the artifact stays where it was.
+    Given a store holding two versions of a decision type, the later one also requiring a consequence the earlier does not have
+    And a decision conforming to the earlier version, with a purpose and a rationale
+    When the client replaces the decision with content carrying a consequence, naming the later version of the decision type, saying which role and why
+    Then the change lands
+    And the decision records the later version of the decision type
+    And the store holds the decision at the IRI it had before
+
+  Scenario Outline: A replacement naming an earlier version of the artifact's type, or a version of another type, is refused
+    Pins that an artifact only ever moves forward within its own type: it never goes back to an earlier version and never becomes an artifact of another type.
+    Given a store holding two versions of a decision type and a tag type
+    And a decision conforming to the later version of the decision type
+    When the client replaces the decision, naming <version>, saying which role and why
+    Then the change is rejected because an artifact moves only to a later version of its own type
+    And the decision reads as before
+
+    Examples:
+      | version                              |
+      | the earlier version of the decision type |
+      | the version of the tag type          |
 
   @slice-13
   Scenario: The client changes one node inside an artifact

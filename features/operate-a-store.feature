@@ -129,20 +129,31 @@ Feature: Operate a store
       | kb init with a seed directory            |
       | kb serve with --start, giving an address |
 
-  @slice-46
   Scenario: The operator checks the whole store
-    Pins the operator's health check: one command tells them everything that does not fit and everything that has fallen behind, for content they did not write.
+    Pins the operator's health check: one command tells them what does not fit, what has fallen behind, and what is linked to but not held, down to each link they would fill, without mixing the three.
     Given a store whose content the operator did not write
+    And it holds a decision that does not fit its type
+    And it holds a decision that conforms to a version of its type a later version has followed
+    And it holds a decision linking twice to a work item the store does not hold, under a type for work items it holds, from two different places in that decision
     When the operator runs kb validate in that store
-    Then the operator is told of everything in the store that does not fit its type, and where
-    And of everything that is behind the type it was last checked against
+    Then the operator is told of the decision that does not fit its type, and where
+    And of the decision behind the type it conforms to
+    And of the work item linked to and not held, a placeholder, with each of the two links into it: the decision holding the link and the place in that decision the link sits at
+    And each of the three is listed apart from the others
 
-  @slice-149
+  Scenario: The operator checks a store whose only findings are placeholders
+    Pins that a placeholder is never a fault: a store holding nothing wrong but links to what it does not hold passes the operator's check.
+    Given a store holding a type for decisions, a type for work items, and a decision that fits its type
+    And that decision links to a work item the store does not hold
+    And nothing else in the store does not fit its type or is behind it
+    When the operator runs kb validate in that store
+    Then the store checks clean
+
   Scenario: The command line offers setting up, checking, exporting, backing up, restoring and importing, and nothing else that changes what the store holds
-    Pins the limit of the command line: beside setting up, checking and exporting, it backs a store up and restores a backup, and every other change to content still goes through a client.
+    Pins the limit of the command line: import is offered into a store, not only a freshly started one, and every other change to content still goes through a client.
     Given a store
     When the operator asks what the command line offers
-    Then it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a freshly started store
+    Then it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a store
     And nothing else that changes what the store holds
 
   @slice-149

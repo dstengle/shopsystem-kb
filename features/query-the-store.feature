@@ -23,6 +23,54 @@ Feature: Query the store
     When the client lists the decisions asking for names only
     Then the client is given three names and nothing else
 
+  Scenario: The client lists by a path below the type
+    Pins that a listing can select by where an artifact sits below its type rather than by its kind, across every type, matching whole segments and never part of one.
+    Given a store holding these artifacts:
+      | kind      | path below its type |
+      | decision  | pricing             |
+      | decision  | pricing/discounts   |
+      | work item | pricing/rollout     |
+      | decision  | pricing-old         |
+      | work item | stock/pricing       |
+    When the client lists by the path "pricing" below the type
+    Then the client is given a stub of each of these and nothing else:
+      | kind      | path below its type |
+      | decision  | pricing             |
+      | decision  | pricing/discounts   |
+      | work item | pricing/rollout     |
+
+  Scenario: The client follows links narrowed to a path below the type
+    Pins that a traversal can be held to where what it finds sits below its type, across every type, matching whole segments and never part of one.
+    Given a store where a decision at "roadmap" below its type points at each of these:
+      | kind      | path below its type |
+      | decision  | pricing/discounts   |
+      | work item | pricing/rollout     |
+      | decision  | pricing-old         |
+      | work item | stock/pricing       |
+    When the client follows the links out of the decision at "roadmap", narrowed to the path "pricing" below the type
+    Then the client is given only these:
+      | kind      | path below its type |
+      | decision  | pricing/discounts   |
+      | work item | pricing/rollout     |
+
+  Scenario: The client asks for the placeholders
+    Pins that every link to something the store does not hold can be found in one question, each such target with every link into it, the artifact holding that link and the place it sits at, while links to held artifacts are left out.
+    Given a store where these links point at IRIs the store does not hold:
+      | IRI not held | artifact holding the link | place the link sits at |
+      | first        | a decision                | what it supersedes     |
+      | first        | a work item               | the decision it serves |
+      | first        | the work item             | its first step         |
+      | second       | the work item             | its second step        |
+    And the decision also points at an older decision the store holds
+    When the client asks for the placeholders
+    Then the client is given the first IRI and the second IRI and nothing else
+    And each comes with these links into it and no others:
+      | IRI not held | artifact holding the link | place the link sits at |
+      | first        | the decision              | what it supersedes     |
+      | first        | the work item             | the decision it serves |
+      | first        | the work item             | its first step         |
+      | second       | the work item             | its second step        |
+
   @slice-31
   Scenario: The client follows the links out of an artifact
     Pins the simplest traversal: what an artifact points at comes back as stubs, enough to show without reading each target whole.

@@ -34,21 +34,12 @@ Feature: Answer a damaged file
       | lies in a directory that is read-only |
       | is a file that is read-only           |
 
-  @slice-124
-  Scenario Outline: A store found that was made by an earlier kb, in a form this kb cannot read, refuses every call and command that needs it
-    Pins that an earlier kb's store always gives one named fault saying how to move it, however it is found, never a crash, with nothing written.
-    Given a store holding a decision, a process and a tag, made by an earlier kb in a form this kb cannot read
-    And the store is found <how the store is found>
+  Scenario: A store found that was made by a kb before contract v2 refuses every call and command that needs it
+    Pins that a store from before contract v2 gives one named fault saying this kb can neither read nor move it, with nothing written.
+    Given a store holding a decision, a process and a tag, made by a kb before contract v2
     When the client creates a decision with a title and both required sections, saying which role and why
-    Then what was asked is rejected because the store was made by an earlier version of kb
-    And the fault says to start a new store and import the old one's files
-    And the fault is given as any other fault is given, never breaking off
+    Then what was asked is rejected because the store was made by an earlier version of kb, which this kb cannot read or move
     And nothing is written in the store
-
-    Examples:
-      | how the store is found            |
-      | upward from the working directory |
-      | through KB_ROOT naming it         |
 
   @slice-124
   Scenario: A store found whose marker names a form of store this kb does not know, one a later kb made, refuses every call and command that needs it

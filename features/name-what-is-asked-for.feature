@@ -2,20 +2,40 @@
 Feature: Name what is asked for
   Narrator: the client
 
-  @slice-1.7
-  Scenario: A name that is not a plain name is refused
+  Scenario Outline: A name a call carries is an IRI of kb's grammar
+    Pins each rule of kb's grammar for a name, and the length it may run to, so a name broken in any one way is refused for its shape before anything is looked up.
+    Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
+    When the client reads an artifact by <name>
+    Then the read is rejected because <reason>
+
+    Examples:
+      | name                                                                              | reason                                    |
+      | the decision's IRI with the scheme "http"                                         | a name is an IRI of kb's grammar          |
+      | the decision's IRI with its host in upper case                                    | a name is an IRI of kb's grammar          |
+      | the decision's IRI with two dots together in its host                             | a name is an IRI of kb's grammar          |
+      | the decision's IRI with a segment holding an upper-case letter                    | a name is an IRI of kb's grammar          |
+      | the decision's IRI with a segment holding two hyphens together                    | a name is an IRI of kb's grammar          |
+      | the decision's IRI with an empty segment in its path                              | a name is an IRI of kb's grammar          |
+      | the decision's IRI followed by a query                                            | a name is an IRI of kb's grammar          |
+      | the decision's IRI followed by a slash                                            | a name is an IRI of kb's grammar          |
+      | the decision's IRI with a segment percent-encoded                                 | a name is an IRI of kb's grammar          |
+      | a name of 513 characters, otherwise of kb's grammar                               | a name is an IRI of kb's grammar          |
+      | a name of 512 characters, of kb's grammar, that the store holds nothing under     | the store holds nothing by that name      |
+      | the decision's IRI with "@" in its host                                           | a name is an IRI of kb's grammar          |
+      | the decision's IRI holding "#" twice                                              | a name is an IRI of kb's grammar          |
+
+  Scenario: A read by a name that is not an IRI of kb's grammar is refused
     Pins that a name is checked for shape before any file is found from it, so a name built to walk out of the store reads nothing at all.
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
-    When the client reads an artifact by the name "decision/../elsewhere"
-    Then the read is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens
+    When the client reads an artifact by a name whose path holds ".."
+    Then the read is rejected because a name is an IRI of kb's grammar, and the name asked for is given back
     And no content comes back, from inside the store or outside it
 
-  @slice-1.7
-  Scenario: A name that begins at the root of the disk is refused
-    Pins the same for a name that is simply a path from the top of the disk, which is the other obvious way to ask for a file that is none of the store's business.
+  Scenario: A read by a name that is a path on the disk is refused
+    Pins that a path on the disk is never taken for a name, the other obvious way to ask for a file that is none of the store's business.
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
-    When the client reads an artifact by a name that begins at the root of the disk
-    Then the read is rejected because a name is a kind and a plain name, never a path
+    When the client reads an artifact by the name "/etc/passwd"
+    Then the read is rejected because a name is an IRI, never a path
     And no content comes back, from inside the store or outside it
 
   @slice-1.7
@@ -26,20 +46,18 @@ Feature: Name what is asked for
     Then the read is rejected because a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it
     And no content comes back, from inside the store or outside it
 
-  @slice-23
-  Scenario: A change aimed at a name that is not a plain name writes nothing
-    Pins that a name is checked for shape before any file is worked out from it, so a name dressed up as a path can never reach the disk, inside the store or out.
+  Scenario: A change by a name that is not an IRI of kb's grammar writes nothing
+    Pins that a change's name is checked for shape before anything is worked out from it, so a name dressed up as a path never reaches the disk.
     Given a store holding a decision with a purpose and a rationale, at its first version
-    When the client replaces an artifact named "../../elsewhere", saying which role and why
-    Then the change is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens
+    When the client replaces an artifact by a name whose path holds "..", saying which role and why
+    Then the change is rejected because a name is an IRI of kb's grammar, and the name asked for is given back
     And nothing is written anywhere, inside the store or outside it
 
-  @slice-1.14
-  Scenario: A kind that is not a plain name is refused
-    Pins that the kind is checked for shape before anything is looked up or worked out from it, so a kind shaped like a path never reaches the disk.
+  Scenario: A create naming a version of a type not shaped as a type's IRI, "@" and a number is refused
+    Pins that the version a create names is checked for shape before anything is looked up from it, so a version shaped like a path never reaches the disk.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates an artifact of the kind "../schema/decision", with a title and both required sections, saying which role and why
-    Then the artifact is rejected because a kind is a plain name of lower-case letters, digits and single hyphens, never a path
+    When the client creates an artifact naming the version of a type "../schema/decision@1", with a title and both required sections, saying which role and why
+    Then the artifact is rejected because a version of a type is named by the type's IRI, "@" and its number
     And nothing is looked up or written anywhere, inside the store or outside it
 
   @slice-1.7
@@ -47,6 +65,12 @@ Feature: Name what is asked for
     Pins that a name the store does not know is an answer that names it back, so a client can tell "not here" from "went wrong".
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
     When the client reads an artifact by a name the store holds nothing under
+    Then the read is rejected because the store holds nothing by that name, and the name asked for is given back
+
+  Scenario: A read by an IRI links point at that the store does not hold is refused
+    Pins that being pointed at by a link does not make a name held, so reading where a link points is the same plain "not here" as any other unheld name.
+    Given a store holding a decision that links to an IRI the store does not hold
+    When the client reads an artifact by that IRI
     Then the read is rejected because the store holds nothing by that name, and the name asked for is given back
 
   @slice-23
@@ -103,26 +127,36 @@ Feature: Name what is asked for
       | replaces a place inside the decision beginning at the decision's own version | a place inside an artifact never names what only the store settles |
       | adds an item at a place inside the decision that is not a collection       | an item is added to a collection, and that place is not one      |
 
-  @slice-1.25
-  Scenario: A kind the store holds no type for is refused
-    Pins that an unknown kind is its own plain answer, named back and kept apart from any complaint about the content, so a client can tell a typo from a bad artifact.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    Given a store that holds no type called "invoice"
-    When the client creates an artifact of the kind "invoice", with a title and both required sections, saying which role and why
-    Then the artifact is rejected because a kind must name a type the store holds, and the kind asked for is given back
+  Scenario Outline: A create naming a type version the store does not hold is refused
+    Pins that an unheld version is its own plain answer, named back and kept apart from any complaint about the content, whether the store holds the type at another version or not at all.
+    Given a store holding a decision type, at its first version, whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    And a store that holds no type for the kind "invoice"
+    When the client creates an artifact naming <version>, with a title and both required sections, saying which role and why
+    Then the artifact is rejected because a create names a version of a type the store holds, and the version asked for is given back
     And that fault stands on its own, apart from anything wrong with the content
     And nothing is written anywhere in the store
 
-  @slice-82
-  Scenario Outline: Asking by a kind the store holds no type for is refused
-    Pins that an unknown kind is the same plain refusal wherever it is asked for, so a typo is never answered with an empty result that reads exactly like an empty store.
+    Examples:
+      | version                                                  |
+      | the decision type at its second version, which the store does not hold |
+      | the invoice type at its first version                    |
+
+  Scenario Outline: Listing, searching, following links or exporting by a kind the store holds no type for is refused
+    Pins that an unknown kind is the same plain refusal wherever it is asked for, export included, so a typo is never answered with an empty result that reads like an empty store.
     Given a store holding three decisions, one of them superseded
-    Given a store that holds no type called "invoice"
+    And a store that holds no type for the kind "invoice"
     When the client <call>
     Then the call is rejected because a kind must name a type the store holds, and the kind asked for is given back
 
     Examples:
-      | call                                                              |
-      | lists the artifacts of the kind "invoice"                         |
-      | searches the prose for restocking among artifacts of that kind    |
+      | call                                                                |
+      | lists the artifacts of the kind "invoice"                           |
+      | searches the prose for restocking among artifacts of that kind      |
       | follows the links into a decision, only from artifacts of that kind |
+      | exports only the artifacts of that kind                             |
+
+  Scenario: A read by an IRI under no type the store holds is refused
+    Pins that a name under no held type is the same plain "not here" as any unheld name, named back rather than a failure.
+    Given a store holding three decisions, one of them superseded
+    When the client reads an artifact by an IRI under no type the store holds
+    Then the read is rejected because the store holds nothing by that name, and the name asked for is given back

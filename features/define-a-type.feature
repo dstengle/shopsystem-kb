@@ -12,12 +12,66 @@ Feature: Define a type
     Then the type is an artifact the client can read back like any other
     And artifacts of that type can be created
 
-  @slice-2
-  Scenario: Two types share a shape
-    Pins that one type can name a shape another type defines, so a client describes a shared shape once instead of repeating it wherever it is used.
-    Given a type that defines the shape of a binding
-    When the client defines a second type that refers to that shape
-    Then artifacts of the second type are checked against the shape the first type defines
+  Scenario: The client defines a type, giving it an https IRI of kb's grammar
+    Pins that a type lives at the IRI its client chooses, its version beside it under a number, and its artifacts beneath it.
+    When the client defines a type, giving it the IRI "https://example.com/shop/decision"
+    Then the type is held at "https://example.com/shop/decision"
+    And its version is held at "https://example.com/shop/decision", "@" and the version's number
+    And an artifact created of that type has an IRI under "https://example.com/shop/decision"
+
+  Scenario: A type's IRI need not sit under the IRI of the type that describes types
+    Pins that a type is exempt from the rule that an artifact sits under its type, so a client may put its types anywhere.
+    When the client defines a type, giving it the IRI "https://example.com/shop/decision", which does not sit under "https://missingmass.io/kb/type"
+    Then the type is accepted
+    And the type is held at "https://example.com/shop/decision"
+
+  Scenario: The client changes a type
+    Pins that a change to a type never alters what was made before it, but adds a version of its own beside the earlier ones.
+    Given a type the store holds at "https://example.com/shop/decision", changed once since it was defined
+    When the client changes what that type requires
+    Then the change makes a new version at "https://example.com/shop/decision", "@" and the new version's number
+    And the version the type was defined with reads back as it was made
+    And the version its first change made reads back as it was made
+
+  Scenario: The client changes a type and the store numbers the new version
+    Pins that the store, not the client, numbers a type's versions, one after another.
+    Given a type the store holds at its second version
+    When the client changes that type
+    Then the new version is the type's third
+
+  Scenario: While an artifact conforms to a version of a type, the store holds that version
+    Pins that a version an artifact still conforms to is never lost when its type moves on.
+    Given a type the store holds at its first version, and an artifact conforming to that version
+    When the client changes that type
+    Then the store still holds the type's first version
+    And the artifact still conforms to the type's first version
+
+  Scenario: When no artifact conforms to a version of a type any longer, the store still holds that version
+    Pins that the store does not clear away a version once nothing uses it.
+    Given a type the store holds at its second version, and the only artifact conforming to its first version
+    When the client removes that artifact
+    Then the store still holds the type's first version
+
+  Scenario: A link field naming a kind by its type's IRI may point at an artifact of any version of that type
+    Pins that a link names a kind and not a version, so moving a type on does not cut off the artifacts already of its kind.
+    Given a decision type the store holds at its second version, a decision conforming to its first version and a decision conforming to its second
+    And a type whose link field names the kinds it may point at by the decision type's IRI
+    When the client creates an artifact of that type pointing through that field at both decisions
+    Then the artifact is created
+    And it points at both decisions
+
+  Scenario: The type that describes types is held at its own IRI
+    Pins where the one type the store ships lives, so a client can name it and read it like any other type.
+    When the client reads "https://missingmass.io/kb/type"
+    Then it reads back the type that describes types
+    And its version is held at "https://missingmass.io/kb/type", "@" and the version's number
+
+  Scenario: A type refers to a shape another type defines, naming the version it reads
+    Pins that a shared shape is read from the version a type names, so moving the other type on does not change what the referring type checks.
+    Given a type that defines the shape of a binding, whose first version requires a binding to give a name, and whose second version requires a name and a port
+    When the client defines a second type that refers to the binding's shape, naming the first version of that type by its IRI
+    Then an artifact of the second type whose binding gives a name and no port is accepted
+    And an artifact of the second type whose binding gives no name is rejected because it does not fit its type
 
   @slice-3
   Scenario: A type built on a shared base carries the base's fields and sections
@@ -33,18 +87,20 @@ Feature: Define a type
     When the client defines a type that does not match the type that describes types
     Then the type is rejected because it does not match the type that describes types
 
-  @slice-68
-  Scenario Outline: A type the store could never check anything against is refused when it is written
-    Pins that a type is checked the moment it is written, so a type that could never check an artifact is caught once here rather than by every create that tries to use it.
+  Scenario Outline: A type that could never check an artifact is refused when it is written
+    Pins that a type is checked the moment it is written, so a type that could never check an artifact is caught once here rather than by every create that tries to use it, and the client is told which fault it has.
+    Given a binding type the store holds at its second version
     When the client defines a type that <fault>
-    Then the type is rejected because <reason>
+    Then the type is rejected because it could never check an artifact
+    And the refusal names that the type <fault>
     And nothing is written anywhere in the store
 
     Examples:
-      | fault                                                          | reason                                                       |
-      | refers to a shape from a type the store does not hold          | a shape a type refers to must belong to a type the store holds |
-      | names itself as the type it is built on                        | a type cannot be built on itself                             |
-      | declares a link field without saying which kinds it may point at | a link field says which kinds it may point at              |
+      | fault                                                                    |
+      | refers to a shape from a version of a type the store does not hold at all |
+      | refers to a shape from the third version of the binding type             |
+      | names itself as the type it is built on                                  |
+      | declares a link field without saying which kinds it may point at         |
 
   @slice-125
   Scenario: A link field declared where kb does not read one is refused
@@ -143,13 +199,13 @@ Feature: Define a type
       | which fields are shown at a glance              | reading a decision of that type at a glance shows the base's fields as well as the type's own |
       | a link field every artifact may carry           | a decision of that type pointing through that field at a kind the base does not allow is rejected |
 
-  @slice-84
-  Scenario: A type changed without moving its version on is refused
-    Pins that a type's version is the only thing that tells an artifact it has fallen behind, so a type cannot change under its artifacts while still claiming the version they were checked against.
-    Given a type the store holds at its second version
-    When the client changes what that type requires, leaving its version at two
-    Then the change is rejected because a type's version goes up whenever the type changes
-    And the type reads back as it was
+  Scenario: A type is changed so that artifacts the store holds would no longer fit it
+    Pins that a type may move on past its artifacts: they stay with the version they named and are reported as behind, never as broken.
+    Given a decision type the store holds at its first version, which does not require an owner, and a decision with no owner
+    When the client changes the decision type to require an owner
+    Then the change is accepted as the type's second version
+    And the decision still conforms to the type's first version
+    And checking the store lists the decision as behind its type, not as a violation
 
   @slice-106
   Scenario: Removing a type while the store holds artifacts of its kind is refused
