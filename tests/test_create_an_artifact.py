@@ -255,6 +255,11 @@ OPTIONS = [
 
 
 @given(
+    "a store holding a decision type, at its first version, whose artifacts require a purpose then a rationale, "
+    "may link to the decision they supersede, and may carry a collection of options",
+    target_fixture="client",
+)
+@given(
     "a store holding a decision type whose artifacts require a purpose then a rationale, "
     "may link to the decision they supersede, and may carry a collection of options",
     target_fixture="client",
@@ -270,6 +275,35 @@ def _store_with_decision_type(root):
 def _given_name_and_first_version(created):
     assert created.id == iri("decision", "price-reviews-happen-weekly")
     assert created.revision == 1
+
+
+@given(
+    "a store holding two versions of the decision type, where the later one requires a section the earlier one does "
+    "not",
+    target_fixture="client",
+)
+def _store_with_two_versions_of_the_decision_type(root):
+    client = _store_with_decision_type(root)
+    assert not next_version(client, "decision", DECISION_TYPE, [*REQUIRED, "Consequences"]).faults
+    return client
+
+
+REQUIRED = [section["title"] for section in DECISION_TYPE["schema"]["sections"]]
+
+
+@when(
+    "the client creates a decision naming the earlier version of the decision type, with content that fits the "
+    "earlier version and lacks the section the later one requires, saying which role and why",
+    target_fixture="created",
+)
+def _create_naming_the_earlier_version(client):
+    return request(client, "decision", "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it", version=1)
+
+
+@then("the client is given the IRI the artifact keeps for life and its first version")
+def _given_iri_and_first_version(created):
+    assert not created.faults, created.faults
+    assert (created.id, created.revision) == (iri("decision", "price-reviews-happen-weekly"), 1)
 
 
 CHOSEN = iri("decision", "pricing/weekly-reviews")
@@ -693,9 +727,51 @@ def _rejected_for_a_directive(created):
     )
 
 
+@given(parsers.parse('a store that holds no type for the kind "{kind}"'))
+def _no_type_for_the_kind(root, kind):
+    assert not held.holds_artifact(root, type_iri(kind))
+
+
+UNHELD = {
+    "the decision type at its second version, which the store does not hold": ("decision", 2),
+    "the invoice type at its first version": ("invoice", 1),
+}
+
+
+@when(
+    parsers.re(
+        f"the client creates an artifact naming (?P<version>{'|'.join(map(re.escape, UNHELD))}), with a title and both "
+        "required sections, saying which role and why"
+    ),
+    target_fixture="attempt",
+)
+def _create_naming_a_version_not_held(client, tmp_path, version):
+    kind, number = UNHELD[version]
+    before = held.everything_in(tmp_path)
+    response = request(
+        client, kind, "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it", version=number,
+    )
+    return {
+        "response": response, "before": before, "after": held.everything_in(tmp_path),
+        "version": version_iri(kind, number),
+    }
+
+
+@then(
+    "the artifact is rejected because a create names a version of a type the store holds, and the version asked for "
+    "is given back"
+)
+def _rejected_for_a_version_not_held(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [fault.rule for fault in refused.faults] == ["version"]
+    assert refused.faults[0].message.startswith("a create names a version of a type the store holds")
+    assert repr(attempt["version"]) in refused.faults[0].message
+
+
 @then("that fault stands on its own, apart from anything wrong with the content")
-def _the_kind_fault_alone(attempt):
-    assert [(fault.place, fault.rule) for fault in attempt["response"].faults] == [("", "kind")]
+def _the_version_fault_alone(attempt):
+    assert [(fault.place, fault.rule) for fault in attempt["response"].faults] == [("", "version")]
 
 
 @then("nothing is written anywhere in the store")

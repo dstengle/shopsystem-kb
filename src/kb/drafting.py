@@ -107,12 +107,14 @@ def _fits(draft: Draft, change: Change) -> list:
 
 
 def _typed(draft: Draft, change: Change) -> dict:
-    """The type a change is checked against: its kind's as the set leaves it, or, for an artifact the set later removes
-    when it leaves no such type, as the change acted on it. Raises Refused when an artifact the set leaves has no
-    type."""
+    """The type a change is checked against: for a create, the version it names, whatever its type stands at; else
+    its kind's as the set leaves it; or, for an artifact the set later removes when it leaves no such type, as the
+    change acted on it. Raises Refused when an artifact the set leaves has no type."""
     kind = composition.artifact_kind(change.left)
     if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(kind)):
         return change.acted
+    if change.op == "create":
+        return composition.conformed(change.left, draft)
     return composition.kind_schema(kind, draft)
 
 
@@ -147,8 +149,8 @@ def _serialised(changes: list[Change]) -> list[str | None]:
 def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
     """A change as the port takes it, read at the revision before the one it leaves, or, for an import, as not held:
     its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
-    artifact, its links and the places of its parts as the set leaves them, read through the types as the set leaves
-    them, with the revisions of those types the set leaves as they are."""
+    artifact, its links and the places of its parts as the set leaves them, read through the type it was checked
+    against, with the revisions of the types it is read through that the set leaves as they are."""
     read = 0 if change.op == "import" else change.revision - 1
     if change.left is None:
         return port.Change(change.artifact_id, None, read=read, revision=change.revision)
@@ -160,7 +162,8 @@ def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
             version=version,
         )
     return port.Change(
-        change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
+        change.artifact_id, change.left,
+        tuple(links.handed(change.artifact_id, change.left, draft, _typed(draft, change))),
         tuple(places.parts(change.left)), read, change.revision,
         draft.as_read(composition.read_through(kind, draft)), searched, kind, version,
     )

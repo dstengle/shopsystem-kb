@@ -40,10 +40,8 @@ def apply(draft: Draft, operation) -> Change:
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
-    return change._replace(
-        revision=left["revision"], type=left["type"], left=left,
-        acted=composition.artifact_schema(left, draft),
-    )
+    acted = composition.conformed(left, draft) if change.op == "create" else composition.artifact_schema(left, draft)
+    return change._replace(revision=left["revision"], type=left["type"], left=left, acted=acted)
 
 
 def _changed(draft: Draft, operation) -> Change:
@@ -60,7 +58,8 @@ def _changed(draft: Draft, operation) -> Change:
 def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     """A new artifact at the IRI its create gives, conforming to the type version it names, which the draft must
     hold."""
-    type_id = _version_type(draft, creation)
+    schema = _named(draft, creation)
+    type_id = values.type_of(creation.version.kind)
     faults = [
         *_identity(draft, creation, type_id), *creation.title_faults,
         *creation.content.refusal(str(creation.name)),
@@ -70,7 +69,6 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     content = copy.deepcopy(creation.content.tree)
     if type_id == values.type_of(values.TYPE_KIND):
         _numbered(draft, creation.name, content)
-    schema = draft.artifact(type_id)
     declared = composition.declared(schema["schema"], draft)
     names.items(declared["parts"], content, False, _item_parts(draft))
     artifact = settled.given(content, str(creation.name), str(creation.version), 1, creation.title)
@@ -78,11 +76,11 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     return creation.name
 
 
-def _version_type(draft: Draft, creation: changes.Create) -> ArtifactId:
-    """The type a create's type version is of; one the draft does not hold refused beside the IRI its set carries
-    twice."""
+def _named(draft: Draft, creation: changes.Create) -> dict:
+    """The type version a create names, whatever version its type stands at; one the draft does not hold refused
+    beside the IRI its set carries twice."""
     try:
-        return composition.version_type(creation.version, draft)
+        return composition.version_schema(creation.version, draft)
     except Refused as refused:
         raise Refused([*creation.carried, *refused.faults])
 

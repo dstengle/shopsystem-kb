@@ -99,12 +99,19 @@ def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
     return type_id
 
 
-def version_type(version: values.Version, corpus) -> values.ArtifactId:
-    """The type a create's type version is of, standing at that version. Raises Refused when the corpus holds no
-    such version."""
-    if not held(Reference(values.type_of(version.kind), True, version.number), corpus):
+def version_schema(version: values.Version, corpus) -> dict:
+    """The version of a type a create names, as the corpus keeps it, its JSON Schema under `schema`, whatever version
+    the type stands at now. Raises Refused when the corpus holds no such version."""
+    found = kept(values.type_of(version.kind), version.number, corpus)
+    if found is None:
         raise values.Refused([refusals.no_version(str(version))])
-    return values.type_of(version.kind)
+    return found.content
+
+
+def conformed(artifact: dict, corpus) -> dict:
+    """The version of its type an artifact conforms to, as the corpus keeps it. Raises Refused when the corpus holds
+    no such version."""
+    return version_schema(values.Version(artifact_kind(artifact), settled.version(artifact)), corpus)
 
 
 def nearest_type(artifact_id: values.ArtifactId, corpus) -> values.ArtifactId | None:
