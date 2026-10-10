@@ -66,8 +66,10 @@ def seeded(root, role: str, seed: str) -> importing.Checked:
 
 def restored(root, backup: str) -> backups.Restored:
     """A store restored inside root from the backup named, nothing signed and so no role needed, or none: the faults
-    that refused it. Raises NotStarted, leaving root as it found it, when no store can be placed there."""
-    _vacant(root)
+    that refused it. Raises NotStarted, leaving root as it found it, when no store can be placed there, or the file is
+    not a backup this kb made, both asked before anything is made."""
+    _vacant(root, "restored")
+    _readable(backup, root)
     with _staged(root) as place:
         restored = operating.Operator(place).restore(backup)
         if not restored.faults:
@@ -99,9 +101,16 @@ def _taken_back(root) -> None:
         os.rename(Path(root) / store.MARKER.parent, place / store.MARKER.parent)
 
 
-def _vacant(root) -> None:
+def _readable(backup: str, root) -> None:
+    """Raises NotStarted with the fault when the file is not a backup this kb made, before anything is made."""
+    faults = operating.Operator(root).readable(backup).faults
+    if faults:
+        raise starting.NotStarted(faults)
+
+
+def _vacant(root, verb: str = "started") -> None:
     """Raises NotStarted with the faults kb.init would refuse root for, before anything is made."""
-    faults = starting.refused(root)
+    faults = starting.refused(root, verb)
     if faults:
         raise starting.NotStarted(faults)
 

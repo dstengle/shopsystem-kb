@@ -51,9 +51,10 @@ class _Starter:
         return Started()
 
     @boundary(Started, opens=False)
-    def vacant(self, root):
-        """Where a store would be started, refused as `start` refuses it; nothing made."""
-        store.vacant(values.root(root))
+    def vacant(self, request: tuple):
+        """Where a store would be put, given as (root, verb), refused as `start` refuses it; nothing made."""
+        root, verb = request
+        store.vacant(values.root(root), verb)
         return Started()
 
 
@@ -67,10 +68,11 @@ def init(root, role: str, *, execution: str = "", clock: Callable[[], datetime] 
         raise NotStarted(started.faults)
 
 
-def refused(root) -> list:
+def refused(root, verb: str = "started") -> list:
     """The faults `init` would refuse root for as the place a store is started in, each a Fault of the contract; none
-    when one can be started there. Nothing is made."""
-    return _Starter(None).vacant(root).faults
+    when one can be started there. Nothing is made. The verb is how a refusal for a directory kb cannot write says the
+    store is put there: started, or restored."""
+    return _Starter(None).vacant((root, verb)).faults
 
 
 def prepared(step: Callable[[], None]) -> None:

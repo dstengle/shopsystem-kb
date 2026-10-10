@@ -48,6 +48,17 @@ def copied_out(backup: Path, path: Path) -> None:
         source.close()
 
 
+def header(backup: Path) -> tuple[int, int]:
+    """The mark and the form a file's header says it holds, read without writing anything. Raises sqlite3.Error when
+    the file is not a database that can be read."""
+    source = sqlite3.connect(f"{backup.resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        return (source.execute("PRAGMA application_id").fetchone()[0],
+                source.execute("PRAGMA user_version").fetchone()[0])
+    finally:
+        source.close()
+
+
 def _created(path: Path) -> None:
     """An empty file made at path, only where nothing is: FileExistsError otherwise."""
     os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644))

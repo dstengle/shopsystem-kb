@@ -67,3 +67,22 @@ def test_a_backup_of_a_freshly_started_store_restores_to_a_store_that_checks_cle
     assert (list(checked.violations), list(checked.stale)) == ([], [])
     assert [entry.op for entry in kb_client.connect(restored).History(kb_pb2.HistoryRequest()).result.entries] == \
         [entry.op for entry in kb_client.connect(root).History(kb_pb2.HistoryRequest()).result.entries]
+
+
+def test_a_backup_cut_short_is_refused_as_unreadable_and_nothing_is_made(tmp_path, root):
+    start_a_store(root)
+    define(kb_client.connect(root), DECISION_TYPE)
+    create(kb_client.connect(root), "decision", WEEKLY)
+    backup = tmp_path / "store.backup"
+    ran = _kb("backup", str(backup), cwd=root)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    whole = backup.read_bytes()
+    backup.write_bytes(whole[: len(whole) // 2])
+    into = tmp_path / "restored"
+    into.mkdir()
+    ran = _kb("restore", str(backup), str(into), cwd=tmp_path)
+    assert (ran.returncode, ran.stdout) == (2, "")
+    [line] = ran.stderr.splitlines()
+    assert line.startswith("kb restore: refused: unreadable: "), line
+    assert "Traceback" not in ran.stderr
+    assert list(into.iterdir()) == []

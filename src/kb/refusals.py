@@ -175,6 +175,22 @@ def earlier_kb(root: str, files: str) -> kb_pb2.Fault:
     ))
 
 
+def not_a_backup(file: str) -> kb_pb2.Fault:
+    """A file offered for restore that is not a backup kb made."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"{file!r} is not a backup kb made")
+
+
+def backup_by_earlier_kb(file: str) -> kb_pb2.Fault:
+    """A backup an earlier kb made, which this kb cannot read as a store."""
+    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"{file!r} was made by an earlier kb, which this kb cannot read")
+
+
+def backup_by_later_kb(file: str) -> kb_pb2.Fault:
+    """A backup a later kb made, which that kb is needed to read."""
+    return kb_pb2.Fault(
+        rule=rules.UNREADABLE, message=f"{file!r} was made by a later version of kb, which is needed to read it")
+
+
 def later_kb(root: str) -> kb_pb2.Fault:
     """A store whose marker names a form of store this kb does not know, or cannot be read at all."""
     return kb_pb2.Fault(rule=rules.UNREADABLE, message=(

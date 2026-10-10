@@ -49,6 +49,12 @@ class Operator:
         return backups.BackedUp()
 
     @boundary(backups.Restored, opens=False)
+    def readable(self, file: str):
+        """The file named read as a backup this kb made; nothing made."""
+        backups.read(values.file(file))
+        return backups.Restored()
+
+    @boundary(backups.Restored, opens=False)
     def restore(self, file: str):
         """The store restored from the backup named, where no store is; nothing signed and nothing landed."""
         backups.restored(values.root(self._root), values.file(file))

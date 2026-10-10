@@ -2,6 +2,8 @@
 
 What a backup holds is read only through the contract: the backup restored by the operator's `kb restore` in a
 directory of its own, and that store read as a client reads any store."""
+import contextlib
+import sqlite3
 import threading
 
 import pytest
@@ -13,7 +15,7 @@ from calls import (DECISION_TYPE, a_decision_type_and_a_decision, answer, create
                    journal, listing, read, replace, signature, snapshot, start_a_store)
 from conftest import _kb
 from kb import client as kb_client
-from kb import sqlite_search
+from kb import sqlite_search, store
 from kb.contract import kb_pb2
 
 DECISIONS = ("decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly")
@@ -78,9 +80,10 @@ def restored():
 
 
 @when("the operator restores that backup in that directory", target_fixture="ran")
+@when("the operator restores that file in that directory", target_fixture="ran")
 def _restores(backup, root, tmp_path, restored):
     """kb restore, run outside the directory with no KB_ACTOR set."""
-    restored.update({"place": root, "from": backup["store"]})
+    restored.update({"place": root, "from": backup.get("store")})
     return _kb("restore", str(backup["file"]), str(root), cwd=tmp_path)
 
 
@@ -326,3 +329,78 @@ def _a_server_serves_it(root, request):
 @then("the server goes on serving: a caller reaching it is answered from that store")
 def _server_goes_on(root, address):
     serving.answered_at(root, address)
+
+
+# A restore refuses what it cannot make a store of, and makes nothing.
+
+@given("a backup of a store", target_fixture="backup")
+def _a_backup_of_a_store(tmp_path):
+    backed_up = tmp_path / "backed-up"
+    backed_up.mkdir()
+    start_a_store(backed_up)
+    define(kb_client.connect(backed_up), DECISION_TYPE)
+    return _backed_up(backed_up, tmp_path)
+
+
+@given("a file that is not a backup kb made", target_fixture="backup")
+def _a_file_that_is_not_a_backup(tmp_path):
+    file = tmp_path / "notes.backup"
+    file.write_text("Prices are reviewed monthly.\n")
+    return {"file": file}
+
+
+def _made_by(tmp_path, form):
+    """A backup of a store, its header saying the store was of the form given."""
+    backup = _a_backup_of_a_store(tmp_path)
+    with contextlib.closing(sqlite3.connect(backup["file"])) as copy:
+        copy.execute(f"PRAGMA user_version = {form}")
+    return backup
+
+
+@given("a backup made by an earlier kb", target_fixture="backup")
+def _a_backup_made_by_an_earlier_kb(tmp_path):
+    return _made_by(tmp_path, store.STORE_FORM - 1)
+
+
+@given("a backup made by a later kb", target_fixture="backup")
+def _a_backup_made_by_a_later_kb(tmp_path):
+    return _made_by(tmp_path, store.STORE_FORM + 1)
+
+
+def _refused_restore(ran, rule, message):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    [line] = ran.stderr.splitlines()
+    assert line.startswith(f"kb restore: refused: {rule}: "), line
+    assert message in line, line
+
+
+@then("restoring is rejected because that directory already has a store inside it")
+def _restore_rejected_as_already_a_store(ran, root):
+    _refused_restore(ran, "root", f"a store is never started over another; {str(root)!r} already has a store inside it")
+
+
+@then("restoring is rejected because that directory is inside a store")
+def _restore_rejected_as_inside_a_store(ran, root, before):
+    _refused_restore(ran, "root", f"stores do not nest; {str(root)!r} is inside the store at {str(before['store'])!r}")
+
+
+@then("restoring is rejected because a store can only be restored in a directory kb can write, and the directory is "
+      "named")
+def _restore_rejected_as_not_writable(ran, root):
+    _refused_restore(ran, "root", f"a store is restored in a directory kb can write, and {str(root)!r} is not one")
+
+
+@then("restoring is rejected because it is not a backup")
+def _restore_rejected_as_not_a_backup(ran, backup):
+    _refused_restore(ran, "unreadable", f"{str(backup['file'])!r} is not a backup kb made")
+
+
+@then("restoring is rejected because this kb cannot read a store an earlier kb made")
+def _restore_rejected_as_earlier(ran, backup):
+    _refused_restore(ran, "unreadable", f"{str(backup['file'])!r} was made by an earlier kb, which this kb cannot read")
+
+
+@then("restoring is rejected because a later version of kb is needed to read it")
+def _restore_rejected_as_later(ran, backup):
+    _refused_restore(ran, "unreadable",
+                     f"{str(backup['file'])!r} was made by a later version of kb, which is needed to read it")
