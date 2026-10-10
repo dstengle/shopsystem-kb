@@ -148,3 +148,54 @@ def test_a_create_in_a_set_that_links_to_its_own_iri_lands_the_link_resolving_wi
     assert [(result.id, result.revision) for result in landed.results] == [(WEEKLY, 1)]
     assert loads(read(client, WEEKLY, whole=True).content)["supersedes"] == WEEKLY
     assert not check(client).violations
+
+
+def _sound(title, at=WEEKLY):
+    return created("decision", title, {"sections": SECTIONS}, at=at)
+
+
+def _carried_twice(refused, at=WEEKLY):
+    """The faults saying the set carries an IRI more than once, each of them naming it and not the store."""
+    found = [fault for fault in refused.faults if fault.rule == "identity"]
+    assert all(fault.artifact == at and repr(at) in fault.message for fault in found)
+    assert all("set" in fault.message and "store" not in fault.message for fault in found)
+    return found
+
+
+def test_two_sound_creates_at_one_iri_are_refused_for_it_once_on_the_second(client):
+    refused = create_many(client, [_sound("Price reviews happen weekly"), _sound("Price reviews happen daily")])
+    assert _faults(refused) == [(WEEKLY, "", "identity")]
+    assert len(_carried_twice(refused)) == 1
+    assert read(client, WEEKLY).faults
+
+
+def test_an_iri_carried_twice_is_refused_when_the_first_create_at_it_is_refused_for_a_fault_of_its_own(client):
+    refused = create_many(client, [_sound(""), _sound("Price reviews happen daily")])
+    assert _faults(refused) == [(WEEKLY, "title", "title"), (WEEKLY, "", "identity")]
+    assert len(_carried_twice(refused)) == 1
+
+
+@pytest.mark.parametrize("wrong, rule", [
+    (created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY), "locator"),
+    (created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY, version=7), "version"),
+])
+def test_an_iri_carried_twice_is_refused_on_a_later_create_that_names_a_wrong_type_version(client, wrong, rule):
+    refused = create_many(client, [_sound("Price reviews happen weekly"), wrong])
+    assert [fault.rule for fault in refused.faults] == ["identity", rule]
+    assert len(_carried_twice(refused)) == 1
+
+
+@pytest.mark.parametrize("wrong, rule", [
+    (created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY), "locator"),
+    (created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY, version=7), "version"),
+])
+def test_an_iri_carried_twice_is_refused_after_a_create_that_names_a_wrong_type_version(client, wrong, rule):
+    refused = create_many(client, [wrong, _sound("Price reviews happen weekly")])
+    assert [fault.rule for fault in refused.faults] == [rule, "identity"]
+    assert len(_carried_twice(refused)) == 1
+
+
+def test_an_iri_carried_three_times_is_refused_once_on_each_create_after_the_first(client):
+    refused = create_many(client, [_sound("Weekly"), _sound("Daily"), _sound("Monthly")])
+    assert _faults(refused) == [(WEEKLY, "", "identity"), (WEEKLY, "", "identity")]
+    assert len(_carried_twice(refused)) == 2

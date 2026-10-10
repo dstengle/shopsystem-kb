@@ -1,9 +1,10 @@
 """Each change's request, alone or in a set, as the values its one domain call takes, built from the conversions in
 kb.values and kb.signatures: who makes it and why first, refused alone when it does not say; then each change,
-converted or standing in its place as a Refusal, so the faults come back in the order of the changes."""
+converted or standing in its place as a Refusal, so the faults come back in the order of the changes. An IRI two
+creates of a set carry is refused on each create after the first, whether or not either converts."""
 from dataclasses import dataclass
 
-from kb import rules, signatures, values
+from kb import refusals, rules, signatures, values
 from kb.contract import kb_pb2
 from kb.requests import Refusal
 from kb.signatures import Signed
@@ -13,12 +14,13 @@ from kb.values import ArtifactId, Content, Locator, Refused, Version
 @dataclass(frozen=True)
 class Create:
     """A new artifact: the IRI its client chose, the type version it conforms to, its title and the title's faults,
-    and its content."""
+    its content, and the fault of an IRI a create before it in its set carries."""
     name: ArtifactId
     version: Version
     title: str
     title_faults: tuple
     content: Content
+    carried: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -65,9 +67,11 @@ def removing(request: kb_pb2.RemoveRequest) -> tuple[list, Signed]:
 
 
 def creating_many(request: kb_pb2.BatchCreateRequest) -> tuple[list, Signed]:
-    """A BatchCreate as the domain takes it: a set of creates, signed."""
+    """A BatchCreate as the domain takes it: a set of creates, signed, each saying whether a create before it carries
+    its IRI."""
     return _many(request.signature, [
-        lambda item=item: _create(item.id, item.type, item.title, item.content) for item in request.items
+        lambda item=item, again=again: _create(item.id, item.type, item.title, item.content, again)
+        for item, again in zip(request.items, _carried_again([item.id for item in request.items]))
     ])
 
 
@@ -119,11 +123,18 @@ def _each(conversions) -> list:
     return converted
 
 
-def _create(iri: str, type_version: str, title: str, content: str) -> Create:
-    """A create's IRI and type version, both faults when both fail, then the rest."""
-    name, version, faults = None, None, []
+def _carried_again(iris: list[str]) -> list[bool]:
+    """For each create of a set, whether a create before it carries the IRI it gives."""
+    return [iri in iris[:index] for index, iri in enumerate(iris)]
+
+
+def _create(iri: str, type_version: str, title: str, content: str, again: bool = False) -> Create:
+    """A create's IRI and type version, both faults when both fail, then the rest; an IRI a create before it carries
+    (`again`) refused once it is one, beside the create's other faults and before them."""
+    name, version, carried, faults = None, None, (), []
     try:
         name = values.artifact_id(iri)
+        carried = (refusals.carried_twice(name),) if again else ()
     except Refused as refused:
         faults += refused.faults
     try:
@@ -131,8 +142,8 @@ def _create(iri: str, type_version: str, title: str, content: str) -> Create:
     except Refused as refused:
         faults += refused.faults
     if faults:
-        raise Refused(faults)
-    return Create(name, version, title, values.titled(title, iri), values.content(content))
+        raise Refused([*carried, *faults])
+    return Create(name, version, title, values.titled(title, iri), values.content(content), carried)
 
 
 def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0) -> Replace:

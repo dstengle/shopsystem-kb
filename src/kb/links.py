@@ -1,8 +1,6 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-those links as the port takes them, and an artifact with each of its links rewritten. The checks, removal, reads
-and walks all read links here."""
-import copy
-from typing import Callable, NamedTuple
+and those links as the port takes them. The checks, removal, reads and walks all read links here."""
+from typing import NamedTuple
 
 from kb import composition, names, port, values
 from kb.composition import declared
@@ -59,14 +57,6 @@ def inside(artifact: dict, schema: dict, corpus, node) -> list[Link]:
     """The links an artifact carries in one node of it, as `places.node` finds it, and in the items inside that node:
     all of them for the artifact itself, none for a field's value, which is not a node."""
     return [spot.link for spot in _spots(artifact, schema, corpus, node)]
-
-
-def rewritten(artifact: dict, schema: dict, corpus, given: Callable[[Link], object]) -> dict:
-    """A copy of an artifact with each link it carries, wherever it sits, holding what `given` gives for it."""
-    copied = copy.deepcopy(artifact)
-    for spot in _spots(copied, schema, corpus, copied):
-        spot.holder[spot.key] = given(spot.link)
-    return copied
 
 
 class _Spot(NamedTuple):

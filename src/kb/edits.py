@@ -60,9 +60,9 @@ def _changed(draft: Draft, operation) -> Change:
 def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     """A new artifact at the IRI its create gives, conforming to the type version it names, which the draft must
     hold."""
-    type_id = composition.version_type(creation.version, draft)
+    type_id = _version_type(draft, creation)
     faults = [
-        *_identity(draft, creation.name, type_id), *creation.title_faults,
+        *_identity(draft, creation, type_id), *creation.title_faults,
         *creation.content.refusal(str(creation.name)),
     ]
     if faults:
@@ -76,13 +76,25 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     return creation.name
 
 
-def _identity(draft: Draft, name: ArtifactId, type_id: ArtifactId) -> list:
+def _version_type(draft: Draft, creation: changes.Create) -> ArtifactId:
+    """The type a create's type version is of; one the draft does not hold refused beside the IRI its set carries
+    twice."""
+    try:
+        return composition.version_type(creation.version, draft)
+    except Refused as refused:
+        raise Refused([*creation.carried, *refused.faults])
+
+
+def _identity(draft: Draft, creation: changes.Create, type_id: ArtifactId) -> list:
     """The faults of the IRI a create gives: an artifact's belongs to the type its create names, the nearest held
-    type it sits under, while a type's is any IRI its client chooses; and the draft holds nothing at it."""
-    faults = []
+    type it sits under, while a type's is any IRI its client chooses; and neither a create before it in its set
+    carries it, said once and as the set's, nor does the draft hold anything at it."""
+    name, faults = creation.name, []
     if type_id != values.type_of(values.TYPE_KIND) and composition.nearest_type(name, draft) != type_id:
         faults.append(refusals.not_under(name, type_id))
-    if draft.holds(name):
+    if creation.carried:
+        faults += creation.carried
+    elif draft.holds(name):
         faults.append(refusals.already_held(name))
     return faults
 

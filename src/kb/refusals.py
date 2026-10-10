@@ -45,6 +45,14 @@ def already_held(artifact_id: ArtifactId) -> kb_pb2.Fault:
     )
 
 
+def carried_twice(artifact_id: ArtifactId) -> kb_pb2.Fault:
+    """A create at an IRI a create before it in its set carries."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.IDENTITY,
+        message=f"an IRI names one artifact; the set carries {str(artifact_id)!r} on more than one create",
+    )
+
+
 def not_a_collection(locator: Locator) -> kb_pb2.Fault:
     place = names.placed(locator.place)
     return kb_pb2.Fault(
