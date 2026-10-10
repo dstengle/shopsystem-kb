@@ -11,7 +11,8 @@ from kb import canonical, drafting, journal, port, query, refusals, search, sett
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
-from kb.values import ArtifactId, Refused, Root
+from kb.roots import Root
+from kb.values import ArtifactId, Refused
 
 METASCHEMA_ID = values.type_of(values.TYPE_KIND)
 

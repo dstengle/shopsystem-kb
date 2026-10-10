@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
 
-from kb import signatures, store, values, write
+from kb import roots, signatures, store, write
 from kb.servicer import boundary, guarded
 
 
@@ -41,7 +41,7 @@ class _Starter:
     def start(self, request: Starting):
         """Who starts the store, then where, the first refusal only; then the store started there."""
         actor = signatures.starter(request.role, request.execution)
-        write.start(values.root(request.root), actor, self._clock)
+        write.start(roots.root(request.root), actor, self._clock)
         return Started()
 
     @boundary(Started, opens=False)
@@ -54,7 +54,7 @@ class _Starter:
     def vacant(self, request: tuple):
         """Where a store would be put, given as (root, verb), refused as `start` refuses it; nothing made."""
         root, verb = request
-        store.vacant(values.root(root), verb)
+        store.vacant(roots.root(root), verb)
         return Started()
 
 

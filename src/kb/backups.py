@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 
 from kb import refusals, sqlite_backup, store
 from kb.port import Port, Unreadable
-from kb.values import Named, Refused, Root
+from kb.roots import Named, Root
+from kb.values import Refused
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 
 from kb import canonical, composition, names, refusals, settled, values
 from kb.port import Port
-from kb.values import Named, Refused
+from kb.roots import Named
+from kb.values import Refused
 
 
 @dataclass(frozen=True)

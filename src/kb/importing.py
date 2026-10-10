@@ -17,7 +17,8 @@ from kb.edits import Import
 from kb.offers import Offered
 from kb.port import Port
 from kb.signatures import Signed
-from kb.values import TYPE_KIND, ArtifactId, Named, Refused
+from kb.roots import Named
+from kb.values import TYPE_KIND, ArtifactId, Refused
 
 METASCHEMA_ID = values.type_of(TYPE_KIND)
 

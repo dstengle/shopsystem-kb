@@ -8,7 +8,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 from kb import canonical, names, refusals, served, settled, store, values
-from kb.values import ArtifactId, Named, Refused
+from kb.roots import Named
+from kb.values import ArtifactId, Refused
 
 HISTORY = (".git", "journal", store.STAGING)
 KEPT = (

@@ -16,7 +16,8 @@ from kb import canonical, refusals, rules, sqlite_store
 from kb.addresses import Address, address
 from kb.contract import kb_pb2
 from kb.port import Port, Unreadable
-from kb.values import Refused, Root
+from kb.roots import Root
+from kb.values import Refused
 
 MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
