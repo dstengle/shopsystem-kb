@@ -1,17 +1,17 @@
 """Every change in a set is checked, not only the last a set makes to an artifact: its content against its type as the
 set leaves it, a type's version moved on from the version it acted on; and a change acting on what an earlier one left
-unfit is refused with a typed fault; a key two creates carry refused beside every other fault of the set. Through
-the contract, and, for a set of more than one kind of change, which the contract does not take, through kb.write's
-own `land`; each store under its own tmp_path."""
+unfit is refused with a typed fault; an IRI two creates carry refused beside every other fault of the set, and a
+create that links to its own IRI landing. Through the contract, and, for a set of more than one kind of change, which
+the contract does not take, through kb.write's own `land`; each store under its own tmp_path."""
 import copy
 
 import pytest
 
 from calls import (
-    DECISION_TYPE, create, create_many, created, define, iri, read, replace_many, replaced, start_a_store, type_iri,
+    DECISION_TYPE, check, create, create_many, created, define, iri, read, replace_many, replaced, start_a_store, type_iri,
 )
 from kb import changes, client as kb_client, signatures, store, values, write
-from kb.content import dumps
+from kb.content import dumps, loads
 from kb.signatures import Signed
 
 DECISION = iri("decision", "price-reviews-happen-weekly")
@@ -115,19 +115,36 @@ def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(c
     assert read(client, type_iri("decision")).revision == 1
 
 
-def test_a_key_carried_twice_is_refused_beside_every_other_fault_of_the_set(client):
-    refused = create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
-        created("decision", "Price reviews happen daily", {"sections": SECTIONS[:1]}, key="pricing"),
-    ])
-    assert _faults(refused) == [(iri("decision", "price-reviews-happen-daily"), "sections", "sections"), ("", "", "ref")]
-    assert "'pricing'" in refused.faults[1].message
+WEEKLY, MONTHLY = iri("decision", "weekly-price-reviews"), iri("decision", "monthly-price-reviews")
 
 
-def test_a_key_carried_twice_is_refused_when_one_of_its_creates_does_not_convert(client):
+def test_an_iri_carried_twice_is_refused_beside_every_other_fault_of_the_set(client):
     refused = create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
-        created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing", at=iri("decision", "daily")),
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Prices are reviewed monthly", {"sections": SECTIONS[:1]}, at=MONTHLY),
     ])
-    assert [fault.rule for fault in refused.faults] == ["locator", "ref"]
-    assert "'pricing'" in refused.faults[1].message
+    assert _faults(refused) == [(WEEKLY, "", "identity"), (MONTHLY, "sections", "sections")]
+    assert repr(WEEKLY) in refused.faults[0].message
+    assert read(client, WEEKLY).faults
+
+
+def test_an_iri_carried_twice_is_refused_when_another_create_of_the_set_does_not_convert(client):
+    refused = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY),
+        created("Not A Kind", "Prices are reviewed monthly", {"sections": SECTIONS}, at=MONTHLY),
+    ])
+    assert [(fault.artifact, fault.rule) for fault in refused.faults][0] == (WEEKLY, "identity")
+    assert [fault.rule for fault in refused.faults] == ["identity", "locator"]
+    assert repr(WEEKLY) in refused.faults[0].message
+
+
+def test_a_create_in_a_set_that_links_to_its_own_iri_lands_the_link_resolving_within_the_set(client):
+    landed = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"supersedes": WEEKLY, "sections": SECTIONS}, at=WEEKLY),
+    ])
+    assert not landed.refused, landed.faults
+    assert [(result.id, result.revision) for result in landed.results] == [(WEEKLY, 1)]
+    assert loads(read(client, WEEKLY, whole=True).content)["supersedes"] == WEEKLY
+    assert not check(client).violations

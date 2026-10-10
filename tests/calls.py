@@ -318,13 +318,12 @@ def read(client, artifact_id, whole=False, depth=0, section=""):
     return answer(client.Read(asked))
 
 
-def created(type_name, title, content, key="", at=None, version=1):
+def created(type_name, title, content, at=None, version=1):
     """A create inside a BatchCreate: at the IRI given, or the one its title gives under its type's, conforming to
-    the version of its type given, the first unless another is, the title beside the content, and the key it carries,
-    if any."""
+    the version of its type given, the first unless another is, the title beside the content."""
     return kb_pb2.CreateItem(
         id=at or named(type_name, title), type=version_iri(type_name, version), title=str(title),
-        content=dumps(content), key=key,
+        content=dumps(content),
     )
 
 
