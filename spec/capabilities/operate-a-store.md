@@ -2,7 +2,7 @@
 id: capability/operate-a-store
 title: Operate a store
 narrator: the operator
-rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule, decision/serving-built, decision/a-server-stamps-with-its-own-clock, decision/0021-kb-served-from-a-container, decision/published-contract-v1-in-0-7-0, decision/seed-may-be-the-root, decision/unwritable-root-refused]
+rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule, decision/serving-built, decision/a-server-stamps-with-its-own-clock, decision/0021-kb-served-from-a-container, decision/published-contract-v1-in-0-7-0, decision/seed-may-be-the-root, decision/unwritable-root-refused, decision/0028-backup-and-restore-beside-export]
 formulated_as: features/operate-a-store.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/operate-a-store.feature
 
 ## Purpose
 
-From a shell, without any client, the operator sets a store up, empty or seeded from a directory of files, checks the whole store, and serves a store to several callers, starting it first when asked and none is there. The same commands run in kb's image, in a container beside the callers. The command line changes content only through import into a freshly started store (export-and-import-a-store), a seed included; every other change to content goes through a client. Checking the store is a read, and is never refused because another change is being written. This capability is not publishing the image, or managing the volumes a store lives on beyond `kb export`.
+From a shell, without any client, the operator sets a store up, empty or seeded from a directory of files, checks the whole store, backs a running store up whole, its history and journal included, restores a backup as a store in an empty place, and serves a store to several callers, starting it first when asked and none is there. The same commands run in kb's image, in a container beside the callers. The command line changes content only through import into a freshly started store (export-and-import-a-store), a seed included, and through restoring a backup; every other change to content goes through a client. Checking the store is a read, and is never refused because another change is being written. This capability is not publishing the image, or the readable, portable copy of a store, which is export (export-and-import-a-store).
 
 ## Behaviour
 
@@ -28,7 +28,23 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 - When the operator runs kb init with a seed directory that is the directory the store is started in, or holds it, saying which role they are, there is a store inside that directory holding the files the seed directory held, as kb import lands them into a freshly started store, and nothing kb made while starting it is among them.
 - If the directory a store would be started in cannot be written, kb init, with a seed directory or without, and kb serve with `--start` are refused because a store can only be started in a directory kb can write, naming the directory; nothing is served, and nothing is made in it.
 - When the operator runs kb validate, they are told of everything in the store that does not fit its type, and where, and of everything behind the type it was last checked against.
-- The command line offers setting a store up, checking and exporting one, and importing into a freshly started store, and nothing else that changes what the store holds.
+- The command line offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a freshly started store, and nothing else that changes what the store holds.
+- When the operator backs up a store, the backup holds the store whole, its history and its journal included.
+- When the operator backs up a store, the backup holds the store as it stood at one moment, each set landing meanwhile either in it whole or not at all.
+- While clients are writing to the store, when the operator backs it up, the backup is made and the clients go on writing, none of their changes refused because of the backup.
+- While another change is being written to the store, when the operator backs it up, the backup is made and is not refused because the store was busy with another change.
+- While a server serves the store, when the operator backs it up, the backup is made and the server goes on serving.
+- If the place a backup would be written holds anything, the backup is refused because a backup never overwrites, and what it holds is left as it was.
+- kb backup finds the store as kb validate does, with the same refusals.
+- When the operator restores a backup in a directory with no store inside it, there is a store inside that directory holding everything the store backed up held, its history and its journal included, and no role is needed.
+- When the operator restores a backup, the restored store's history ends with the last entry the store held when backed up.
+- If the directory already has a store inside it, the restore is refused because that directory already has a store inside it, and that store holds what it held before.
+- If the directory sits inside a store, the restore is refused because that directory is inside a store, and that store holds what it held before.
+- If the directory a backup would be restored in cannot be written, the restore is refused because a store can only be restored in a directory kb can write, naming the directory, and nothing is made in it.
+- If what the operator restores is not a backup kb made, the restore is refused because it is not a backup, and nothing is made.
+- If the backup was made by an earlier kb, the restore is refused because this kb cannot read a store an earlier kb made, and nothing is made.
+- If the backup was made by a later kb, the restore is refused because a later version of kb is needed to read it, and nothing is made.
+- If a restore is stopped before it finishes, however it was stopped, the directory has no store inside it, and the same restore run again restores the backup.
 - While the operator works in a folder deep inside the directory a store sits in, when they run kb validate, the store found above where they are working is the one checked.
 - While the operator works outside any store with `KB_ROOT` naming one, when they run kb validate, the store `KB_ROOT` names is the one checked.
 - If the operator works outside any store and nothing names one, kb validate is refused because no store was found, neither above where they are working nor named outright.
@@ -51,12 +67,14 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 
 ## Implementation, may change
 
-- The commands are `kb init <root> [--seed <dir>]`, `kb validate` and `kb serve <root> --listen <host:port> [--start]`; the role for `kb init` and for a store `kb serve --start` starts comes from `KB_ACTOR`. `kb serve` hosts the store at `<root>/kb/` with `grpc.server`, the same servicer an in-process client reaches, and stamps each change with the server's own clock, the machine's. `kb export` and `kb import` are export-and-import-a-store.
+- The commands are `kb init <root> [--seed <dir>]`, `kb validate`, `kb serve <root> --listen <host:port> [--start]`, `kb backup <file>` and `kb restore <file> <root>`; the role for `kb init` and for a store `kb serve --start` starts comes from `KB_ACTOR`. `kb serve` hosts the store at `<root>/kb/` with `grpc.server`, the same servicer an in-process client reaches, and stamps each change with the server's own clock, the machine's. `kb export` and `kb import` are export-and-import-a-store.
+- `kb backup <file>` writes the backup as one file.
+- Backing up and restoring are the operator's commands only, not rpcs: the contract does not change for them.
 - Reads never wait for the write lock (change-the-store).
 - A module of its own, `staging.py`, owns a store started, and seeded, out of sight, then put in place whole: `kb init --seed` starts the store (`kb.init`) and imports the seed (the operator's import) under `<root>/.kb-starting/`, then moves `.kb-starting/kb` to `<root>/kb` with one `os.rename`, atomic because both lie on one filesystem. Whatever an earlier stopped run left in `.kb-starting/` is removed first. The staging directory is part of the store's files and layout, which may change, and is not published.
 - `kb serve --start` with no store is `kb.init` and then serving, as `kb serve` serves today.
 - A seed directory that is the root itself, or holds it, is read with kb's staging place passed over wherever the root lies inside it, as an import passes over a store's own files. A root kb cannot write is refused with rule `root`, naming the root, before anything is made, the way `kb.init` refuses a root it cannot start a store in.
-- Getting a store out of a container is `kb export` run inside it, its files carried out as a tar stream (the README's recipe); no command is added for it, and a store's files are never read through a bind mount owned by another user.
+- Getting a store out of a container whole is `kb backup` run inside it, its file carried out; `kb export` gives the readable copy. A store's files are never read through a bind mount owned by another user.
 - `cli.py` dispatches only. Exit codes: 2 for a refusal (a seed's report printed first, as `kb import` prints it), 0 after a clean stop.
 - The image: one `Dockerfile` at the repository's root, so compose can build from the repository's URL at a tag without naming a file; a `.dockerignore` leaves out `.venv`, `.git`, `tests`, `features`, `bench` and `docs`.
 - Two stages: the first builds kb's wheel; the second installs that wheel and its runtime dependencies alone into a virtualenv on `python:3.12-slim`, pinned to an exact tag. No test or build tools.
@@ -77,4 +95,3 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 
 - Publishing the image to GHCR from a release tag, and the repository's first CI workflow. Promoted when a caller needs kb's image without building it from the repository.
 - Images for more than one architecture. Promoted when someone needs to run the image on a machine whose architecture it was not built for.
-- Backups and managing volumes beyond `kb export`. Promoted when an operator needs to restore a store that `kb export` and import cannot bring back.

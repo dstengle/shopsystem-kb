@@ -8,8 +8,8 @@ kb knows nothing about any domain. It ships no type beyond the one that describe
 
 ## Constraints carried
 
-- The database is canonical; canonical YAML is its export and wire form. The contract is the only access path for clients, except that a client starts a store in its own process through `kb.init`, never through the contract or a server; files on disk enter a store only through the operator's import, checked first, into a freshly started store. kb runs no git.
-- Every change goes through the contract or the operator's import: drafted, checked, then landed with its history in one transaction. Nothing else edits the store.
+- The database is canonical; canonical YAML is its export and wire form. The contract is the only access path for clients, except that a client starts a store in its own process through `kb.init`, never through the contract or a server; files on disk enter a store only through the operator's import, checked first, into a freshly started store, or as a whole store through the operator's restore of a backup. kb runs no git.
+- Every change goes through the contract or the operator's import: drafted, checked, then landed with its history in one transaction. Nothing else edits the store; restoring a backup makes a store whole, it does not change one.
 - Artifacts are typed, ordered documents. Domain parts are typed nodes with names, never text quoted inside a code fence. Inline formatting is never modelled; a prose body is one markdown string.
 - Renderings are outputs written elsewhere, never stored in their source, and never in the store's tree.
 - Every artifact carries the version of the type it was last checked against. Migration is not built; versioning is.
@@ -45,7 +45,7 @@ Reading order:
 16. `capabilities/snapshot-what-work-read.md`: a piece of work records what it read.
 17. `capabilities/check-the-store.md`: the whole store against its types.
 18. `capabilities/answer-a-damaged-file.md`: a store this kb cannot read (its database damaged, missing or on a read-only filesystem, or the store made by an earlier or a later kb) is a named fault.
-19. `capabilities/operate-a-store.md`: the operator's `kb init` (empty or seeded), `kb validate`, `kb serve` (starting the store first when asked), and kb's image that runs them in a container.
+19. `capabilities/operate-a-store.md`: the operator's `kb init` (empty or seeded), `kb validate`, `kb serve` (starting the store first when asked), backing a store up whole and restoring a backup, and kb's image that runs them in a container.
 20. `capabilities/export-and-import-a-store.md`: the operator's `kb export` and `kb import`, the files as people read them.
 
 ## Order of building

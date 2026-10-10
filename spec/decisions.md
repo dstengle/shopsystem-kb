@@ -568,3 +568,9 @@ source: the batch 28 review (B2), lines approved by the controller under the per
 A root kb cannot write is refused before anything is made, by kb init (with a seed directory or without), kb serve --start and `kb.init` alike, with rule `root`, naming the root, rather than as a store that could not answer naming a place kb would have made; nothing is served and nothing is made in it. The rule is kb's existing one for where a store may be started; no rule name is added.
 date: 2026-10-08
 source: the batch 28 review (B1), lines approved by the controller under the person's delegation of 2026-10-08
+
+## decision/0028-backup-and-restore-beside-export
+The operator backs up a running store whole, its history and journal included, without stopping writers, and restores that backup as a store in an empty place, so that losing a server loses nothing: backup is how a lost server is recovered; export stays the readable, portable copy and does not carry history. Files enter a store through the operator's import, or whole as a store through the operator's restore of a backup. Promotes the backups deferred in operate-a-store; the user's decision.
+date: 2026-10-10
+supersedes: decision/files-are-an-export (its clause that files on disk enter a store only through `kb import`)
+source: adrs/0028-backup-and-restore-beside-export.md
