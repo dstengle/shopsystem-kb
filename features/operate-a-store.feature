@@ -129,6 +129,7 @@ Feature: Operate a store
       | kb init with a seed directory            |
       | kb serve with --start, giving an address |
 
+  @slice-170
   Scenario: The operator checks the whole store
     Pins the operator's health check: one command tells them what does not fit, what has fallen behind, and what is linked to but not held, down to each link they would fill, without mixing the three.
     Given a store whose content the operator did not write
@@ -141,6 +142,7 @@ Feature: Operate a store
     And of the work item linked to and not held, a placeholder, with each of the two links into it: the decision holding the link and the place in that decision the link sits at
     And each of the three is listed apart from the others
 
+  @slice-170
   Scenario: The operator checks a store whose only findings are placeholders
     Pins that a placeholder is never a fault: a store holding nothing wrong but links to what it does not hold passes the operator's check.
     Given a store holding a type for decisions, a type for work items, and a decision that fits its type
@@ -149,6 +151,7 @@ Feature: Operate a store
     When the operator runs kb validate in that store
     Then the store checks clean
 
+  @slice-185
   Scenario: The command line offers setting up, checking, exporting, backing up, restoring and importing, and nothing else that changes what the store holds
     Pins the limit of the command line: import is offered into a store, not only a freshly started one, and every other change to content still goes through a client.
     Given a store

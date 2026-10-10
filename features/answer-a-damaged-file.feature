@@ -34,6 +34,7 @@ Feature: Answer a damaged file
       | lies in a directory that is read-only |
       | is a file that is read-only           |
 
+  @slice-157
   Scenario: A store found that was made by a kb before contract v2 refuses every call and command that needs it
     Pins that a store from before contract v2 gives one named fault saying this kb can neither read nor move it, with nothing written.
     Given a store holding a decision, a process and a tag, made by a kb before contract v2

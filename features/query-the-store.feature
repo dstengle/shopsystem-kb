@@ -23,6 +23,7 @@ Feature: Query the store
     When the client lists the decisions asking for names only
     Then the client is given three names and nothing else
 
+  @slice-175
   Scenario: The client lists by a path below the type
     Pins that a listing can select by where an artifact sits below its type rather than by its kind, across every type, matching whole segments and never part of one.
     Given a store holding these artifacts:
@@ -39,6 +40,7 @@ Feature: Query the store
       | decision  | pricing/discounts   |
       | work item | pricing/rollout     |
 
+  @slice-175
   Scenario: The client follows links narrowed to a path below the type
     Pins that a traversal can be held to where what it finds sits below its type, across every type, matching whole segments and never part of one.
     Given a store where a decision at "roadmap" below its type points at each of these:
@@ -53,6 +55,7 @@ Feature: Query the store
       | decision  | pricing/discounts   |
       | work item | pricing/rollout     |
 
+  @slice-166
   Scenario: The client asks for the placeholders
     Pins that every link to something the store does not hold can be found in one question, each such target with every link into it, the artifact holding that link and the place it sits at, while links to held artifacts are left out.
     Given a store where these links point at IRIs the store does not hold:

@@ -83,6 +83,7 @@ Feature: Make several changes in one go
     And each entry records the version that change left behind
     And the work item's version has gone up by two
 
+  @slice-160
   Scenario Outline: A create in a set points at what another create in it makes, earlier or later
     Pins that a link may point at what any create in the set makes, before or after it, because links are judged against the store as the whole set leaves it.
     When the client asks, in one go, for <creates>, in that order, saying which role and why
@@ -93,6 +94,7 @@ Feature: Make several changes in one go
       | a decision to be created carrying an IRI and a work item to be created pointing at it by that IRI                        |
       | a work item to be created pointing at a decision by the IRI its create carries and that decision to be created with it   |
 
+  @slice-160
   Scenario Outline: A link in a set to the IRI another create in it carries lands on what that create makes
     Pins that new artifacts in one set name each other by the IRIs their creates carry, wherever in an artifact the link is written.
     Given work items may carry a collection of tasks, each of which may point at a decision
@@ -105,6 +107,7 @@ Feature: Make several changes in one go
       | in its content          |
       | inside one of its tasks |
 
+  @slice-160
   Scenario: Two new artifacts in one set that point at each other by their IRIs land
     Pins that a set is checked as a whole, so two artifacts that each need the other to exist can be made together, which no order of single changes allows.
     Given the decision type lets a decision point at another decision
@@ -112,6 +115,7 @@ Feature: Make several changes in one go
     Then the set lands
     And the store holds both decisions, each pointing at the other
 
+  @slice-180
   Scenario Outline: A link in a set into a part a create in it names lands on that part
     Pins that a client can link into a part of an artifact it creates in the same set, by the name it gave that part.
     Given the decision type gives a decision a collection of options
@@ -125,6 +129,7 @@ Feature: Make several changes in one go
       | in its content          |
       | inside one of its tasks |
 
+  @slice-180
   Scenario Outline: A link in a set to an IRI nothing holds, under <type>, lands on a placeholder
     Pins that a link to an artifact not yet held is kept, not refused, so long as its IRI sits under a type the store or the set provides and the link field allows.
     Given work items may point at an artifact of <type>
@@ -137,6 +142,7 @@ Feature: Make several changes in one go
       | the decision type, which the store holds | a work item to be created                                     |
       | a note type a create in the set makes    | a note type to be created and a work item to be created       |
 
+  @slice-160
   Scenario: Two creates in one set that carry the same IRI are refused
     Pins that an IRI names one artifact only, so a set can never make two artifacts under it.
     When the client asks, in one go, for two decisions to be created, both carrying the same IRI, saying which role and why
@@ -144,6 +150,7 @@ Feature: Make several changes in one go
     And the IRI is given back
     And the store holds none of the changes in the set
 
+  @slice-160
   Scenario: Each create in a set gives back its artifact's IRI and first revision, in the order of the set
     Pins that a client which made several artifacts at once can tell which result belongs to which create, and where each artifact starts, without reading the store again.
     When the client asks, in one go, for three decisions to be created, each carrying an IRI of its own, saying which role and why
@@ -186,6 +193,7 @@ Feature: Make several changes in one go
     And nothing is written
     And the same set may be asked for again
 
+  @slice-177
   Scenario Outline: A set of <changes> asked to be checked only answers as it would land and lands nothing
     Pins that a client can learn what a set would give before committing to it, and that asking leaves no trace.
     Given the store also holds a second work item
@@ -200,6 +208,7 @@ Feature: Make several changes in one go
       | creates      | a decision and a work item to be created               |
       | replacements | the work item and the second work item to be replaced  |
 
+  @slice-177
   Scenario: A set asked to be checked only that would be refused is refused with every fault
     Pins that checking only answers a bad set as landing it would, every fault included, and still leaves no trace.
     Given a set whose first and second changes are each missing a section its type requires
@@ -209,6 +218,7 @@ Feature: Make several changes in one go
     And the store holds nothing of the set
     And the store's history holds nothing of it
 
+  @slice-177
   Scenario: A replacement in a set asked to be checked only that says a revision its artifact no longer stands at is refused
     Pins that checking only holds a replacement to the revision the client read, just as landing would.
     Given the store also holds a second work item
@@ -217,6 +227,7 @@ Feature: Make several changes in one go
     Then the set is rejected because the artifact moved since it was read
     And the revision the work item stands at is given back
 
+  @slice-177
   Scenario: A set asked to be checked only while another change is being written is answered, not refused as busy
     Pins that checking only does not wait on a change being written, so it is never refused as busy.
     Given another change is being written and holds the store longer than the store waits

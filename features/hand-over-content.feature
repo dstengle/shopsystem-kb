@@ -2,6 +2,7 @@
 Feature: Hand over content
   Narrator: the client
 
+  @slice-159
   Scenario: Content given to a create that carries what travels beside it is refused
     Pins that the artifact's IRI, the version of its type and its revision travel beside the content and never inside it, and that each one the content carried is named back.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options

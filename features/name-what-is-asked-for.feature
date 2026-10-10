@@ -2,6 +2,7 @@
 Feature: Name what is asked for
   Narrator: the client
 
+  @slice-178
   Scenario Outline: A name a call carries is an IRI of kb's grammar
     Pins each rule of kb's grammar for a name, and the length it may run to, so a name broken in any one way is refused for its shape before anything is looked up.
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
@@ -24,6 +25,7 @@ Feature: Name what is asked for
       | the decision's IRI with "@" in its host                                           | a name is an IRI of kb's grammar          |
       | the decision's IRI holding "#" twice                                              | a name is an IRI of kb's grammar          |
 
+  @slice-178
   Scenario: A read by a name that is not an IRI of kb's grammar is refused
     Pins that a name is checked for shape before any file is found from it, so a name built to walk out of the store reads nothing at all.
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
@@ -31,6 +33,7 @@ Feature: Name what is asked for
     Then the read is rejected because a name is an IRI of kb's grammar, and the name asked for is given back
     And no content comes back, from inside the store or outside it
 
+  @slice-178
   Scenario: A read by a name that is a path on the disk is refused
     Pins that a path on the disk is never taken for a name, the other obvious way to ask for a file that is none of the store's business.
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
@@ -46,6 +49,7 @@ Feature: Name what is asked for
     Then the read is rejected because a place inside an artifact is named by parts of the same plain alphabet, or a collection and an item in it
     And no content comes back, from inside the store or outside it
 
+  @slice-178
   Scenario: A change by a name that is not an IRI of kb's grammar writes nothing
     Pins that a change's name is checked for shape before anything is worked out from it, so a name dressed up as a path never reaches the disk.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -53,6 +57,7 @@ Feature: Name what is asked for
     Then the change is rejected because a name is an IRI of kb's grammar, and the name asked for is given back
     And nothing is written anywhere, inside the store or outside it
 
+  @slice-178
   Scenario: A create naming a version of a type not shaped as a type's IRI, "@" and a number is refused
     Pins that the version a create names is checked for shape before anything is looked up from it, so a version shaped like a path never reaches the disk.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
@@ -67,6 +72,7 @@ Feature: Name what is asked for
     When the client reads an artifact by a name the store holds nothing under
     Then the read is rejected because the store holds nothing by that name, and the name asked for is given back
 
+  @slice-166
   Scenario: A read by an IRI links point at that the store does not hold is refused
     Pins that being pointed at by a link does not make a name held, so reading where a link points is the same plain "not here" as any other unheld name.
     Given a store holding a decision that links to an IRI the store does not hold
@@ -127,6 +133,7 @@ Feature: Name what is asked for
       | replaces a place inside the decision beginning at the decision's own version | a place inside an artifact never names what only the store settles |
       | adds an item at a place inside the decision that is not a collection       | an item is added to a collection, and that place is not one      |
 
+  @slice-162
   Scenario Outline: A create naming a type version the store does not hold is refused
     Pins that an unheld version is its own plain answer, named back and kept apart from any complaint about the content, whether the store holds the type at another version or not at all.
     Given a store holding a decision type, at its first version, whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
@@ -141,6 +148,7 @@ Feature: Name what is asked for
       | the decision type at its second version, which the store does not hold |
       | the invoice type at its first version                    |
 
+  @slice-176
   Scenario Outline: Listing, searching, following links or exporting by a kind the store holds no type for is refused
     Pins that an unknown kind is the same plain refusal wherever it is asked for, export included, so a typo is never answered with an empty result that reads like an empty store.
     Given a store holding three decisions, one of them superseded
@@ -155,6 +163,7 @@ Feature: Name what is asked for
       | follows the links into a decision, only from artifacts of that kind |
       | exports only the artifacts of that kind                             |
 
+  @slice-178
   Scenario: A read by an IRI under no type the store holds is refused
     Pins that a name under no held type is the same plain "not here" as any unheld name, named back rather than a failure.
     Given a store holding three decisions, one of them superseded

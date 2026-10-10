@@ -11,6 +11,7 @@ Feature: Keep the history
     Then there is one entry for each change
     And each entry says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the version it left behind, a fingerprint of what was written, the message given, and which set of changes it landed with
 
+  @slice-171
   Scenario: Each entry read from the history gives its position in the history
     Pins that every entry the history gives says where it stands in the history, so a client has something to hold that names that point.
     Given today is 2026-09-23

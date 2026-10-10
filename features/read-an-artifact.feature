@@ -13,6 +13,7 @@ Feature: Read an artifact
     And a stub of each thing it points at and of each of its parts
     And how many things point at it, counted by their kind and by the link they use
 
+  @slice-169
   Scenario: At a glance, the stub of a link to an IRI the store does not hold is marked as not held
     Pins that a summary tells a client which of the things an artifact points at the store does not hold, before it tries to read one.
     Given the decision also points at a decision under an IRI the store does not hold
@@ -31,6 +32,7 @@ Feature: Read an artifact
     When the client reads the whole decision
     Then the client is given every field, every section and every part, in the order the type declares
 
+  @slice-159
   Scenario: Reading the whole artifact gives its IRI, its type version's IRI, its revision and its title beside its content
     Pins that a whole read says which artifact it is and what it conforms to, so a client holding only the read can find the artifact again and know the version of its type.
     When the client reads the whole decision
@@ -42,6 +44,7 @@ Feature: Read an artifact
     When the client reads the whole decision without asking for its links to be followed
     Then the older decision is given as the name it is known by, and nothing more
 
+  @slice-169
   Scenario Outline: A link to an IRI the store does not hold comes back marked as landing on nothing held, at any level and following links or not
     Pins that a client can always tell a link that lands on nothing held from one that lands, however it reads, and that nothing is ever put in place of such a link.
     Given the decision also points at a decision under an IRI the store does not hold
@@ -86,6 +89,7 @@ Feature: Read an artifact
     When the client reads the whole process following its links one step
     Then the branches are given as written, naming the steps of that process
 
+  @slice-159
   Scenario: A link filled in comes with its IRI, its type version's IRI, its title and its revision, ahead of its content
     Pins that a target put in place of a link says which artifact it is and what it conforms to, before the content, so a client can tell what it has been handed.
     When the client reads the whole decision following its links one step
