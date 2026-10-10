@@ -16,12 +16,11 @@ CREATE INDEX type_versions_by_type ON type_versions (type);
 
 def made(db: sqlite3.Connection, type_id: str, version: str, number: int, revision: int, title: str,
           stored: str) -> None:
-    """A version of a type, beside every version of it already held at another IRI; one handed at an IRI a version
-    is held at (a number the type keeps or goes back to, or a type removed and held again) is written in its place.
-    The number is handed as its digits, which SQLite keeps as an integer when it can hold it: one of any size is
-    still a client's to give."""
+    """A version of a type, beside every version of it already held, at an IRI no version is held at: kb gives each
+    version of a type a number of its own. The number is handed as its digits, which SQLite keeps as an integer when
+    it can hold it."""
     db.execute(
-        "INSERT OR REPLACE INTO type_versions (id, type, number, revision, title, content) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO type_versions (id, type, number, revision, title, content) VALUES (?, ?, ?, ?, ?, ?)",
         (version, type_id, str(number), revision, title, stored),
     )
 

@@ -1,5 +1,5 @@
 """Every change in a set is checked, not only the last a set makes to an artifact: its content against its type as the
-set leaves it, a type's version moved on from the version it acted on; and a change acting on what an earlier one left
+set leaves it, a type given its next version by each change to it; and a change acting on what an earlier one left
 unfit is refused with a typed fault; an IRI two creates carry refused beside every other fault of the set, and a
 create that links to its own IRI landing. Through the contract, and, for a set of more than one kind of change, which
 the contract does not take, through kb.write's own `land`; each store under its own tmp_path."""
@@ -89,20 +89,26 @@ def test_changing_what_an_earlier_change_wrote_as_a_single_value_comes_back_type
     assert _faults(response) == [(DECISION, "options", "type"), (DECISION, "options", "type")]
 
 
-def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(client):
+def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(root, client):
     first, second = copy.deepcopy(DECISION_TYPE), copy.deepcopy(DECISION_TYPE)
     first["version"] = second["version"] = 2
     first["schema"]["properties"]["owner"] = {"type": "string"}
     second["schema"]["properties"]["outcome"] = {"type": "string"}
     content = [{key: value for key, value in each.items() if key != "title"} for each in (first, second)]
     response = replace_many(client, [replaced(type_iri("decision"), each) for each in content])
-    assert _faults(response) == [(type_iri("decision"), "version", "version")]
-    assert read(client, type_iri("decision")).revision == 1
+    assert not response.refused, response.faults
+    stands = read(client, type_iri("decision"), whole=True)
+    assert (stands.revision, loads(stands.content)) == (3, {"version": 3, "schema": second["schema"]})
+    schemas = [DECISION_TYPE["schema"], first["schema"], second["schema"]]
+    with store.opened(root) as held:
+        for number, schema in enumerate(schemas, start=1):
+            version = held.type_version(values.Version(values.Kind(type_iri("decision")), number))
+            assert (version.revision, version.content["version"], version.content["schema"]) == (number, number, schema)
 
 
 @pytest.mark.parametrize("earlier, faults", [
     ({"version": "two"}, [(type_iri("decision"), "version", "type")]),
-    ({"schema": None}, [(type_iri("decision"), "", "required"), (type_iri("decision"), "version", "version")]),
+    ({"schema": None}, [(type_iri("decision"), "", "required")]),
 ])
 def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(client, earlier, faults):
     content = {key: value for key, value in DECISION_TYPE.items() if key != "title"}

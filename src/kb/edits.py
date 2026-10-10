@@ -6,7 +6,7 @@ the whole set has acted (kb.write). An import puts an artifact in the draft whol
 import copy
 from typing import NamedTuple
 
-from kb import changes, composition, definitions, names, places, refusals, settled, values
+from kb import changes, composition, names, places, refusals, settled, values
 from kb.draft import Draft
 from kb.values import ArtifactId, Refused
 
@@ -21,8 +21,8 @@ class Change(NamedTuple):
     """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name; the
     version its entry records and the IRI of the type version it conforms to; the artifact as this
     operation left it, None for a removal; the type of its kind as it acted, which it is checked against when the set
-    leaves none; and the faults of the names it handed back and of a type's version kept, which refuse the set while
-    it still acts, so what it leaves is checked too."""
+    leaves none; and the faults of the names it handed back, which refuse the set while it still acts, so what it
+    leaves is checked too."""
     op: str
     artifact_id: ArtifactId
     path: str = ""
@@ -68,6 +68,8 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     if faults:
         raise Refused(faults)
     content = copy.deepcopy(creation.content.tree)
+    if type_id == values.type_of(values.TYPE_KIND):
+        _numbered(draft, creation.name, content)
     schema = draft.artifact(type_id)
     declared = composition.declared(schema["schema"], draft)
     names.items(declared["parts"], content, False, _item_parts(draft))
@@ -166,9 +168,9 @@ def _as_read(draft: Draft, artifact_id: ArtifactId, expected: int | None) -> Non
 
 
 def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict) -> tuple:
-    """The artifact's next version put in the draft: its new items named, its version up by one, its title kept.
-    Returns the faults of the names its items hand back that the artifact did not hold, with any of which no item is
-    named, and, for a type, of a schema changed while its version did not move on from the one it acted on."""
+    """The artifact's next version put in the draft: its new items named, its version up by one, its title kept, and
+    a type given the number of the version this change makes. Returns the faults of the names its items hand back
+    that the artifact did not hold, with any of which no item is named."""
     kind = composition.artifact_kind(current)
     schema = composition.kind_schema(kind, draft)
     declared = composition.declared(schema["schema"], draft)
@@ -176,11 +178,20 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict)
     misnamed = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
     if not misnamed:
         names.items(declared["parts"], content, True, _item_parts(draft))
-    kept = definitions.version_kept(artifact_id, content, current) if kind == values.TYPE_KIND else []
+    if kind == values.TYPE_KIND:
+        _numbered(draft, artifact_id, content)
     version = names.versioned(kind.name, schema["version"])
     artifact = settled.given(content, current["id"], version, current["revision"] + 1, current["title"])
     draft.put(artifact_id, settled.order(artifact, declared))
-    return (*misnamed, *kept)
+    return tuple(misnamed)
+
+
+def _numbered(draft: Draft, type_id: ArtifactId, content: dict) -> None:
+    """A type's content given, as its `version`, the number kb makes this version of it at, over any number its
+    client sent or none; what a client sent there that is no number stays, for the type of types to refuse."""
+    number, sent = draft.numbered(type_id), content.get("version", 0)
+    if isinstance(sent, (int, float)) and not isinstance(sent, bool):
+        content["version"] = number
 
 
 def _item_parts(draft: Draft):

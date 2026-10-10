@@ -1,6 +1,6 @@
 """The refusals of a type as it is written, each with its rule and its message, from plain values: a shape it refers
 to that no held type has, a type built on itself, one of kb's keywords where kb does not read it, a link field that
-leaves out part of its shape or says what kb does not know, a version kept while the type changed."""
+leaves out part of its shape or says what kb does not know."""
 from kb import rules
 from kb.contract import kb_pb2
 from kb.values import ArtifactId
@@ -24,13 +24,6 @@ def no_targets(type_id: ArtifactId, place: str, field: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=str(type_id), place=place, rule=rules.TARGETS,
         message=f"a link field says which kinds it may point at; {field!r} does not",
-    )
-
-
-def version_kept(type_id: ArtifactId, held: int) -> kb_pb2.Fault:
-    return kb_pb2.Fault(
-        artifact=str(type_id), place="version", rule=rules.VERSION,
-        message=f"a type's version goes up whenever the type changes; {str(type_id)!r} changed at version {held}",
     )
 
 

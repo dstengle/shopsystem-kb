@@ -14,6 +14,7 @@ class Draft:
         self._removed: set[ArtifactId] = set()
         self._types: dict[ArtifactId, dict] = {}
         self._changed: set[ArtifactId] = set()
+        self._numbers: dict[ArtifactId, int] = {}
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
         self._removed.discard(artifact_id)
@@ -59,6 +60,13 @@ class Draft:
         found = self._store.type_version(version)
         self._types.setdefault(type_id, found.content)
         return found
+
+    def numbered(self, type_id: ArtifactId) -> int:
+        """The number the next version of a type is made at, and counted as made: 1 for a type the draft does not
+        hold, else the number after the last counted here, or after the one the type stands at."""
+        last = (self._numbers.get(type_id) or self.artifact(type_id)["version"]) if self.holds(type_id) else 0
+        self._numbers[type_id] = last + 1
+        return last + 1
 
     def as_read(self, type_ids: list[ArtifactId]) -> tuple[tuple[ArtifactId, int], ...]:
         """Each type given that the draft read from the store and leaves as it is, with the revision it was read at."""

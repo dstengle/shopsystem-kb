@@ -315,21 +315,6 @@ def _a_type_at_its_second_version(client):
     return read(client, type_iri("decision"), whole=True)
 
 
-@when("the client changes what that type requires, leaving its version at two", target_fixture="changed")
-def _change_the_type_leaving_its_version(client):
-    schema = {**DECISION_TYPE["schema"], "required": ["title", "supersedes"]}
-    return replace(client, type_iri("decision"), {"version": 2, "schema": schema}, message="Revise Decision")
-
-
-@then("the change is rejected because a type's version goes up whenever the type changes")
-def _rejected_for_the_version_kept(changed):
-    assert [(fault.artifact, fault.place, fault.rule) for fault in changed.faults] == [
-        (type_iri("decision"), "version", "version"),
-    ]
-    assert changed.faults[0].message.startswith("a type's version goes up whenever the type changes")
-    assert changed.revision == 0
-
-
 @then("the type reads back as it was")
 def _the_type_as_it_was(client, held):
     assert read(client, type_iri("decision"), whole=True) == held
