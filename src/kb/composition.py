@@ -5,7 +5,7 @@ from typing import NamedTuple
 
 from referencing.exceptions import NoSuchResource
 
-from kb import names, refusals, settled, values
+from kb import names, port, refusals, settled, values
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -42,13 +42,32 @@ def reference(ref: str) -> Reference | None:
     return Reference(values.ArtifactId(found[0]), not fragment, found[1])
 
 
+def kept(type_id: values.ArtifactId, number: int, corpus) -> port.TypeVersion | None:
+    """The version of a type the corpus keeps, as the type's IRI and the number name it; None when it keeps none, or
+    when no type is held at the IRI (a version kept for a type since removed is not proof the type is held)."""
+    if not (corpus.holds(type_id) and settled.typed(corpus.artifact(type_id))):
+        return None
+    try:
+        return corpus.type_version(values.Version(values.Kind(str(type_id)), number))
+    except KeyError:
+        return None
+
+
+def current(type_id: values.ArtifactId, corpus) -> port.TypeVersion:
+    """The version a type stands at, read through the versions the corpus keeps. KeyError when no type is held at
+    the IRI."""
+    found = corpus.artifact(type_id)
+    if not settled.typed(found):
+        raise KeyError(str(type_id))
+    return corpus.type_version(values.Version(values.Kind(str(type_id)), found["version"]))
+
+
 def held(referred: Reference, corpus) -> bool:
     """Whether the corpus holds the type version a kb: reference names: a type at its IRI, standing at that
     version."""
-    if referred.type_id is None or not corpus.holds(referred.type_id):
+    if referred.type_id is None:
         return False
-    found = corpus.artifact(referred.type_id)
-    return settled.kind(found) == values.TYPE_KIND.name and found.get("version") == referred.number
+    return kept(referred.type_id, referred.number, corpus) is not None
 
 
 def type_schema(uri: str, corpus) -> dict:
@@ -56,7 +75,7 @@ def type_schema(uri: str, corpus) -> dict:
     referred = reference(uri)
     if referred is None or not held(referred, corpus):
         raise NoSuchResource(ref=uri)
-    return corpus.artifact(referred.type_id)["schema"]
+    return kept(referred.type_id, referred.number, corpus).content["schema"]
 
 
 def declared(schema: dict, corpus) -> dict:
@@ -116,7 +135,7 @@ def artifact_schema(artifact: dict, corpus) -> dict:
 def kind_schema(kind: values.Kind, corpus) -> dict:
     """The type a kind names, as the corpus holds it, its JSON Schema under `schema`. Raises Refused when the corpus
     holds none."""
-    return corpus.artifact(kind_type(kind, corpus))
+    return current(kind_type(kind, corpus), corpus).content
 
 
 def read_through(kind: values.Kind, corpus) -> list[values.ArtifactId]:
@@ -128,7 +147,7 @@ def read_through(kind: values.Kind, corpus) -> list[values.ArtifactId]:
         if type_id in found or not corpus.holds(type_id):
             return
         found.append(type_id)
-        for each in referred(corpus.artifact(type_id).get("schema")):
+        for each in referred(schema_of(type_id, corpus)):
             visit(each)
     visit(values.type_of(kind))
     return found
@@ -142,8 +161,17 @@ def reading(changed: set[values.ArtifactId], types: list[values.ArtifactId], cor
             return True
         if type_id in seen or not corpus.holds(type_id):
             return False
-        return any(reads(each, seen | {type_id}) for each in referred(corpus.artifact(type_id).get("schema")))
+        return any(reads(each, seen | {type_id}) for each in referred(schema_of(type_id, corpus)))
     return [values.Kind(str(type_id)) for type_id in types if reads(type_id, frozenset())]
+
+
+def schema_of(type_id: values.ArtifactId, corpus) -> dict | None:
+    """The schema of the type held at an IRI, read through the version it stands at; None when what is held there
+    is not a type."""
+    try:
+        return current(type_id, corpus).content.get("schema")
+    except KeyError:
+        return None
 
 
 def referred(node):

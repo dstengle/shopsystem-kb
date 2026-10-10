@@ -1,5 +1,7 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too."""
+from dataclasses import replace
+
 from kb import composition, links, places, refusals, settled, values
 from kb.content import dumps
 from kb.contract import kb_pb2
@@ -11,6 +13,8 @@ from kb.values import ArtifactId, Locator, Refused
 def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     """The artifact at the level asked. Raises Refused for a name the store lacks, a place or a section it holds
     nothing at."""
+    if reading.version is not None:
+        return _version(store, reading)
     locator = reading.locator
     if not store.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])
@@ -21,6 +25,34 @@ def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     if reading.level == "section":
         return _section(store, locator, reading.section)
     return _summary(store, locator)
+
+
+def _version(store: Port, reading: Reading) -> kb_pb2.Artifact:
+    """A version of a type, read as the artifact it was made as, under the version's IRI, with the revision and the
+    title it was made with. Raises Refused when the store keeps no such version."""
+    version = reading.version
+    held = composition.kept(values.type_of(version.kind), version.number, store)
+    if held is None:
+        raise Refused([refusals.not_found(ArtifactId(str(version)))])
+    at = ArtifactId(str(version))
+    made = {**held.content, "id": str(at), "revision": held.revision, "title": held.title}
+    return artifact(_Kept(store, at, made), replace(reading, locator=Locator(at, reading.locator.place), version=None))
+
+
+class _Kept:
+    """The store with one artifact put over it, as a version of a type is read as an artifact; all else is the store's."""
+
+    def __init__(self, store: Port, artifact_id: ArtifactId, made: dict):
+        self._store, self._id, self._made = store, artifact_id, made
+
+    def holds(self, artifact_id: ArtifactId) -> bool:
+        return artifact_id == self._id or self._store.holds(artifact_id)
+
+    def artifact(self, artifact_id: ArtifactId) -> dict:
+        return self._made if artifact_id == self._id else self._store.artifact(artifact_id)
+
+    def __getattr__(self, name):
+        return getattr(self._store, name)
 
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:

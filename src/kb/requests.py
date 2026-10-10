@@ -5,7 +5,7 @@ the faults come back in the order of the entries."""
 from dataclasses import dataclass
 from datetime import datetime
 
-from kb import signatures, values
+from kb import names, signatures, values
 from kb.contract import kb_pb2
 from kb.signatures import Signed
 from kb.values import ArtifactId, Kind, Locator, Refused
@@ -23,6 +23,7 @@ class Reading:
     level: str
     depth: int
     section: str
+    version: values.Version | None = None
 
 
 @dataclass(frozen=True)
@@ -59,9 +60,12 @@ class Listing:
 
 
 def reading(request: kb_pb2.ReadRequest) -> Reading:
-    """The level asked for, a summary when none is: a whole read's depth, a section read's title."""
+    """The level asked for, a summary when none is: a whole read's depth, a section read's title. A locator naming a
+    type's version is a read of that version, its locator the type's."""
     level = request.WhichOneof("level") or "summary"
-    return Reading(values.locator(request.locator), level, request.whole.depth, request.section.title)
+    version = values.version(request.locator.id) if names.version(request.locator.id) is not None else None
+    asked = request.locator if version is None else kb_pb2.Locator(id=version.kind.name, place=request.locator.place)
+    return Reading(values.locator(asked), level, request.whole.depth, request.section.title, version)
 
 
 def history(request: kb_pb2.HistoryRequest) -> JournalFilter:

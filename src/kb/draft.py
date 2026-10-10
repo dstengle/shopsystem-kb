@@ -3,8 +3,8 @@ holds, artifacts removed here are no longer held, and nothing is written. It ans
 artifact) and the links into an artifact, over the port. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
-from kb.port import Linking, Port
-from kb.values import TYPE_KIND, ArtifactId, Kind
+from kb.port import Linking, Port, TypeVersion
+from kb.values import TYPE_KIND, ArtifactId, Kind, Version
 
 
 class Draft:
@@ -42,6 +42,22 @@ class Draft:
         found = self._store.artifact(artifact_id)
         if settled.typed(found):
             self._types[artifact_id] = found
+        return found
+
+    def type_version(self, version: Version) -> TypeVersion:
+        """A version of a type as the draft leaves it: the type the draft put, when it stands at that version, over
+        the version the store keeps, which is kept as first read. KeyError when the draft removed the type or leaves
+        it at another version."""
+        type_id = ArtifactId(version.kind.name)
+        if type_id in self._removed:
+            raise KeyError(str(version))
+        if type_id in self._pending:
+            put = self._pending[type_id]
+            if put.get("version") != version.number:
+                raise KeyError(str(version))
+            return TypeVersion(version, put, put["revision"], put["title"])
+        found = self._store.type_version(version)
+        self._types.setdefault(type_id, found.content)
         return found
 
     def as_read(self, type_ids: list[ArtifactId]) -> tuple[tuple[ArtifactId, int], ...]:
