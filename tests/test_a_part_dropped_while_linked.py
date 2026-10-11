@@ -8,7 +8,7 @@ import pytest
 
 from calls import DECISION_TYPE, NOTE_TYPE, create, define, iri, placeholders, read, start_a_store
 import held
-from kb import changes, client as kb_client, signatures, store, values, write
+from kb import changes, client as kb_client, content_values, signatures, store, values, write
 from kb.content import dumps
 from kb.signatures import Signed
 
@@ -59,7 +59,7 @@ def _waiting(client):
 
 
 def _replace(name, content):
-    return changes.Replace(values.Locator(values.artifact_id(name), ()), values.content(dumps(content)))
+    return changes.Replace(values.Locator(values.artifact_id(name), ()), content_values.content(dumps(content)))
 
 
 def _remove(name):
