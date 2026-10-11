@@ -1,7 +1,7 @@
 """The operator's commands that are not rpcs, export, the import check, the import, the backup and the restore, over
 one store, each run inside kb.boundary's one boundary: the store opened first (but for a restore, which makes it),
-the command's values made, one call into the domain, and any refusal or escaping exception its faults. The import writes, so it is
-refused while a server owns the store, as a change asked of the store directly is."""
+the command's values made, one call into the domain, and any refusal or escaping exception its faults. The import
+writes, so it is refused while a server owns the store, as a change asked of the store directly is."""
 from pathlib import Path
 from typing import NamedTuple
 

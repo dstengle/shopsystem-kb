@@ -22,11 +22,11 @@ def imported(store: Port, directory: Named, signed: Signed, skip_errors: bool,
     version of a type, the store already holds as its file gives it, which has no entry in the history. A directory
     holding a file that differs from what the store holds at its IRI is refused with one fault for each such IRI,
     whether or not errors are skipped, and nothing is written. A directory with errors and no difference is refused
-    with the check's report, and nothing is written; or, with errors skipped, every artifact lands but the broken files and the files that would be
-    skipped, and the report says which they are and why. Files under the place passed over, when one is given, are not
-    offered. The store's write lock is held from before the
-    directory is read to the landing, so what is identical is judged against the store as it stands when the set
-    lands, and nothing lands between them."""
+    with the check's report, and nothing is written; or, with errors skipped, every artifact lands but the broken
+    files and the files that would be skipped, and the report says which they are and why. Files under the place
+    passed over, when one is given, are not offered. The store's write lock is held from before the directory is read
+    to the landing, so what is identical is judged against the store as it stands when the set lands, and nothing
+    lands between them."""
     with store.exclusive():
         return _imported(store, directory, signed, skip_errors, passed_over)
 
