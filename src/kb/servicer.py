@@ -134,7 +134,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @boundary(kb_pb2.PlaceholdersResponse, at_one_moment=True)
     def Placeholders(self, request, held):
-        return kb_pb2.Placeholders()
+        return query.placeholders(held)
 
     @changing(kb_pb2.SnapshotResponse)
     def Snapshot(self, request, held):

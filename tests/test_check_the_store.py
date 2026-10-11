@@ -1,8 +1,8 @@
-from pytest_bdd import given, parsers, scenario, then
+from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, create, define, iri,
-    next_version, start_a_store,
+    next_version, placeholders, replace, start_a_store, targets,
 )
 import held
 from kb import client as kb_client
@@ -123,10 +123,9 @@ def _a_second_version_has_followed(client):
     assert not followed.faults, followed.faults
 
 
-@given(parsers.parse("the decision {how}"))
+@given(parsers.re(r"the decision (?P<how>fits the first version but not the second|does not fit the first version)"))
 def _the_decision_fits(root, how):
     """Made by hand behind the store's back, since the store refuses to write a decision that does not fit."""
-    assert how in ("fits the first version but not the second", "does not fit the first version"), how
     if how.startswith("does not"):
         decision = held.artifact(root, WEEKLY)
         decision["sections"] = decision["sections"][:1]
@@ -193,3 +192,97 @@ def _violations_in_reading_order(checked):
 @then("the two violations at the field come in the alphabetical order of the names of the rules they break")
 def _two_violations_at_the_field_in_rule_order(checked):
     assert [fault.rule for fault in checked.violations if fault.place == "status"] == ["maxLength", "pattern"]
+
+
+def _to_a_decision():
+    return {"type": "string", "ref": {"targets": targets("decision"), "cardinality": "one", "parts": False,
+                                      "on_delete": "refuse"}}
+
+
+# A decision that may supersede one decision and revisit another; a work item that serves a decision and whose steps
+# each may need one.
+LINKING_DECISION_TYPE = {"title": "Decision", "version": 1, "schema": {
+    "type": "object",
+    "properties": {"title": {"type": "string"}, "supersedes": _to_a_decision(), "revisits": _to_a_decision()},
+    "required": ["title"],
+}}
+STEPPED_WORK_ITEM_TYPE = {"title": "Work item", "version": 1, "schema": {
+    "type": "object",
+    "properties": {"title": {"type": "string"}, "decision": _to_a_decision()},
+    "required": ["title"],
+    "parts": {"steps": {"items": {
+        "type": "object", "properties": {"title": {"type": "string"}, "needs": _to_a_decision()}, "required": ["title"],
+    }}},
+}}
+NOT_HELD = {
+    "first": iri("decision", "prices-are-reviewed-monthly"), "second": iri("decision", "prices-are-reviewed-yearly"),
+}
+HOLDING = {"decision": iri("decision", "prices-are-reviewed-daily"), "work item": iri("work-item", "move-the-review")}
+OLDER = iri("decision", "prices-are-reviewed-hourly")
+# What a step calls a link's place, as the field holding it and the place kb gives for it.
+SITS_AT = {
+    "what it supersedes": ("supersedes", "supersedes"), "the decision it serves": ("decision", "decision"),
+    "its first step": ("needs", "steps/0/needs"), "its second step": ("needs", "steps/1/needs"),
+}
+
+
+def _links(datatable):
+    """A step's table of links as (the IRI not held, the artifact holding the link, the field, the place)."""
+    heading, *rows = datatable
+    assert heading == ["IRI not held", "artifact holding the link", "place the link sits at"]
+    return [
+        (NOT_HELD[target], HOLDING[holder.split(" ", 1)[1]], *SITS_AT[where]) for target, holder, where in rows
+    ]
+
+
+def _written(links, holder):
+    """The content of the artifact a step's links sit in, each link written at its place."""
+    content = {}
+    for target, _, _, place in (link for link in links if link[1] == holder):
+        *above, field = place.split("/")
+        node = content
+        if above:
+            items = content.setdefault(above[0], [])
+            items.extend({"title": f"Step {number + 1}"} for number in range(len(items), int(above[1]) + 1))
+            node = items[int(above[1])]
+        node[field] = target
+    return content
+
+
+@given("a store where these links point at IRIs the store does not hold:", target_fixture="client")
+def _store_with_links_to_iris_not_held(root, datatable):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, LINKING_DECISION_TYPE)
+    define(client, STEPPED_WORK_ITEM_TYPE)
+    links = _links(datatable)
+    create(client, "decision", {"title": "Daily", **_written(links, HOLDING["decision"])}, at=HOLDING["decision"])
+    create(client, "work-item", {"title": "Move", **_written(links, HOLDING["work item"])}, at=HOLDING["work item"])
+    return client
+
+
+@given("the decision also points at an older decision the store holds")
+def _the_decision_also_points_at_a_held_decision(client):
+    create(client, "decision", {"title": "Hourly"}, at=OLDER)
+    answered = replace(client, HOLDING["decision"], {"supersedes": NOT_HELD["first"], "revisits": OLDER})
+    assert not answered.faults, answered.faults
+
+
+@when("the client asks for the placeholders", target_fixture="asked")
+def _ask_for_the_placeholders(client):
+    return placeholders(client)
+
+
+@then("the client is given the first IRI and the second IRI and nothing else")
+def _given_the_two_iris(asked):
+    assert not asked.faults, asked.faults
+    assert sorted((each.id, each.part) for each in asked.placeholders) == sorted(
+        [(NOT_HELD["first"], ""), (NOT_HELD["second"], "")])
+
+
+@then("each comes with these links into it and no others:")
+def _each_with_its_links(asked, datatable):
+    given = [
+        (each.id, link.artifact, link.field, link.place) for each in asked.placeholders for link in each.links
+    ]
+    assert sorted(given) == sorted(_links(datatable))

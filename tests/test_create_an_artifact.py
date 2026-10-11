@@ -4,7 +4,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, TYPE_OF_TYPES, create, define, iri,
-    next_version, read, replace, request, start_a_store, type_iri, version_iri,
+    next_version, placeholders, read, replace, request, start_a_store, type_iri, version_iri,
 )
 import held
 from kb import content, client as kb_client
@@ -872,6 +872,30 @@ def _rejected_for_the_link(refused):
         (iri("decision", "price-reviews-happen-weekly"), "supersedes", "ref"),
     ]
     assert refused.faults[0].message.startswith("a link must land on a node of a kind the type allows")
+
+
+NOT_HELD = iri("decision", "prices-are-reviewed-monthly")
+
+
+@when(
+    "the client creates a decision that supersedes a decision the store does not hold, at an IRI under the decision "
+    "type, saying which role and why",
+    target_fixture="created",
+)
+def _create_superseding_a_decision_not_held(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": NOT_HELD, "sections": SECTIONS,
+    }, message="Record it")
+
+
+@then("asked for the placeholders, the client is given that IRI, with the new decision linking to it")
+def _the_placeholders_give_that_iri(client, created):
+    asked = placeholders(client)
+    assert not asked.faults, asked.faults
+    assert [
+        (each.id, each.part, [(link.artifact, link.field, link.place) for link in each.links])
+        for each in asked.placeholders
+    ] == [(NOT_HELD, "", [(created.id, "supersedes", "supersedes")])]
 
 
 @when(

@@ -132,6 +132,15 @@ class Reads:
                 counts[key] = counts.get(key, 0) + 1
         return counts
 
+    def waiting(self) -> list[Linking]:
+        rows = self._rows(
+            "SELECT source, field, place, target, part, ordinal FROM links WHERE implicit = 0 AND ("
+            "NOT EXISTS (SELECT 1 FROM artifacts WHERE id = target) OR (part != '' AND NOT EXISTS"
+            " (SELECT 1 FROM parts WHERE artifact = target AND parts.place = part)))"
+        )
+        rows.sort(key=lambda row: (names.order(row[3]), row[4], names.order(row[0]), row[5]))
+        return [_linking(*row[:5]) for row in rows]
+
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:
         if not words:

@@ -1,5 +1,8 @@
 """Questions asked of the store through the port: the artifacts of a kind, what links reach out of or into an artifact,
-where words occur, what the history holds, and what a piece of work read. Nothing here writes."""
+where words occur, what the history holds, what a piece of work read, and the placeholders, what links point at that
+the store does not hold. Nothing here writes."""
+import itertools
+
 from kb import composition, journal, links, names, places, read, refusals, search, values
 from kb.contract import kb_pb2
 from kb.port import Port
@@ -64,6 +67,19 @@ def found(store: Port, asked: Searching) -> kb_pb2.Found:
             snippet=hit.snippet,
         )
         for hit in hits
+    ])
+
+
+def placeholders(store: Port) -> kb_pb2.Placeholders:
+    """Every placeholder, each IRI a link points at that the store does not hold, or the part a link names that
+    what it holds there lacks, once, in the order of their names, with every link into it: the artifact holding the
+    link, the field and the link's place there."""
+    waited = itertools.groupby(store.waiting(), key=lambda each: (str(each.target), each.part))
+    return kb_pb2.Placeholders(placeholders=[
+        kb_pb2.Placeholder(id=target, part=part, links=[
+            kb_pb2.Linking(artifact=str(each.source), field=each.field, place=each.place) for each in into
+        ])
+        for (target, part), into in waited
     ])
 
 

@@ -179,6 +179,10 @@ class Port(Protocol):
     def inbound(self, artifact_id: ArtifactId) -> dict[tuple[str, str], int]:
         """How many artifacts link into an artifact or its parts, by the kind of the source and the field."""
 
+    def waiting(self) -> list[Linking]:
+        """Every link that lands on nothing held: one whose target is not held, or into a part its held target lacks;
+        never an implicit one. By the name it points at, then the part, then the artifact holding it, then as handed."""
+
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:
         """Every section and every text field holding any word given, as search.tokens folds words."""
