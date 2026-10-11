@@ -17,7 +17,7 @@ from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import addresses, names, rules, server, staging
+from kb import addresses, reports, rules, server, staging
 from kb.contract import kb_pb2
 from kb.values import Refused
 
@@ -83,7 +83,7 @@ def _init(root: str, seed: str | None) -> int:
         return _refused("init", refused.faults)
     except KeyboardInterrupt:
         return _interrupted()
-    _reported(imported)
+    reports.imported(imported)
     return _refused("init", imported.faults) if imported.faults else 0
 
 
@@ -150,14 +150,7 @@ def _validate() -> int:
     if answered.WhichOneof("outcome") == "refusal":
         return _refused("validate", answered.refusal.faults)
     checked = answered.result
-    for fault in checked.violations:
-        print("\t".join(("violation", fault.artifact, fault.place, fault.rule, fault.message)))
-    for stale in checked.stale:
-        print(f"stale\t{stale.artifact}\tchecked against version {stale.schema_version} of its type, "
-              f"which is at {stale.current}")
-    for placeholder in checked.placeholders:
-        for link in placeholder.links:
-            print("\t".join(("placeholder", names.pointing(placeholder.id, link.part), link.artifact, link.place)))
+    reports.checked(checked)
     return VIOLATED if checked.violations else 0
 
 
@@ -194,7 +187,7 @@ def _import_check(directory: str) -> int:
     checked = kb_client.import_check(directory)
     if checked.faults:
         return _refused("import", checked.faults)
-    _reported(checked)
+    reports.imported(checked)
     if checked.errors:
         return VIOLATED
     print(f"clean\t{directory} checks clean for import")
@@ -210,19 +203,10 @@ def _import(directory: str, skip_errors: bool) -> int:
             rule=rules.ACTOR, message="an import lands only under a role, named through KB_ACTOR",
         )])
     imported = kb_client.import_(directory, role, skip_errors)
-    _reported(imported)
+    reports.imported(imported)
     if imported.faults:
         return _refused("import", imported.faults)
     return 0
-
-
-def _reported(checked) -> None:
-    """The check's report: every error, then every file that would be skipped with the chain of files leading to a
-    broken one, one to a line."""
-    for fault in checked.errors:
-        print("\t".join(("error", fault.artifact, fault.rule, fault.message)))
-    for skipped in checked.skipped:
-        print("\t".join(("skipped", skipped.file, " -> ".join(skipped.chain))))
 
 
 def _refused(command: str, faults) -> int:
