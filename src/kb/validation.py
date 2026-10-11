@@ -2,7 +2,7 @@
 language cannot say, checked in code: required sections in their declared order, and links that land on an artifact
 the corpus holds, or a part inside it, of a kind the type allows, or wait on an IRI it does not hold, under a held
 type the field allows, or already wait, as the store held them, on a part their held target lacks
-(decision/a-link-that-waits-keeps-waiting). Every fault comes back together; kb's rules pass
+(decision/a-link-that-waits-keeps-waiting), each told by what holds it, never by where it stands in a list. Every fault comes back together; kb's rules pass
 over a node JSON Schema found misshapen. kb's keywords are read through kb.composition. What is checked, and the
 corpus it is checked against, are given; nothing here finds or opens a file.
 """
@@ -11,7 +11,7 @@ from jsonschema_specifications import REGISTRY as SPECIFICATIONS
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
-from kb import links, names, places, refusals, rules, settled, values
+from kb import links, places, refusals, rules, settled, values
 from kb.composition import composition, declared, nearest_type, type_schema
 from kb.contract import kb_pb2
 
@@ -83,7 +83,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
     """Every violation, as artifact, path, rule, message, JSON Schema's and kb's own rules' together. A
     kb:<type IRI>@<n> reference resolves against the corpus, to the version it holds. `waited` are the links the
     store held for this artifact, before what is checked, that landed on nothing held, each as
-    `port.Linking.held_as` gives it: none for an artifact the store did not hold.
+    `port.told` gives it: none for an artifact the store did not hold.
 
     kb's own rules read a node only where JSON Schema found it in the shape they read it in.
     """
@@ -95,10 +95,11 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
     if not _misread("sections", errors):
         required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
         faults += _sections(artifact_id, content.get("sections", []), required, "sections")
-    for link in links.carried(content, schema, corpus):
+    carried = links.carried(content, schema, corpus)
+    for link, told in zip(carried, links.told(carried)):
         if _misread(link.place, errors) or _lands(link.target, link.ref, corpus):
             continue
-        if not _keeps_waiting(link, corpus, waited):
+        if told not in waited or not _keeps_waiting(link, told[2], corpus):
             faults.append(refusals.unlanded(artifact_id, link.place, link.target))
     return faults
 
@@ -140,19 +141,14 @@ def _lands(target: str, ref: dict, corpus) -> bool:
     return not link.place or places.holds_part(corpus.artifact(link.id), link.place)
 
 
-def _keeps_waiting(link: links.Link, corpus, waited) -> bool:
-    """Whether a link that does not land is one that already waits: the very link the store held for its artifact,
-    in the same field and place, to the same IRI and part, landing on nothing held, which the corpus refuses only
-    for the part it names, its target held, of a kind the field allows, and lacking that part. A link into such a
-    part that the store did not hold so is new, and never waits."""
-    try:
-        target = values.target(link.target)
-    except values.Refused:
-        return False
-    if (link.field, link.place, target.id, names.placed(target.place)) not in waited:
-        return False
-    held = bool(link.ref.get("parts")) and corpus.holds(target.id)
-    return held and settled.kind(corpus.artifact(target.id)) in link.ref["targets"]
+def _keeps_waiting(link: links.Link, target: values.ArtifactId, corpus) -> bool:
+    """Whether a link that does not land, and is the very link the store held for its artifact landing on nothing
+    held (in the same field of the same thing, the artifact or the item of that name, to the same IRI and part,
+    wherever it stands in a list), still waits: the corpus refuses it only for the part it names, its target held,
+    of a kind the field allows, and lacking that part. A link into such a part that the store did not hold so is
+    new, and never waits."""
+    held = bool(link.ref.get("parts")) and corpus.holds(target)
+    return held and settled.kind(corpus.artifact(target)) in link.ref["targets"]
 
 
 def _waits(target: values.ArtifactId, ref: dict, corpus) -> bool:

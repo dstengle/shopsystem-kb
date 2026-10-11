@@ -2,8 +2,8 @@
 leaves it: each change's revision and that of every type it was read through compared with the one it was read at, every link it hands
 landing, on a held artifact or, its target not held, under a held type the link carries and may land on, one into a
 part its held target lacks landing only when it says it waits and its artifact held that very link waiting before the
-set, nothing outside it linking into what it removes or drops, and each entry's id held once."""
-from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded
+set, told as the port tells one link from another (`port.told`: by what holds it, never where it stands), nothing outside it linking into what it removes or drops, and each entry's id held once."""
+from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded, held_waiting, told
 from kb.sqlite_reads import Reads
 
 
@@ -28,11 +28,9 @@ class Checks(Reads):
         return [place for (place,) in self._rows("SELECT place FROM parts WHERE artifact = ?", str(artifact))]
 
     def _waited(self, changes: list[Change]) -> dict:
-        """The links each artifact a set changes holds that land on nothing held, each as `Linking.held_as` gives
-        it: read before any of the set is written, they are those that waited before it."""
-        return {
-            change.artifact: {each.held_as for each in self.waiting(change.artifact)} for change in changes
-        }
+        """The links each artifact a set changes holds that land on nothing held, each as `port.told` gives it,
+        read once for each: read before any of the set is written, they are those that waited before it."""
+        return {artifact: held_waiting(self.waiting(artifact)) for artifact in {change.artifact for change in changes}}
 
     def _integral(self, changes: list[Change], before: dict, waited: dict) -> None:
         """Unlanded for every link the set hands that does not land (`_lands`); then
@@ -41,7 +39,8 @@ class Checks(Reads):
         unlanded = [
             Linking(artifact, link.field, link.place, link.target, link.part)
             for artifact, change in last.items() if change.content is not None
-            for link in change.links if not self._lands(link, waited[artifact])
+            for link, as_told in zip(change.links, told(change.links))
+            if not self._lands(link, as_told, waited[artifact])
         ]
         if unlanded:
             raise Unlanded(unlanded)
@@ -56,10 +55,10 @@ class Checks(Reads):
         if linked:
             raise Linked(linked)
 
-    def _lands(self, link, waited: set[tuple]) -> bool:
+    def _lands(self, link, as_told: tuple | None, waited: frozenset) -> bool:
         """Whether a link lands: on a held artifact of a kind it may land on, and on a part that artifact holds when
-        it names one, or, lacking it, when the link says it waits and is among those its artifact held waiting
-        before the set; or, its target not held, on an IRI under a type the link vouches for."""
+        it names one, or, lacking it, when the link says it waits and, told as given, is among those its artifact
+        held waiting before the set; or, its target not held, on an IRI under a type the link vouches for."""
         rows = self._rows("SELECT kind FROM artifacts WHERE id = ?", str(link.target))
         if not rows:
             return self._vouched(link)
@@ -67,7 +66,7 @@ class Checks(Reads):
             return False
         if not link.part or link.part in self._parts(link.target):
             return True
-        return link.waits and link.held_as in waited
+        return link.waits and as_told in waited
 
     def _vouched(self, link) -> bool:
         """Whether a link to an IRI not held carries a type that is held and is one it may land on; never an

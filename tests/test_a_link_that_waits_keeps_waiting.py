@@ -23,6 +23,10 @@ LINKING_TYPE["schema"]["properties"]["builds_on"] = {
     "items": {"type": "string"},
     "ref": {"targets": targets("decision"), "cardinality": "many", "parts": True, "on_delete": "refuse"},
 }
+LINKING_TYPE["schema"]["parts"]["options"]["items"]["properties"]["replaces"] = {
+    "type": "string",
+    "ref": {"targets": targets("decision"), "cardinality": "one", "parts": True, "on_delete": "refuse"},
+}
 
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
@@ -38,20 +42,20 @@ WAITING = [(TARGET, [(LINKER, "supersedes", "supersedes", "options/rollback")])]
 LINKER_CONTENT = {"supersedes": ROLLBACK, "sections": SECTIONS, "options": OPTIONS}
 
 
-def _a_decision_waiting_on_an_option_its_target_was_created_without(root):
-    """A client over a store holding a decision that supersedes the option "rollback" of a second decision, the
-    second created afterwards with no such option, and a third decision nothing links to."""
+def _a_decision_waiting_on_an_option_its_target_was_created_without(root, content=LINKER_CONTENT, waiting=WAITING):
+    """A client over a store holding a decision that supersedes the option "rollback" of a second decision, or links
+    to it as the content given does, the second created afterwards with no such option, and a third decision."""
     client = kb_client.connect(root)
     start_a_store(root)
     define(client, LINKING_TYPE)
     for title, content in (
-        ("Price reviews happen weekly", LINKER_CONTENT),
+        ("Price reviews happen weekly", content),
         ("Prices are reviewed monthly", {"sections": SECTIONS, "options": OPTIONS}),
         ("Prices are reviewed yearly", {"sections": SECTIONS}),
     ):
         made = request(client, "decision", title, content)
         assert not made.faults, made.faults
-    assert _listed(placeholders(client)) == WAITING
+    assert _listed(placeholders(client)) == waiting
     return client
 
 
@@ -208,3 +212,111 @@ def test_kb_validate_says_of_a_link_that_waits_what_it_said_before_its_artifact_
     assert not replace(client, LINKER, AGAIN[1], path="sections/rationale").faults
     after = _kb("validate", cwd=root, env={})
     assert (after.returncode, after.stderr, after.stdout) == (0, "", before.stdout)
+
+
+# decision 14 of batch 35: the link is told by the thing holding it, the artifact or the item of that name, its
+# field, the IRI and the part, never by where it stands in a list.
+FIRST, THIRD = {"id": "first", "title": "First"}, {"id": "third", "title": "Third"}
+SECOND = {"id": "second", "title": "Second", "replaces": ROLLBACK}
+BARE = {"id": "second", "title": "Second"}
+IN_AN_ITEM = {"sections": SECTIONS, "options": [FIRST, SECOND, THIRD]}
+IN_A_LIST = {"sections": SECTIONS, "builds_on": [OTHER, ROLLBACK]}
+HELD_BY = {"an item": (IN_AN_ITEM, "replaces", "options/1/replaces"), "a list": (IN_A_LIST, "builds_on", "builds_on/1")}
+
+
+def _waiting_at(field, place):
+    return [(TARGET, [(LINKER, field, place, "options/rollback")])]
+
+
+def _a_decision_whose_link_waits_in(root, holder):
+    """The client, with the linker's link held in the second of its options, or second in a field of several."""
+    content, field, place = HELD_BY[holder]
+    return _a_decision_waiting_on_an_option_its_target_was_created_without(root, content, _waiting_at(field, place))
+
+
+LEAVING_THE_LINK_WHERE_IT_IS_HELD = {
+    "the first option removed": ("an item", lambda client: replace(client, LINKER, [SECOND, THIRD], path="options"), 0),
+    "the first option removed by replacing the whole": (
+        "an item", lambda client: replace(client, LINKER, {**IN_AN_ITEM, "options": [SECOND, THIRD]}), 0,
+    ),
+    "the options reordered": ("an item", lambda client: replace(client, LINKER, [THIRD, FIRST, SECOND], path="options"), 2),
+    "an option put before it": (
+        "an item", lambda client: replace(client, LINKER, [{"title": "Zeroth"}, FIRST, SECOND, THIRD], path="options"), 2,
+    ),
+    "a later option removed": ("an item", lambda client: replace(client, LINKER, [FIRST, SECOND], path="options"), 1),
+    "the option holding it replaced with the same link": (
+        "an item", lambda client: replace(client, LINKER, {**SECOND, "body": "Said again."}, path="options/second"), 1,
+    ),
+    "the first link of the field removed": ("a list", lambda client: replace(client, LINKER, {**IN_A_LIST, "builds_on": [ROLLBACK]}), 0),
+    "the links of the field reordered": (
+        "a list", lambda client: replace(client, LINKER, {**IN_A_LIST, "builds_on": [ROLLBACK, OTHER]}), 0,
+    ),
+}
+
+
+@pytest.mark.parametrize("change", sorted(LEAVING_THE_LINK_WHERE_IT_IS_HELD))
+def test_a_change_to_what_stands_beside_a_link_that_waits_lands_wherever_it_leaves_the_link_standing(root, change):
+    holder, attempt, index = LEAVING_THE_LINK_WHERE_IT_IS_HELD[change]
+    client = _a_decision_whose_link_waits_in(root, holder)
+    _, field, place = HELD_BY[holder]
+    place = place.replace("1", str(index))
+    still = _waiting_at(field, place)
+    before = held.text(root, LINKER)
+    changed = attempt(client)
+    assert not changed.faults, changed.faults
+    assert held.text(root, LINKER) != before
+    assert _listed(placeholders(client)) == still
+    checked = check(client)
+    assert (list(checked.violations), _listed(checked)) == ([], still)
+    assert [each.id for each in read(client, LINKER).placeholders] == [TARGET]
+    validated = _kb("validate", cwd=root, env={})
+    assert (validated.returncode, validated.stdout) == (0, f"placeholder\t{ROLLBACK}\t{LINKER}\t{place}\n")
+
+
+MOVING_OR_ALTERING = {
+    "moved to another option": (
+        "an item", lambda client: replace(client, LINKER, [{**FIRST, "replaces": ROLLBACK}, BARE, THIRD], path="options"),
+        "options/0/replaces",
+    ),
+    "left in an option of another name": (
+        "an item", lambda client: replace(client, LINKER, [FIRST, {"title": "Second again", "replaces": ROLLBACK}], path="options"),
+        "options/1/replaces",
+    ),
+    "moved out of its option to a field of the decision": (
+        "an item", lambda client: replace(client, LINKER, {**IN_AN_ITEM, "options": [FIRST, BARE], "supersedes": ROLLBACK}),
+        "supersedes",
+    ),
+    "its part altered inside its option": (
+        "an item", lambda client: replace(
+            client, LINKER, {**BARE, "replaces": f"{TARGET}#options/go-yearly"}, path="options/second",
+        ),
+        "options/1/replaces",
+    ),
+    "written again in another option as the first is removed": (
+        "an item", lambda client: replace(client, LINKER, [SECOND, {**THIRD, "replaces": ROLLBACK}], path="options"),
+        "options/1/replaces",
+    ),
+    "written a second time in its field": (
+        "a list", lambda client: replace(client, LINKER, {**IN_A_LIST, "builds_on": [ROLLBACK, ROLLBACK]}), "builds_on/1",
+    ),
+    "its part altered in its field": (
+        "a list", lambda client: replace(client, LINKER, {**IN_A_LIST, "builds_on": [OTHER, f"{TARGET}#options/go-yearly"]}),
+        "builds_on/1",
+    ),
+    "moved to another field": (
+        "a list", lambda client: replace(client, LINKER, {"sections": SECTIONS, "builds_on": [OTHER], "supersedes": ROLLBACK}),
+        "supersedes",
+    ),
+}
+
+
+@pytest.mark.parametrize("change", sorted(MOVING_OR_ALTERING))
+def test_a_link_that_waits_moved_to_another_holder_or_altered_where_it_is_held_is_refused_as_new(root, change):
+    holder, attempt, place = MOVING_OR_ALTERING[change]
+    client = _a_decision_whose_link_waits_in(root, holder)
+    before = held.text(root, LINKER)
+    refused = attempt(client)
+    assert [(fault.rule, fault.place) for fault in refused.faults] == [("ref", place)]
+    assert held.text(root, LINKER) == before
+    assert _listed(placeholders(client)) == _waiting_at(*HELD_BY[holder][1:])
+    assert list(check(client).violations) == []

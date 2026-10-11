@@ -16,6 +16,11 @@ from kb.port import Candidate, Linking, TypeVersion
 from kb.values import ArtifactId, Kind, Version
 
 PAIRS = "~pairs"
+WAITING = (
+    "SELECT source, field, place, target, part, ordinal, holder FROM links WHERE implicit = 0 AND ("
+    "NOT EXISTS (SELECT 1 FROM artifacts WHERE id = target) OR (part != '' AND NOT EXISTS"
+    " (SELECT 1 FROM parts WHERE artifact = target AND parts.place = part)))"
+)
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
@@ -113,13 +118,13 @@ class Reads:
                 implicit: bool = True) -> list[tuple[Linking, str]]:
         """The links landing on an artifact or a part inside it, each with the kind of the artifact holding it."""
         rows = self._rows(
-            "SELECT links.source, field, place, target, part, ordinal, artifacts.kind FROM links"
+            "SELECT links.source, field, place, target, part, ordinal, artifacts.kind, holder FROM links"
             " LEFT JOIN artifacts ON artifacts.id = links.source WHERE target = ?"
             + ("" if implicit else " AND implicit = 0"), str(artifact_id),
         )
         rows.sort(key=lambda row: (names.order(row[0]), row[5]))
         return [
-            (_linking(*row[:5]), row[6]) for row in rows
+            (_linking(*row[:5], row[7]), row[6]) for row in rows
             if (not field or row[1] == field) and (kind is None or row[6] == kind.name)
         ]
 
@@ -133,14 +138,10 @@ class Reads:
         return counts
 
     def waiting(self, source: ArtifactId | None = None) -> list[Linking]:
-        rows = self._rows(
-            "SELECT source, field, place, target, part, ordinal FROM links WHERE implicit = 0 AND ("
-            "NOT EXISTS (SELECT 1 FROM artifacts WHERE id = target) OR (part != '' AND NOT EXISTS"
-            " (SELECT 1 FROM parts WHERE artifact = target AND parts.place = part))) AND source = coalesce(?, source)",
-            None if source is None else str(source),
-        )
+        """One artifact's are found by the links' key, which begins with their source, never by reading them all."""
+        rows = self._rows(WAITING) if source is None else self._rows(WAITING + " AND source = ?", str(source))
         rows.sort(key=lambda row: (names.order(row[3]), names.order(row[0]), row[5]))
-        return [_linking(*row[:5]) for row in rows]
+        return [_linking(*row[:5], row[6]) for row in rows]
 
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:
@@ -175,8 +176,8 @@ class Reads:
         return [entry_id for (entry_id,) in self._rows("SELECT id FROM entries WHERE moment = ?", moment(at))]
 
 
-def _linking(source: str, field: str, place: str, target: str, part: str) -> Linking:
-    return Linking(ArtifactId(source), field, place, ArtifactId(target), part)
+def _linking(source: str, field: str, place: str, target: str, part: str, holder: str | None) -> Linking:
+    return Linking(ArtifactId(source), field, place, ArtifactId(target), part, holder)
 
 
 def _holds(artifact: dict, fields: dict[str, str]) -> bool:

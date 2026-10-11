@@ -2,6 +2,8 @@
 that target's IRI sits under, which the adapter checks again as it lands the link (decision 2 of batch 35); one whose
 target is held carries the type that target sits under too, for a target removed before the link lands (decision 10);
 the link to an artifact's own type carries none."""
+import copy
+
 import pytest
 
 from calls import DECISION_TYPE, create, define, iri, start_a_store, type_iri
@@ -48,15 +50,43 @@ def test_a_link_carries_the_held_type_its_target_sits_under_held_or_not(corpus, 
 
 
 def test_a_link_says_it_waits_only_when_it_is_among_those_the_store_held_waiting_for_its_artifact(corpus):
-    """decision/a-link-that-waits-keeps-waiting: the mark is the store's own account of the artifact, field, place,
-    IRI and part alike."""
+    """decision/a-link-that-waits-keeps-waiting: the mark is the store's own account of the artifact, the field,
+    what holds it, the IRI and the part alike, and how many like it stand before it (`port.told`)."""
     target = iri("decision", "nothing-here")
     artifact = {**corpus.artifact(HELD), "supersedes": target}
     typed = composition.conformed(artifact, corpus)
     named = ArtifactId(iri("decision", "b"))
     marks = lambda waited: [each.waits for each in links.handed(named, artifact, corpus, typed, waited)]
     assert marks(frozenset()) == [False, False]
-    assert marks(frozenset({("supersedes", "supersedes", ArtifactId(target), "")})) == [False, True]
-    assert marks(frozenset({("supersedes", "supersedes", ArtifactId(target), "options/a")})) == [False, False]
-    assert marks(frozenset({("supersedes", "supersedes/0", ArtifactId(target), "")})) == [False, False]
-    assert marks(frozenset({("", "", ArtifactId(type_iri("decision")), "")})) == [False, False]
+    assert marks(frozenset({("supersedes", "", ArtifactId(target), "", 0)})) == [False, True]
+    assert marks(frozenset({("supersedes", "", ArtifactId(target), "options/a", 0)})) == [False, False]
+    assert marks(frozenset({("supersedes", "options/a", ArtifactId(target), "", 0)})) == [False, False]
+    assert marks(frozenset({("supersedes", "", ArtifactId(target), "", 1)})) == [False, False]
+    assert marks(frozenset({("", "", ArtifactId(type_iri("decision")), "", 0)})) == [False, False]
+
+
+def test_a_link_says_what_holds_it_by_name_the_artifact_or_the_item_wherever_the_item_stands(root):
+    """Decision 14 of batch 35: an item is named, never counted."""
+    start_a_store(root)
+    client = kb_client.connect(root)
+    linking = copy.deepcopy(DECISION_TYPE)
+    linking["schema"]["parts"]["options"]["items"]["properties"]["replaces"] = {
+        "type": "array", "items": {"type": "string"}, "ref": linking["schema"]["properties"]["supersedes"]["ref"],
+    }
+    define(client, linking)
+    options = [{"id": "first", "title": "First"}, {"id": "second", "title": "Second", "replaces": [str(HELD), str(HELD)]},
+               {"title": "Unnamed", "replaces": [str(HELD)]}]
+    artifact = {"id": iri("decision", "b"), "type": type_iri("decision") + "@1", "supersedes": str(HELD), "options": options}
+    with store.opened(root) as opened:
+        draft = Draft(opened)
+        carried = links.carried(artifact, composition.conformed(artifact, draft)["schema"], draft)
+        handed = links.handed(ArtifactId(iri("decision", "b")), artifact, draft, composition.conformed(artifact, draft))
+    assert [(each.place, each.holder) for each in carried] == [
+        ("supersedes", ""), ("options/1/replaces/0", "options/second"), ("options/1/replaces/1", "options/second"),
+        ("options/2/replaces/0", None),
+    ]
+    assert [(each.place, each.holder) for each in handed[1:]] == [(each.place, each.holder) for each in carried]
+    assert links.told(carried) == [
+        ("supersedes", "", HELD, "", 0), ("replaces", "options/second", HELD, "", 0),
+        ("replaces", "options/second", HELD, "", 1), None,
+    ]

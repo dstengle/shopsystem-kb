@@ -70,11 +70,11 @@ def removal(text, read):
     return port.Change(name(text), None, read=read, revision=read + 1)
 
 
-def link(field, place, target, kinds, part="", under=None, waits=False):
+def link(field, place, target, kinds, part="", under=None, waits=False, holder=""):
     """A link as kb hands it; `under` the held type kb says a target not held sits under, as the cases name it;
-    `waits` whether kb says the store already held this very link, waiting."""
+    `waits` whether kb says the store already held this very link, waiting; `holder` what kb says holds it."""
     return port.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds),
-                     under=under and name(under), waits=waits)
+                     under=under and name(under), waits=waits, holder=holder)
 
 
 def entry(entry_id, at=T0, seq=1, batch="", artifact="", role="tester", execution=""):
@@ -515,7 +515,7 @@ def _a_note_waiting_on_an_option_its_decision_was_created_without(store):
     land(store, put("schema/decision", {"title": "Decision"}))
     into = link("into", "into", "decision/d", ["decision"], "options/a", under="schema/decision")
     land(store, put("note/n", {"title": "N"}, links=[into]))
-    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]), put("decision/e", {"title": "E"}))
     return dataclasses.replace(into, waits=True)
 
 
@@ -535,7 +535,9 @@ def test_a_link_into_a_part_its_held_target_lacks_lands_again_when_it_says_it_wa
 @pytest.mark.parametrize("handed", [
     pytest.param(lambda waits: [dataclasses.replace(waits, waits=False)], id="not saying it waits"),
     pytest.param(lambda waits: [dataclasses.replace(waits, part="options/c")], id="into another part it lacks"),
-    pytest.param(lambda waits: [dataclasses.replace(waits, place="into/0")], id="at another place"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, holder="steps/one")], id="held by another thing"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, holder=None)], id="held by a thing with no name"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, target=name("decision/e"))], id="to another held target"),
     pytest.param(lambda waits: [dataclasses.replace(waits, field="about", place="about")], id="in another field"),
     pytest.param(lambda waits: [waits, dataclasses.replace(waits, place="into/1")], id="a second beside the first"),
     pytest.param(lambda waits: [dataclasses.replace(waits, kinds=(type_iri("work"),))], id="of a kind it may not land on"),
@@ -557,6 +559,41 @@ def test_a_link_saying_it_waits_is_refused_from_an_artifact_that_did_not_hold_it
         land(store, put("note/other", {"title": "Other"}, links=[waits]))
     assert refused.value.links == [port.Linking(name("note/other"), "into", "into", name("decision/d"), "options/a")]
     assert not store.holds(name("note/other"))
+
+
+def test_a_link_saying_it_waits_is_refused_from_another_held_artifact_alone_or_beside_its_holder(store):
+    waits = _a_note_waiting_on_an_option_its_decision_was_created_without(store)
+    land(store, put("note/other", {"title": "Other"}))
+    before = written(store)
+    again = put("note/n", {"title": "N, said again"}, read=1, links=[waits])
+    for changes in ([put("note/other", {"title": "Other"}, read=1, links=[waits])],
+                    [again, put("note/other", {"title": "Other"}, read=1, links=[waits])],
+                    [again, put("note/new", {"title": "New"}, links=[waits])]):
+        with pytest.raises(port.Unlanded) as refused:
+            land(store, *changes)
+        assert refused.value.links == [dataclasses.replace(WAITING, source=changes[-1].artifact)]
+        assert written(store) == before
+        assert store.waiting() == [WAITING]
+
+
+def test_a_link_that_waits_is_the_very_link_wherever_it_stands_in_what_holds_it_and_is_held_once(store):
+    """Decision 14 of batch 35: the adapter tells the link by what kb says holds it, never by its place."""
+    land(store, put("schema/decision", {"title": "Decision"}))
+    into = link("into", "steps/1/into/1", "decision/d", ["decision"], "options/a", under="schema/decision",
+                holder="steps/one")
+    land(store, put("note/n", {"title": "N"}, links=[into]))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
+    held = port.Linking(name("note/n"), "into", "steps/1/into/1", name("decision/d"), "options/a", "steps/one")
+    assert store.waiting() == store.waiting(name("note/n")) == store.links_in(name("decision/d")) == [held]
+    moved = dataclasses.replace(into, place="steps/0/into/0", waits=True)
+    land(store, put("note/n", {"title": "N, its steps reordered"}, read=1, links=[moved]))
+    assert store.waiting() == [dataclasses.replace(held, place="steps/0/into/0")]
+    for wrong in (dataclasses.replace(moved, place="steps/0/into/1"), dataclasses.replace(moved, holder="steps/two"),
+                  dataclasses.replace(moved, holder="")):
+        with pytest.raises(port.Unlanded) as refused:
+            land(store, put("note/n", {"title": "N"}, read=2, links=[moved, wrong]))
+        assert [(each.place, each.part) for each in refused.value.links] == [(wrong.place, "options/a")]
+    assert store.waiting() == [dataclasses.replace(held, place="steps/0/into/0")]
 
 
 def test_a_link_saying_it_waits_is_refused_when_the_artifact_held_it_landing_and_its_set_drops_the_part(store):

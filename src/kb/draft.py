@@ -6,7 +6,7 @@ read through the version each conforms to, the store's standing for everything e
 none. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
-from kb.port import Linking, Port, TypeVersion
+from kb.port import Linking, Port, TypeVersion, held_waiting
 from kb.values import ArtifactId, Kind, Version, type_of
 
 
@@ -19,6 +19,7 @@ class Draft:
         self._numbers: dict[ArtifactId, int] = {}
         self._made: dict[ArtifactId, dict[int, dict]] = {}
         self._gone: set[ArtifactId] = set()
+        self._waited: dict[ArtifactId, frozenset] = {}
 
     def put(self, artifact_id: ArtifactId, artifact: dict) -> None:
         """An artifact as the draft leaves it; a type is kept too as the version of it this makes, under its number,
@@ -122,8 +123,10 @@ class Draft:
 
     def waited(self, artifact_id: ArtifactId) -> frozenset:
         """The links the store holds for an artifact that land on nothing held, as it stood before the draft, each
-        as `Linking.held_as` gives it: those that already wait, whatever the draft does."""
-        return frozenset(each.held_as for each in self._store.waiting(artifact_id))
+        as `port.told` gives it: those that already wait, whatever the draft does. Read once for each artifact."""
+        if artifact_id not in self._waited:
+            self._waited[artifact_id] = held_waiting(self._store.waiting(artifact_id))
+        return self._waited[artifact_id]
 
     def _put(self) -> list[Linking]:
         """Every link of the artifacts the draft put, each read through its own version of its type as the draft
@@ -133,7 +136,7 @@ class Draft:
             if source not in self._removed
         ]
         return [
-            Linking(source, link.field, link.place, link.target, link.part)
+            Linking(source, link.field, link.place, link.target, link.part, link.holder)
             for source, artifact, own in sources if own is not None
             for link in links.handed(source, artifact, self, own) if not link.implicit
         ]
