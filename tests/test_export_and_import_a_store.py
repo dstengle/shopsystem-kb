@@ -954,19 +954,28 @@ def _not_fitting(target):
     return {_file(WEEKLY): "sections", _file(MONTHLY): "type"}
 
 
-def _linking_to_nothing(target):
+def _a_version_nobody_holds(target):
+    """Both decisions said to conform to a third version of their type, which nobody holds."""
+    for name in (WEEKLY, MONTHLY):
+        _put(target, {**_read(target, name), "type": version_iri("decision", 3)})
+    return {_file(WEEKLY): "version", _file(MONTHLY): "version"}
+
+
+def _linking_under_a_type_nobody_holds(target):
+    """Two work items whose links name IRIs under a type for memos, which nobody holds."""
     mondays = _read(target, MONDAYS)
-    _put(target, {**mondays, "decisions": [WEEKLY, iri("decision", "nothing-by-this-name")]})
-    _put(target, _artifact(iri("work-item", "review-on-fridays"), "Review on Fridays", decisions=[iri("decision", "nor-this")]))
+    _put(target, {**mondays, "decisions": [WEEKLY, iri("memo", "first-memo")]})
+    _put(target, _artifact(iri("work-item", "review-on-fridays"), "Review on Fridays", decisions=[iri("memo", "second-memo")]))
     return {_file(MONDAYS): "ref", _file(iri("work-item", "review-on-fridays")): "ref"}
 
 
 FAULTS = {
     "cannot be read as YAML 1.2": _unreadable,
     "is not in canonical form": _not_canonical,
-    "claims a kind neither the directory nor the store holds a type for": _no_type_for_the_kind,
+    "claims a type neither the directory nor the store holds": _no_type_for_the_kind,
+    "conforms to a version of its type neither the directory nor the store holds": _a_version_nobody_holds,
     "has content that does not fit its type": _not_fitting,
-    "carries a link that lands on nothing in the directory or the store": _linking_to_nothing,
+    "carries a link to an IRI under a type neither the directory nor the store holds": _linking_under_a_type_nobody_holds,
 }
 
 
@@ -1980,6 +1989,54 @@ def test_a_link_under_a_type_only_the_store_holds_lands_on_a_placeholder_with_er
     assert _waiting(root) == {iri("decision", "not-anywhere"): [LINKING_UNDER]}
     assert held.versions(root)[DECISIONS] == [1]
     assert sorted(entry.artifact for entry in _imported(root)) == sorted([type_iri("work-item"), LINKING_UNDER])
+
+
+NOT_ANYWHERE = iri("decision", "not-anywhere")
+
+
+@given("a store holding a type for work items whose link field allows decisions")
+def _a_store_with_the_type_for_work_items(root):
+    define(_started(root), WORK_ITEM_TYPE)
+
+
+@given(parsers.parse("a type for decisions held by {holder}"), target_fixture="holder")
+def _a_type_for_decisions_held_by(root, holder):
+    """The store is given the type here; the directory is given it as it is made."""
+    if holder == "the store":
+        define(kb_client.connect(root), DECISION_TYPE)
+    return holder
+
+
+@given(
+    "a directory for import that checks clean, holding a work item whose link names an IRI under the type for "
+    "decisions that neither the directory nor the store holds",
+    target_fixture="target",
+)
+def _for_import_with_a_work_item_linking_to_nothing_held(root, tmp_path, holder):
+    """The export of a store holding both types and the work item, without the type for decisions when the store
+    imported into is the one that holds it."""
+    def fill(client):
+        define(client, DECISION_TYPE)
+        _a_work_item_linking_under_the_type(client)
+
+    target = _for_import(tmp_path, fill)
+    if holder == "the store":
+        (Path(target) / _file(DECISIONS, 1)).unlink()
+    assert not (Path(target) / _file(NOT_ANYWHERE)).exists() and not held.holds_artifact(root, NOT_ANYWHERE)
+    assert _report(_kb("import", str(target), "--check", cwd=root)) == [["clean", f"{target} checks clean for import"]]
+    return target
+
+
+@then("the import lands")
+def _the_import_lands(ran, root, target):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert set(_exported_names(target)) <= set(held.names(root))
+
+
+@then("the work item's link lands on a placeholder at that IRI")
+def _the_work_item_waits_at_that_iri(root):
+    assert held.text(root, LINKING_UNDER)
+    assert _waiting(root) == {NOT_ANYWHERE: [LINKING_UNDER]}
 
 
 @given("a directory for import that checks clean", target_fixture="target")
