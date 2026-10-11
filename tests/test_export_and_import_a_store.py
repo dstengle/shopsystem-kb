@@ -379,16 +379,6 @@ def _same_bytes(compared):
     assert first == second
 
 
-@given("a store holding a decision")
-def _store_holding_a_decision(root):
-    client = _started(root)
-    define(client, DECISION_TYPE)
-    create(client, "decision", {"title": "Price reviews happen weekly", "sections": [
-        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-        {"title": "Rationale", "body": "Costs move weekly.\n"},
-    ]})
-
-
 @given("a directory that already holds a file", target_fixture="target")
 def _directory_holding_a_file(tmp_path, before):
     target = tmp_path / "exported"

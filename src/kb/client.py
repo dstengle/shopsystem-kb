@@ -1,6 +1,6 @@
 """The client: an object with the stub's method names that, on each call, finds what it reaches and chooses the
 transport for it, the servicer called directly for a store found, the network (kb.network) for the connection to a
-server; `Export` answers with a stream, in this process only so far; and, beside it, the operator's commands that
+server; `Export` answers with a stream over either; and, beside it, the operator's commands that
 are not rpcs, each a function over the store it finds, never through a server."""
 import os
 from dataclasses import dataclass, field
@@ -115,11 +115,14 @@ class Client:
         return self._call("BatchRemove", request, kb_pb2.BatchRemoveResponse)
 
     def Export(self, request, timeout=None):
-        """The export's stream from the store this call finds, in this process, read as it is iterated and let go
-        when it ends or is closed; or a stream of one message, the refusal that says nothing was found."""
+        """The export's stream from what this call finds, read as it is iterated and let go when it ends or is
+        closed: a store's in this process, a server's over the network; or a stream of one message, the refusal that
+        says nothing was found."""
         found, refusal = _found(self._root)
         if refusal is not None:
             return iter([responses.refused(kb_pb2.ExportResponse, [refusal])])
+        if found.address is not None:
+            return network.streamed(found.address, "Export", request, kb_pb2.ExportResponse)
         return KbServicer(found.root, self._clock).Export(request, None)
 
 

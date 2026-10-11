@@ -290,3 +290,15 @@ def in_process(main, argv, cwd, env):
         os.environ.clear()
         os.environ.update(was_env)
     return types.SimpleNamespace(returncode=code or 0, stdout=out.getvalue(), stderr=err.getvalue())
+
+
+def database_open(root):
+    """The files of the store's database this process holds open, none when nothing in it has the store open: a
+    server hosted in this process holds them only while a call reads or writes."""
+    database, found = str(_place(Path(root).resolve()) / _DATABASE), []
+    for descriptor in os.listdir("/proc/self/fd"):
+        try:
+            found.append(os.readlink(f"/proc/self/fd/{descriptor}"))
+        except OSError:  # a descriptor closed since the listing, the listing's own among them
+            continue
+    return sorted(name for name in found if name.startswith(database))

@@ -38,17 +38,6 @@ def _store_with_a_decision(root):
     return client
 
 
-@given("a server serves that store, and the client works where the connection to that server is found",
-       target_fixture="arranged")
-@given("a server the operator runs with kb serve serves that store, and the client works where the connection to "
-       "that server is found", target_fixture="arranged")
-def _served_and_working_where_the_connection_is(root, tmp_path, request, monkeypatch):
-    arranged = tmp_path / "arranged"
-    connection = serving.connection(arranged, serving.serving(root, request))
-    monkeypatch.chdir(arranged)
-    return {"connection": connection, "bytes": connection.read_bytes()}
-
-
 @pytest.fixture
 def hosting():
     """The server a step hosts in this process, and the gate its clock is."""

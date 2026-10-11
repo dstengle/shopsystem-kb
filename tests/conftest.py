@@ -12,6 +12,7 @@ from calls import (
     CLIENT, DECISION_TYPE, check, create, define, iri, journal, listing, moment, next_version, start_a_store,
 )
 import held
+import serving
 import slices
 from kb import cli, client as kb_client, served, store
 
@@ -125,6 +126,22 @@ def _store_with_content(root):
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ],
     })
+
+
+@given("a store holding a decision")
+def _store_holding_a_decision(root):
+    _store_with_content(root)
+
+
+@given("a server serves that store, and the client works where the connection to that server is found",
+       target_fixture="arranged")
+@given("a server the operator runs with kb serve serves that store, and the client works where the connection to "
+       "that server is found", target_fixture="arranged")
+def _served_and_working_where_the_connection_is(root, tmp_path, request, monkeypatch):
+    arranged = tmp_path / "arranged"
+    connection = serving.connection(arranged, serving.serving(root, request))
+    monkeypatch.chdir(arranged)
+    return {"connection": connection, "bytes": connection.read_bytes()}
 
 
 @given("a directory that already has a store inside it, with content in that store", target_fixture="root")

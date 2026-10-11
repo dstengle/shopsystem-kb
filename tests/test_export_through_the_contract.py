@@ -4,8 +4,8 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 import held
-from calls import (DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, answer, create, define, filed, journal, replace,
-                   start_a_store, type_iri)
+from calls import (DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, answer, create, define, export, filed, iri, journal,
+                   replace, start_a_store, type_iri)
 from kb import client as kb_client
 from kb.content import dumps, loads
 from kb.contract import kb_pb2
@@ -16,6 +16,7 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
+DECISION = iri("decision", "price-reviews-happen-weekly")
 REPLACED = [SECTIONS[0], {"title": "Rationale", "body": "Suppliers reprice weekly.\n"}]
 
 
@@ -47,6 +48,20 @@ def _a_decision_replaced_last(root, client):
     assert not replace(client, decision, {"sections": REPLACED}).faults
     made, replacement = journal(client, artifact=decision).entries
     return decision, replacement
+
+
+@given("a store holding a type for decisions and two decisions")
+def _two_decisions(root, client):
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
+        create(client, "decision", {"title": title, "sections": SECTIONS})
+
+
+@when("the client exports the store through the server", target_fixture="stream")
+def _exports_through_the_server():
+    """The stream as a client working where the connection is found is given it, not yet read."""
+    return kb_client.connect().Export(kb_pb2.ExportRequest())
 
 
 @when("the client exports the store", target_fixture="stream")
@@ -107,3 +122,37 @@ def _the_file_shows_the_replacement(exported, replaced):
     decision, _ = replaced
     [shown] = [loads(text) for place, text in exported.files if place == filed(decision)]
     assert (shown["revision"], shown["sections"]) == (2, REPLACED)
+
+
+@pytest.fixture
+def in_process(root):
+    """The same export as a client that reaches the store in process is given it."""
+    return export(kb_client.connect(root))
+
+
+@then("the client is given the same files, at the same places, as a client that reaches that store in process is "
+      "given")
+def _the_same_files_at_the_same_places(exported, in_process):
+    """The two decisions and both types' versions, each file's place and text as in process."""
+    assert not exported.refused, exported.faults
+    assert len(in_process.files) == 4
+    assert exported.files == in_process.files
+
+
+@then("the client is told the same position as a client that reaches that store in process is told")
+def _the_same_position(exported, in_process):
+    assert exported.position == in_process.position
+
+
+@then("the client is given the export")
+def _given_the_export(exported, holding):
+    """The whole of it, the decision's file in it, while the other change still holds the store."""
+    assert exported.complete, exported.faults
+    assert filed(DECISION) in [place for place, _ in exported.files]
+    assert holding.held  # the other change took the store before the export, and is let go only when the test ends
+
+
+@then("the export is not refused because the store was busy with another change")
+def _not_refused_as_busy(exported):
+    assert not exported.refused, exported.faults
+    assert "busy" not in [fault.rule for fault in exported.faults]
