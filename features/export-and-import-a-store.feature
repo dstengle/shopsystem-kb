@@ -209,6 +209,7 @@ Feature: Export and import a store
       | the store     |
       | the directory |
 
+  @slice-183
   Scenario Outline: The operator imports a directory holding a link into a part that the artifact at its IRI lacks
     Pins that a link into a part its target lacks does not stop an import: it lands and waits for the part, as the store exported held it, whether the directory or the store holds the target.
     Given a store holding a type for decisions whose decisions carry options and may link to an option of another
@@ -223,6 +224,7 @@ Feature: Export and import a store
       | the store     |
       | the directory |
 
+  @slice-180.2
   Scenario: The operator imports a file holding an item that carries no name
     Pins that every item an import lands has a name, as every item a write makes has, and that a name a file gives is kept.
     Given a store holding a type for decisions whose decisions carry options

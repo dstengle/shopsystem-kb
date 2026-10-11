@@ -43,6 +43,16 @@ def test_the_operator_imports_a_directory_holding_a_link_to_an_iri_neither_the_d
     pass
 
 
+@scenario("export-and-import-a-store.feature", "The operator imports a directory holding a link into a part that the artifact at its IRI lacks")
+def test_the_operator_imports_a_directory_holding_a_link_into_a_part_that_the_artifact_lacks():
+    pass
+
+
+@scenario("export-and-import-a-store.feature", "The operator imports a file holding an item that carries no name")
+def test_the_operator_imports_a_file_holding_an_item_that_carries_no_name():
+    pass
+
+
 @scenario("export-and-import-a-store.feature", "The operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version")
 def test_the_operator_imports_a_directory_holding_an_artifact_the_store_already_holds_at():
     pass
