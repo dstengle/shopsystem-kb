@@ -257,3 +257,35 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 - [ ] **Tests the decisions break:** any existing test that defines a type under another type's IRI above held artifacts and expects it to land (the batch 32 review's reproduction was a probe, not a test; the scout found none). One that breaks is a `BLOCKED` reply naming it, unless its setup alone can change with no assertion changed.
 - [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-166.3"` gives 2 passed; the race (a create under the new type's IRI at the same moment as its define) in both orders by a plain test; `make test` shows no new failure.
 - [ ] **Checkpoint:** `plan status 166.3 green`, then `plan log "Suite: ..."`.
+
+---
+
+Tasks 10 and 11 were added on 2026-10-11 from the batch's branch review. Task 10 rests on decision/a-link-that-waits-keeps-waiting; Task 11 is the review's refactors A, B and C.
+
+13. **A link that waits keeps waiting.** A change to an artifact (a replacement of the whole or of a node, an item added or removed, any change in a set) that leaves in place a link into a part its held target lacks, as the store holds that link before the change (the same field and place, the same target IRI and part), lands, and the link still waits. A link the change adds, or alters in target or part, into a part a held artifact lacks is refused as today (`ref`). A create is always new. The port's landing check accepts the same: the domain says on the link that it already waits, as it says the held type an unheld target sits under, and the adapter accepts a link so marked only when the store already holds that very link for that artifact. The store's check lists it as a placeholder by the same judgement (it replaces slice 170's own rule in `check.py`).
+
+### Task 10: Slice 170.1. A link that waits keeps waiting when its artifact changes
+
+Review: per-task
+Model: opus
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-170.1`, 1 scenario, 1 collected): check-a-change / Changing an artifact that holds a link waiting on a part its target lacks leaves the link waiting.
+- [ ] **Why it is red today:** no steps; behind them every change to such an artifact is refused with `ref` at the link (the draft's check refuses a link into a part its held target lacks, and so does the adapter's landing check).
+- [ ] **Where the change lands** (about 5 production, 3 test): the one judgement of "this very link already waits" beside "whether a link lands" (`validation.py` or a module of its own if `validation.py` would pass its limit), used by the draft's check (`drafting.py`/`validation.py`), handed to the port on the link (`port.py`, `links.py`) and checked at landing (`sqlite_checks.py`), and by `check.py` in place of its own rule; `tests/test_create_an_artifact.py` or `tests/test_change_an_artifact.py` (the steps, where the scenario's Givens already live), `tests/test_the_storage_port.py`, one module of plain tests.
+- [ ] **Decisions applied:** 13, 5.
+- [ ] **Tests the decisions break:** slice 170's plain tests of `check.py`'s exemption keep their assertions (the judgement moves, the answers do not). The port's case that a link into a part a held artifact lacks is refused stays for a link not so marked. Another test that breaks is a `BLOCKED` reply naming it, unless it was written in this batch and pinned an interim state.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-170.1"` gives 1 passed; plain tests through the contract: each kind of change that leaves the link lands; a change that alters the link's part to another lacking part is refused; a change that adds a second link into a lacking part is refused while the first still waits; a set of changes; the race of a change to the linker against the target gaining the part, both orders; the whole-store check and `kb validate` unchanged for it; `make test` shows no new failure.
+- [ ] **Checkpoint:** `plan status 170.1 green`, then `plan log "Suite: ..."`.
+
+### Task 11: Slice 170.2. drafting.py, cli.py and edits.py split before batch 36 grows them
+
+Review: batch-end
+Model: sonnet
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Check:** `make test` gives the same passed and failed tests as the record before it; `wc -l` gives `src/kb/drafting.py` at most 215, `src/kb/cli.py` at most 200, `src/kb/edits.py` at most 200, and no module under `src/kb` over 250.
+- [ ] **Where the change lands** (about 6 production, 0 test): what stands in the way of a type's removal and the questions "does this set remove a type" and "does it define one" move from `drafting.py` to `standing.py` (the function that also finds waiting links renamed for what it finds); the printing of the check's three lists and of the import's report moves from `cli.py` to a module of its own; a create's identity and naming move from `edits.py` to a module of its own. Each new module gets a row in CLAUDE.md's map and each cut module's row says what is left. Behaviour, messages and printed output are unchanged.
+- [ ] **Tests the decisions break:** none: a refactor; tests use the contract, the operator's commands and public functions. A test importing a name that moves is a `BLOCKED` reply naming it.
+- [ ] **Verify:** the Check, with the `wc -l` output in the report.
+- [ ] **Checkpoint:** `plan status 170.2 green`, then `plan log "Suite: ..."`.

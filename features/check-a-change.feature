@@ -73,6 +73,7 @@ Feature: Check a change
     Then the client is given the IRI the artifact keeps for life and its first version
     And asked for the placeholders, the client is given the IRI the link points at, with the first decision linking to it
 
+  @slice-170.1
   Scenario: Changing an artifact that holds a link waiting on a part its target lacks leaves the link waiting
     Pins that a link left waiting by someone else's create does not lock the artifact that holds it: its other content can still change, and only a link the change itself makes is judged anew.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede or into one of its options, and may carry a collection of options
