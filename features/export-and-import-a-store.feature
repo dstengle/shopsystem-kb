@@ -19,6 +19,13 @@ Feature: Export and import a store
       | is empty       |
       | does not exist |
 
+  Scenario: An artifact that conforms to an earlier version of its type is exported in the order that version declares
+    Pins that an export shows each artifact as the version it conforms to declares it, so its file does not change shape when its type moves on.
+    Given a store holding a note type whose first version declares a summary then a body and whose second declares the body then the summary
+    And a note that conforms to the first version, with a summary and a body
+    When the operator exports the store to a directory that is empty
+    Then the note's file gives its summary before its body
+
   @slice-110
   Scenario: The operator opens an exported artifact's file
     Pins that the exported files are meant to be read and reviewed by people: prose in blocks, lists under their names, no rewrapping, and nothing in them that instructs a reader how to build a value.
@@ -149,6 +156,15 @@ Feature: Export and import a store
     When the operator imports the directory, saying which role they are
     Then the store's history gains one import entry for each of the five artifacts
     And in the history each type's import entry comes before the import entries of the artifacts of its kind
+
+  Scenario: A store holding an artifact behind its type comes back from its export as it was
+    Pins that an export carries everything a store needs to read its artifacts again: every version of a type travels, and an artifact left at an earlier version is still held to that version after the import.
+    Given a store holding a note type at two versions, the second requiring an owner the first does not, and a note that conforms to the first version, with no owner
+    And that store exported to a directory
+    When the operator imports that directory into a freshly started store, saying which role they are
+    Then the new store holds both versions of the note type as their files give them
+    And the note still conforms to the first version of the note type
+    And the note can be read, listed and replaced there, and checking that store lists it as behind its type, not as a violation
 
   @slice-181
   Scenario: The operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version
