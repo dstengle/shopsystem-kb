@@ -3,7 +3,7 @@ import re
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, TYPE_OF_TYPES, create, define, iri,
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, PROCESS_TYPE, READING_ORDER, TYPE_OF_TYPES, create, define, iri,
     next_version, placeholders, read, replace, request, start_a_store, type_iri, version_iri,
 )
 import held
@@ -896,6 +896,51 @@ def _the_placeholders_give_that_iri(client, created):
         (each.id, [(link.artifact, link.field, link.place, link.part) for link in each.links])
         for each in asked.placeholders
     ] == [(NOT_HELD, [(created.id, "supersedes", "supersedes", "")])]
+
+
+UNHELD_TYPE_IRI = "https://shop.example/kb/gadget/prices-are-reviewed-monthly"
+
+
+@when(
+    "the client creates a decision that supersedes an IRI under a type the store does not hold, saying which role and why",
+    target_fixture="refused",
+)
+def _create_superseding_under_a_type_not_held(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": UNHELD_TYPE_IRI, "sections": SECTIONS,
+    }, message="Record it")
+
+
+@given("a process type")
+def _a_process_type(client):
+    define(client, PROCESS_TYPE)
+
+
+@when(
+    "the client creates a decision that supersedes an IRI the store does not hold, under the process type, saying "
+    "which role and why",
+    target_fixture="refused",
+)
+def _create_superseding_under_the_process_type(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": iri("process", "prices-are-reviewed-monthly"), "sections": SECTIONS,
+    }, message="Record it")
+
+
+@when(
+    "the client creates a decision that is missing its purpose and supersedes an IRI under a type the store does not "
+    "hold, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_with_two_faults_under_a_type_not_held(client, tmp_path):
+    before = held.everything_in(tmp_path)
+    response = request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": UNHELD_TYPE_IRI, "sections": [SECTIONS[1]],
+    }, message="Record it")
+    return {
+        "response": response, "before": before, "after": held.everything_in(tmp_path),
+        "faults": [("sections", "sections"), ("supersedes", "ref")],
+    }
 
 
 @when(
