@@ -493,6 +493,10 @@ def _a_second_work_item_and_tasks(client):
     "the client read the work item at its first version, and another client has since replaced it",
     target_fixture="moved",
 )
+@given(
+    "the client read the work item at its first revision, and another client has since replaced it",
+    target_fixture="moved",
+)
 def _read_then_replaced_by_another(root, client):
     seen = read(client, WORK_ITEM).revision
     assert seen == 1
@@ -534,6 +538,7 @@ def _set_rejected_as_moved(applied):
 
 
 @then("the version the work item stands at is given back")
+@then("the revision the work item stands at is given back")
 def _given_where_the_work_item_stands(applied, moved):
     assert f"stands at revision {moved['stands_at']}" in applied.faults[0].message
 
@@ -565,3 +570,104 @@ def _lands_two_versions_on(client, applied):
     assert not applied.refused, applied.faults
     assert [(result.id, result.revision) for result in applied.results] == [(WORK_ITEM, 2), (WORK_ITEM, 3)]
     assert read(client, WORK_ITEM).revision == 3
+
+
+@given("the store also holds a second work item")
+def _a_second_work_item(client):
+    create(client, "work-item", {"title": "Print the new price labels"})
+
+
+# Each set asked to be checked only: how it is asked for, and each change's result as landing it would give.
+CHECKED_ONLY = {
+    "a decision and a work item to be created": (
+        lambda client: create_many(client, [
+            created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+            created("work-item", "Review prices on Mondays", {}),
+        ], message="Move price reviews to weekly", check_only=True),
+        [(DECISION, 1), (NEW_WORK_ITEM, 1)],
+    ),
+    "the work item and the second work item to be replaced": (
+        lambda client: replace_many(client, [
+            replaced(WORK_ITEM, {"decisions": []}), replaced(SECOND_WORK_ITEM, {}),
+        ], message="Replace both work items", check_only=True),
+        [(WORK_ITEM, 2), (SECOND_WORK_ITEM, 2)],
+    ),
+}
+
+
+@when(
+    parsers.re(f"the client asks, in one go, for (?P<asked>{'|'.join(map(re.escape, CHECKED_ONLY))}) to be checked "
+               "only, saying which role and why"),
+    target_fixture="attempt",
+)
+def _ask_for_a_set_to_be_checked_only(root, client, asked):
+    ask, would_give = CHECKED_ONLY[asked]
+    return {**_attempted(root, client, lambda: ask(client)), "would give": would_give}
+
+
+@then("the client is given each change's result as the set would give it if it landed")
+def _each_result_as_it_would_land(attempt):
+    checked = attempt["response"]
+    assert not checked.refused, checked.faults
+    assert [(result.id, result.revision) for result in checked.results] == attempt["would give"]
+
+
+@then("the client is given no name for the set")
+def _no_name_for_the_set(attempt):
+    assert attempt["response"].batch == ""
+
+
+@then("the store holds nothing of the set")
+def _nothing_of_the_set_held(attempt):
+    assert attempt["after"] == attempt["before"]
+
+
+@then("the store's history holds nothing of it")
+def _nothing_of_the_set_in_the_history(client, attempt):
+    assert held.history(client) == attempt["history"]
+
+
+@when("the client asks for the set to be checked only, saying which role and why", target_fixture="attempt")
+def _ask_for_the_set_to_be_checked_only(root, client, bad_set):
+    return _attempted(
+        root, client, lambda: create_many(client, bad_set, message="Record two decisions", check_only=True),
+    )
+
+
+@then("every fault the set would be refused with comes back")
+def _every_fault_it_would_be_refused_with(attempt):
+    missing = "the sections the type requires must all be present, in order; {!r} is missing"
+    assert [(fault.artifact, fault.place, fault.message) for fault in attempt["response"].faults] == [
+        (name, "sections", missing.format(section))
+        for name in (DECISION, MONTHLY) for section in ("Purpose", "Rationale")
+    ]
+
+
+@when(
+    "the client asks, in one go, for the work item and the second work item to be replaced, checked only, the "
+    "replacement of the work item saying the revision the client read it at, saying which role and why",
+    target_fixture="applied",
+)
+def _ask_for_replacements_checked_only_saying_what_was_read(client, moved):
+    return replace_many(client, [
+        replaced(WORK_ITEM, {}, revision=moved["seen"]), replaced(SECOND_WORK_ITEM, {}),
+    ], message="Replace both work items", check_only=True)
+
+
+@when(
+    "the client asks, in one go, for a decision and a work item to be created, checked only, saying which role and why",
+    target_fixture="applied",
+)
+def _ask_for_creates_checked_only(client):
+    return CHECKED_ONLY["a decision and a work item to be created"][0](client)
+
+
+@then("the client is answered")
+def _the_client_is_answered(applied):
+    assert not applied.refused, applied.faults
+    assert [(result.id, result.revision) for result in applied.results] == [(DECISION, 1), (NEW_WORK_ITEM, 1)]
+
+
+@then("the set is not rejected because the store was busy with another change")
+def _set_not_rejected_as_busy(applied):
+    assert "busy" not in [fault.rule for fault in applied.faults]
