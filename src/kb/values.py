@@ -112,8 +112,19 @@ def read(request: kb_pb2.Locator) -> tuple[Locator, Version | None]:
 
 
 def locator(request: kb_pb2.Locator) -> Locator:
-    """A locator's name and its place, each checked; both faults when both fail."""
-    return _located(request.id, request.place)
+    """A locator's name and its place, each checked; both faults when both fail. Its name may be a part's IRI, the
+    artifact's with the place after it as a link writes one, which names what the artifact's IRI with that place
+    beside it names; a locator giving a place both ways is refused, whether or not the two agree. A name that reads
+    as neither an artifact's IRI nor a part's is refused whole, as a name."""
+    name, part = names.linked(request.id)
+    if not (part and names.iri(name) and all(names.plain(step) for step in names.steps(part))):
+        return _located(request.id, request.place)
+    if request.place:
+        raise Refused([kb_pb2.Fault(artifact=request.id, place=request.place, rule=rules.LOCATOR, message=(
+            "a part is named by its artifact's IRI, # and its place, or by the IRI with the place beside it, never "
+            f"both; {request.id!r} was given with the place {request.place!r}"
+        ))])
+    return _located(name, part)
 
 
 def target(text: str) -> Locator:
