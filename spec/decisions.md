@@ -798,3 +798,23 @@ source: review questions (slice 165.7: a type removed while links wait under it 
 A link that already waits on a part its held target lacks does not stand in the way of later changes to the artifact that holds it: a change that leaves the link as it is lands and the link still waits, since another client's create is what made it wait and the store's check already lists it as a placeholder, not a violation. A link a change adds or alters into a part a held artifact lacks is still refused. An import lets such a link wait as the exporting store held it.
 date: 2026-10-11
 source: review question (batch 35: an artifact holding a link into a part its filled target lacks could not be changed at all, and its store's export could not be imported), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-never-skips-a-difference
+A file that differs from what the store holds at its IRI is not a broken file: with errors skipped the import is still refused naming each such IRI, and nothing lands, since skipping it would hide that the directory and the store disagree.
+date: 2026-10-11
+source: slicing question (K3, slice 182: a differing file under `--skip-errors`), answered under the person's delegation of 2026-10-10
+
+## decision/a-skipped-types-links-are-left-out
+A link waits on a placeholder only under a held type (decision/0024-a-link-may-land-on-a-placeholder), so with errors skipped a file carrying a link to an IRI under a type no version of which lands is left out with that type and reported as skipped by it; a link to a file left out under a type that does land waits on a placeholder.
+date: 2026-10-11
+source: slicing question (K3, slices 183 and 184: a link under a type whose only version is broken), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-names-items-as-a-write-does
+An item a file gives with no name lands named as a write names it, and one given with a name keeps it, so everything that tells an item by its name holds for what an import lands; an export of a store kb wrote carries every name and comes back byte for byte.
+date: 2026-10-11
+source: review question (batch 35, slice 170.1: a link waiting inside an unnamed imported item made every change to its artifact refused), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-counts-files
+An import's history gains one entry for each file that lands, each version of a type counted; a file conforming to a version of its type that neither the directory nor the store holds is an error of the check.
+date: 2026-10-11
+source: slicing questions (K3, slices 165.6 and 181: version files in the history's count; a version nobody holds), answered under the person's delegation of 2026-10-10
