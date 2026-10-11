@@ -17,7 +17,7 @@ from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import addresses, rules, server, staging
+from kb import addresses, names, rules, server, staging
 from kb.contract import kb_pb2
 from kb.values import Refused
 
@@ -145,7 +145,7 @@ def _unservable(listen: str, unservable: ValueError) -> int:
 
 def _validate() -> int:
     """Check the store this directory finds: every violation, then every artifact behind its type, then every link
-    into a placeholder, one to a line. Only a violation makes the check fail."""
+    into a placeholder, with the part it names, one to a line. Only a violation makes the check fail."""
     answered = kb_client.connect().Check(kb_pb2.CheckRequest())
     if answered.WhichOneof("outcome") == "refusal":
         return _refused("validate", answered.refusal.faults)
@@ -157,7 +157,7 @@ def _validate() -> int:
               f"which is at {stale.current}")
     for placeholder in checked.placeholders:
         for link in placeholder.links:
-            print("\t".join(("placeholder", placeholder.id, link.artifact, link.place)))
+            print("\t".join(("placeholder", names.pointing(placeholder.id, link.part), link.artifact, link.place)))
     return VIOLATED if checked.violations else 0
 
 
