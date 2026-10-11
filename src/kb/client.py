@@ -117,7 +117,9 @@ class Client:
     def Export(self, request, timeout=None):
         """The export's stream from what this call finds, read as it is iterated and let go when it ends or is
         closed: a store's in this process, a server's over the network; or a stream of one message, the refusal that
-        says nothing was found."""
+        says nothing was found. A caller that will not read to the end closes the stream: until then the read moment
+        (and, through a server, one of its workers) is held. A close while another thread is inside a read raises
+        `ValueError` and lets nothing go."""
         found, refusal = _found(self._root)
         if refusal is not None:
             return iter([responses.refused(kb_pb2.ExportResponse, [refusal])])

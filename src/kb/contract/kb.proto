@@ -332,7 +332,9 @@ message SearchResponse {
 
 // The links out of an artifact, or into it, followed as many steps as
 // depth says. A via names the one field a link may be; a kind, the one
-// kind an artifact reached may be. Either narrows every step.
+// kind an artifact reached may be. Either narrows every step, as does a
+// path: a step is kept when its artifact's path below its own type
+// begins with the path's segments, whole segments only.
 message FollowRequest {
   enum Direction {
     OUT = 0;
@@ -376,7 +378,10 @@ message FollowResponse {
 
 // The artifacts of one kind, narrowed to those whose fields hold the
 // values given, each value compared as the text it is written as. As
-// stubs by default, or as names only.
+// stubs by default, or as names only. With a path the kind may be left
+// out: the list then spans every kind but the type that describes types.
+// A path matches whole segments only. With neither a kind nor a path, the
+// list is refused.
 message ListRequest {
   enum Form {
     STUBS = 0;
@@ -394,8 +399,9 @@ message Listed {
   repeated string ids = 2;
 }
 
-// A refusal: a kind that is not a type's IRI, a kind the store holds no
-// type for, or no store found.
+// A refusal: a kind that is not a type's IRI, a path that is not one, a
+// kind the store holds no type for, neither a kind nor a path, or no store
+// found.
 message ListResponse {
   oneof outcome {
     Listed result = 1;
@@ -632,7 +638,10 @@ message PlaceholdersResponse {
 // path selects the artifacts whose path below their own type begins with
 // its segments, whole segments only, whatever their type; a kind, named
 // by its type's IRI as a list's is, those of that type; both, those of
-// that type the path selects. A kind the store holds no type for is
+// that type the path selects. A kind or a path brings the files of the
+// artifacts selected and no file of a version of their types; both apply
+// together. A selection that matches nothing is a whole export of no
+// file, ending with the position. A kind the store holds no type for is
 // refused as a list by it is.
 message ExportRequest {
   string path = 1;
@@ -667,10 +676,14 @@ message Exported {
 
 // An export answers with a stream of these: one for each file, every file
 // showing the store as it stood at one moment, then one carrying the end.
-// An export refused gives a refusal as its only message: no store found,
-// or one that cannot be read. One that fails after files were given ends
-// with a refusal in the end's place. Only a stream whose last message
-// carries the end is the whole export.
+// An export refused gives a refusal as its only message: a kind that is
+// not a type's IRI, a kind the store holds no type for, a path that is
+// not one, no store found, or one that cannot be read. A server that
+// cannot be reached, or is lost partway, ends the stream with a refusal
+// in the end's place, the stream's only message when no file had come.
+// One that fails after files were given ends with a refusal in the end's
+// place. Only a stream whose last message carries the end is the whole
+// export.
 message ExportResponse {
   oneof outcome {
     Exported result = 1;
