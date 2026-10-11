@@ -10,11 +10,12 @@ from ruamel.yaml import YAML
 
 from calls import (
     DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
-    filed, iri, journal, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
+    filed, iri, journal, listing, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
 from kb import canonical, client as kb_client, signatures, store, values, write
+from kb.content import dumps, loads
 from kb.edits import Import
 from kb.signatures import Signed
 
@@ -61,6 +62,11 @@ def test_the_operator_exports_the_store():
     FEATURE, "An artifact that conforms to an earlier version of its type is exported in the order that version declares",
 )
 def test_an_artifact_conforming_to_an_earlier_version_is_exported_in_that_version_s_order():
+    pass
+
+
+@scenario(FEATURE, "A store holding an artifact behind its type comes back from its export as it was")
+def test_a_store_holding_an_artifact_behind_its_type_comes_back_from_its_export_as_it_was():
     pass
 
 
@@ -1408,7 +1414,6 @@ def test_an_artifact_left_at_its_version_when_its_type_reordered_its_fields_expo
     _a_note_left_at_version_1_by_a_type_reordered_at_2(tmp_path, monkeypatch)
 
 
-@pytest.mark.skip(reason="the import of an export holding two versions of a type: slice 165.6")
 def test_the_export_of_an_artifact_left_at_its_version_imports_into_a_fresh_store(tmp_path, monkeypatch):
     target, exported = _a_note_left_at_version_1_by_a_type_reordered_at_2(tmp_path, monkeypatch)
     monkeypatch.setenv("KB_ROOT", str(target))
@@ -1416,6 +1421,171 @@ def test_the_export_of_an_artifact_left_at_its_version_imports_into_a_fresh_stor
     assert (checked.faults, list(checked.errors), list(checked.skipped)) == ([], [], [])
     assert kb_client.import_(str(exported), OPERATOR).faults == []
     assert held.artifact(target, iri("note", "x"))["b"] == "second"
+
+
+# A store holding an artifact behind its type, exported and imported into a fresh store (slice 165.6): the review's
+# reproduction of batch 33's RELEASE GATE, the scenario first, then each call on the imported store held separately,
+# each compared with the same call on the store exported.
+
+BEHIND = iri("note", "stock-count")
+
+
+def _owned_note_type(*required):
+    """The schema of a note type declaring a body and an owner, requiring its title and the fields named."""
+    properties = {name: {"type": "string"} for name in ("title", "body", "owner")}
+    return {"type": "object", "properties": properties, "required": ["title", *required]}
+
+
+def _a_note_left_without_the_owner_its_type_now_requires(client):
+    define(client, {"title": "Note", "version": 1, "schema": _owned_note_type()})
+    create(client, "note", {"title": "Stock count", "body": "Count on Fridays."})
+    changed = change_type(client, "note", _owned_note_type("owner"))
+    assert not changed.faults, changed.faults
+
+
+@given(
+    "a store holding a note type at two versions, the second requiring an owner the first does not, and a note that "
+    "conforms to the first version, with no owner",
+    target_fixture="source",
+)
+def _store_with_a_note_behind_its_type(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    start_a_store(source)
+    _a_note_left_without_the_owner_its_type_now_requires(kb_client.connect(source))
+    assert held.versions(source)[type_iri("note")] == [1, 2]
+    assert held.artifact(source, BEHIND)["type"] == version_iri("note", 1) and "owner" not in held.artifact(source, BEHIND)
+    return source
+
+
+@given("that store exported to a directory", target_fixture="target")
+def _exported_to_a_directory(source, tmp_path):
+    target = tmp_path / "exported"
+    ran = _kb("export", str(target), cwd=source)
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    return target
+
+
+@when("the operator imports that directory into a freshly started store, saying which role they are", target_fixture="ran")
+def _kb_import_into_a_fresh_store(root, target):
+    start_a_store(root)
+    return _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+
+@then("the new store holds both versions of the note type as their files give them")
+def _both_versions_as_their_files_give_them(ran, root, target):
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    note = type_iri("note")
+    assert held.versions(root)[note] == [1, 2]
+    for number in (1, 2):
+        assert canonical.dump(held.version(root, note, number)) == (target / _file(note, number)).read_text("utf-8")
+
+
+@then("the note still conforms to the first version of the note type")
+def _the_note_at_the_first_version(root, target):
+    assert held.artifact(root, BEHIND)["type"] == version_iri("note", 1)
+    assert held.text(root, BEHIND) == (target / _file(BEHIND)).read_text(encoding="utf-8")
+
+
+def _behind(client):
+    """What a check of the store lists: its violations, and the stale as the artifact, its version and its type's."""
+    checked = check(client)
+    assert not checked.refused, checked.faults
+    return list(checked.violations), [(each.artifact, each.schema_version, each.current) for each in checked.stale]
+
+
+@then(
+    "the note can be read, listed and replaced there, and checking that store lists it as behind its type, not as a "
+    "violation",
+)
+def _read_listed_checked_and_replaced(root):
+    client = kb_client.connect(root)
+    for whole in (False, True):
+        assert not read(client, BEHIND, whole=whole).refused
+    assert [stub.id for stub in listing(client, "note").stubs] == [BEHIND]
+    assert _behind(client) == ([], [(BEHIND, 1, 2)])
+    replaced = replace(client, BEHIND, {"body": "Count on Mondays."})
+    assert not replaced.refused, replaced.faults
+    assert held.artifact(root, BEHIND)["body"] == "Count on Mondays."
+
+
+@pytest.fixture
+def came_back(tmp_path, root):
+    """A client on the store exported, holding a note behind its type, and one on the fresh store its export was
+    imported into; the check of that directory for import found it clean."""
+    source = _store_with_a_note_behind_its_type(tmp_path)
+    target = _exported_to_a_directory(source, tmp_path)
+    ran = _check_for_import(root, target)
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, f"clean\t{target} checks clean for import\n", "")
+    landed = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (landed.returncode, landed.stdout, landed.stderr) == (0, "", "")
+    return kb_client.connect(source), kb_client.connect(root)
+
+
+def test_a_note_behind_its_type_reads_at_a_glance_in_the_store_its_export_was_imported_into_as_it_did(came_back):
+    exported_from, imported_into = (read(client, BEHIND) for client in came_back)
+    assert not imported_into.refused, imported_into.faults
+    assert imported_into == exported_from
+    assert (imported_into.revision, imported_into.type) == (1, version_iri("note", 1))
+
+
+def test_a_note_behind_its_type_reads_whole_in_the_store_its_export_was_imported_into_as_it_did(came_back):
+    exported_from, imported_into = (read(client, BEHIND, whole=True) for client in came_back)
+    assert not imported_into.refused, imported_into.faults
+    assert imported_into == exported_from
+    assert loads(imported_into.content) == {"body": "Count on Fridays."}
+
+
+def test_a_note_behind_its_type_is_listed_in_the_store_its_export_was_imported_into_as_it_was(came_back):
+    exported_from, imported_into = (listing(client, "note") for client in came_back)
+    assert not imported_into.refused, imported_into.faults
+    assert imported_into == exported_from
+    assert [(stub.id, stub.type) for stub in imported_into.stubs] == [(BEHIND, version_iri("note", 1))]
+
+
+def test_checking_the_store_an_export_was_imported_into_lists_a_note_behind_its_type_as_behind_and_no_violation(
+    came_back,
+):
+    exported_from, imported_into = (_behind(client) for client in came_back)
+    assert imported_into == exported_from == ([], [(BEHIND, 1, 2)])
+
+
+def test_a_note_behind_its_type_is_replaced_in_the_store_its_export_was_imported_into_as_it_would_have_been(
+    came_back, root,
+):
+    exported_from, imported_into = (replace(client, BEHIND, {"body": "Count on Mondays."}) for client in came_back)
+    assert not imported_into.refused, imported_into.faults
+    assert imported_into.revision == exported_from.revision == 2
+    kept = held.artifact(root, BEHIND)
+    assert (kept["type"], kept["body"]) == (version_iri("note", 1), "Count on Mondays.") and "owner" not in kept
+    assert [read(client, BEHIND, whole=True).content for client in came_back] == [dumps({"body": "Count on Mondays."})] * 2
+
+
+def test_a_note_behind_its_type_moves_to_the_latest_version_in_the_store_its_export_was_imported_into(came_back, root):
+    _, imported_into = came_back
+    moved = replace(
+        imported_into, BEHIND, {"body": "Count on Fridays.", "owner": "Ada"}, version=version_iri("note", 2),
+    )
+    assert not moved.refused, moved.faults
+    assert held.artifact(root, BEHIND)["type"] == version_iri("note", 2)
+    assert _behind(imported_into) == ([], [])
+
+
+def test_the_export_of_a_store_imported_into_a_fresh_store_exports_the_same_files_byte_for_byte(root, tmp_path):
+    source = tmp_path / "held"
+    source.mkdir()
+    _store_with_a_type_at_two_versions(source)
+    assert _behind(kb_client.connect(source))[1] == [(WEEKLY, 1, 2), (MONTHLY, 1, 2)]
+    first, second = (tmp_path / each for each in ("first", "second"))
+    assert _kb("export", str(first), cwd=source).returncode == 0
+
+    _import_into_a_fresh_store(root, first)
+    ran = _kb("export", str(second), cwd=root)
+
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    assert _files(second) == _files(first) == _held_files(source)
+    for file in _files(first):
+        assert (second / file).read_bytes() == (first / file).read_bytes(), file
 
 
 @scenario(

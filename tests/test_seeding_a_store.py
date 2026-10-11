@@ -2,8 +2,12 @@
 store at all or a whole one."""
 import signal
 
-from calls import DECISION_TYPE, TYPE_OF_TYPES, a_decision_type_and_a_decision, define, iri, type_iri
+from calls import (
+    DECISION_TYPE, TYPE_OF_TYPES, a_decision_type_and_a_decision, change_type, check, create, define, iri, read,
+    type_iri, version_iri,
+)
 from conftest import OPERATOR, _kb, exported
+from kb.content import loads
 import grpc
 
 import held
@@ -49,6 +53,38 @@ def test_a_seeded_setup_interrupted_exits_without_a_traceback_and_leaves_no_stor
     assert ran.returncode == -signal.SIGINT
     assert "Traceback" not in ran.stderr, ran.stderr
     assert held.holds_nothing(root)
+
+
+def _a_note_behind_its_type(client):
+    """A note type, a note of its first version, with no owner, and the type's second version, requiring one."""
+    def typed(*required):
+        properties = {name: {"type": "string"} for name in ("title", "body", "owner")}
+        return {"type": "object", "properties": properties, "required": ["title", *required]}
+
+    define(client, {"title": "Note", "version": 1, "schema": typed()})
+    create(client, "note", {"title": "Stock count", "body": "Count on Fridays."})
+    assert not change_type(client, "note", typed("owner")).faults
+
+
+def test_a_store_seeded_from_a_directory_holding_two_versions_of_a_type_holds_both_and_reads_the_artifact_behind_it(
+    tmp_path, root,
+):
+    """`kb init --seed` lands a seed through the import: every version file of a type lands, and an artifact left at
+    the earlier one reads there, listed by the check as behind its type and not as a violation."""
+    seed, note = exported(tmp_path, _a_note_behind_its_type), iri("note", "stock-count")
+    ran = _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.versions(root) == {TYPE_OF_TYPES: [1], type_iri("note"): [1, 2]}
+    for number in (1, 2):
+        kept = held.version(root, type_iri("note"), number)
+        assert kept["schema"]["required"] == ["title", "owner"][:number], number
+    client = kb_client.connect(root)
+    whole = read(client, note, whole=True)
+    assert not whole.refused, whole.faults
+    assert (whole.type, whole.revision, loads(whole.content)) == (version_iri("note", 1), 1, {"body": "Count on Fridays."})
+    checked = check(client)
+    assert list(checked.violations) == []
+    assert [(each.artifact, each.schema_version, each.current) for each in checked.stale] == [(note, 1, 2)]
 
 
 def _staged_store(root):
