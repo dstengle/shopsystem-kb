@@ -3,7 +3,7 @@ import copy
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, iri, read, refs, remove, replace, start_a_store,
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, iri, read, refs, remove, replace, start_a_store,
     tagged_decision_type, targets, type_iri, version_iri,
 )
 from kb import client as kb_client
@@ -155,6 +155,53 @@ def _follow_in_narrowed(client):
 @then("the client is given both work items and nothing else")
 def _both_work_items(reached):
     assert [found.stub.id for found in reached] == WORK_ITEMS
+
+
+ROADMAP = iri("decision", "roadmap")
+PLAIN_WORK_ITEM_TYPE = {"title": "Work item", "version": 1, "schema": TAG_TYPE["schema"]}
+
+
+def leading_decision_type():
+    """The decision type, whose artifacts may also lead to decisions and work items."""
+    decision_type = copy.deepcopy(DECISION_TYPE)
+    decision_type["schema"]["properties"]["leads"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "ref": {"targets": targets("decision", "work-item"), "cardinality": "many", "parts": False, "on_delete": "refuse"},
+    }
+    return decision_type
+
+
+@given(parsers.parse('a store where a decision at "{path}" below its type points at each of these:'), target_fixture="client")
+def _a_decision_pointing_below_types(root, path, datatable):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, PLAIN_WORK_ITEM_TYPE)
+    define(client, leading_decision_type())
+    pointed_at = below_their_types(datatable)
+    for kind, at in pointed_at:
+        create(client, kind, {"title": at, **({"sections": OLDER_SECTIONS} if kind == "decision" else {})}, at=at)
+    create(client, "decision", {
+        "title": "Roadmap", "leads": [at for _, at in pointed_at], "sections": OLDER_SECTIONS,
+    }, at=iri("decision", path))
+    return client
+
+
+@when(
+    parsers.parse('the client follows the links out of the decision at "{at}", narrowed to the path "{path}" below the type'),
+    target_fixture="reached",
+)
+def _follow_out_narrowed_to_a_path(client, at, path):
+    response = refs(client, iri("decision", at), depth=1, path=path)
+    assert not response.faults, response.faults
+    return list(response.reached)
+
+
+@then("the client is given only these:")
+def _only_these(reached, datatable):
+    assert [(found.stub.id, found.stub.type) for found in reached] == [
+        (at, version_iri(kind)) for kind, at in below_their_types(datatable)
+    ]
 
 
 PROCESS = iri("process", "open-the-shop")

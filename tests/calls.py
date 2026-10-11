@@ -455,14 +455,14 @@ def search(client, text, type_name="", everywhere=False):
     return answer(client.Search(request))
 
 
-def refs(client, artifact_id, depth, inward=False, via="", type_name="", place=""):
+def refs(client, artifact_id, depth, inward=False, via="", type_name="", place="", path=""):
     """The links out of an artifact, or out of the place inside it place names, or into it when inward, followed as
-    many steps as depth says, through the field via names and to artifacts of the kind type_name names when either is
-    given."""
+    many steps as depth says, through the field via names, to artifacts of the kind type_name names and to what the
+    path below the type selects, when each is given."""
     direction = kb_pb2.FollowRequest.IN if inward else kb_pb2.FollowRequest.OUT
     return answer(client.Follow(kb_pb2.FollowRequest(
         locator=kb_pb2.Locator(id=artifact_id, place=place), depth=depth, direction=direction, via=via,
-        kind=type_iri(type_name) if type_name else "",
+        kind=type_iri(type_name) if type_name else "", path=path,
     )))
 
 
@@ -495,10 +495,19 @@ PROCESS_TYPE = {
 }
 
 
-def listing(client, type_name, fields=None, ids_only=False):
-    """The artifacts of a kind, those whose fields hold the values given, as stubs or as names only."""
+def listing(client, type_name, fields=None, ids_only=False, path=""):
+    """The artifacts of a kind, or of every kind when none is named, those whose fields hold the values given and
+    that the path below the type selects when one is given, as stubs or as names only."""
     form = kb_pb2.ListRequest.IDS if ids_only else kb_pb2.ListRequest.STUBS
-    return answer(client.List(kb_pb2.ListRequest(kind=type_iri(type_name), fields=fields or {}, form=form)))
+    kind = type_iri(type_name) if type_name else ""
+    return answer(client.List(kb_pb2.ListRequest(kind=kind, fields=fields or {}, form=form, path=path)))
+
+
+def below_their_types(datatable):
+    """A table of kinds and paths below the type read as each row's kind, by its short name, and its artifact's IRI."""
+    heading, *rows = datatable
+    assert heading == ["kind", "path below its type"]
+    return [(slug(kind), iri(slug(kind), path)) for kind, path in rows]
 
 
 def check(client):

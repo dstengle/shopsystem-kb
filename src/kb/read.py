@@ -71,15 +71,15 @@ def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
 
 def stubs(store: Port, artifact_ids: list[ArtifactId]) -> list[kb_pb2.Stub]:
     """Artifacts in brief, as `stub` gives each under no field, each through the version of the type it
-    conforms to, a version read once."""
-    shown: dict[int, dict] = {}
+    conforms to, whatever its type, a version read once."""
+    shown: dict[str, dict] = {}
     stubbed = []
     for artifact_id in artifact_ids:
         found = store.artifact(artifact_id)
-        number = settled.version(found)
-        if number not in shown:
-            shown[number] = _shown(store, found)
-        stubbed.append(_stub("", found, shown[number]))
+        version = found["type"]
+        if version not in shown:
+            shown[version] = _shown(store, found)
+        stubbed.append(_stub("", found, shown[version]))
     return stubbed
 
 

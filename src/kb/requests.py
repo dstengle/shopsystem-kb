@@ -8,7 +8,7 @@ from datetime import datetime
 from kb import signatures, values
 from kb.contract import kb_pb2
 from kb.signatures import Signed
-from kb.values import ArtifactId, Kind, Locator, Refused
+from kb.values import ArtifactId, Below, Kind, Locator, Refused
 
 
 @dataclass(frozen=True)
@@ -50,13 +50,15 @@ class Walk:
     depth: int
     via: str
     inward: bool
+    path: Below | None = None
 
 
 @dataclass(frozen=True)
 class Listing:
-    kind: Kind
+    kind: Kind | None
     fields: dict
     ids: bool
+    path: Below | None = None
 
 
 def reading(request: kb_pb2.ReadRequest) -> Reading:
@@ -90,23 +92,38 @@ def searching(request: kb_pb2.SearchRequest) -> Searching:
 
 
 def following(request: kb_pb2.FollowRequest) -> Walk:
-    """The walk's start and its narrowing by kind; both faults when both fail."""
-    locator, kind, faults = None, None, []
-    try:
-        locator = values.locator(request.locator)
-    except Refused as refused:
-        faults += refused.faults
-    try:
-        kind = values.kind(request.kind) if request.kind else None
-    except Refused as refused:
-        faults += refused.faults
+    """The walk's start and its narrowing by kind and by a path below the type, each when given; every fault when
+    more than one fails."""
+    faults = []
+    locator = _converted(values.locator, request.locator, faults, always=True)
+    kind = _converted(values.kind, request.kind, faults)
+    path = _converted(values.below, request.path, faults)
     if faults:
         raise Refused(faults)
-    return Walk(locator, kind, request.depth, request.via, request.direction == kb_pb2.FollowRequest.IN)
+    return Walk(locator, kind, request.depth, request.via, request.direction == kb_pb2.FollowRequest.IN, path)
 
 
 def listing(request: kb_pb2.ListRequest) -> Listing:
-    return Listing(values.kind(request.kind), dict(request.fields), request.form == kb_pb2.ListRequest.IDS)
+    """The list's kind, taken when one is given or no path is, so a list by neither is refused for its kind, and its
+    path below the type when one is given; both faults when both fail."""
+    faults = []
+    kind = _converted(values.kind, request.kind, faults, always=not request.path)
+    path = _converted(values.below, request.path, faults)
+    if faults:
+        raise Refused(faults)
+    return Listing(kind, dict(request.fields), request.form == kb_pb2.ListRequest.IDS, path)
+
+
+def _converted(convert, text: str, faults: list, always: bool = False):
+    """A request's text converted when it is given, or always; None when it is not, or when it does not convert,
+    its faults then added to those given."""
+    if not (text or always):
+        return None
+    try:
+        return convert(text)
+    except Refused as refused:
+        faults += refused.faults
+        return None
 
 
 def snapshot(request: kb_pb2.SnapshotRequest) -> tuple[list, Signed]:

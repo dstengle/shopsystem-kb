@@ -7,6 +7,7 @@ from typing import Callable, NamedTuple
 
 PLAIN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 _DOTTED = r"[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*"
+SEGMENT = re.compile(_DOTTED)
 IRI = re.compile(rf"https://(?P<host>{_DOTTED})(?P<path>(?:/{_DOTTED})+)")
 VERSION = re.compile(r"(?P<iri>[^@]+)@(?P<number>[1-9][0-9]*)")
 LONGEST = 512
@@ -50,6 +51,13 @@ def selects(segments: tuple[str, ...], iri_text, type_iri) -> bool:
     given or begins with them, whole segments only, so `plan` selects `plan` and `plan/a`, never `planning`."""
     found = below(iri_text, type_iri)
     return found is not None and found[:len(segments)] == tuple(segments)
+
+
+def path(text: str) -> tuple[str, ...] | None:
+    """A path below a type read as its segments: one or more, joined by single slashes, each a segment of kb's IRI
+    grammar, with no slash at either end. None for text that is not one, empty text among it."""
+    segments = tuple(text.split("/"))
+    return segments if all(SEGMENT.fullmatch(each) for each in segments) else None
 
 
 def version(text: str) -> tuple[str, int] | None:

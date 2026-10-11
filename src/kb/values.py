@@ -70,6 +70,16 @@ def kind(text: str) -> Kind:
     return Kind(text)
 
 
+def below(text: str) -> Below:
+    """A path below a type as a request names it: segments of kb's grammar joined by single slashes."""
+    segments = names.path(text)
+    if segments is None:
+        raise Refused([kb_pb2.Fault(rule=rules.LOCATOR, message=(
+            f"a path below a type is plain segments joined by single slashes, as pricing or pricing/discounts; {text!r} is not"
+        ))])
+    return Below(segments)
+
+
 def artifact_id(text: str) -> ArtifactId:
     """An artifact's IRI as a request names it, of kb's grammar, which holds neither a version nor a place."""
     if not names.iri(text):

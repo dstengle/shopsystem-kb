@@ -11,10 +11,12 @@ from kb.values import ArtifactId, Locator, Refused
 
 
 def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
-    """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names. Raises
-    Refused for a kind the store holds no type for."""
-    composition.kind_type(asked.kind, store)
-    matched = store.ids(asked.kind, asked.fields)
+    """Every artifact of a kind whose fields hold the values asked for, in the order of their names, as stubs or
+    names; with a path below the type, only those it selects, and, with no kind, of every kind but the kind of
+    types. Raises Refused for a kind the store holds no type for."""
+    if asked.kind is not None:
+        composition.kind_type(asked.kind, store)
+    matched = store.ids(asked.kind, asked.fields, asked.path)
     if asked.ids:
         return kb_pb2.Listed(ids=[str(artifact_id) for artifact_id in matched])
     return kb_pb2.Listed(stubs=read.stubs(store, matched))
@@ -22,9 +24,9 @@ def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
 
 def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
     """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
-    a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via or a
-    kind narrows every step. An IRI a link points at that the store does not hold is reached as the IRI alone, of
-    no kind, and not walked on from. Raises Refused for a kind the store holds no type for, a name the store lacks,
+    a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via, a
+    kind or a path below the type narrows every step, never the artifact asked about. An IRI a link points at that
+    the store does not hold is reached as the IRI alone, of no kind, and not walked on from. Raises Refused for a kind the store holds no type for, a name the store lacks,
     or, going out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
@@ -40,7 +42,7 @@ def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
                 if str(other_id) in seen or (asked.via and field != asked.via):
                     continue
                 held = store.holds(other_id)
-                if asked.kind is not None and not (held and composition.kind_of(other_id, store) == asked.kind):
+                if not _narrowed_to(store, asked, other_id, held):
                     continue
                 seen.add(str(other_id))
                 taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
@@ -49,6 +51,18 @@ def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
                     following.append((Locator(other_id, ()), taken))
         frontier = following
     return kb_pb2.Followed(reached=reached)
+
+
+def _narrowed_to(store: Port, asked: Walk, other_id: ArtifactId, held: bool) -> bool:
+    """Whether what a step reaches is what the walk is narrowed to: of the kind asked for, which nothing not held
+    is, and selected by the path asked for, read below its own type's IRI, or, for an IRI not held, below the
+    nearest held type it sits under, and never selected when it sits under none."""
+    if asked.kind is not None and not (held and composition.kind_of(other_id, store) == asked.kind):
+        return False
+    if asked.path is None:
+        return True
+    type_id = composition.kind_of(other_id, store).name if held else composition.nearest_type(other_id, store)
+    return type_id is not None and names.selects(asked.path.segments, other_id, type_id)
 
 
 def found(store: Port, asked: Searching) -> kb_pb2.Found:

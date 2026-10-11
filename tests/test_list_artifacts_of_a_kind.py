@@ -3,7 +3,7 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import DECISION_TYPE, create, define, iri, listing, refs, search, start_a_store, version_iri
+from calls import DECISION_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, iri, listing, refs, search, start_a_store, version_iri
 from kb import client as kb_client
 from kb.content import loads
 
@@ -94,6 +94,31 @@ def _three_names(listed):
     assert not listed.faults, listed.faults
     assert list(listed.ids) == [WEEKLY, MONTHLY, THURSDAYS]
     assert not listed.stubs
+
+
+@given("a store holding these artifacts:", target_fixture="client")
+def _store_holding_artifacts_below_their_types(root, datatable):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    define(client, WORK_ITEM_TYPE)
+    for kind, at in below_their_types(datatable):
+        create(client, kind, {"title": at, **({"sections": SECTIONS} if kind == "decision" else {})}, at=at)
+    return client
+
+
+@when(parsers.parse('the client lists by the path "{path}" below the type'), target_fixture="listed")
+def _list_by_a_path(client, path):
+    return listing(client, "", path=path)
+
+
+@then("the client is given a stub of each of these and nothing else:")
+def _a_stub_of_each_of_these(listed, datatable):
+    assert not listed.faults, listed.faults
+    assert sorted((stub.id, stub.type, stub.title) for stub in listed.stubs) == sorted(
+        (at, version_iri(kind), at) for kind, at in below_their_types(datatable)
+    )
+    assert not listed.ids
 
 
 CALLS = {
