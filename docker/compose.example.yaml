@@ -2,7 +2,7 @@
 # through the connection a compose config gives them; no port is published to the host.
 services:
   kb:
-    build: https://github.com/dstengle/shopsystem-kb.git#v0.7.0
+    build: https://github.com/dstengle/shopsystem-kb.git#v0.8.0
     environment:
       KB_ACTOR: operator            # needed only when the store is started
     volumes:

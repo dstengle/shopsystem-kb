@@ -2,7 +2,7 @@
 id: capability/keep-the-history
 title: Keep the history
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/kb-runs-no-git, decision/every-change-is-attributable, decision/past-states-kept-not-yet-read, decision/history-ordered-per-artifact, decision/one-method-per-action, decision/0022-ids-are-chosen-by-the-client-in-a-namespace, decision/0027-each-type-version-is-its-own-iri, decision/journal-position-is-an-entry]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/kb-runs-no-git, decision/every-change-is-attributable, decision/past-states-kept-not-yet-read, decision/history-ordered-per-artifact, decision/one-method-per-action]
 formulated_as: features/keep-the-history.feature
 ---
 
@@ -15,7 +15,6 @@ Every change leaves an entry in the store's own history. The entry says when, by
 ## Behaviour
 
 - When the client reads the history of an artifact, there is one entry for each change, and each says when it happened, which role made it, for which piece of work, what it did, to which artifact and place in it, the revision it left, a fingerprint of what was written, the message given, and which set of changes it landed with.
-- When the client reads the history, each entry gives its position in the history.
 - When the client reads the history, the entries of changes made in one go name the same set, and a change made on its own names itself as its own set.
 - When the client reads the history for one role, it is given only that role's entries.
 - When the client reads the history for one piece of work, it is given only the entries made for it.
@@ -38,11 +37,10 @@ Every change leaves an entry in the store's own history. The entry says when, by
 
 ## Implementation, may change
 
-- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact` (the artifact's IRI), `place`, `revision`, the IRI of the type version the artifact conforms to (in place of `schema_version`), `digest` (sha256 of the canonical text, encoded as UTF-8), `message` and `batch`: the name of the set (`BatchCreate`, `BatchReplace`, `BatchAdd` or `BatchRemove`) that wrote it, or the entry's own id for a single change. Snapshot entries keep their shape.
-- An entry's position is its `id`; an export's position is the `id` of the last entry landed when the store stood at the export's moment.
+- A journal entry is `id`, `at`, `actor: { role, execution }`, `op`, `artifact`, `place`, `revision`, `schema_version`, `digest` (sha256 of the canonical text, encoded as UTF-8), `message` and `batch`: the name of the set (`BatchCreate`, `BatchReplace`, `BatchAdd` or `BatchRemove`) that wrote it, or the entry's own id for a single change. Snapshot entries keep their shape.
 - History entries are rows in the store's database, replacing the journal files. They ride with the set handed to the storage port, named by `journal.py` and fingerprinted from the canonical text.
 - The adapter keeps each artifact's content at every revision; today's contract does not read it.
-- `History` (until v1 `Journal`) takes filters: artifact (an IRI), actor, execution, batch, since.
+- `History` (until v1 `Journal`) takes filters: artifact, actor, execution, batch, since.
 - A clock returns a `datetime`, read as UTC when it has no zone; the journal holds every moment in UTC. The clock is the in-process client's (`connect`) and `kb.init`'s, and is part of the published contract.
 - An unreadable `since` is the fault with rule `since`.
 

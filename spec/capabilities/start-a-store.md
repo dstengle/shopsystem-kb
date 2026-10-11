@@ -2,7 +2,7 @@
 id: capability/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/starting-leaves-the-wire, decision/init-carries-a-piece-of-work, decision/type-of-types-iri]
+rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/starting-leaves-the-wire, decision/init-carries-a-piece-of-work, decision/type-of-types-id-published]
 formulated_as: features/start-a-store.feature
 ---
 
@@ -37,7 +37,7 @@ The client starts a store in a directory it names, in its own process and never 
 - The store is `<root>/kb/`, marked by `<root>/kb/store.yaml`, whose value says which form of store it marks (answer-a-damaged-file); its data lives in `<root>/kb/store.sqlite3`, in WAL mode. Nothing else in `<root>` is the store's concern.
 - Starting a store makes the directory, the marker and the database, and writes the type that describes types and the first history entry. No git repository is made.
 - A client starts a store by calling `kb.init(root, role, *, execution="", clock=None)`, a function of the published package, which starts a store at the root under the role, its first history entry carrying the piece of work `execution` names beside the role, and takes the same optional clock `connect` takes; it raises `kb.NotStarted`, carrying the faults, when it refuses. There is no `Init` rpc. The root is an absolute or relative path.
-- The type that describes types (the metaschema) is shipped in kb's code and written at `https://missingmass.io/kb/type`, its first version `https://missingmass.io/kb/type@1`, an IRI kb publishes in place of `schema/schema`; its entry is the write of that IRI at revision 1 with its digest. A client tells a store that holds nothing but it by listing the kind of types and finding that IRI alone; no call is added for this.
+- The type that describes types (the metaschema) is shipped in kb's code and written as artifact `schema/schema`, an id kb publishes; its entry is the write of `schema/schema` at revision 1 with its digest. A client tells a store that holds nothing but it by listing the kind `schema` and finding that id alone; no call is added for this.
 
 ## Not yet
 

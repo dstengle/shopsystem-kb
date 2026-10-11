@@ -6,12 +6,16 @@ canonical store (written out as canonical YAML files on the operator's
 `kb export`, and read back by `kb import`), and one versioned API contract,
 hosted both by an in-process client and by a server (`kb serve`).
 
-## The contract: v1 (kb 0.7.0)
+## The contract: v1 (kb 0.8.0)
 
 The contract is `kb.v1` (`kb.contract.kb_pb2`); 0.5.0 was the breaking release that removed every v0 rpc and request
 (`Actor` stays only as the type of `Entry.actor`), and 0.6.0 adds serving a store over the network.
 0.7.0 adds `kb init <root> --seed <dir>`, `kb serve <root> --listen <host:port> --start` and kb's image, which serves
 a store from a Docker container (below).
+0.8.0 adds the operator's `kb backup <file>` and `kb restore <file> <root>`: a backup copies the store whole into one
+file, its history included, as it stood at one moment, while clients go on writing and while a server serves it, and
+never overwrites; a restore makes the store a backup holds inside a directory that holds none, needs no role, and
+refuses a file that is not a backup this kb made. Neither is part of the contract, which 0.8.0 leaves as it was.
 
 - Changes: `Create`, `Replace`, `Add` and `Remove`, each taking one `Signature { role, execution, message }` and
   answering its result or a `Refusal`; the same four as sets, `BatchCreate`, `BatchReplace`, `BatchAdd` and
@@ -84,7 +88,7 @@ Compose 2.23.1 or later, for its `configs:` entry given by `content:`:
 ```yaml
 services:
   kb:
-    build: https://github.com/dstengle/shopsystem-kb.git#v0.7.0
+    build: https://github.com/dstengle/shopsystem-kb.git#v0.8.0
     environment:
       KB_ACTOR: operator            # needed only when the store is started
     volumes:
@@ -106,7 +110,7 @@ volumes:
 ```
 
 - `agent` stands for your caller: put your caller's image in place of `my-shop-knol-role`.
-- The `build:` URL's `#v0.7.0` names kb 0.7.0's tag, which exists once kb 0.7.0 is tagged and the repository is
+- The `build:` URL's `#v0.8.0` names kb 0.8.0's tag, which exists once kb 0.8.0 is tagged and the repository is
   reachable from where you build. Until then, build from a checkout: `build: <path to the checkout>`, or `make image`
   in the checkout and `image: shopsystem-kb:dev` in place of `build:`.
 - The example sets no `restart:` policy on purpose: a refusal (no `KB_ACTOR` on an empty volume, a store it cannot
@@ -142,6 +146,9 @@ volumes:
   tar, `docker compose run --rm -T --entrypoint sh kb -c 'kb export /tmp/x && tar -C /tmp/x -c .' > kb-export.tar`.
   It works with the server up, too; `tar -xf kb-export.tar -C <dir>` gives the files, laid out as `kb export` lays
   them out, ready to seed another store.
+- Getting the store out whole, its history included, is a backup made inside the container and streamed out,
+  `docker compose run --rm -T --entrypoint sh kb -c 'kb backup /tmp/store.backup && cat /tmp/store.backup' > store.backup`,
+  which `kb restore store.backup <root>` makes a store of again. It works with the server up, too.
 - The image is built from the repository at a release tag; `make image` builds one from a checkout, and
   `make image-check` checks one serves a store beside its callers.
 
