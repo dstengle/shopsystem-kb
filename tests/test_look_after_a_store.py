@@ -239,7 +239,7 @@ def _kb_help(root):
 
 
 @then("it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing "
-      "into a freshly started store")
+      "into a store")
 def _offers_six_commands(ran):
     assert (ran.returncode, ran.stderr) == (0, "")
     listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
@@ -250,7 +250,7 @@ def _offers_six_commands(ran):
     assert "export write the store" in lines
     assert "backup back the store found here, or the one KB_ROOT names, up whole" in lines
     assert "restore restore a backup as a store in a directory" in lines
-    assert "import bring a directory of files into a freshly started store" in lines
+    assert "import bring a directory of files into a store" in lines
 
 
 @then("nothing else that changes what the store holds")
