@@ -2930,3 +2930,32 @@ def _the_file_as_it_was(target, before):
 def _rejected_as_read_from_a_directory(ran, target, command):
     assert (ran.returncode, ran.stdout) == (2, "")
     assert ran.stderr == f"kb import: refused: root: an import is read from a directory; {str(target)!r} is not one\n"
+
+
+# A link whose value names nothing is an error of its file, as it is a fault of a create carrying it, never the store's.
+
+@pytest.mark.parametrize("value, rule", [
+    (["not an iri"], "ref"),
+    ([""], "ref"),
+    ([f"{WEEKLY}#a b"], "ref"),
+    ([5], "type"),
+    ([[WEEKLY]], "type"),
+    ("not an iri", "type"),
+], ids=["not an iri", "empty", "a part that is no name", "a number", "a list", "a string for the list"])
+@pytest.mark.parametrize("how", [(), ("--skip-errors",)], ids=["plainly", "with errors skipped"])
+def test_a_link_whose_value_names_nothing_is_an_error_of_its_file(root, tmp_path, value, rule, how):
+    target = exported(tmp_path, _decisions_and_a_work_item)
+    _put(target, {**_read(target, MONDAYS), "decisions": value})
+    _started(root)
+
+    checked = _kb("import", "--check", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    ran = _kb("import", str(target), *how, cwd=root, env={"KB_ACTOR": OPERATOR})
+
+    assert (checked.returncode, checked.stderr) == (1, ""), checked.stderr
+    assert {tuple(line[:3]) for line in _report(checked) if line[0] == "error"} == {("error", _file(MONDAYS), rule)}
+    if how:
+        assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+        assert set(held.names(root)) >= {WEEKLY, MONTHLY} and MONDAYS not in held.names(root)
+    else:
+        assert (ran.returncode, ran.stdout) == (2, checked.stdout) and "TypeError" not in ran.stderr, ran.stderr
+        assert MONDAYS not in held.names(root) and WEEKLY not in held.names(root)

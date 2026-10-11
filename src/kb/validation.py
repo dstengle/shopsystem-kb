@@ -110,7 +110,7 @@ def unlanded(content: dict, schema: dict, corpus, waited=frozenset(), imported: 
     return [
         link for link, told in zip(carried, links.told(carried))
         if not (_misread(link.place, errors) or _lands(link.target, link.ref, corpus))
-        and not ((imported or told in waited) and _keeps_waiting(link, told[2], corpus))
+        and not (told and (imported or told in waited) and _keeps_waiting(link, told[2], corpus))
     ]
 
 

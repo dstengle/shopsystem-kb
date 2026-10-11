@@ -67,12 +67,20 @@ def _unlanded(store: Port, offered: list[Offered], by_name: dict, drafted: dict)
     for each, artifact in sound:
         schema = composition.conformed(artifact, landing)["schema"]
         for link in validation.unlanded(settled.checked(artifact), schema, landing, imported=True):
-            under = skipping.under(values.target(link.target).id, lost, landing)
+            under = _under(link.target, lost, landing)
             if under is None:
                 each.errors.append(refusals.unlanded(each.file, link.place, link.target))
             else:
                 waiting.setdefault(each.file, []).extend(lost[under])
     return waiting
+
+
+def _under(target: str, lost: dict, landing):
+    """The type a link leads its file to, as `skipping.under` gives it; None for a value that names nothing."""
+    try:
+        return skipping.under(values.target(target).id, lost, landing)
+    except values.Refused:
+        return None
 
 
 def _sound(by_name: dict, drafted: dict) -> list[tuple[Offered, dict]]:
