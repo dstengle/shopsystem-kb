@@ -105,7 +105,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
 def unlanded(content: dict, schema: dict, corpus, waited=frozenset(), imported: bool = False, errors=()) -> list:
     """The links content carries that neither land in the corpus nor wait, `waited` and `imported` as `validate` takes
     them, but those JSON Schema's errors leave unread. The links are read through the schema; the corpus is where
-    they would land, which an import's check gives as the store with only the files that would land (kb.examining)."""
+    they would land, which an import's check gives as the store with only the files that would land (kb.judging)."""
     carried = links.carried(content, schema, corpus)
     return [
         link for link, told in zip(carried, links.told(carried))

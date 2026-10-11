@@ -5,6 +5,8 @@ files ahead of it, never against the links the directory's own artifacts bring: 
 under the other type, before the import still keeps the type out. The commands are the operator's."""
 from pathlib import Path
 
+import pytest
+
 from calls import DECISION_TYPE, NOTE_TYPE, TAG_TYPE, create, define, filed, iri, start_a_store, type_iri
 from conftest import OPERATOR, _kb, exported
 import held
@@ -115,3 +117,43 @@ def test_a_type_file_is_kept_out_by_a_link_that_waited_in_the_store_under_anothe
     assert (checked.returncode, checked.stderr, held.holds(root)) == (1, "", before)
     assert _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR}).returncode == 2
     assert held.holds(root) == before
+
+
+def _report(ran):
+    """The lines of a report that name a file with an error or one skipped, each as its kind, its file and, for an
+    error, the rule broken."""
+    lines = [line.split("\t") for line in ran.stdout.splitlines()]
+    return sorted(line[:3] for line in lines if line[0] in ("error", "skipped"))
+
+
+@pytest.mark.parametrize("nested", [("o", "o/i"), ("o", "o/i", "o/i/j")], ids=["two", "three"])
+def test_every_type_file_above_a_link_that_waited_in_the_store_is_kept_out_however_they_nest(root, tmp_path, nested):
+    """The store's note waits on an IRI under the innermost type brought, which belongs to the type for decisions:
+    each type brought would take it, so each file has an error, as each define would be refused, and a type file
+    whose place is refused shields none above it. With errors skipped nothing lands and the store stays valid."""
+    brought = [f"{DECISIONS}/{each}" for each in nested]
+    waited_on = f"{brought[-1]}/to-come"
+    target = exported(tmp_path, lambda client: [define(client, RULING_TYPE, at=each) for each in brought])
+    start_a_store(root)
+    client = kb_client.connect(root)
+    define(client, DECISION_TYPE)
+    define(client, NOTE_TYPE)
+    create(client, "note", {"title": "On a ruling to come", "about": waited_on})
+    before = held.names(root)
+
+    checked = _kb("import", str(target), "--check", cwd=root)
+
+    assert _report(checked) == sorted(["error", filed(each, 1), "identity"] for each in brought), checked.stdout
+    errors = [line for line in checked.stdout.splitlines() if line.startswith("error\t")]
+    assert all(f"{waited_on!r} belongs to {DECISIONS!r}" in line for line in errors), checked.stdout
+    assert (checked.returncode, checked.stderr) == (1, "")
+
+    ran = _kb("import", str(target), "--skip-errors", cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, ""), (ran.stdout, ran.stderr)
+    assert _report(ran) == _report(checked)
+    assert held.names(root) == before
+    validated = _kb("validate", cwd=root)
+    assert (validated.returncode, validated.stderr) == (0, ""), validated.stdout
+    assert [line.split("\t")[:2] for line in validated.stdout.splitlines()] == [["placeholder", waited_on]]
+    again = _kb("import", str(target), "--check", cwd=root)
+    assert (again.returncode, again.stdout, again.stderr) == (checked.returncode, checked.stdout, checked.stderr)

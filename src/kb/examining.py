@@ -3,14 +3,14 @@ they lead to one, each with the chain of files that leads there. Each file that 
 the export layout (kb.offers) is put in one draft over the store, so files are checked against the types the
 directory brings and the store's together, as a set is. A file read through a type file that has an error, or that
 leads to one, is not checked but left to be skipped. A file's links are judged last, a file with an error's too,
-against the store with only the files that would land, as the landing judges them; a type's place is judged against
-the store and the type files ahead of it, never the links the directory's artifacts bring. The type that describes
-types is the store's own: a copy of it is compared, never drafted. The examination writes nothing."""
+against the store with only the files that would land (kb.judging); a type's place is judged against the store and
+the type files ahead of it whose place is not refused, never the links the directory's artifacts bring. The type that
+describes types is the store's own: a copy of it is compared, never drafted. The examination writes nothing."""
 import copy
 from dataclasses import dataclass, field
 
 from kb import (
-    canonical, comparing, composition, definitions, file_refusals, naming, names, offers, refusals, rules, settled,
+    canonical, comparing, composition, definitions, file_refusals, judging, naming, names, offers, rules, settled,
     skipping, validation, values,
 )
 from kb.draft import Draft
@@ -50,49 +50,11 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
     for name in in_order(by_name):
         each = by_name[name]
         each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, drafted, places)]
-    waiting = _unlanded(store, offered, by_name, drafted)
+    waiting = judging.unlanded(store, offered, by_name, _read(by_name, drafted))
     for each in comparing.compared(store, [each for each in offered if each.id != METASCHEMA_ID]).differing:
         each.errors.append(file_refusals.differs(each.file, str(each.id)))
     errors = [fault for each in offered for fault in each.errors]
     return Checked(errors=errors, skipped=skipping.skipped(offered, by_name, waiting))
-
-
-def _unlanded(store: Port, offered: list[Offered], by_name: dict, drafted: dict) -> dict[str, list[str]]:
-    """Each checked file's links judged as the landing judges them, against the store with only the files that would
-    land, so a link to a file that does not land is a link to an IRI not held: it waits under a type the store holds
-    or of which a version lands; under a type no version of which lands it leads its file, when it has no error, to
-    that type's version files, which are given here for the file; under no type at all it is the file's error,
-    beside any other the file has."""
-    landing, read = Draft(store), _read(by_name, drafted)
-    for each, artifact in read:
-        if not each.errors:
-            landing.put(each.id, artifact)
-    lost, waiting = skipping.lost(store, offered, by_name), {}
-    for each, artifact in read:
-        led = [(link, _under(link.target, lost, landing)) for link in _links(each, artifact, landing)]
-        if not each.errors:
-            waiting[each.file] = [file for _, under in led if under is not None for file in lost[under]]
-        each.errors += [refusals.unlanded(each.file, link.place, link.target) for link, under in led if under is None]
-    return waiting
-
-
-def _links(each: Offered, artifact: dict, landing: Draft) -> list:
-    """The links of a checked file that neither land nor wait in what would land, those JSON Schema's errors leave
-    unread passed over; none for a file the version of whose type is not held or whose content cannot be read."""
-    try:
-        schema, content = composition.conformed(artifact, landing)["schema"], settled.checked(artifact)
-        errors = validation.misshapen(content, schema, landing) if each.errors else ()
-    except Refused:
-        return []
-    return validation.unlanded(content, schema, landing, imported=True, errors=errors)
-
-
-def _under(target: str, lost: dict, landing):
-    """The type a link leads its file to, as `skipping.under` gives it; None for a value that names nothing."""
-    try:
-        return skipping.under(values.target(target).id, lost, landing)
-    except values.Refused:
-        return None
 
 
 def _read(by_name: dict, drafted: dict) -> list[tuple[Offered, dict]]:
@@ -104,14 +66,16 @@ def _read(by_name: dict, drafted: dict) -> list[tuple[Offered, dict]]:
 
 def _places(store: Port, by_name: dict) -> dict[ArtifactId, list]:
     """The faults of the place each type a file brings stands at, by the type's IRI: under nothing that belongs to
-    another type (kb.naming) in the store with the type files ahead of it, in the order files are read in. The links
-    the directory's own artifacts bring are not there: they wait under the type as they did in the store exported,
-    while one that waited in the store before the import counts. A type the store holds stands where it stood."""
+    another type (kb.naming) in the store with the type files ahead of it whose own place is not refused, in the
+    order files are read in, so a type whose place is refused shields none above it. The links the directory's own
+    artifacts bring are not there: they wait under the type as they did in the store exported, while one that waited
+    in the store before the import counts. A type the store holds stands where it stood."""
     ahead, found = Draft(store), {}
     for each in (by_name[name] for name in in_order(by_name)):
         if each.typed and each.artifact is not None and each.id != METASCHEMA_ID and each.id not in found:
             found[each.id] = [] if store.holds(each.id) else naming.placed(ahead, each.id, METASCHEMA_ID)
-            ahead.put(each.id, each.artifact)
+            if not found[each.id]:
+                ahead.put(each.id, each.artifact)
     return found
 
 
@@ -162,7 +126,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, drafted: di
     the store's; or, unless it is read through a type file that is broken or leads to one, its kind, the version of
     its type it names, which the directory or the store must hold, its form and its content against that version,
     whatever its type stands at, and for a type, its place (`_places`) and the type as a type. Its links are judged
-    apart, once it is known which files would land (`_unlanded`)."""
+    apart, once it is known which files would land (kb.judging)."""
     if each.artifact is None:
         return []
     if each.id == METASCHEMA_ID:
