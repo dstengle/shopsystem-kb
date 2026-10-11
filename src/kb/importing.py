@@ -35,7 +35,7 @@ def _imported(store: Port, directory: Named, signed: Signed, skip_errors: bool, 
     landing = _landing(offered, report)
     if not landing:
         return Checked([file_refusals.nothing_lands()], report.errors, report.skipped)
-    write.land(store, [Import(name, landing[name].artifact) for name in examining.in_order(landing)], signed)
+    write.land(store, [Import(landing[name].id, landing[name].artifact) for name in examining.in_order(landing)], signed)
     return report
 
 
@@ -52,5 +52,5 @@ def _landing(offered: list[Offered], report: Checked) -> dict[ArtifactId, Offere
     left_out = {skipped.file for skipped in report.skipped}
     return {
         each.name: each for each in offered
-        if each.name not in (None, METASCHEMA_ID) and not each.errors and each.file not in left_out
+        if each.name is not None and each.id != METASCHEMA_ID and not each.errors and each.file not in left_out
     }

@@ -20,7 +20,8 @@ KEPT = (
 
 @dataclass
 class Offered:
-    """One file as read: its place, the IRI the layout gives it (None where the layout puts no artifact) and the
+    """One file as read: its place, the name the layout gives it (None where the layout puts no artifact): the IRI
+    of the artifact, or, for a type's version, of that version, so the versions of one type are told apart; the
     number of the version a type's place gives (None for any other artifact's), its text and, when it reads as an
     artifact at its place, that artifact; and its errors."""
     file: str
@@ -29,6 +30,13 @@ class Offered:
     text: str = ""
     artifact: dict | None = None
     errors: list = field(default_factory=list)
+
+    @property
+    def id(self) -> ArtifactId | None:
+        """The IRI of the artifact the file holds: the name, but for a type's version, the type's."""
+        if self.name is None or self.number is None:
+            return self.name
+        return ArtifactId(names.version(str(self.name))[0])
 
     @property
     def typed(self) -> bool:
@@ -62,7 +70,7 @@ def _under(file: Path, place: Path | None) -> bool:
 def _offered(directory: Named, steps: tuple[str, ...]) -> Offered:
     """A file read as YAML 1.2, and as an artifact at the place the layout gives its IRI, and a type's version."""
     file, written = "/".join(steps), names.filed(steps)
-    offered = Offered(file, *((ArtifactId(written[0]), written[1]) if written is not None else (None, None)))
+    offered = Offered(file, *((_named(*written), written[1]) if written is not None else (None, None)))
     try:
         offered.text = directory.path.joinpath(*steps).read_bytes().decode("utf-8")
         loaded = canonical.load(offered.text)
@@ -83,6 +91,11 @@ def _offered(directory: Named, steps: tuple[str, ...]) -> Offered:
     return offered
 
 
+def _named(iri: str, number: int | None) -> ArtifactId:
+    """The name a file's IRI and version number give it: the IRI, or the version's."""
+    return ArtifactId(iri if number is None else names.versioned(iri, number))
+
+
 def _misplaced(offered: Offered, loaded) -> str | None:
     """Why what a file holds is not an artifact at its place, or None when it is: its IRI the one its place gives,
     and a type's version the one its place gives, at a type version's place, and no other artifact there."""
@@ -91,8 +104,8 @@ def _misplaced(offered: Offered, loaded) -> str | None:
                 "<host>/.../<segment>@<n>.yaml, and nothing else is offered for import")
     if not isinstance(loaded, dict) or not settled.identified(loaded):
         return f"an artifact opens with {', '.join(settled.IDENTITY)}, in that order, and this file does not"
-    if loaded["id"] != str(offered.name):
-        return f"its place names {str(offered.name)!r}, and it holds {loaded['id']!r}"
+    if loaded["id"] != str(offered.id):
+        return f"its place names {str(offered.id)!r}, and it holds {loaded['id']!r}"
     if settled.typed(loaded) != offered.typed or (offered.typed and loaded.get("version") != offered.number):
         return "a type is filed at its version's place, <segment>@<n>.yaml, and nothing else is"
     return None

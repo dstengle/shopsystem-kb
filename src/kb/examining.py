@@ -46,10 +46,10 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
     checked. Each file's errors are kept on it."""
     draft = Draft(store)
     for each in offered:
-        if each.artifact is not None and each.name != METASCHEMA_ID:
-            draft.put(each.name, each.artifact)
+        if each.artifact is not None and each.id != METASCHEMA_ID:
+            draft.put(each.id, each.artifact)
     by_name = {each.name: each for each in offered if each.name is not None}
-    unread = {name for name, each in by_name.items() if each.artifact is None}
+    unread = {each.id for each in by_name.values() if each.artifact is None}
     for name in in_order(by_name):
         each = by_name[name]
         each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, unread)]
@@ -60,18 +60,21 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
 
 def in_order(by_name: dict[ArtifactId, Offered]) -> list[ArtifactId]:
     """The names of the files offered, the types first, each after the types it is read through, then the rest, each
-    in the order of names."""
+    in the order of names, the versions of one type by their numbers."""
+    def key(name: ArtifactId) -> tuple:
+        return names.order(by_name[name].id), by_name[name].number or 0
+
     ordered: list[ArtifactId] = []
 
     def visit(name: ArtifactId, seen: frozenset) -> None:
         if name in ordered or name in seen:
             return
-        for under in sorted(_beneath(by_name[name], by_name), key=names.order):
+        for under in sorted(_beneath(by_name[name], by_name), key=key):
             visit(under, seen | {name})
         ordered.append(name)
-    for name in sorted((name for name in by_name if by_name[name].typed), key=names.order):
+    for name in sorted((name for name in by_name if by_name[name].typed), key=key):
         visit(name, frozenset())
-    return ordered + sorted((name for name in by_name if not by_name[name].typed), key=names.order)
+    return ordered + sorted((name for name in by_name if not by_name[name].typed), key=key)
 
 
 def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set) -> list:
@@ -81,7 +84,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     read is left to the skipping."""
     if each.artifact is None:
         return []
-    if each.name == METASCHEMA_ID:
+    if each.id == METASCHEMA_ID:
         return [] if each.text == canonical.dump(store.artifact(METASCHEMA_ID)) else [file_refusals.not_canonical(
             each.file, "the type that describes types is the store's own, and this copy differs from it",
         )]
@@ -94,7 +97,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     content = settled.checked(each.artifact)
     found = [*_form(draft, each, schema), *_fit(draft, each, content, schema, unread)]
     if not found and each.typed:
-        found = definitions.faults(each.name, content, draft)
+        found = definitions.faults(each.id, content, draft)
     return found
 
 
@@ -130,10 +133,11 @@ def _skipped(draft: Draft, offered: list[Offered], by_name: dict) -> list[Skippe
     """Each file without an error that leads to a broken one by its links, its implicit link to its type file or, for a
     type, what it is built on or refers to, with the shortest chain of files that leads there. The type that describes
     types is the store's own, led to by none."""
-    files = {name: each.file for name, each in by_name.items() if name != METASCHEMA_ID}
+    files = {name: each.file for name, each in by_name.items() if each.id != METASCHEMA_ID}
     broken = {each.file for each in offered if each.errors}
     leads = {
-        each.file: [files[target] for target in _leads_to(draft, each, by_name) if target in files]
+        each.file: [files[name] for target in _leads_to(draft, each, by_name) for name in _named_by(target, by_name)
+                    if name in files]
         for each in offered if each.name in files and each.file not in broken
     }
     chains = [(file, _chain(file, leads, broken)) for file in leads]
@@ -146,7 +150,7 @@ def _leads_to(draft: Draft, each: Offered, by_name: dict) -> list[ArtifactId]:
     beneath = _beneath(each, by_name)
     if _held_back(each, by_name):
         return beneath
-    return [*beneath, *(link.target for link in links.handed(each.name, each.artifact, draft))]
+    return [*beneath, *(link.target for link in links.handed(each.id, each.artifact, draft))]
 
 
 def _beneath(each: Offered, by_name: dict) -> list[ArtifactId]:
@@ -157,7 +161,13 @@ def _beneath(each: Offered, by_name: dict) -> list[ArtifactId]:
     found = [values.type_of(composition.artifact_kind(each.artifact))]
     if each.typed:
         found += composition.referred(each.artifact.get("schema"))
-    return [name for name in dict.fromkeys(found) if name != METASCHEMA_ID and name in by_name]
+    return [name for under in dict.fromkeys(found) if under != METASCHEMA_ID for name in _named_by(under, by_name)]
+
+
+def _named_by(target: ArtifactId, by_name: dict) -> list[ArtifactId]:
+    """The names of the files offered that hold the artifact an IRI names: one, or, for a type, one for each version
+    the directory brings."""
+    return [name for name, each in by_name.items() if each.id == target]
 
 
 def _held_back(each: Offered, by_name: dict, seen: frozenset = frozenset()) -> bool:
