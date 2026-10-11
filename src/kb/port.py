@@ -4,7 +4,7 @@ Above the port stay names, content checks, sections and items, signatures, fault
 adapter keeps the artifacts, their content at every revision, the links both ways, the search rows and the history,
 and lands a set of changes whole or not at all. An adapter keeps the versions of a type it is handed, each
 as made, and knows nothing of what a type declares: a change says the kind of its artifact, its type's IRI, and a link
-says which kinds it may land on and, for a target kb found not held, the held type that target sits under.
+says which kinds it may land on and the held type its target sits under, read when the target is not held.
 
 The port refuses with the exceptions named here. None of them is published, and kb translates them above the port.
 """
@@ -22,8 +22,8 @@ class Link:
     it lands on, the place of the part inside that artifact it lands on (empty for the artifact itself), and the kinds
     it may land on. An implicit link is kb's own bookkeeping: it holds what it lands on in place, and refuses its
     removal like any link, but no read of links, counts or walks shows it. `under` is the held type kb found the
-    target's IRI to sit under when it found the target not held, None for a target it found held: a link to an IRI
-    not held lands only when the adapter holds that type and its IRI is among `kinds`, nothing but the link's target
+    target's IRI to sit under, held or not, None for one under no held type; it is read only when the target is not
+    held as the link lands, as one removed since the link was drafted is not: a link to an IRI not held lands only when the adapter holds that type and its IRI is among `kinds`, nothing but the link's target
     kept for it, and an implicit link never does."""
     field: str
     place: str

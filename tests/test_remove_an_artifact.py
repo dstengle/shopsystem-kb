@@ -7,6 +7,7 @@ from calls import (
 import at_once
 import held
 from kb import client as kb_client
+from kb.content import loads
 
 
 @scenario("name-artifacts-and-items.feature", "After an artifact has been removed, a new artifact may be created at its IRI")
@@ -249,14 +250,12 @@ def _one_lands_first(root, racing, first):
     return attempt
 
 
-@then("the new decision is rejected because a link must land on a node of a kind the type allows")
-def _new_decision_rejected_for_its_link(attempt):
-    assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
-        (TAGGED, "tags/0", "ref"),
-    ]
-    assert attempt["response"].faults[0].message.startswith("a link must land on a node of a kind the type allows")
-    assert f"'{LOOSE}'" in attempt["response"].faults[0].message
-    assert attempt["after"] == attempt["before"]
+@then("the new decision lands, its link on a placeholder at the removed tag's IRI")
+def _new_decision_lands_on_a_placeholder(client, attempt):
+    assert not attempt["response"].faults, attempt["response"].faults
+    assert (attempt["response"].id, attempt["response"].revision) == (TAGGED, 1)
+    assert loads(read(client, TAGGED, whole=True).content)["tags"] == [LOOSE]
+    assert [fault.rule for fault in read(client, LOOSE).faults] == ["not-found"]
 
 
 @then("the store holds the tag and the decision that points at it")
@@ -266,7 +265,10 @@ def _tag_and_decision_held(client):
     assert [fault.rule for fault in remove(client, LOOSE).faults] == ["on_delete"]
 
 
-@then("the store holds neither the tag nor the new decision")
-def _neither_held(client):
+@then("the store holds the new decision and not the tag")
+def _decision_held_and_not_the_tag(root, client):
+    assert read(client, TAGGED).faults == []
+    assert held.holds_artifact(root, TAGGED)
     assert [fault.rule for fault in read(client, LOOSE).faults] == ["not-found"]
-    assert [fault.rule for fault in read(client, TAGGED).faults] == ["not-found"]
+    assert not held.holds_artifact(root, LOOSE)
+    assert list(listing(client, "tag", ids_only=True).ids) == []

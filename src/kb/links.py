@@ -1,5 +1,5 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-and those links as the port takes them, one to a target not held saying the held type it sits under. The checks,
+and those links as the port takes them, each saying the held type its target sits under. The checks,
 removal, reads and walks all read links here."""
 from typing import NamedTuple
 
@@ -32,8 +32,8 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
 def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
     the kinds its field allows, read through the type given, the version of its type the artifact conforms to,
-    whatever its type stands at, and, for a target the corpus does not hold, the held type its IRI sits under
-    (`port.Link.under`). Every artifact carries one implicit link, first, to the artifact of its type, which says
+    whatever its type stands at, and the held type its target's IRI sits under (`port.Link.under`), held or not,
+    since a held target may be removed before the link lands and the link then waits on its IRI. Every artifact carries one implicit link, first, to the artifact of its type, which says
     nothing of what that sits under. A value that could name nothing, which a type changed after it was written can
     leave in a link field, is not handed."""
     kind = composition.artifact_kind(artifact)
@@ -53,9 +53,9 @@ def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) 
 
 
 def _under(target: values.ArtifactId, corpus) -> values.ArtifactId | None:
-    """The held type a target the corpus does not hold sits under; None for a held target, or one under no held
-    type."""
-    return None if corpus.holds(target) else composition.nearest_type(target, corpus)
+    """The held type a target's IRI sits under, whether or not the corpus holds the target, which may be removed
+    before the link lands; None for one under no held type."""
+    return composition.nearest_type(target, corpus)
 
 
 def inside(artifact: dict, schema: dict, corpus, node) -> list[Link]:

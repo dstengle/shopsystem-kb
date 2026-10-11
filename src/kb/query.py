@@ -20,7 +20,8 @@ def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
 def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
     """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
     a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via or a
-    kind narrows every step. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
+    kind narrows every step. An IRI a link points at that the store does not hold is reached as the IRI alone, of
+    no kind, and not walked on from. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
     out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
@@ -35,12 +36,14 @@ def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
             for field, other_id in step(store, locator):
                 if str(other_id) in seen or (asked.via and field != asked.via):
                     continue
-                if asked.kind is not None and composition.kind_of(other_id, store) != asked.kind:
+                held = store.holds(other_id)
+                if asked.kind is not None and not (held and composition.kind_of(other_id, store) == asked.kind):
                     continue
                 seen.add(str(other_id))
                 taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
                 reached.append(kb_pb2.Reached(stub=read.stub(store, field, other_id), route=taken))
-                following.append((Locator(other_id, ()), taken))
+                if held:
+                    following.append((Locator(other_id, ()), taken))
         frontier = following
     return kb_pb2.Followed(reached=reached)
 

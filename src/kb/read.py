@@ -1,5 +1,6 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
-of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too."""
+of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too.
+A link to an IRI the store does not hold is never followed: its stub is the IRI alone, and read whole it stays a name."""
 from dataclasses import replace
 
 from kb import composition, links, places, refusals, settled, values
@@ -56,7 +57,10 @@ class _Kept:
 
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
-    """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance."""
+    """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance.
+    An IRI the store does not hold, which a link may point at, is given as the IRI alone."""
+    if not store.holds(target_id):
+        return kb_pb2.Stub(field=field, id=str(target_id))
     target = store.artifact(target_id)
     return _stub(field, target, _shown(store, target))
 
@@ -126,12 +130,12 @@ def _response(found: dict, content: str) -> kb_pb2.Artifact:
 def _resolved(store: Port, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
     """The artifact as stored, each link in its own fields followed depth steps with the target, itself resolved, in
     place of its name; a link inside one of its items stays a name. A target on the path already being filled in
-    stays a name, so a loop ends."""
+    stays a name, so a loop ends, and so does one the store does not hold."""
     found = store.artifact(artifact_id)
     if depth < 1:
         return found
     def fill(target):
-        if target in on_path:
+        if target in on_path or not store.holds(values.artifact_id(target)):
             return target
         return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
     resolved = dict(found)

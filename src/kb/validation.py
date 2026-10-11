@@ -1,6 +1,7 @@
 """Schema validation: the type's JSON Schema composed with kb's own structural rules, and beside it what the schema
 language cannot say, checked in code: required sections in their declared order, and links that land on an artifact
-the corpus holds, or a part inside it, of a kind the type allows. Every fault comes back together; kb's rules pass
+the corpus holds, or a part inside it, of a kind the type allows, or wait on an IRI it does not hold, under a held
+type the field allows. Every fault comes back together; kb's rules pass
 over a node JSON Schema found misshapen. kb's keywords are read through kb.composition. What is checked, and the
 corpus it is checked against, are given; nothing here finds or opens a file.
 """
@@ -10,7 +11,7 @@ from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
 from kb import links, places, refusals, rules, settled, values
-from kb.composition import composition, declared, type_schema
+from kb.composition import composition, declared, nearest_type, type_schema
 from kb.contract import kb_pb2
 
 SECTION = {
@@ -119,16 +120,26 @@ def _misread(place: str, errors: list) -> bool:
 
 def _lands(target: str, ref: dict, corpus) -> bool:
     """Whether a link lands: on an artifact of a kind the field allows that the corpus holds, and, when it names a
-    place after `#` and the field allows parts, on a part that artifact holds."""
+    place after `#` and the field allows parts, on a part that artifact holds; or on an IRI the corpus does not hold
+    that waits under a held type the field allows, the part it names, if any, not checked, nothing being held there."""
     try:
         link = values.target(target)
     except values.Refused:
         return False
     if link.place and not ref.get("parts"):
         return False
-    if not corpus.holds(link.id) or settled.kind(corpus.artifact(link.id)) not in ref["targets"]:
+    if not corpus.holds(link.id):
+        return _waits(link.id, ref, corpus)
+    if settled.kind(corpus.artifact(link.id)) not in ref["targets"]:
         return False
     return not link.place or places.holds_part(corpus.artifact(link.id), link.place)
+
+
+def _waits(target: values.ArtifactId, ref: dict, corpus) -> bool:
+    """Whether an IRI the corpus does not hold may be linked to: the nearest held type it sits under is one the
+    field allows. One under no held type may not."""
+    under = nearest_type(target, corpus)
+    return under is not None and str(under) in ref["targets"]
 
 
 def _sections(artifact_id: str, sections: list, required: list, place: str) -> list[kb_pb2.Fault]:

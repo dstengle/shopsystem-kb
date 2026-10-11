@@ -261,6 +261,27 @@ def _rejected_as_not_held(shown):
     assert iri("decision", "nothing-of-the-sort") in shown.faults[0].message
 
 
+@given("a store holding a decision that links to an IRI the store does not hold", target_fixture="client")
+def _store_with_a_link_to_an_iri_not_held(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    create(client, "decision", {
+        "title": "Price reviews happen weekly",
+        "supersedes": iri("decision", "nothing-of-the-sort"),
+        "sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+            {"title": "Rationale", "body": "Costs move weekly.\n"},
+        ],
+    })
+    return client
+
+
+@when("the client reads an artifact by that IRI", target_fixture="shown")
+def _read_the_iri_a_link_points_at(client):
+    return read(client, iri("decision", "nothing-of-the-sort"))
+
+
 @when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="shown")
 def _read_by_the_name(client, name):
     return read(client, name)
