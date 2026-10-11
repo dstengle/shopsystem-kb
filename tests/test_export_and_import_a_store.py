@@ -1139,7 +1139,24 @@ def _a_decision_with_an_error_and_one_linking(tmp_path):
     return target, {_file(BROKEN): "error"}
 
 
+def _a_broken_second_version_and_a_decision_linked_to(tmp_path):
+    """The type for decisions at two versions, the second broken, a decision conforming to the second, and the work
+    item linking to that decision."""
+    def fill(client):
+        _decisions_at(client, 2)
+        _a_decision_of_the_type(client)
+        define(client, WORK_ITEM_TYPE)
+        create(client, "work-item", {"title": "Stands alone", "decisions": [AT_TWO]})
+
+    target = _for_import(tmp_path, fill)
+    broken = _breaks(target, DECISIONS, 2)
+    return target, {broken: "error", _file(AT_TWO): f"{_file(AT_TWO)} -> {broken}"}
+
+
 TOGETHER_WITH = {
+    "version 1 of a type for decisions, version 2 of it whose content does not fit the type that describes types, "
+    "and a decision conforming to version 2 that the work item links to":
+        _a_broken_second_version_and_a_decision_linked_to,
     "a type for decisions, a decision with an error, and a second decision that links to it":
         _a_decision_with_an_error_and_one_linking,
 }
@@ -1172,6 +1189,7 @@ def _the_work_item_lands(ran, root, target):
 
 LEFT_OUT = {
     "the decision with an error": [_file(BROKEN)],
+    "version 2 of the type for decisions and the decision": [_file(DECISIONS, 2), _file(AT_TWO)],
 }
 
 
@@ -1205,6 +1223,11 @@ def _waiting(root):
 def _the_second_decision_waits_on_the_broken_one(root, target):
     assert held.text(root, SECOND) == (Path(target) / _file(SECOND)).read_text(encoding="utf-8")
     assert _waiting(root) == {BROKEN: [SECOND]}
+
+
+@then("the work item's link to the decision lands on a placeholder at the decision's IRI")
+def _the_work_item_waits_on_the_decision(root):
+    assert _waiting(root) == {AT_TWO: [STANDALONE]}
 
 
 @then("the operator is told what was skipped and why")
