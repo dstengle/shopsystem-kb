@@ -528,12 +528,14 @@ class CreateItem(_message.Message):
     def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
 class BatchCreateRequest(_message.Message):
-    __slots__ = ("items", "signature")
+    __slots__ = ("items", "signature", "check_only")
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    CHECK_ONLY_FIELD_NUMBER: _ClassVar[int]
     items: _containers.RepeatedCompositeFieldContainer[CreateItem]
     signature: Signature
-    def __init__(self, items: _Optional[_Iterable[_Union[CreateItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
+    check_only: bool
+    def __init__(self, items: _Optional[_Iterable[_Union[CreateItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., check_only: _Optional[bool] = ...) -> None: ...
 
 class BatchCreated(_message.Message):
     __slots__ = ("batch", "results")
@@ -564,12 +566,14 @@ class ReplaceItem(_message.Message):
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., content: _Optional[str] = ..., revision: _Optional[int] = ..., type: _Optional[str] = ...) -> None: ...
 
 class BatchReplaceRequest(_message.Message):
-    __slots__ = ("items", "signature")
+    __slots__ = ("items", "signature", "check_only")
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    CHECK_ONLY_FIELD_NUMBER: _ClassVar[int]
     items: _containers.RepeatedCompositeFieldContainer[ReplaceItem]
     signature: Signature
-    def __init__(self, items: _Optional[_Iterable[_Union[ReplaceItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ...) -> None: ...
+    check_only: bool
+    def __init__(self, items: _Optional[_Iterable[_Union[ReplaceItem, _Mapping]]] = ..., signature: _Optional[_Union[Signature, _Mapping]] = ..., check_only: _Optional[bool] = ...) -> None: ...
 
 class BatchReplaced(_message.Message):
     __slots__ = ("batch", "results")

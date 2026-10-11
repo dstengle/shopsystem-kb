@@ -212,6 +212,7 @@ message CreateItem
 message BatchCreateRequest
   items = 1 repeated kb.v2.CreateItem
   signature = 2 singular kb.v2.Signature
+  check_only = 3 singular bool
 message BatchCreated
   batch = 1 singular string
   results = 2 repeated kb.v2.Created
@@ -226,6 +227,7 @@ message ReplaceItem
 message BatchReplaceRequest
   items = 1 repeated kb.v2.ReplaceItem
   signature = 2 singular kb.v2.Signature
+  check_only = 3 singular bool
 message BatchReplaced
   batch = 1 singular string
   results = 2 repeated kb.v2.Replaced

@@ -496,10 +496,15 @@ message CreateItem {
 message BatchCreateRequest {
   repeated CreateItem items = 1;
   Signature signature = 2;
+  // Asks that the set be checked only: answered as it would land, each
+  // change's result in order and no name for the set, or refused with every
+  // fault it would be refused with; nothing is written, and it is never
+  // refused as busy.
+  bool check_only = 3;
 }
 
-// The set's name, minted by kb, and each create's result in the order of
-// the set.
+// The set's name, minted by kb, empty for a set checked only, and each
+// create's result in the order of the set.
 message BatchCreated {
   string batch = 1;
   repeated Created results = 2;
@@ -523,10 +528,16 @@ message ReplaceItem {
 message BatchReplaceRequest {
   repeated ReplaceItem items = 1;
   Signature signature = 2;
+  // Asks that the set be checked only: answered as it would land, each
+  // change's result in order and no name for the set, or refused with every
+  // fault it would be refused with; nothing is written, and it is never
+  // refused as busy.
+  bool check_only = 3;
 }
 
-// The set's name, minted by kb, and each replacement's result, naming the
-// artifact it replaced, in the order of the set.
+// The set's name, minted by kb, empty for a set checked only, and each
+// replacement's result, naming the artifact it replaced, in the order of
+// the set.
 message BatchReplaced {
   string batch = 1;
   repeated Replaced results = 2;
