@@ -55,6 +55,14 @@ def names(root):
         return sorted(str(each) for each in opened.ids())
 
 
+def versions(root):
+    """Every version the store holds of every type, by the type's name: the numbers held, lowest first. An artifact
+    that is no type, and a type with no version held, is not in it."""
+    with store.opened(root) as opened:
+        found = {str(each): opened.versions(each) for each in opened.ids()}
+    return {name: numbers for name, numbers in sorted(found.items()) if numbers}
+
+
 def history(client):
     """The store's history, oldest first, as the `History` rpc gives it."""
     return list(client.History(kb_pb2.HistoryRequest()).result.entries)

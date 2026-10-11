@@ -142,7 +142,7 @@ def _files(target):
 @then("the directory holds one file for each artifact in the store, under a folder named for its kind")
 def _one_file_for_each_artifact(ran, root, target):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
-    assert _files(target) == sorted(_held_file(root, name) for name in held.names(root))
+    assert _files(target) == _held_files(root)
     assert {path.parent.name for path in Path(target).rglob("*.yaml")} == {"schema", "decision", "work-item"}
 
 
@@ -605,6 +605,16 @@ def _held_file(root, name):
     """The file an export of the store at root gives an artifact it holds: a type's at the version it stands at."""
     artifact = held.artifact(root, name)
     return _file(name, artifact["version"] if artifact["type"].startswith(f"{TYPE_OF_TYPES}@") else None)
+
+
+def _held_files(root):
+    """The files an export of the store at root holds, sorted: one for every held version of every type, at the
+    type's place with the version's number, and one for every other artifact."""
+    versions = held.versions(root)
+    return sorted(
+        file for name in held.names(root)
+        for file in ([_file(name, number) for number in versions[name]] if name in versions else [_file(name)])
+    )
 
 
 @when("the operator imports the directory, saying which role they are", target_fixture="ran")
