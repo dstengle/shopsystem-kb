@@ -8,7 +8,7 @@ import copy
 import pytest
 
 from calls import iri, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri
-from kb import changes, client as kb_client, signatures, store, values, write
+from kb import changes, client as kb_client, content_values, signatures, store, values, write
 from kb.content import dumps
 from kb.signatures import Signed
 
@@ -103,7 +103,7 @@ def test_a_type_changed_in_the_same_set_as_a_removal_does_not_block_it(where, cl
     _with_a_note_about_a_tag(client, PLAIN)
     content = {key: value for key, value in LINKING.items() if key != "title"}
     faults = _landed(where, [
-        changes.Replace(_whole(type_iri("note")), values.content(dumps({**content, "version": 2}))),
+        changes.Replace(_whole(type_iri("note")), content_values.content(dumps({**content, "version": 2}))),
         changes.Remove(_whole(iri("tag", "pricing"))),
     ])
     assert faults == []
@@ -127,7 +127,7 @@ def test_an_artifact_made_and_removed_in_one_set_does_not_hold_up_removing_its_t
     _create(client, "schema", PLAIN["title"], {key: value for key, value in PLAIN.items() if key != "title"})
     passing = values.artifact_id(iri("note", "passing"))
     assert _landed(where, [
-        changes.Create(passing, values.version(version_iri("note")), "Passing", (), values.content(dumps({}))),
+        changes.Create(passing, values.version(version_iri("note")), "Passing", (), content_values.content(dumps({}))),
         changes.Remove(_whole(iri("note", "passing"))),
         changes.Remove(_whole(type_iri("note"))),
     ]) == []
@@ -138,7 +138,7 @@ def test_an_artifact_made_at_an_earlier_version_in_the_same_set_as_a_removal_lin
     _with_a_note_about_a_tag(client, PLAIN)
     _retype(client, LINKING, 2)
     plain = values.artifact_id(iri("note", "plain"))
-    about = values.content(dumps({"about": iri("tag", "pricing")}))
+    about = content_values.content(dumps({"about": iri("tag", "pricing")}))
     assert _landed(where, [
         changes.Create(plain, values.version(version_iri("note", 1)), "Plain", (), about),
         changes.Remove(_whole(iri("tag", "pricing"))),

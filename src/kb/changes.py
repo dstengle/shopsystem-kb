@@ -4,11 +4,12 @@ converted or standing in its place as a Refusal, so the faults come back in the 
 creates of a set carry is refused on each create after the first, whether or not either converts."""
 from dataclasses import dataclass
 
-from kb import refusals, rules, signatures, values
+from kb import content_values, refusals, rules, signatures, values
+from kb.content_values import Content
 from kb.contract import kb_pb2
 from kb.requests import Refusal
 from kb.signatures import Signed
-from kb.values import ArtifactId, Content, Locator, Refused, Version
+from kb.values import ArtifactId, Locator, Refused, Version
 
 
 @dataclass(frozen=True)
@@ -147,18 +148,18 @@ def _create(iri: str, type_version: str, title: str, content: str, again: bool =
         faults += refused.faults
     if faults:
         raise Refused([*carried, *faults])
-    return Create(name, version, title, values.titled(title, iri), values.content(content), carried)
+    return Create(name, version, title, values.titled(title, iri), content_values.content(content), carried)
 
 
 def _replace(requested: kb_pb2.Locator, content: str, revision: int = 0, type_version: str = "") -> Replace:
     """A replacement, the version of its type it names read as a create's is; one naming none names no version."""
     locator = values.locator(requested)
     version = values.named(type_version)
-    return Replace(locator, values.content(content, at_root=not locator.place), values.expected(revision), version)
+    return Replace(locator, content_values.content(content, at_root=not locator.place), values.expected(revision), version)
 
 
 def _add(requested: kb_pb2.Locator, content: str, revision: int = 0) -> Add:
-    return Add(values.locator(requested), values.item(content), values.expected(revision))
+    return Add(values.locator(requested), content_values.item(content), values.expected(revision))
 
 
 def _remove(requested: kb_pb2.Locator, revision: int = 0) -> Remove:

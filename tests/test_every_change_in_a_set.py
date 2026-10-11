@@ -11,7 +11,7 @@ from calls import (
     DECISION_TYPE, check, create, create_many, created, define, iri, kb_ref, read, replace_many, replaced,
     start_a_store, type_iri,
 )
-from kb import changes, client as kb_client, signatures, store, values, write
+from kb import changes, client as kb_client, content_values, signatures, store, values, write
 from kb.content import dumps, loads
 from kb.signatures import Signed
 
@@ -75,8 +75,8 @@ def test_adding_to_a_collection_an_earlier_change_wrote_as_a_single_value_is_ref
     _with_the_decision(client)
     decision = values.artifact_id(DECISION)
     faults = _landed(root, [
-        changes.Replace(values.Locator(decision, ()), values.content(dumps({"sections": SECTIONS, "options": written}))),
-        changes.Add(values.Locator(decision, ("options",)), values.item(dumps({"title": "Go monthly"}))),
+        changes.Replace(values.Locator(decision, ()), content_values.content(dumps({"sections": SECTIONS, "options": written}))),
+        changes.Add(values.Locator(decision, ("options",)), content_values.item(dumps({"title": "Go monthly"}))),
     ])
     assert faults == [(DECISION, "options", "type"), (DECISION, "options", "collection")]
 
