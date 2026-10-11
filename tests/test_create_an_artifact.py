@@ -1,10 +1,12 @@
+import copy
 import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, PROCESS_TYPE, READING_ORDER, TYPE_OF_TYPES, create, define, iri,
-    next_version, placeholders, read, replace, request, start_a_store, type_iri, version_iri,
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, PROCESS_TYPE, READING_ORDER, TYPE_OF_TYPES, check, create,
+    define, iri, next_version, placeholders, read, refs, remove, replace, request, slug, start_a_store, type_iri,
+    version_iri,
 )
 import held
 from kb import content, client as kb_client
@@ -1159,3 +1161,136 @@ def _faults_in_reading_order(attempt):
 @then("the two faults at the field come in the alphabetical order of the names of the rules they break")
 def _two_faults_at_the_field_in_rule_order(attempt):
     assert [fault.rule for fault in attempt["response"].faults if fault.place == "status"] == ["maxLength", "pattern"]
+
+
+# Slice 168: a placeholder is filled by creating what it names.
+
+PARTS_DECISION_TYPE = copy.deepcopy(DECISION_TYPE)
+PARTS_DECISION_TYPE["schema"]["properties"]["supersedes"]["ref"]["parts"] = True
+ROLLBACK = f"{NOT_HELD}#options/rollback"
+FIRST_DECISION = iri("decision", "price-reviews-happen-weekly")
+
+
+def _listed(client):
+    asked = placeholders(client)
+    assert not asked.faults, asked.faults
+    return [
+        (each.id, [(link.artifact, link.field, link.place, link.part) for link in each.links])
+        for each in asked.placeholders
+    ]
+
+
+@given(
+    "a store holding a decision type whose artifacts require a purpose then a rationale, "
+    "may link to the decision they supersede or into one of its options, and may carry a collection of options",
+    target_fixture="client",
+)
+def _store_with_decision_type_linking_into_options(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, PARTS_DECISION_TYPE)
+    return client
+
+
+@when(
+    "the client creates a decision that supersedes an option of a decision the store does not hold, at an IRI under "
+    "the decision type, saying which role and why",
+    target_fixture="created",
+)
+def _create_superseding_an_option_not_held(client):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": f"{NOT_HELD}#options/keep-weekly", "sections": SECTIONS,
+    }, message="Record it")
+
+
+@then("asked for the placeholders, the client is given the IRI the link points at, with the new decision linking to it")
+def _the_placeholders_give_the_iri_with_the_part(client, created):
+    assert _listed(client) == [(NOT_HELD, [(created.id, "supersedes", "supersedes", "options/keep-weekly")])]
+
+
+@given(parsers.parse('a decision the store holds, with no option named "{name}"'))
+def _a_decision_with_no_such_option(client, name):
+    assert name not in {slug(option["title"]) for option in OPTIONS}
+    held_one = request(client, "decision", "Prices are reviewed monthly", {"sections": SECTIONS, "options": OPTIONS})
+    assert held_one.id == NOT_HELD, held_one.faults
+
+
+@when(
+    parsers.parse('the client creates a decision that supersedes the option "{name}" of that decision, saying which role and why'),
+    target_fixture="refused",
+)
+def _create_superseding_an_option_not_there(client, name):
+    return request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": f"{NOT_HELD}#options/{name}", "sections": SECTIONS,
+    }, message="Record it")
+
+
+@given("a decision that supersedes a decision the store does not hold, at an IRI under the decision type")
+def _a_decision_waiting_on_a_decision(client):
+    first = request(client, "decision", "Price reviews happen weekly", {"supersedes": NOT_HELD, "sections": SECTIONS})
+    assert first.id == FIRST_DECISION, first.faults
+    assert [each[0] for each in _listed(client)] == [NOT_HELD]
+
+
+@when("the client creates a decision at that IRI, saying which role and why", target_fixture="created")
+def _create_at_the_iri_waited_on(client):
+    return request(client, "decision", "Prices are reviewed monthly", {"sections": SECTIONS}, message="Record it")
+
+
+@then("following the link from the first decision reaches the new decision")
+def _following_reaches_the_new_decision(client, created):
+    assert created.id == NOT_HELD, created.faults
+    reached = refs(client, FIRST_DECISION, 1)
+    assert not reached.faults, reached.faults
+    assert [each.stub.id for each in reached.reached] == [NOT_HELD]
+    assert not check(client).violations
+
+
+@then("asked for the placeholders, the client is not given that IRI")
+def _the_placeholders_do_not_give_the_iri(client):
+    assert NOT_HELD not in [each[0] for each in _listed(client)]
+
+
+# This scenario's decision waited on is the one `_given_iri_and_first_version` names, the other links to it.
+@given(
+    parsers.parse(
+        'a decision that supersedes the option "{name}" of a decision the store does not hold, at an IRI under the '
+        "decision type"
+    )
+)
+def _a_decision_waiting_on_an_option(client, name):
+    first = request(client, "decision", "Prices are reviewed monthly", {
+        "supersedes": f"{FIRST_DECISION}#options/{name}", "sections": SECTIONS,
+    })
+    assert first.id == NOT_HELD, first.faults
+    assert [each[0] for each in _listed(client)] == [FIRST_DECISION]
+
+
+@when(
+    parsers.parse('the client creates a decision at that IRI with no option named "{name}", saying which role and why'),
+    target_fixture="created",
+)
+def _create_at_the_iri_without_the_option(client, name):
+    assert name not in {slug(option["title"]) for option in OPTIONS}
+    return request(client, "decision", "Price reviews happen weekly", {
+        "sections": SECTIONS, "options": OPTIONS,
+    }, message="Record it")
+
+
+@then("asked for the placeholders, the client is given the IRI the link points at, with the first decision linking to it")
+def _the_placeholders_still_give_the_iri(client, created):
+    assert created.id == FIRST_DECISION, created.faults
+    assert _listed(client) == [(FIRST_DECISION, [(NOT_HELD, "supersedes", "supersedes", "options/rollback")])]
+
+
+def test_removing_the_artifact_that_filled_a_placeholder_is_refused_for_the_link_naming_the_linking_artifact(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    linking = request(client, "decision", "Price reviews happen weekly", {"supersedes": NOT_HELD, "sections": SECTIONS})
+    assert not linking.faults, linking.faults
+    filled = request(client, "decision", "Prices are reviewed monthly", {"sections": SECTIONS})
+    assert filled.id == NOT_HELD, filled.faults
+    refused = remove(client, NOT_HELD)
+    assert [(fault.rule, fault.artifact) for fault in refused.faults] == [("on_delete", linking.id)], refused.faults
+    assert not read(client, NOT_HELD).faults
