@@ -6,7 +6,7 @@ before the set lands would stand nearer to what it makes or links to than the ty
 as holding nothing, so the port refuses the set once something has landed at one."""
 import dataclasses
 
-from kb import composition, names, port, refusals, values
+from kb import composition, names, port_values, refusals, values
 
 TYPE_OF_TYPES = values.type_of(values.TYPE_KIND)
 
@@ -31,7 +31,7 @@ def under(type_id: values.ArtifactId, draft) -> tuple[values.ArtifactId | None, 
     return other, sorted({*held, *waited}, key=names.order)
 
 
-def guarded(handed: list[port.Change], draft) -> tuple[list[port.Change], bool]:
+def guarded(handed: list[port_values.Change], draft) -> tuple[list[port_values.Change], bool]:
     """A set's changes as the port takes them, each saying, beside the types it was read through, that nothing is
     held, revision 0, at each IRI where a type could be defined nearer (`_open`): the port then refuses the set
     when anything landed at one since. An IRI the set itself changes is left out, its own change being compared
@@ -45,7 +45,7 @@ def guarded(handed: list[port.Change], draft) -> tuple[list[port.Change], bool]:
     ], any(held.values())
 
 
-def _open(change: port.Change) -> list[values.ArtifactId]:
+def _open(change: port_values.Change) -> list[values.ArtifactId]:
     """Each IRI, once, at which a type defined before a change lands would take what the change makes or links to
     from the type it was drafted under: those between a new artifact's IRI and its type's, never a type's, whose
     IRI is free; and those between the target of each link it hands, held or not, since one held may be removed

@@ -6,7 +6,8 @@ read through the version each conforms to, the store's standing for everything e
 none. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
-from kb.port import Linking, Port, TypeVersion, held_waiting
+from kb.port import Port
+from kb.port_values import Linking, TypeVersion, held_waiting
 from kb.values import ArtifactId, Kind, Version, type_of
 
 
@@ -123,7 +124,7 @@ class Draft:
 
     def waited(self, artifact_id: ArtifactId) -> frozenset:
         """The links the store holds for an artifact that land on nothing held, as it stood before the draft, each
-        as `port.told` gives it: those that already wait, whatever the draft does. Read once for each artifact."""
+        as `port_values.told` gives it: those that already wait, whatever the draft does. Read once for each artifact."""
         if artifact_id not in self._waited:
             self._waited[artifact_id] = held_waiting(self._store.waiting(artifact_id))
         return self._waited[artifact_id]

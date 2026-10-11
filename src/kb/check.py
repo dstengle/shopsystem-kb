@@ -1,6 +1,6 @@
 """The check of the whole store, read through the port: every artifact against the version of its type it
 conforms to, the stale listed beside the violations, and the placeholders apart from both."""
-from kb import composition, fault_order, port, query, settled, validation
+from kb import composition, fault_order, port_values, query, settled, validation
 from kb.contract import kb_pb2
 from kb.port import Port
 
@@ -25,7 +25,7 @@ def everything(store: Port) -> kb_pb2.Checked:
                 artifact=str(artifact_id), schema_version=conforming.number, current=standing[conforming.kind],
             ))
         schema = schemas[conforming]["schema"]
-        waited = port.held_waiting(held.get(artifact_id, ()))
+        waited = port_values.held_waiting(held.get(artifact_id, ()))
         found = validation.validate(str(artifact_id), settled.checked(artifact), schema, store, waited)
         violations += fault_order.ordered(found, settled.checked(artifact), composition.declared(schema, store))
     return kb_pb2.Checked(violations=violations, stale=stale, placeholders=query.placeholders_of(waiting).placeholders)

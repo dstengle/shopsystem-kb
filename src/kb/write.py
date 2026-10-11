@@ -9,7 +9,7 @@ set of which the port compares nothing that would show what landed since lands o
 Starting a store and recording a snapshot land through the port too."""
 from typing import NamedTuple
 
-from kb import canonical, drafting, journal, names, port, query, refusals, search, settled, store, values
+from kb import canonical, drafting, journal, names, port, port_values, query, refusals, search, settled, store, values
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
@@ -46,9 +46,9 @@ def start(root: Root, actor: Actor, clock: journal.Clock | None = None) -> None:
         signed=Signed(actor, "initialise store"), op="create", artifact=str(METASCHEMA_ID), path="", revision=1,
         type=str(METASCHEMA_VERSION), text=canonical.dump(metaschema), stamp=stamp,
     )
-    created = port.Change(
+    created = port_values.Change(
         METASCHEMA_ID, metaschema, revision=1, searched=tuple(search.searchable(metaschema)), kind=values.TYPE_KIND,
-        version=port.Versioned(METASCHEMA_VERSION, METASCHEMA["title"]),
+        version=port_values.Versioned(METASCHEMA_VERSION, METASCHEMA["title"]),
     )
     store.start(root, lambda made: made.land([created], [entry]))
 
@@ -109,13 +109,13 @@ def _landed(held: port.Port, drafted: drafting.Drafted, entries: list) -> None:
         ]) from unlanded
 
 
-def _named(draft: Draft, link: port.Linking) -> str:
+def _named(draft: Draft, link: port_values.Linking) -> str:
     """What a link into what a set takes out lands on: the item, for a part of an artifact the set keeps, or the
     artifact."""
     return _landing_on(link) if draft.holds(link.target) else str(link.target)
 
 
-def _landing_on(link: port.Linking) -> str:
+def _landing_on(link: port_values.Linking) -> str:
     """Where a link lands, as it is written: the artifact, and the place of the part inside it after `#`."""
     return names.pointing(link.target, link.part)
 

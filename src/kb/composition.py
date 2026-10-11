@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 from referencing.exceptions import NoSuchResource
 
-from kb import names, port, refusals, settled, values
+from kb import names, port_values, refusals, settled, values
 
 
 def composition(schema: dict, corpus) -> list[dict]:
@@ -43,7 +43,7 @@ def reference(ref: str) -> Reference | None:
     return Reference(values.ArtifactId(found[0]), not fragment, found[1])
 
 
-def kept(type_id: values.ArtifactId, number: int, corpus) -> port.TypeVersion | None:
+def kept(type_id: values.ArtifactId, number: int, corpus) -> port_values.TypeVersion | None:
     """The version of a type the corpus keeps, as the type's IRI and the number name it; None when it keeps none, or
     when no type is held at the IRI (a version kept for a type since removed is not proof the type is held)."""
     if not (corpus.holds(type_id) and settled.typed(corpus.artifact(type_id))):
@@ -54,7 +54,7 @@ def kept(type_id: values.ArtifactId, number: int, corpus) -> port.TypeVersion | 
         return None
 
 
-def current(type_id: values.ArtifactId, corpus) -> port.TypeVersion:
+def current(type_id: values.ArtifactId, corpus) -> port_values.TypeVersion:
     """The version a type stands at, read through the versions the corpus keeps. KeyError when no type is held at
     the IRI."""
     found = corpus.artifact(type_id)

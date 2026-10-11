@@ -11,7 +11,7 @@ conforms to declares them. A fault anywhere refuses the whole set with every fau
 from typing import NamedTuple
 
 from kb import (
-    canonical, composition, definitions, edits, fault_order, links, names, places, port, refusals, requests,
+    canonical, composition, definitions, edits, fault_order, links, names, places, port, port_values, refusals, requests,
     search, settled, standing, validation, values,
 )
 from kb.draft import Draft
@@ -28,7 +28,7 @@ class Drafted(NamedTuple):
     draft: Draft
     changes: list[Change]
     texts: list[str | None]
-    handed: list[port.Change]
+    handed: list[port_values.Change]
     locked: bool
 
 
@@ -175,7 +175,7 @@ def _serialised(changes: list[Change]) -> list[str | None]:
     return texts
 
 
-def _handed(draft: Draft, change: Change, read: int, last: bool) -> port.Change:
+def _handed(draft: Draft, change: Change, read: int, last: bool) -> port_values.Change:
     """A change as the port takes it, read at the revision given:
     its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
     artifact, its links and the places of its parts as the set leaves them, read through the type it was checked
@@ -183,17 +183,17 @@ def _handed(draft: Draft, change: Change, read: int, last: bool) -> port.Change:
     it names, that the set leaves as they are; every change that leaves a type with those of the types the version it
     makes reads."""
     if change.left is None:
-        return port.Change(change.artifact_id, None, read=read, revision=change.revision)
+        return port_values.Change(change.artifact_id, None, read=read, revision=change.revision)
     searched, kind = tuple(search.searchable(change.left)), composition.artifact_kind(change.left)
     version = _stands_at(change.left) if kind == values.TYPE_KIND else None
     made = _read_by_the_version_made(draft, change)
     if not last:
-        return port.Change(
+        return port_values.Change(
             change.artifact_id, change.left, read=read, revision=change.revision, through=draft.as_read(made),
             searched=searched, kind=kind, version=version,
         )
     typed, waited = _typed(draft, change), draft.waited(change.artifact_id)
-    return port.Change(
+    return port_values.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft, typed, waited)),
         tuple(places.parts(change.left)), read, change.revision,
         draft.as_read([*composition.read_through(kind, typed["schema"], draft), *made]), searched, kind, version,
@@ -209,7 +209,7 @@ def _read_by_the_version_made(draft: Draft, change: Change) -> list:
     return composition.read_through(values.TYPE_KIND, change.left.get("schema"), draft)[1:]
 
 
-def _stands_at(held: dict) -> port.Versioned:
+def _stands_at(held: dict) -> port_values.Versioned:
     """The version a type's change makes as the port takes it: of the kind its IRI names, the number and the title
     it holds."""
-    return port.Versioned(values.Version(values.Kind(held["id"]), held["version"]), held["title"])
+    return port_values.Versioned(values.Version(values.Kind(held["id"]), held["version"]), held["title"])

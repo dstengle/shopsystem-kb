@@ -51,7 +51,7 @@ def test_a_link_carries_the_held_type_its_target_sits_under_held_or_not(corpus, 
 
 def test_a_link_says_it_waits_only_when_it_is_among_those_the_store_held_waiting_for_its_artifact(corpus):
     """decision/a-link-that-waits-keeps-waiting: the mark is the store's own account of the artifact, the field,
-    what holds it, the IRI and the part alike, and how many like it stand before it (`port.told`)."""
+    what holds it, the IRI and the part alike, and how many like it stand before it (`port_values.told`)."""
     target = iri("decision", "nothing-here")
     artifact = {**corpus.artifact(HELD), "supersedes": target}
     typed = composition.conformed(artifact, corpus)

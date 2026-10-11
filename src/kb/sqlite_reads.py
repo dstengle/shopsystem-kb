@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from kb import names, sqlite_types
 from kb.content import text
-from kb.port import Candidate, Linking, TypeVersion
+from kb.port_values import Candidate, Linking, TypeVersion
 from kb.values import ArtifactId, Kind, Version
 
 PAIRS = "~pairs"

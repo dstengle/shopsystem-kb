@@ -11,7 +11,7 @@ import calls
 import kb
 from calls import TYPE_OF_TYPES, TYPES, TYPES_AT, iri, type_iri
 from kb import client as kb_client
-from kb import port, search, sqlite_store
+from kb import port, port_values, search, sqlite_store
 from kb import store as stores
 from kb.values import ArtifactId, Kind, Version
 
@@ -61,25 +61,25 @@ def kind_of(text):
 def put(text, content, read=0, links=(), parts=()):
     """A change landing content, with the rows it is found by as kb gives them."""
     searched = tuple(search.searchable(content))
-    return port.Change(
+    return port_values.Change(
         name(text), content, tuple(links), tuple(parts), read, read + 1, searched=searched, kind=kind_of(text),
     )
 
 
 def removal(text, read):
-    return port.Change(name(text), None, read=read, revision=read + 1)
+    return port_values.Change(name(text), None, read=read, revision=read + 1)
 
 
 def link(field, place, target, kinds, part="", under=None, waits=False, holder=""):
     """A link as kb hands it; `under` the held type kb says a target not held sits under, as the cases name it;
     `waits` whether kb says the store already held this very link, waiting; `holder` what kb says holds it."""
-    return port.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds),
+    return port_values.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds),
                      under=under and name(under), waits=waits, holder=holder)
 
 
 def entry(entry_id, at=T0, seq=1, batch="", artifact="", role="tester", execution=""):
     record = {"id": entry_id, "at": at.isoformat(), "artifact": artifact}
-    return port.Entry(entry_id, at, seq, record, artifact, role, execution, batch or entry_id)
+    return port_values.Entry(entry_id, at, seq, record, artifact, role, execution, batch or entry_id)
 
 
 def land(store, *changes, at=T0):
@@ -155,9 +155,9 @@ def test_a_change_read_through_a_type_that_has_since_moved_is_refused_and_writes
     before = written(store)
     through = ((name("schema/note"), 1), (name("schema/tag"), 1))
     with pytest.raises(port.Conflict):
-        land(store, put("note/a", {"title": "A"}), port.Change(name("note/b"), {"title": "B"}, through=through, kind=kind("note")))
+        land(store, put("note/a", {"title": "A"}), port_values.Change(name("note/b"), {"title": "B"}, through=through, kind=kind("note")))
     assert written(store) == before
-    land(store, port.Change(name("note/b"), {"title": "B"}, revision=1, through=((name("schema/note"), 2),), kind=kind("note")))
+    land(store, port_values.Change(name("note/b"), {"title": "B"}, revision=1, through=((name("schema/note"), 2),), kind=kind("note")))
     assert store.holds(name("note/b"))
 
 def test_a_change_read_through_a_type_that_has_since_been_removed_is_refused_and_writes_nothing(store):
@@ -248,7 +248,7 @@ def test_a_removal_landing_second_on_another_connection_is_refused_for_the_link_
         land(one, linking)
         with pytest.raises(port.Linked) as refused:
             land(other, removing)
-    assert refused.value.links == [port.Linking(name("note/n"), "about", "about", name("decision/d"), "")]
+    assert refused.value.links == [port_values.Linking(name("note/n"), "about", "about", name("decision/d"), "")]
     assert store.holds(name("decision/d"))
     assert store.links_in(name("decision/d")) == refused.value.links
 
@@ -261,7 +261,7 @@ def test_a_link_landing_second_on_another_connection_lands_on_the_iri_the_remova
     assert not store.holds(name("decision/d"))
     assert store.artifact(name("note/n")) == {"title": "N", "about": "decision/d"}
     assert store.links_in(name("decision/d")) == [
-        port.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
+        port_values.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
     ]
 
 
@@ -270,7 +270,7 @@ def test_a_removal_and_a_new_link_to_it_let_go_at_once_are_each_judged_against_w
     removed, linked = _race(opener, [removing], [linking])
     assert linked is None
     assert store.links_in(name("decision/d")) == [
-        port.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
+        port_values.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
     ]
     if store.holds(name("decision/d")):
         assert isinstance(removed, port.Linked)
@@ -284,7 +284,7 @@ def test_a_link_to_an_iri_not_held_and_a_create_at_that_iri_let_go_at_once_both_
     outcomes = _race(opener, [put("note/n", {"title": "N"}, links=[about])], [put("decision/d", {"title": "D"})])
     assert outcomes == [None, None]
     assert store.links_in(name("decision/d")) == [
-        port.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
+        port_values.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
     ]
     with pytest.raises(port.Linked):
         land(store, removal("decision/d", 1))
@@ -297,7 +297,7 @@ def test_a_link_must_land_on_an_artifact_or_part_of_a_kind_it_allows(store):
         wrong = link("about", "about", target, kinds, part)
         with pytest.raises(port.Unlanded) as refused:
             land(store, put("note/wrong", {}, links=[wrong]))
-        assert refused.value.links == [port.Linking(name("note/wrong"), "about", "about", name(target), part)]
+        assert refused.value.links == [port_values.Linking(name("note/wrong"), "about", "about", name(target), part)]
     assert not store.holds(name("note/wrong"))
 
 
@@ -308,7 +308,7 @@ def test_a_link_to_an_iri_not_held_lands_when_it_carries_a_held_type_it_allows(s
     assert store.artifact(name("note/fine")) == {"about": "decision/gone"}
     assert not store.holds(name("decision/gone"))
     assert store.links_in(name("decision/gone")) == [
-        port.Linking(name("note/fine"), "about", "about", name("decision/gone"), ""),
+        port_values.Linking(name("note/fine"), "about", "about", name("decision/gone"), ""),
     ]
 
 
@@ -324,7 +324,7 @@ def test_a_link_to_an_iri_not_held_is_refused_unless_the_type_it_carries_is_held
     wrong = link("about", "about", "decision/gone", kinds, under=under)
     with pytest.raises(port.Unlanded) as refused:
         land(store, put("note/wrong", {}, links=[wrong]))
-    assert refused.value.links == [port.Linking(name("note/wrong"), "about", "about", name("decision/gone"), "")]
+    assert refused.value.links == [port_values.Linking(name("note/wrong"), "about", "about", name("decision/gone"), "")]
     assert written(store) == before
 
 
@@ -347,7 +347,7 @@ def test_an_artifact_whose_own_type_is_not_held_is_refused_whatever_its_implicit
     )
     with pytest.raises(port.Unlanded) as refused:
         land(store, put("note/a", {"title": "A"}, links=[of_its_type]))
-    assert refused.value.links == [port.Linking(name("note/a"), "", "", name("schema/note"), "")]
+    assert refused.value.links == [port_values.Linking(name("note/a"), "", "", name("schema/note"), "")]
     assert written(store) == before
     with pytest.raises(port.Unlanded):
         land(store, put("note/a", {"title": "A"}, links=[dataclasses.replace(of_its_type, under=None)]))
@@ -359,7 +359,7 @@ def test_an_artifact_created_at_an_iri_a_link_already_names_is_what_the_link_lan
     land(store, put("note/n", {"about": "decision/later"}, links=[about]))
     assert store.ids(kind("decision")) == []
     land(store, put("decision/later", {"title": "Later"}))
-    into = [port.Linking(name("note/n"), "about", "about", name("decision/later"), "")]
+    into = [port_values.Linking(name("note/n"), "about", "about", name("decision/later"), "")]
     assert store.links_in(name("decision/later")) == into
     assert store.inbound(name("decision/later")) == {(type_iri("note"), "about"): 1}
     with pytest.raises(port.Linked) as refused:
@@ -386,7 +386,7 @@ def test_the_port_lands_the_removal_of_a_type_a_link_waits_under_which_kb_refuse
     land(store, put("note/n", {"about": "decision/later"}, links=[about]))
     land(store, removal("schema/decision", 1))
     assert not store.holds(name("schema/decision"))
-    assert store.waiting() == [port.Linking(name("note/n"), "about", "about", name("decision/later"), "")]
+    assert store.waiting() == [port_values.Linking(name("note/n"), "about", "about", name("decision/later"), "")]
 
 
 def test_two_new_artifacts_in_one_set_that_link_each_other_land(store):
@@ -404,8 +404,8 @@ def test_removing_an_artifact_something_outside_the_set_links_into_is_refused_na
     with pytest.raises(port.Linked) as refused:
         land(store, removal("decision/d", 1))
     assert refused.value.links == [
-        port.Linking(name("note/one"), "about", "about", name("decision/d"), ""),
-        port.Linking(name("note/two"), "uses", "steps/0/uses", name("decision/d"), "options/a"),
+        port_values.Linking(name("note/one"), "about", "about", name("decision/d"), ""),
+        port_values.Linking(name("note/two"), "uses", "steps/0/uses", name("decision/d"), "options/a"),
     ]
     land(store, removal("note/one", 1), removal("note/two", 1), removal("decision/d", 1))
     assert store.ids() == []
@@ -416,7 +416,7 @@ def test_a_replacement_dropping_a_part_something_links_into_is_refused(store):
     land(store, put("note/n", {}, links=[link("uses", "uses", "decision/d", ["decision"], "options/a")]))
     with pytest.raises(port.Linked) as refused:
         land(store, put("decision/d", {"v": 2}, read=1, parts=["options/b"]))
-    assert refused.value.links == [port.Linking(name("note/n"), "uses", "uses", name("decision/d"), "options/a")]
+    assert refused.value.links == [port_values.Linking(name("note/n"), "uses", "uses", name("decision/d"), "options/a")]
     land(store, put("decision/d", {"v": 2}, read=1, parts=["options/a"]))
 
 
@@ -457,8 +457,8 @@ def test_links_in_narrowed_by_field_and_source_kind_into_parts_too(store):
          put("note/n", {}, links=[link("about", "about", "decision/d", ["decision"])]))
     into = name("decision/d")
     assert store.links_in(into) == [
-        port.Linking(name("note/n"), "about", "about", into, ""),
-        port.Linking(name("work/w"), "uses", "uses", into, "options/a"),
+        port_values.Linking(name("note/n"), "about", "about", into, ""),
+        port_values.Linking(name("work/w"), "uses", "uses", into, "options/a"),
     ]
     assert [short(each.source) for each in store.links_in(into, field="uses")] == ["work/w"]
     assert [short(each.source) for each in store.links_in(into, kind=kind("note"))] == ["note/n"]
@@ -474,11 +474,11 @@ def test_the_links_landing_on_nothing_held_are_given_by_what_they_point_at_then_
          put("note/n", {}, links=[to("about", "about", "decision/b"), to("into", "into", "decision/held", "options/a"),
                                   to("into", "into/1", "decision/b", "options/x")]))
     assert store.waiting() == [
-        port.Linking(name("work/w"), "uses", "uses/2", name("decision/a"), ""),
-        port.Linking(name("note/n"), "about", "about", name("decision/b"), ""),
-        port.Linking(name("note/n"), "into", "into/1", name("decision/b"), "options/x"),
-        port.Linking(name("work/w"), "uses", "uses/0", name("decision/b"), ""),
-        port.Linking(name("work/w"), "uses", "uses/3", name("decision/b"), ""),
+        port_values.Linking(name("work/w"), "uses", "uses/2", name("decision/a"), ""),
+        port_values.Linking(name("note/n"), "about", "about", name("decision/b"), ""),
+        port_values.Linking(name("note/n"), "into", "into/1", name("decision/b"), "options/x"),
+        port_values.Linking(name("work/w"), "uses", "uses/0", name("decision/b"), ""),
+        port_values.Linking(name("work/w"), "uses", "uses/3", name("decision/b"), ""),
     ]
 
 
@@ -490,7 +490,7 @@ def test_a_link_into_a_part_of_an_iri_not_held_still_waits_when_what_is_created_
         ("into/0", "options/a"), ("into/1", "options/b"), ("into/2", ""),
     ]
     land(store, put("decision/later", {}, parts=["options/b"]))
-    assert store.waiting() == [port.Linking(name("note/n"), "into", "into/0", name("decision/later"), "options/a")]
+    assert store.waiting() == [port_values.Linking(name("note/n"), "into", "into/0", name("decision/later"), "options/a")]
 
 
 def test_the_links_landing_on_nothing_held_are_given_for_one_artifact_when_it_is_named(store):
@@ -501,10 +501,10 @@ def test_the_links_landing_on_nothing_held_are_given_for_one_artifact_when_it_is
                                   to("uses/2", "decision/a", "options/x")]),
          put("note/n", {}, links=[to("uses", "decision/b")]))
     assert store.waiting(name("work/w")) == [
-        port.Linking(name("work/w"), "uses", "uses/2", name("decision/a"), "options/x"),
-        port.Linking(name("work/w"), "uses", "uses/0", name("decision/b"), ""),
+        port_values.Linking(name("work/w"), "uses", "uses/2", name("decision/a"), "options/x"),
+        port_values.Linking(name("work/w"), "uses", "uses/0", name("decision/b"), ""),
     ]
-    assert store.waiting(name("note/n")) == [port.Linking(name("note/n"), "uses", "uses", name("decision/b"), "")]
+    assert store.waiting(name("note/n")) == [port_values.Linking(name("note/n"), "uses", "uses", name("decision/b"), "")]
     assert store.waiting(name("decision/held")) == []
     assert store.waiting(name("decision/nowhere")) == []
 
@@ -519,7 +519,7 @@ def _a_note_waiting_on_an_option_its_decision_was_created_without(store):
     return dataclasses.replace(into, waits=True)
 
 
-WAITING = port.Linking(name("note/n"), "into", "into", name("decision/d"), "options/a")
+WAITING = port_values.Linking(name("note/n"), "into", "into", name("decision/d"), "options/a")
 
 
 def test_a_link_into_a_part_its_held_target_lacks_lands_again_when_it_says_it_waits_and_the_artifact_held_it(store):
@@ -548,7 +548,7 @@ def test_a_link_into_a_part_its_held_target_lacks_is_refused_unless_it_is_the_ve
     with pytest.raises(port.Unlanded) as refused:
         land(store, put("note/n", {"title": "N, said again"}, read=1, links=links))
     wrong = links[-1]
-    assert refused.value.links == [port.Linking(name("note/n"), wrong.field, wrong.place, wrong.target, wrong.part)]
+    assert refused.value.links == [port_values.Linking(name("note/n"), wrong.field, wrong.place, wrong.target, wrong.part)]
     assert written(store) == before
     assert store.waiting() == [WAITING]
 
@@ -557,7 +557,7 @@ def test_a_link_saying_it_waits_is_refused_from_an_artifact_that_did_not_hold_it
     waits = _a_note_waiting_on_an_option_its_decision_was_created_without(store)
     with pytest.raises(port.Unlanded) as refused:
         land(store, put("note/other", {"title": "Other"}, links=[waits]))
-    assert refused.value.links == [port.Linking(name("note/other"), "into", "into", name("decision/d"), "options/a")]
+    assert refused.value.links == [port_values.Linking(name("note/other"), "into", "into", name("decision/d"), "options/a")]
     assert not store.holds(name("note/other"))
 
 
@@ -583,7 +583,7 @@ def test_a_link_that_waits_is_the_very_link_wherever_it_stands_in_what_holds_it_
                 holder="steps/one")
     land(store, put("note/n", {"title": "N"}, links=[into]))
     land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
-    held = port.Linking(name("note/n"), "into", "steps/1/into/1", name("decision/d"), "options/a", "steps/one")
+    held = port_values.Linking(name("note/n"), "into", "steps/1/into/1", name("decision/d"), "options/a", "steps/one")
     assert store.waiting() == store.waiting(name("note/n")) == store.links_in(name("decision/d")) == [held]
     moved = dataclasses.replace(into, place="steps/0/into/0", waits=True)
     land(store, put("note/n", {"title": "N, its steps reordered"}, read=1, links=[moved]))
@@ -672,13 +672,13 @@ def test_search_candidates_per_section_and_per_field_keeping_the_section_title(s
          put("work/c", {"summary": "weekly too"}))
     weekly = search.terms("WEEKLY")
     assert store.search(weekly) == [
-        port.Candidate(name("note/a"), "When", ""), port.Candidate(name("note/a"), "", "summary"),
-        port.Candidate(name("work/c"), "", "summary"),
+        port_values.Candidate(name("note/a"), "When", ""), port_values.Candidate(name("note/a"), "", "summary"),
+        port_values.Candidate(name("work/c"), "", "summary"),
     ]
-    assert store.search(weekly, kind=kind("note"), fields=False) == [port.Candidate(name("note/a"), "When", "")]
-    assert store.search(weekly, sections=False, kind=kind("work")) == [port.Candidate(name("work/c"), "", "summary")]
-    assert store.search(search.terms("done")) == [port.Candidate(name("note/b"), "", "title")]
-    assert store.search(search.terms("foo_bar")) == [port.Candidate(name("note/b"), "", "body_note")]
+    assert store.search(weekly, kind=kind("note"), fields=False) == [port_values.Candidate(name("note/a"), "When", "")]
+    assert store.search(weekly, sections=False, kind=kind("work")) == [port_values.Candidate(name("work/c"), "", "summary")]
+    assert store.search(search.terms("done")) == [port_values.Candidate(name("note/b"), "", "title")]
+    assert store.search(search.terms("foo_bar")) == [port_values.Candidate(name("note/b"), "", "body_note")]
     assert store.search(search.terms("foo")) == []
 
 
@@ -686,7 +686,7 @@ def test_search_candidates_per_section_and_per_field_keeping_the_section_title(s
 def test_search_finds_an_artifact_by_what_it_holds_now_and_nothing_once_it_is_removed(store):
     land(store, put("note/a", {"summary": "zebra"}))
     land(store, put("note/a", {"summary": "okapi"}, read=1))
-    found = [port.Candidate(name("note/a"), "", "summary")]
+    found = [port_values.Candidate(name("note/a"), "", "summary")]
     assert (store.search(search.terms("zebra")), store.search(search.terms("okapi"))) == ([], found)
     land(store, removal("note/a", read=2))
     assert (store.search(search.terms("zebra")), store.search(search.terms("okapi"))) == ([], [])
@@ -773,14 +773,14 @@ def note_type(number, read=0, **content):
     version = Version(kind("note"), number)
     held = {"title": f"Note {number}", "version": number, **content}
     change = put("schema/note", held, read=read)
-    return dataclasses.replace(change, version=port.Versioned(version, held["title"])), version
+    return dataclasses.replace(change, version=port_values.Versioned(version, held["title"])), version
 
 
 def test_a_type_version_reads_back_by_its_iri_with_the_content_revision_and_title_it_was_made_with(store):
     made, first = note_type(1, schema={"n": 123456789012345678901234567890, 1: "a number for a key"})
     land(store, made)
     read = store.type_version(first)
-    assert read == port.TypeVersion(first, made.content, 1, "Note 1")
+    assert read == port_values.TypeVersion(first, made.content, 1, "Note 1")
     assert typed(read.content) == typed(made.content)
     with pytest.raises(KeyError):
         store.type_version(Version(kind("note"), 2))
@@ -801,9 +801,9 @@ def test_a_type_changed_stands_at_the_later_version_and_the_earlier_still_reads_
     land(store, made)
     changed, second = note_type(2, read=1)
     land(store, changed)
-    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+    assert store.type_version(second) == port_values.TypeVersion(second, changed.content, 2, "Note 2")
     assert store.artifact(name("schema/note")) == changed.content
-    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(first) == port_values.TypeVersion(first, made.content, 1, "Note 1")
 
 
 def test_a_type_version_lands_with_its_set_or_not_at_all(store):
@@ -826,7 +826,7 @@ def test_a_type_version_is_read_at_the_moment_the_block_holds_and_still_reads_on
         assert store.type_version(first) == before
     assert store.type_version(first) == before
     assert store.artifact(name("schema/note")) == changed.content
-    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+    assert store.type_version(second) == port_values.TypeVersion(second, changed.content, 2, "Note 2")
 
 
 def test_the_type_that_describes_types_has_its_version_from_the_start_of_a_store(tmp_path):
@@ -844,12 +844,12 @@ def test_a_type_defined_and_then_changed_through_kb_stands_at_the_later_version_
     calls.define(client, calls.NOTE_TYPE)
     note, first, second = ArtifactId(type_iri("note")), Version(kind("note"), 1), Version(kind("note"), 2)
     with stores.opened(tmp_path) as defined:
-        made = port.TypeVersion(first, defined.artifact(note), 1, "Note")
+        made = port_values.TypeVersion(first, defined.artifact(note), 1, "Note")
         assert defined.type_version(first) == made
     changed = calls.replace_many(client, [calls.replaced(str(note), {"version": 2, "schema": calls.NOTE_TYPE["schema"]})])
     assert not changed.faults, changed.faults
     with stores.opened(tmp_path) as moved:
-        assert moved.type_version(second) == port.TypeVersion(second, moved.artifact(note), 2, "Note")
+        assert moved.type_version(second) == port_values.TypeVersion(second, moved.artifact(note), 2, "Note")
         assert moved.type_version(first) == made
         assert [str(each) for each in moved.ids()] == [TYPE_OF_TYPES, str(note)]
 
@@ -859,8 +859,8 @@ def test_two_versions_of_a_type_landed_in_turn_both_read_back_as_each_was_made(s
     land(store, made)
     changed, second = note_type(2, read=1, schema={"n": 2, "more": [1.0, True]})
     land(store, changed)
-    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
-    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+    assert store.type_version(first) == port_values.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(second) == port_values.TypeVersion(second, changed.content, 2, "Note 2")
     assert typed(store.type_version(first).content) == typed(made.content)
     assert store.artifact(name("schema/note")) == changed.content
     with pytest.raises(KeyError):
@@ -871,8 +871,8 @@ def test_two_versions_of_a_type_landed_in_one_set_are_both_held(store):
     made, first = note_type(1)
     changed, second = note_type(2, read=1)
     land(store, made, changed)
-    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
-    assert store.type_version(second) == port.TypeVersion(second, changed.content, 2, "Note 2")
+    assert store.type_version(first) == port_values.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(second) == port_values.TypeVersion(second, changed.content, 2, "Note 2")
 
 
 def test_ids_list_a_type_once_however_many_versions_of_it_are_held(store):
@@ -914,8 +914,8 @@ def test_a_set_taken_back_inside_a_block_holding_the_write_lock_takes_its_versio
             land(store, note_type(2, read=1)[0], put("note/b", {"title": "B"}, read=4))
         kept, third = note_type(3, read=1)
         land(store, kept)
-    assert store.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
-    assert store.type_version(third) == port.TypeVersion(third, kept.content, 2, "Note 3")
+    assert store.type_version(first) == port_values.TypeVersion(first, made.content, 1, "Note 1")
+    assert store.type_version(third) == port_values.TypeVersion(third, kept.content, 2, "Note 3")
     with pytest.raises(KeyError):
         store.type_version(Version(kind("note"), 2))
 
@@ -926,7 +926,7 @@ def test_a_type_removed_and_held_again_at_a_number_it_had_lands_with_the_version
     again, first = note_type(1, schema={"n": 2})
     land(store, again)
     assert store.artifact(name("schema/note")) == again.content
-    assert store.type_version(first) == port.TypeVersion(first, again.content, 1, "Note 1")
+    assert store.type_version(first) == port_values.TypeVersion(first, again.content, 1, "Note 1")
 
 
 def test_the_numbers_of_the_versions_held_of_a_type_are_given_lowest_first_and_none_once_it_is_removed(store):
@@ -949,7 +949,7 @@ def test_a_type_removed_has_none_of_its_versions_read_by_its_iri(store):
     land(store, note_type(1)[0], put("schema/tag", {"title": "Tag"}))
     land(store, note_type(2, read=1)[0])
     tag = dataclasses.replace(note_type(1)[0], artifact=name("schema/tag"), read=1, revision=2,
-                              version=port.Versioned(Version(kind("tag"), 1), "Tag"))
+                              version=port_values.Versioned(Version(kind("tag"), 1), "Tag"))
     land(store, tag)
     land(store, removal("schema/note", 2))
     for number in (1, 2):
@@ -968,8 +968,8 @@ def test_a_set_that_removes_a_type_and_is_refused_leaves_every_version_of_it_hel
     with pytest.raises(port.Conflict):
         land(store, removal("schema/note", 2), put("note/a", {"title": "A", "v": 2}, read=4))
     assert (written(store), store.type_version(first), store.type_version(second)) == before
-    assert before[1:] == (port.TypeVersion(first, made.content, 1, "Note 1"),
-                          port.TypeVersion(second, changed.content, 2, "Note 2"))
+    assert before[1:] == (port_values.TypeVersion(first, made.content, 1, "Note 1"),
+                          port_values.TypeVersion(second, changed.content, 2, "Note 2"))
 
 
 def test_a_type_removed_inside_a_block_that_is_taken_back_keeps_every_version_of_it(opener, store):
@@ -982,7 +982,7 @@ def test_a_type_removed_inside_a_block_that_is_taken_back_keeps_every_version_of
                 store.type_version(first)
             1 / 0
     with opener() as other:
-        assert other.type_version(first) == port.TypeVersion(first, made.content, 1, "Note 1")
+        assert other.type_version(first) == port_values.TypeVersion(first, made.content, 1, "Note 1")
 
 
 def test_a_type_defined_again_where_one_was_removed_stands_at_its_first_version_and_only_that_is_held(store):
@@ -992,7 +992,7 @@ def test_a_type_defined_again_where_one_was_removed_stands_at_its_first_version_
     again, first = note_type(1, schema={"n": 3})
     land(store, again)
     assert store.artifact(name("schema/note")) == again.content
-    assert store.type_version(first) == port.TypeVersion(first, again.content, 1, "Note 1")
+    assert store.type_version(first) == port_values.TypeVersion(first, again.content, 1, "Note 1")
     with pytest.raises(KeyError):
         store.type_version(Version(kind("note"), 2))
 
@@ -1013,8 +1013,8 @@ def test_two_versions_of_a_type_landed_in_one_set_at_revisions_of_their_own_read
         store):
     (made, first), (changed, second) = versions_as_files_give_them((1, 3), (2, 7))
     land(store, made, changed)
-    assert store.type_version(first) == port.TypeVersion(first, made.content, 3, "Note 1")
-    assert store.type_version(second) == port.TypeVersion(second, changed.content, 7, "Note 2")
+    assert store.type_version(first) == port_values.TypeVersion(first, made.content, 3, "Note 1")
+    assert store.type_version(second) == port_values.TypeVersion(second, changed.content, 7, "Note 2")
     assert store.versions(name("schema/note")) == [1, 2]
     assert store.artifact(name("schema/note")) == changed.content
     assert [short(each) for each in store.ids()] == ["schema/note"]
@@ -1023,7 +1023,7 @@ def test_two_versions_of_a_type_landed_in_one_set_at_revisions_of_their_own_read
 
 
 def test_a_set_landing_two_versions_of_a_type_and_an_artifact_linked_to_that_type_does_not_conflict_with_itself(store):
-    land(store, dataclasses.replace(put("schema/tag", {"title": "Tag"}), version=port.Versioned(Version(kind("tag"), 1), "Tag")))
+    land(store, dataclasses.replace(put("schema/tag", {"title": "Tag"}), version=port_values.Versioned(Version(kind("tag"), 1), "Tag")))
     (made, first), (changed, second) = versions_as_files_give_them((1, 1), (2, 2))
     of_its_type = dataclasses.replace(link("type", "", "schema/note", ["schema"]), implicit=True)
     note = dataclasses.replace(

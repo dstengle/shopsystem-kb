@@ -1,11 +1,11 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
 and those links as the port takes them, each saying the held type its target sits under, what holds it, by name, or
 where it stands when it has none, and whether it is one the store already held waiting, and what tells each from
-every other (`port.told`). The checks, removal, reads and walks all read links here."""
+every other (`port_values.told`). The checks, removal, reads and walks all read links here."""
 import dataclasses
 from typing import NamedTuple
 
-from kb import composition, names, port, values
+from kb import composition, names, port_values, values
 from kb.composition import declared
 
 
@@ -13,7 +13,7 @@ class Link(NamedTuple):
     """One link an artifact carries: the field that holds it, the place of that field in the artifact, the name it
     points at, the field's `ref`, which says what it may land on, whether the field is one of the artifact's own,
     holding the link alone or in a list, rather than a field of one of its items, and what holds the field, by name
-    (`port.Link.holder`): nothing for the artifact, the place of the item by its name, or, for an item with no name,
+    (`port_values.Link.holder`): nothing for the artifact, the place of the item by its name, or, for an item with no name,
     by where it stands."""
     field: str
     place: str
@@ -34,33 +34,33 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
     return inside(artifact, schema, corpus, artifact)
 
 
-def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict, waited=frozenset()) -> list[port.Link]:
+def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict, waited=frozenset()) -> list[port_values.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
     the kinds its field allows, read through the type given, the version of its type the artifact conforms to,
-    whatever its type stands at, and the held type its target's IRI sits under (`port.Link.under`), held or not,
+    whatever its type stands at, and the held type its target's IRI sits under (`port_values.Link.under`), held or not,
     since a held target may be removed before the link lands and the link then waits on its IRI. Every artifact
     carries one implicit link, first, to the artifact of its type, which says nothing of what that sits under. Each
-    but that one says it waits (`port.Link.waits`) when it is among `waited`, the links the store held for the
-    artifact that landed on nothing held, each as `port.told` gives it. A value that could name nothing, which a
+    but that one says it waits (`port_values.Link.waits`) when it is among `waited`, the links the store held for the
+    artifact that landed on nothing held, each as `port_values.told` gives it. A value that could name nothing, which a
     type changed after it was written can leave in a link field, is not handed."""
     kind = composition.artifact_kind(artifact)
     own = [each for each in map(_read, carried(artifact, typed["schema"], corpus)) if each is not None]
     return [
-        port.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True),
+        port_values.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True),
         *(dataclasses.replace(link, under=_under(link.target, corpus), waits=as_told in waited)
-          for link, as_told in zip(own, port.told(own))),
+          for link, as_told in zip(own, port_values.told(own))),
     ]
 
 
 def told(carried: list[Link]) -> list[tuple | None]:
-    """What tells each link an artifact carries from every other it holds, as `port.told` gives it for the link
+    """What tells each link an artifact carries from every other it holds, as `port_values.told` gives it for the link
     handed: None for a value that could name nothing, which is not handed."""
     read = [_read(link) for link in carried]
-    found = iter(port.told([each for each in read if each is not None]))
+    found = iter(port_values.told([each for each in read if each is not None]))
     return [None if each is None else next(found) for each in read]
 
 
-def _read(link: Link) -> port.Link | None:
+def _read(link: Link) -> port_values.Link | None:
     """A link an artifact carries with the artifact and the part it names read apart; None for a value that could
     name nothing."""
     if not isinstance(link.target, str):
@@ -69,7 +69,7 @@ def _read(link: Link) -> port.Link | None:
         target = values.target(link.target)
     except values.Refused:
         return None
-    return port.Link(
+    return port_values.Link(
         link.field, link.place, target.id, names.placed(target.place), tuple(link.ref["targets"]), holder=link.holder,
     )
 

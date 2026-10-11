@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Iterator
 
 from kb import sqlite_backup, sqlite_search, sqlite_types
-from kb.port import Busy, Change, Entry, Unreadable
+from kb.port import Busy, Unreadable
+from kb.port_values import Change, Entry
 from kb.sqlite_checks import Checks
 from kb.sqlite_reads import encoded, moment
 

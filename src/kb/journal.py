@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from typing import Callable, NamedTuple
 
 from kb import canonical, values
-from kb.port import Entry, Port
+from kb.port import Port
+from kb.port_values import Entry
 from kb.signatures import Signed
 
 Clock = Callable[[], datetime]

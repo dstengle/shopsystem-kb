@@ -2,9 +2,10 @@
 leaves it: each change's revision and that of every type it was read through compared with the one it was read at,
 every link it hands landing, on a held artifact or, its target not held, under a held type the link carries and may
 land on, one into a part its held target lacks landing only when it says it waits and its artifact held that very
-link waiting before the set, told as the port tells one link from another (`port.told`: by what holds it, never
+link waiting before the set, told as the port tells one link from another (`port_values.told`: by what holds it, never
 where it stands), nothing outside it linking into what it removes or drops, and each entry's id held once."""
-from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded, held_waiting, told
+from kb.port import Conflict, Linked, Unlanded
+from kb.port_values import Change, Entry, Linking, held_waiting, told
 from kb.sqlite_reads import Reads
 
 
@@ -29,7 +30,7 @@ class Checks(Reads):
         return [place for (place,) in self._rows("SELECT place FROM parts WHERE artifact = ?", str(artifact))]
 
     def _waited(self, changes: list[Change]) -> dict:
-        """The links each artifact a set changes holds that land on nothing held, each as `port.told` gives it,
+        """The links each artifact a set changes holds that land on nothing held, each as `port_values.told` gives it,
         read once for each: read before any of the set is written, they are those that waited before it."""
         return {artifact: held_waiting(self.waiting(artifact)) for artifact in {change.artifact for change in changes}}
 

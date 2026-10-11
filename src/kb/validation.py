@@ -83,7 +83,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
     """Every violation, as artifact, path, rule, message, JSON Schema's and kb's own rules' together. A
     kb:<type IRI>@<n> reference resolves against the corpus, to the version it holds. `waited` are the links the
     store held for this artifact, before what is checked, that landed on nothing held, each as
-    `port.told` gives it: none for an artifact the store did not hold.
+    `port_values.told` gives it: none for an artifact the store did not hold.
 
     kb's own rules read a node only where JSON Schema found it in the shape they read it in.
     """

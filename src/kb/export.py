@@ -7,7 +7,8 @@ the title it was made with."""
 from dataclasses import dataclass, field
 
 from kb import canonical, composition, file_refusals, names, settled
-from kb.port import Port, TypeVersion
+from kb.port import Port
+from kb.port_values import TypeVersion
 from kb.roots import Named
 from kb.values import Kind, Refused, Version
 
