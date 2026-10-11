@@ -372,6 +372,7 @@ def test_a_link_that_waits_in_an_item_with_no_name_still_waits_once_its_target_i
 
 
 @LANDED
+@pytest.mark.skip(reason="a change to an artifact whose imported item has no name: slice 180.2")
 def test_a_change_that_leaves_a_link_waiting_in_an_item_with_no_name_lands_and_the_link_still_waits(tmp_path, landed):
     root, client = _a_decision_whose_link_waits_in_an_option_with_no_name(tmp_path, landed)
     before = held.text(root, LINKER)

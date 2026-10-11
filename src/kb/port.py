@@ -31,7 +31,7 @@ class Link:
     landing on nothing held (decision/a-link-that-waits-keeps-waiting); it is read only when the link names a part
     its held target lacks, and the link then lands only when the adapter held it so before the set (`told`).
     `holder` is the thing in the artifact whose field holds the link, as kb names it: empty for the artifact itself,
-    the place of an item by its name, None for an item with no name; the adapter keeps it and reads nothing in it."""
+    the place of an item by its name, or by where it stands when it has none; the adapter keeps it, reads nothing in it."""
     field: str
     place: str
     target: ArtifactId
@@ -59,8 +59,8 @@ def told(links) -> list[tuple | None]:
     """What tells each link of one artifact, given in the order the artifact carries them, from every other it
     holds: its field, what holds that field (`holder`), the IRI it names and the part, and how many links before it
     are the same in all four. Where it stands in a list is no part of it, so two links of one artifact, before and
-    after a change, are the very same link when these are. None for a link in an item with no name, which is the
-    same as no other."""
+    after a change, are the very same link when these are. None for a link handed with no holder, which is the same
+    as no other."""
     seen, found = {}, []
     for each in links:
         key = (each.field, each.holder, each.target, each.part)

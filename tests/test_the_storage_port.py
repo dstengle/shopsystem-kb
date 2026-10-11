@@ -536,7 +536,7 @@ def test_a_link_into_a_part_its_held_target_lacks_lands_again_when_it_says_it_wa
     pytest.param(lambda waits: [dataclasses.replace(waits, waits=False)], id="not saying it waits"),
     pytest.param(lambda waits: [dataclasses.replace(waits, part="options/c")], id="into another part it lacks"),
     pytest.param(lambda waits: [dataclasses.replace(waits, holder="steps/one")], id="held by another thing"),
-    pytest.param(lambda waits: [dataclasses.replace(waits, holder=None)], id="held by a thing with no name"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, holder=None)], id="held by nothing named"),
     pytest.param(lambda waits: [dataclasses.replace(waits, target=name("decision/e"))], id="to another held target"),
     pytest.param(lambda waits: [dataclasses.replace(waits, field="about", place="about")], id="in another field"),
     pytest.param(lambda waits: [waits, dataclasses.replace(waits, place="into/1")], id="a second beside the first"),
