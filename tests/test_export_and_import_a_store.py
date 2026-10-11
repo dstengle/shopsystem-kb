@@ -1,5 +1,6 @@
 """Export and import a store, bound scenario by scenario as each slice comes in. The exported files are the operator's
 output, read here as files; the store behind them is read through `held`."""
+import copy
 import re
 from pathlib import Path
 
@@ -9,14 +10,14 @@ from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
 from calls import (
-    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
-    filed, iri, journal, kb_ref, listing, next_version, placeholders, read, refs, remove, replace, request, start_a_store,
-    targets, type_iri, version_iri,
+    DECISION_TYPE, NOTE_TYPE, TAG_TYPE, TYPE_OF_TYPES, TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, add, change_type, check,
+    create, create_many, created, define, filed, iri, journal, kb_ref, listing, next_version, placeholders, read, refs, remove,
+    replace, replace_many, replaced, request, start_a_store, targets, type_iri, version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
 import serving
-from kb import canonical, client as kb_client, signatures, store, values, write
+from kb import canonical, client as kb_client, signatures, sqlite_store, store, values, write
 from kb.content import dumps, loads
 from kb.edits import Import
 from kb.signatures import Signed
@@ -2037,6 +2038,140 @@ def _the_import_lands(ran, root, target):
 def _the_work_item_waits_at_that_iri(root):
     assert held.text(root, LINKING_UNDER)
     assert _waiting(root) == {NOT_ANYWHERE: [LINKING_UNDER]}
+
+
+EARLY, LATER = iri("note", "early"), iri("decision", "later")
+KEEP = "options/keep"
+
+
+def _a_note_waiting_on_an_option_its_decision_was_created_without(client):
+    """The release gate's store: a note about an option of a decision, written while the decision was not held, and
+    that decision, created since with no option."""
+    define(client, DECISION_TYPE)
+    define(client, NOTE_TYPE)
+    create(client, "note", {"title": "Early", "about": f"{LATER}#{KEEP}"})
+    create(client, "decision", {"title": "Later", "sections": _sections("Purpose", "Rationale")})
+
+
+def _waiting_for(root):
+    """Each link in the store that waits, as the store's check lists it: the IRI, the artifact, its field and the
+    part it waits for; the check finding no violation."""
+    checked = check(kb_client.connect(root))
+    assert not checked.faults and list(checked.violations) == [], checked
+    assert list(checked.placeholders) == list(placeholders(kb_client.connect(root)).placeholders)
+    return [(each.id, link.artifact, link.field, link.part) for each in checked.placeholders for link in each.links]
+
+
+def test_the_export_of_a_store_holding_a_link_into_a_part_its_target_lacks_checks_clean_lands_and_waits_as_it_did(
+    root, tmp_path,
+):
+    target = _for_import(tmp_path, _a_note_waiting_on_an_option_its_decision_was_created_without)
+    waited = _waiting_for(tmp_path / "source")
+
+    checked = _check_for_import(root, target)
+    ran = _kb_import(root, target)
+
+    assert (checked.returncode, _report(checked)) == (0, [["clean", f"{target} checks clean for import"]])
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert waited == _waiting_for(root) == [(LATER, EARLY, "about", KEEP)]
+    assert _export_of(root, tmp_path / "again") == {file: (target / file).read_bytes() for file in _files(target)}
+    validated = _kb("validate", cwd=root)
+    assert validated.returncode == 0 and f"{LATER}#{KEEP}" in validated.stdout, validated.stdout
+
+
+def test_the_export_of_a_store_holding_a_link_into_a_part_its_target_lacks_is_passed_over_by_the_store_it_came_from(
+    tmp_path,
+):
+    target = _for_import(tmp_path, _a_note_waiting_on_an_option_its_decision_was_created_without)
+    source = tmp_path / "source"
+
+    checked = _kb("import", str(target), "--check", cwd=source)
+    ran = _kb_import(source, target)
+
+    assert (checked.returncode, _report(checked)) == (0, [["clean", f"{target} checks clean for import"]])
+    assert (ran.returncode, ran.stderr) == (0, "") and _imported(source) == []
+    assert _waiting_for(source) == [(LATER, EARLY, "about", KEEP)]
+
+
+def test_a_link_an_import_left_waiting_on_a_part_is_kept_by_a_later_change_and_refused_when_a_client_writes_one(root, tmp_path):
+    """Only the import lets such a link wait: once landed it is the store's own, kept by a change that leaves it, while
+    a create, and a replacement that adds one, are refused as they always were."""
+    _import_into_a_fresh_store(root, _for_import(tmp_path, _a_note_waiting_on_an_option_its_decision_was_created_without))
+    client = kb_client.connect(root)
+
+    kept = replace(client, EARLY, {"about": f"{LATER}#{KEEP}", "status": "said again"})
+    created = request(client, "note", "Late", {"about": f"{LATER}#{KEEP}"}, "Create an artifact")
+    altered = replace(client, EARLY, {"about": f"{LATER}#options/drop"})
+
+    assert not kept.faults, kept.faults
+    assert [(fault.rule, fault.place) for fault in created.faults] == [("ref", "about")]
+    assert [(fault.rule, fault.place) for fault in altered.faults] == [("ref", "about")]
+    assert _waiting_for(root) == [(LATER, EARLY, "about", KEEP)]
+
+
+def _handed_to_the_port(monkeypatch):
+    """Every link handed to the port from here on, but kb's own implicit ones, each with the mark it carries."""
+    handed = []
+    land = sqlite_store.SqliteStore.land
+
+    def spied(self, changes, entries):
+        handed.extend((str(change.artifact), link.imported) for change in changes for link in change.links if not link.implicit)
+        return land(self, changes, entries)
+
+    monkeypatch.setattr(sqlite_store.SqliteStore, "land", spied)
+    return handed
+
+
+def test_only_an_import_marks_the_links_it_hands_the_port_and_no_change_a_client_asks_for_does(root, tmp_path, monkeypatch):
+    """Review Focus 4: a create, a replacement, an addition and their sets hand every link unmarked, whatever they
+    send; an import hands each of its links marked."""
+    target = _for_import(tmp_path, _a_note_waiting_on_an_option_its_decision_was_created_without)
+    client = _started(root)
+    define(client, DECISION_TYPE)
+    define(client, NOTE_TYPE)
+    linking = copy.deepcopy(DECISION_TYPE)
+    linking["schema"]["parts"]["options"]["items"]["properties"]["about"] = NOTE_TYPE["schema"]["properties"]["about"]
+    define(client, {**linking, "title": "Ruling"})
+    create(client, "decision", {"title": "Held", "sections": _sections("Purpose", "Rationale"), "options": [{"title": "Keep"}]})
+    into, ruling = f"{iri('decision', 'held')}#{KEEP}", {"title": "First", "sections": _sections("Purpose", "Rationale")}
+    handed = _handed_to_the_port(monkeypatch)
+
+    create(client, "note", {"title": "One", "about": into, "imported": True})
+    assert not create_many(client, [created("note", "Two", {"about": into})]).faults
+    assert not replace(client, iri("note", "one"), {"about": iri("decision", "held")}).faults
+    assert not replace_many(client, [replaced(iri("note", "two"), {"about": iri("decision", "held")})]).faults
+    create(client, "ruling", ruling)
+    assert not add(client, iri("ruling", "first"), "options", {"title": "Keep", "about": into}).faults
+    assert len(handed) == 5 and {mark for _, mark in handed} == {False}, handed
+
+    del handed[:]
+    ran = _kb_import(root, target)
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert handed == [(EARLY, True)]
+
+
+SECOND_DECISION, SECOND_NOTE = iri("decision", "second"), iri("note", "second")
+LACKING = {  # a file carrying a link into a part its target lacks that no import lets wait
+    "in a field that allows no part": lambda: {
+        **{key: _decision(SECOND_DECISION)[key] for key in IDENTITY}, "supersedes": f"{LATER}#{KEEP}",
+        "sections": _decision(SECOND_DECISION)["sections"],
+    },
+    "into an artifact of a kind the field does not allow": lambda: _artifact(SECOND_NOTE, "Second", about=f"{EARLY}#{KEEP}"),
+}
+
+
+@pytest.mark.parametrize("carrying", LACKING.values(), ids=list(LACKING))
+def test_a_link_into_a_part_is_still_an_error_of_the_check_where_no_link_could_wait_and_the_import_is_refused(
+    root, tmp_path, carrying,
+):
+    target = _for_import(tmp_path, _a_note_waiting_on_an_option_its_decision_was_created_without)
+    _put(target, carrying())
+
+    checked = _check_for_import(root, target)
+    ran = _kb_import(root, target)
+
+    assert (checked.returncode, _errors(checked)) == (1, [(_file(carrying()["id"]), "ref")]), checked.stdout
+    assert ran.returncode == 2 and held.names(root) == [TYPE_OF_TYPES]
 
 
 @given("a directory for import that checks clean", target_fixture="target")

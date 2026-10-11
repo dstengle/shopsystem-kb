@@ -3,7 +3,8 @@ leaves it: each change's revision and that of every type it was read through com
 every link it hands landing, on a held artifact or, its target not held, under a held type the link carries and may
 land on, one into a part its held target lacks landing only when it says it waits and its artifact held that very
 link waiting before the set, told as the port tells one link from another (`port_values.told`: by what holds it, never
-where it stands), nothing outside it linking into what it removes or drops, and each entry's id held once."""
+where it stands), or when it carries an import's mark (`port_values.Link.imported`), nothing outside it linking into
+what it removes or drops, and each entry's id held once."""
 from kb.port import Conflict, Linked, Unlanded
 from kb.port_values import Change, Entry, Linking, held_waiting, told
 from kb.sqlite_reads import Reads
@@ -59,8 +60,9 @@ class Checks(Reads):
 
     def _lands(self, link, as_told: tuple | None, waited: frozenset) -> bool:
         """Whether a link lands: on a held artifact of a kind it may land on, and on a part that artifact holds when
-        it names one, or, lacking it, when the link says it waits and, told as given, is among those its artifact
-        held waiting before the set; or, its target not held, on an IRI under a type the link vouches for."""
+        it names one, or, lacking it, when an import brings the link, or the link says it waits and, told as given,
+        is among those its artifact held waiting before the set; or, its target not held, on an IRI under a type the
+        link vouches for."""
         rows = self._rows("SELECT kind FROM artifacts WHERE id = ?", str(link.target))
         if not rows:
             return self._vouched(link)
@@ -68,7 +70,7 @@ class Checks(Reads):
             return False
         if not link.part or link.part in self._parts(link.target):
             return True
-        return link.waits and as_told in waited
+        return link.imported or (link.waits and as_told in waited)
 
     def _vouched(self, link) -> bool:
         """Whether a link to an IRI not held carries a type that is held and is one it may land on; never an

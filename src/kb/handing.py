@@ -1,7 +1,10 @@
 """Each change of a drafted set as the port takes it: the type it is checked against (`typed`), its entries in the
 order that type declares and the version it records (`versioned`), its canonical text (`serialised`), and the change
 handed over (`handed`), read at the revision given, with the rows it is found by, its links and the places of its parts
-for the last change the set makes to an artifact, and the revisions of the types it was read through."""
+for the last change the set makes to an artifact, each link an import brings carrying the import's mark and no other
+change's any, and the revisions of the types it was read through."""
+import dataclasses
+
 from kb import canonical, composition, links, names, places, port_values, refusals, search, settled, values
 from kb.draft import Draft
 from kb.edits import Change
@@ -51,9 +54,9 @@ def handed(draft: Draft, change: Change, read: int, last: bool) -> port_values.C
     """A change as the port takes it, read at the revision given:
     its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
     artifact, its links and the places of its parts as the set leaves them, read through the type it was checked
-    against, with the revisions of the types that version is read through, each kb: reference followed at the version
-    it names, that the set leaves as they are; every change that leaves a type with those of the types the version it
-    makes reads."""
+    against, each marked as an import's when the change is one (`port_values.Link.imported`), with the revisions of
+    the types that version is read through, each kb: reference followed at the version it names, that the set leaves
+    as they are; every change that leaves a type with those of the types the version it makes reads."""
     if change.left is None:
         return port_values.Change(change.artifact_id, None, read=read, revision=change.revision)
     searched, kind = tuple(search.searchable(change.left)), composition.artifact_kind(change.left)
@@ -65,11 +68,18 @@ def handed(draft: Draft, change: Change, read: int, last: bool) -> port_values.C
             searched=searched, kind=kind, version=version,
         )
     schema, waited = typed(draft, change), draft.waited(change.artifact_id)
+    carried = links.handed(change.artifact_id, change.left, draft, schema, waited)
     return port_values.Change(
-        change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft, schema, waited)),
+        change.artifact_id, change.left, tuple(_marked(carried) if change.op == "import" else carried),
         tuple(places.parts(change.left)), read, change.revision,
         draft.as_read([*composition.read_through(kind, schema["schema"], draft), *made]), searched, kind, version,
     )
+
+
+def _marked(carried: list[port_values.Link]) -> list[port_values.Link]:
+    """The links an import brings, each but kb's own implicit one carrying the import's mark, which lets one into a
+    part its held target lacks land and wait (decision/a-link-that-waits-keeps-waiting)."""
+    return [link if link.implicit else dataclasses.replace(link, imported=True) for link in carried]
 
 
 def _read_by_the_version_made(draft: Draft, change: Change) -> list:

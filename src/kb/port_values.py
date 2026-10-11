@@ -20,6 +20,8 @@ class Link:
     implicit link never does. `waits` says kb found the store already holding this very link for the artifact,
     landing on nothing held (decision/a-link-that-waits-keeps-waiting); it is read only when the link names a part
     its held target lacks, and the link then lands only when the adapter held it so before the set (`told`).
+    `imported` is the mark of a link an import brings, which no other change sets: such a link into a part its held
+    target lacks lands whatever the adapter held, and waits for that part as the store exported held it.
     `holder` is the thing in the artifact whose field holds the link, as kb names it: empty for the artifact itself,
     the place of an item by its name, or by where it stands when it has none; the adapter keeps it, reads nothing in it."""
     field: str
@@ -31,6 +33,7 @@ class Link:
     under: ArtifactId | None = None
     waits: bool = False
     holder: str | None = ""
+    imported: bool = False
 
 
 @dataclass(frozen=True)

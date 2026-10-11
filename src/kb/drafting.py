@@ -160,10 +160,13 @@ def _in_order(draft: Draft, change: Change, faults: list) -> list:
 
 def _fits(draft: Draft, change: Change) -> list:
     """Every fault of what a change left against its type, its links landing, both as the set leaves them, but
-    that a link the store already held waiting still waits."""
+    that a link the store already held waiting still waits, and so does each an import brings into a part its held
+    target lacks."""
     try:
         schema = handing.typed(draft, change)
     except Refused as refused:
         return list(refused.faults)
     waited = draft.waited(change.artifact_id)
-    return validation.validate(str(change.artifact_id), settled.checked(change.left), schema["schema"], draft, waited)
+    return validation.validate(
+        str(change.artifact_id), settled.checked(change.left), schema["schema"], draft, waited, change.op == "import",
+    )

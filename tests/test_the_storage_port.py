@@ -70,11 +70,12 @@ def removal(text, read):
     return port_values.Change(name(text), None, read=read, revision=read + 1)
 
 
-def link(field, place, target, kinds, part="", under=None, waits=False, holder=""):
+def link(field, place, target, kinds, part="", under=None, waits=False, holder="", imported=False):
     """A link as kb hands it; `under` the held type kb says a target not held sits under, as the cases name it;
-    `waits` whether kb says the store already held this very link, waiting; `holder` what kb says holds it."""
+    `waits` whether kb says the store already held this very link, waiting; `holder` what kb says holds it;
+    `imported` whether kb says an import brings it."""
     return port_values.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds),
-                     under=under and name(under), waits=waits, holder=holder)
+                     under=under and name(under), waits=waits, holder=holder, imported=imported)
 
 
 def entry(entry_id, at=T0, seq=1, batch="", artifact="", role="tester", execution=""):
@@ -634,6 +635,66 @@ def test_a_link_saying_it_waits_is_refused_from_another_held_artifact_alone_or_b
         assert refused.value.links == [dataclasses.replace(WAITING, source=changes[-1].artifact)]
         assert written(store) == before
         assert store.waiting() == [WAITING]
+
+
+def _imported_into_an_option(target="decision/d", kinds=("decision",)):
+    """A link an import brings into option `a` of a decision, as kb hands it: marked, and not saying the store held
+    it waiting, which it never did."""
+    return link("into", "into", target, list(kinds), "options/a", under="schema/decision", imported=True)
+
+
+def test_a_link_an_import_brings_into_a_part_its_held_target_lacks_lands_and_waits_for_that_part(store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
+    land(store, put("note/n", {"title": "N"}, links=[_imported_into_an_option()]))
+    assert store.artifact(name("note/n")) == {"title": "N"}
+    assert store.waiting() == [WAITING]
+    assert store.links_in(name("decision/d")) == [WAITING]
+
+
+def test_a_link_an_import_brings_into_a_part_lacked_by_a_target_landing_in_its_own_set_lands_and_waits(store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]),
+         put("note/n", {"title": "N"}, links=[_imported_into_an_option()]))
+    assert store.waiting() == [WAITING]
+
+
+def test_a_link_an_import_brings_that_once_waits_is_held_to_the_stores_own_account_like_any_other(store):
+    """The mark is the import's, for the set it lands in: afterwards the link is one the store holds waiting, kept by
+    a change that says so (`waits`) and refused, unmarked, when it does not."""
+    land(store, put("schema/decision", {"title": "Decision"}))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
+    brought = _imported_into_an_option()
+    land(store, put("note/n", {"title": "N"}, links=[brought]))
+    unmarked = dataclasses.replace(brought, imported=False)
+    with pytest.raises(port.Unlanded):
+        land(store, put("note/n", {"title": "N, said again"}, read=1, links=[unmarked]))
+    land(store, put("note/n", {"title": "N, said again"}, read=1, links=[dataclasses.replace(unmarked, waits=True)]))
+    assert store.waiting() == [WAITING]
+
+
+@pytest.mark.parametrize("brought, held", [
+    pytest.param(_imported_into_an_option(kinds=("work",)), "decision/d", id="of a kind it may not land on"),
+    pytest.param(_imported_into_an_option(target="memo/m"), "memo/m", id="on a held artifact of another kind"),
+])
+def test_a_link_an_import_brings_is_refused_when_what_it_names_is_not_of_a_kind_it_may_land_on(store, brought, held):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    land(store, put(held, {"title": "Held"}, parts=["options/b"]))
+    before = written(store)
+    with pytest.raises(port.Unlanded) as refused:
+        land(store, put("note/n", {"title": "N"}, links=[brought]))
+    assert refused.value.links == [port_values.Linking(name("note/n"), "into", "into", brought.target, "options/a")]
+    assert written(store) == before
+
+
+def test_a_link_no_import_brings_into_a_part_its_held_target_lacks_is_refused_from_an_artifact_new_to_the_store(store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
+    for said in (False, True):
+        new = dataclasses.replace(_imported_into_an_option(), imported=False, waits=said)
+        with pytest.raises(port.Unlanded):
+            land(store, put("note/n", {"title": "N"}, links=[new]))
+        assert not store.holds(name("note/n")) and store.waiting() == []
 
 
 def test_a_link_that_waits_is_the_very_link_wherever_it_stands_in_what_holds_it_and_is_held_once(store):

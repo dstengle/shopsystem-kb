@@ -133,10 +133,10 @@ def _form(draft: Draft, each: Offered, schema: dict) -> list:
 
 
 def _fit(draft: Draft, each: Offered, content: dict, schema: dict, unread: set) -> list:
-    """Every fault of the content against its type, as a set is checked, but for a link to a file that could not be
-    read."""
+    """Every fault of the content against its type, as an import's set is checked, a link into a part its held target
+    lacks waiting, but for a link to a file that could not be read."""
     try:
-        found = validation.validate(each.file, content, schema, draft)
+        found = validation.validate(each.file, content, schema, draft, imported=True)
     except Refused as refused:
         return list(refused.faults)
     leading = {link.place for link in links.carried(content, schema, draft) if _named(link.target) in unread}

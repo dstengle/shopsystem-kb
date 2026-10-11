@@ -2,7 +2,8 @@
 language cannot say, checked in code: required sections in their declared order, and links that land on an artifact
 the corpus holds, or a part inside it, of a kind the type allows, or wait on an IRI it does not hold, under a held
 type the field allows, or already wait, as the store held them, on a part their held target lacks
-(decision/a-link-that-waits-keeps-waiting), each told by what holds it, never by where it stands in a list. Every
+(decision/a-link-that-waits-keeps-waiting), each told by what holds it, never by where it stands in a list, or are
+brought by an import, which lets every such link wait as the store exported held it. Every
 fault comes back together; kb's rules pass over a node JSON Schema found misshapen. kb's keywords are read through
 kb.composition. What is checked, and the corpus it is checked against, are given; nothing here finds or opens a file.
 """
@@ -79,11 +80,13 @@ def registry(corpus) -> Registry:
     return METASCHEMAS.combine(Registry(retrieve=retrieve))
 
 
-def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=frozenset()) -> list[kb_pb2.Fault]:
+def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=frozenset(),
+             imported: bool = False) -> list[kb_pb2.Fault]:
     """Every violation, as artifact, path, rule, message, JSON Schema's and kb's own rules' together. A
     kb:<type IRI>@<n> reference resolves against the corpus, to the version it holds. `waited` are the links the
     store held for this artifact, before what is checked, that landed on nothing held, each as
-    `port_values.told` gives it: none for an artifact the store did not hold.
+    `port_values.told` gives it: none for an artifact the store did not hold. `imported` says an import brings what
+    is checked, so that each of its links into a part its held target lacks waits, whatever the store held.
 
     kb's own rules read a node only where JSON Schema found it in the shape they read it in.
     """
@@ -99,7 +102,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
     for link, told in zip(carried, links.told(carried)):
         if _misread(link.place, errors) or _lands(link.target, link.ref, corpus):
             continue
-        if told not in waited or not _keeps_waiting(link, told[2], corpus):
+        if not (imported or told in waited) or not _keeps_waiting(link, told[2], corpus):
             faults.append(refusals.unlanded(artifact_id, link.place, link.target))
     return faults
 
@@ -144,9 +147,9 @@ def _lands(target: str, ref: dict, corpus) -> bool:
 def _keeps_waiting(link: links.Link, target: values.ArtifactId, corpus) -> bool:
     """Whether a link that does not land, and is the very link the store held for its artifact landing on nothing
     held (in the same field of the same thing, the artifact or the item of that name, to the same IRI and part,
-    wherever it stands in a list), still waits: the corpus refuses it only for the part it names, its target held,
-    of a kind the field allows, and lacking that part. A link into such a part that the store did not hold so is
-    new, and never waits."""
+    wherever it stands in a list), or one an import brings, waits: the corpus refuses it only for the part it names,
+    its target held, of a kind the field allows, and lacking that part. A link into such a part that the store did
+    not hold so, in a change that is no import, is new, and never waits."""
     held = bool(link.ref.get("parts")) and corpus.holds(target)
     return held and settled.kind(corpus.artifact(target)) in link.ref["targets"]
 
