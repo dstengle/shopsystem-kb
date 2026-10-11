@@ -29,8 +29,8 @@ def test_a_link_from_inside_a_part_blocks_a_removal_like_any_other():
     pass
 
 
-@scenario("change-the-store.feature", "A removal and a new link to the same artifact made at once never both land")
-def test_a_removal_and_a_new_link_to_the_same_artifact_made_at_once_never_both_land():
+@scenario("change-the-store.feature", "A removal and a new link to the same artifact made at once are each judged against what the other left")
+def test_a_removal_and_a_new_link_to_the_same_artifact_made_at_once_are_each_judged_against_what_the_other_left():
     pass
 
 
