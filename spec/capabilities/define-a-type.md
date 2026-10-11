@@ -2,7 +2,7 @@
 id: capability/define-a-type
 title: Define a type
 narrator: the client
-rests_on: [decision/types-are-data, decision/0006-validation-from-composed-schema, decision/composition-covers-common-fields, decision/validation-engine, decision/stale-is-safe, decision/integrity-checked-both-ways, decision/type-language-stays-json-schema, decision/kb-keywords-read-where-written, decision/metaschema-from-a-registry-of-kbs-own, decision/faults-ordered-by-reading-order-then-rule-name, decision/0023-an-artifacts-iri-sits-under-its-types, decision/0027-each-type-version-is-its-own-iri, decision/type-of-types-iri, decision/unused-type-versions-kept, decision/kb-numbers-type-versions, decision/type-iris-are-free, decision/references-name-a-version, decision/an-artifact-keeps-its-version, decision/an-artifact-is-read-through-its-version, decision/a-referred-type-is-not-removed]
+rests_on: [decision/types-are-data, decision/0006-validation-from-composed-schema, decision/composition-covers-common-fields, decision/validation-engine, decision/stale-is-safe, decision/integrity-checked-both-ways, decision/type-language-stays-json-schema, decision/kb-keywords-read-where-written, decision/metaschema-from-a-registry-of-kbs-own, decision/faults-ordered-by-reading-order-then-rule-name, decision/0023-an-artifacts-iri-sits-under-its-types, decision/0027-each-type-version-is-its-own-iri, decision/type-of-types-iri, decision/unused-type-versions-kept, decision/kb-numbers-type-versions, decision/type-iris-are-free, decision/references-name-a-version, decision/an-artifact-keeps-its-version, decision/an-artifact-is-read-through-its-version, decision/a-referred-type-is-not-removed, decision/a-types-place-is-settled-by-what-sits-under-it]
 formulated_as: features/define-a-type.feature
 ---
 
@@ -41,6 +41,8 @@ The client decides what its artifacts are made of by defining types, which are o
 - When the client changes a type, the links of an artifact conforming to an earlier version stay as that version declares them: what such a link points at still cannot be removed, and a field only the new version makes a link is not a link for that artifact.
 - If the client removes a type while the store holds artifacts of its kind, the removal is refused because something still points at it, naming each of those artifacts.
 - If the client removes a type while a held version of another type refers to a shape one of its versions defines, or is built on one of its versions, the removal is refused because something still points at it, naming each of those types, and nothing is written anywhere in the store.
+- If the client removes a type while a link waits on an IRI under it that the store does not hold, the removal is refused because something still points at it, naming each artifact that holds such a link, and nothing is written anywhere in the store.
+- If the client defines a type at an IRI under another type's, while the store holds an artifact of that other type at an IRI under the new type's, or a link waits on an IRI there, the type is refused because what sits under it already belongs to the other type, naming each such IRI, and nothing is written anywhere in the store.
 
 ## Implementation, may change
 
