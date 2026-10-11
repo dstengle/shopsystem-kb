@@ -4,9 +4,9 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, add_many, added,
-    create, create_many, created, define, held_version, iri, journal, listing, next_version, read, refs, remove_many, removed,
-    replace, replace_many, replaced, start_a_store, type_iri,
+    DECISION_TYPE, MISORDERED_DECISION, NOTE_TYPE, ORDERED_DECISION_TYPE, READING_ORDER, TYPES, WORK_ITEM_TYPE,
+    add_many, added, create, create_many, created, define, held_version, iri, journal, listing, next_version,
+    placeholders, read, refs, remove, remove_many, removed, replace, replace_many, replaced, start_a_store, type_iri,
 )
 import held
 from kb import client as kb_client
@@ -424,6 +424,139 @@ def _points_at_the_decision_made(client, applied, where):
     assert read(client, made).title == "Price reviews happen weekly"
     assert [found.stub.id for found in refs(client, made, 1, inward=True).reached] == [NEW_WORK_ITEM]
     assert LINKED_TO_THE_IRI[where][1](loads(read(client, NEW_WORK_ITEM, whole=True).content)) == made
+
+
+@given("the decision type gives a decision a collection of options")
+def _decisions_carry_options():
+    assert "options" in DECISION_TYPE["schema"]["parts"]
+
+
+INTO_AN_OPTION = {"targets": [type_iri("decision")], "cardinality": "one", "parts": True, "on_delete": "refuse"}
+
+
+@given("work items may carry a collection of tasks, each of which may point into a decision's option")
+def _work_items_carry_tasks_pointing_into_options(client):
+    """A work item's own link may point into an option too, as the link in its content does."""
+    schema = copy.deepcopy(WORK_ITEM_TYPE["schema"])
+    schema["properties"]["decisions"]["ref"] = {**INTO_AN_OPTION, "cardinality": "many"}
+    schema["parts"] = {"tasks": {"items": {
+        "type": "object",
+        "properties": {"title": {"type": "string"}, "decision": {"type": "string", "ref": INTO_AN_OPTION}},
+        "required": ["title"],
+    }}}
+    assert not replace(client, type_iri("work-item"), {"version": 2, "schema": schema}).faults
+
+
+OPTION = {"id": "go-weekly", "title": "Review every week"}
+THE_OPTION = f"{CHOSEN}#options/{OPTION['id']}"
+LINKED_INTO_THE_OPTION = {
+    "in its content": ({"decisions": [THE_OPTION]}, lambda content: content["decisions"][0], "decisions/0"),
+    "inside one of its tasks": (
+        {"tasks": [{"title": "Move the meeting", "decision": THE_OPTION}]},
+        lambda content: content["tasks"][0]["decision"], "tasks/0/decision",
+    ),
+}
+
+
+@when(
+    parsers.re(
+        "the client asks, in one go, for a decision to be created carrying an IRI and giving one of its options a name "
+        "of the client's choosing, and a work item to be created with a link "
+        f"(?P<where>{'|'.join(map(re.escape, LINKED_INTO_THE_OPTION))}) to the decision's IRI and that option's place, "
+        "saying which role and why"
+    ),
+    target_fixture="applied",
+)
+def _create_linking_into_an_option(client, where):
+    return create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS, "options": [OPTION]}, at=CHOSEN),
+        created("work-item", "Review prices on Mondays", LINKED_INTO_THE_OPTION[where][0],
+                version=held_version(client, "work-item")),
+    ], message="Move price reviews to weekly")
+
+
+@then(parsers.re(
+    f"the new work item points, (?P<where>{'|'.join(map(re.escape, LINKED_INTO_THE_OPTION))}), at that option of the "
+    "decision"
+))
+def _points_at_that_option(client, where):
+    _, linked, place = LINKED_INTO_THE_OPTION[where]
+    assert loads(read(client, THE_OPTION, whole=True).content) == OPTION
+    work_item = read(client, NEW_WORK_ITEM, whole=True)
+    assert linked(loads(work_item.content)) == THE_OPTION
+    assert not work_item.placeholders and not placeholders(client).placeholders
+    into = refs(client, CHOSEN, 1, inward=True, place=f"options/{OPTION['id']}")
+    assert [found.stub.id for found in into.reached] == [NEW_WORK_ITEM]
+    kept = remove(client, CHOSEN)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in kept.faults] == [(NEW_WORK_ITEM, place, "on_delete")]
+
+
+def _may_point_at_decisions(client):
+    assert WORK_ITEM_TYPE["schema"]["properties"]["decisions"]["ref"]["targets"] == [type_iri("decision")]
+    assert not read(client, type_iri("decision")).faults
+
+
+def _may_point_at_notes(client):
+    """The work item type moved on to a version whose `notes` point at notes, a type the store does not hold."""
+    schema = copy.deepcopy(WORK_ITEM_TYPE["schema"])
+    schema["properties"]["notes"] = {
+        "type": "array", "items": {"type": "string"},
+        "ref": {"targets": [type_iri("note")], "cardinality": "many", "parts": False, "on_delete": "refuse"},
+    }
+    assert not replace(client, type_iri("work-item"), {"version": 2, "schema": schema}).faults
+    assert read(client, type_iri("note")).refused
+
+
+# For each type a work item may point at: its kind, the work item's field that points at it, and how the store is
+# made to allow it.
+POINTED_AT = {
+    "the decision type, which the store holds": ("decision", "decisions", _may_point_at_decisions),
+    "a note type a create in the set makes": ("note", "notes", _may_point_at_notes),
+}
+OF_A_TYPE = "|".join(map(re.escape, POINTED_AT))
+# What the set creates before its work item.
+CREATED_FIRST = {
+    "a work item to be created": lambda: [],
+    "a note type to be created and a work item to be created": lambda: [
+        created(TYPES, NOTE_TYPE["title"], {key: NOTE_TYPE[key] for key in ("version", "schema")}),
+    ],
+}
+
+
+@given(parsers.re(f"work items may point at an artifact of (?P<of>{OF_A_TYPE})"), target_fixture="pointing")
+def _work_items_may_point_at(client, of):
+    """The field of a work item that points at an artifact of that type, and an IRI under the type nothing holds."""
+    kind, field, allow = POINTED_AT[of]
+    allow(client)
+    return field, iri(kind, "what-the-supplier-said")
+
+
+@when(
+    parsers.re(
+        f"the client asks, in one go, for (?P<creates>{'|'.join(map(re.escape, CREATED_FIRST))}), the work item "
+        f"pointing at an IRI under (?P<of>{OF_A_TYPE}) that neither the store nor any create in the set holds, saying "
+        "which role and why"
+    ),
+    target_fixture="applied",
+)
+def _create_pointing_at_an_iri_nothing_holds(client, creates, of, pointing):
+    field, nothing_held = pointing
+    assert read(client, nothing_held).refused
+    return create_many(client, [
+        *CREATED_FIRST[creates](),
+        created("work-item", "Review prices on Mondays", {field: [nothing_held]},
+                version=held_version(client, "work-item")),
+    ], message="Move price reviews to weekly")
+
+
+@then("the work item's link lands on a placeholder at that IRI")
+def _lands_on_a_placeholder(client, pointing):
+    field, nothing_held = pointing
+    assert read(client, nothing_held).refused
+    assert [
+        (waiting.id, [(link.artifact, link.field, link.place, link.part) for link in waiting.links])
+        for waiting in placeholders(client).placeholders
+    ] == [(nothing_held, [(NEW_WORK_ITEM, field, f"{field}/0", "")])]
 
 
 THREE = {
