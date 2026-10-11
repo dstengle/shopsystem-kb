@@ -3,7 +3,9 @@ the type it names must be the nearest held one under and nothing may be held at,
 type's place (kb.standing); and the items of a new or a revised artifact named, those a create names and those it
 held kept (kb.item_names decides what a name looks like and whether it is free); and a type's content given the
 number of its version."""
-from kb import composition, item_names, refusals, standing, values
+import copy
+
+from kb import composition, item_names, refusals, settled, standing, values
 from kb.draft import Draft
 
 
@@ -46,6 +48,17 @@ def revised(draft: Draft, artifact_id: values.ArtifactId, declared: dict, conten
     if not misnamed:
         item_names.items(declared["parts"], content, inner)
     return tuple(misnamed)
+
+
+def imported(draft: Draft, artifact_id: values.ArtifactId, artifact: dict) -> tuple:
+    """An artifact an import brings, as it would land: its items named as a create names them, those a file names
+    keeping the names it gives them, and its entries in the order its type's version declares, so a name given here
+    stands where kb writes names. Returns the artifact and the faults of the names its file gives that an item may
+    not carry, with any of which no item is named. Raises Refused when the draft holds no such version of its type."""
+    declared = composition.declared(composition.conformed(artifact, draft)["schema"], draft)
+    named = copy.deepcopy(artifact)
+    misnamed = items(draft, artifact_id, declared, named)
+    return settled.order(named, declared), misnamed
 
 
 def numbered(draft: Draft, type_id: values.ArtifactId, content: dict) -> None:

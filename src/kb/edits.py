@@ -2,8 +2,8 @@
 collection, an artifact removed. Each acts on the draft as the operations before it left it, on a copy of what it was
 asked to put there, so the same set can act again on another draft, and is refused there with every fault it finds in
 what it names, the revisions it makes and the names of its items (kb.naming); what its content and links come to is
-checked once the whole set has acted (kb.write). An import puts an artifact in the draft whole, as its file gives it,
-conforming to the version of its type that file names, which the draft must hold."""
+checked once the whole set has acted (kb.write). An import puts an artifact in the draft as its file gives it, its
+items named as a create's are, conforming to the version of its type that file names, which the draft must hold."""
 import copy
 from typing import NamedTuple
 
@@ -47,8 +47,9 @@ def apply(draft: Draft, operation) -> Change:
 
 def _changed(draft: Draft, operation) -> Change:
     if isinstance(operation, Import):
-        draft.put(operation.artifact_id, copy.deepcopy(operation.artifact))
-        return Change("import", operation.artifact_id)
+        artifact, misnamed = naming.imported(draft, operation.artifact_id, operation.artifact)
+        draft.put(operation.artifact_id, artifact)
+        return Change("import", operation.artifact_id, faults=misnamed)
     if isinstance(operation, changes.Create):
         return _create(draft, operation)
     if isinstance(operation, changes.Add):

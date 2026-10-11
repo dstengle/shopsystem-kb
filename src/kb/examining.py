@@ -8,7 +8,8 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from kb import (
-    canonical, composition, definitions, file_refusals, links, names, offers, rules, settled, validation, values,
+    canonical, composition, definitions, file_refusals, links, naming, names, offers, rules, settled, validation,
+    values,
 )
 from kb.draft import Draft
 from kb.offers import Offered
@@ -51,9 +52,10 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
             draft.put(each.id, each.artifact)
     by_name = {each.name: each for each in offered if each.name is not None}
     unread = {each.id for each in by_name.values() if each.artifact is None}
+    drafted = _drafted(draft, by_name)
     for name in in_order(by_name):
         each = by_name[name]
-        each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, unread)]
+        each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, unread, drafted)]
     return Checked(
         errors=[fault for each in offered for fault in each.errors], skipped=_skipped(draft, offered, by_name),
     )
@@ -78,7 +80,24 @@ def in_order(by_name: dict[ArtifactId, Offered]) -> list[ArtifactId]:
     return ordered + sorted((name for name in by_name if not by_name[name].typed), key=key)
 
 
-def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set) -> list:
+def _drafted(draft: Draft, by_name: dict) -> dict[ArtifactId, tuple]:
+    """Each file's artifact as it would land, its items named and its entries ordered (kb.naming), put in the draft in
+    its place, each file after the types it is read through, with the faults of the names it gives. A file whose type
+    version is not held is left as it is."""
+    drafted = {}
+    for name in in_order(by_name):
+        each = by_name[name]
+        if each.artifact is None or each.id == METASCHEMA_ID or _held_back(each, by_name):
+            continue
+        try:
+            drafted[name] = naming.imported(draft, each.id, each.artifact)
+        except Refused:
+            continue
+        draft.put(each.id, drafted[name][0])
+    return drafted
+
+
+def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set, drafted: dict) -> list:
     """What is wrong with a file that reads as an artifact: a copy of the type that describes types that differs from
     the store's; or, unless it is read through a type file that is broken or leads to one, its kind, the version of
     its type it names, which the directory or the store must hold, its form, its content and its links against that
@@ -99,8 +118,12 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     version = composition.kept(values.type_of(kind), named.number, draft)
     if version is None:
         return [file_refusals.no_version_offered(each.file, str(named))]
-    schema, content = version.content["schema"], settled.checked(each.artifact)
-    found = [*_form(draft, each, schema), *_fit(draft, each, content, schema, unread)]
+    landing, misnamed = drafted.get(each.name, (each.artifact, ()))
+    schema, content = version.content["schema"], settled.checked(landing)
+    found = [
+        *_form(draft, each, schema), *misnamed,
+        *_fit(draft, each, content, schema, unread),
+    ]
     if not found and each.typed:
         found = definitions.faults(each.id, content, draft)
     return found

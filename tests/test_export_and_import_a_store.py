@@ -63,6 +63,95 @@ def test_the_operator_imports_a_file_holding_an_item_that_carries_no_name():
     pass
 
 
+KEPT, NAMELESS = "kept-name", "Roll back"
+
+
+@given("a store holding a type for decisions whose decisions carry options")
+def _a_store_with_decisions_that_carry_options(root):
+    """The store imported into, freshly started: the type is brought by the directory, which is the export of a store
+    holding it."""
+    _started(root)
+
+
+@given(
+    "a directory for import that checks clean, holding a decision with one option that carries a name and one that "
+    "carries none",
+    target_fixture="target",
+)
+def _for_import_with_one_option_unnamed(tmp_path):
+    def fill(client):
+        define(client, DECISION_TYPE)
+        create(client, "decision", {"title": "Price reviews", "sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+            {"title": "Rationale", "body": "Costs move weekly.\n"},
+        ], "options": [{"id": KEPT, "title": "Keep"}, {"title": NAMELESS}]})
+
+    target = _for_import(tmp_path, fill)
+    file = Path(target) / _file(iri("decision", "price-reviews"))
+    file.write_text(file.read_text(encoding="utf-8").replace("  - id: roll-back\n    title: Roll back", "  - title: Roll back"))
+    assert "roll-back" not in file.read_text(encoding="utf-8")
+    return target
+
+
+@then("the option that carried a name lands with that name")
+def _the_named_option_keeps_its_name(ran, root):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.artifact(root, iri("decision", "price-reviews"))["options"][0]["id"] == KEPT
+
+
+@then("the option that carried none lands with a name the store gives it")
+def _the_unnamed_option_is_named(ran, root):
+    options = held.artifact(root, iri("decision", "price-reviews"))["options"]
+    assert list(options[1]) == ["id", "title"] and options[1]["id"] == "roll-back", options[1]
+
+
+def _the_decision_file(tmp_path, options):
+    """The export of a store holding the type for decisions and a decision, its file's options then written as given."""
+    def fill(client):
+        define(client, DECISION_TYPE)
+        create(client, "decision", {"title": "Price reviews", "sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+            {"title": "Rationale", "body": "Costs move weekly.\n"},
+        ]})
+
+    target = _for_import(tmp_path, fill)
+    file = Path(target) / _file(iri("decision", "price-reviews"))
+    written = file.read_text(encoding="utf-8")
+    file.write_text(written + "options:\n" + "".join(options), encoding="utf-8")
+    return target
+
+
+def test_an_item_an_import_names_is_named_where_a_create_names_it_and_written_where_a_create_writes_the_name(
+    root, tmp_path,
+):
+    _started(root)
+    target = _the_decision_file(tmp_path, ["  - title: Roll back\n", "  - title: Roll back\n"])
+    checked = _kb("import", "--check", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (checked.returncode, _report(checked)[-1][0]) == (0, "clean"), checked.stdout
+    assert _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR}).returncode == 0
+    options = held.artifact(root, iri("decision", "price-reviews"))["options"]
+    assert [list(option) for option in options] == [["id", "title"], ["id", "title"]]
+    assert [option["id"] for option in options] == ["roll-back", "roll-back-2"]
+
+
+@pytest.mark.parametrize("options", [
+    ["  - id: Not Plain\n    title: Keep\n"],
+    ["  - id: kept\n    title: Keep\n", "  - id: kept\n    title: Again\n"],
+], ids=["a name that is not plain", "a name carried twice"])
+def test_a_name_a_file_gives_an_item_that_it_may_not_carry_is_an_error_of_the_check_and_nothing_lands(
+    root, tmp_path, options,
+):
+    _started(root)
+    target = _the_decision_file(tmp_path, options)
+    checked = _kb("import", "--check", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    errors = [line for line in _report(checked) if line[0] == "error"]
+    assert (checked.returncode, [(line[1], line[2]) for line in errors]) == (
+        1, [(_file(iri("decision", "price-reviews")), "item-name")],
+    ), checked.stdout
+    assert _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR}).returncode != 0
+    assert not held.holds_artifact(root, iri("decision", "price-reviews"))
+
+
 @scenario("export-and-import-a-store.feature", "The operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version")
 def test_the_operator_imports_a_directory_holding_an_artifact_the_store_already_holds_at():
     pass

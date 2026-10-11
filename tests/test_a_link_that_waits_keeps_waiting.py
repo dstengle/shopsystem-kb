@@ -15,7 +15,6 @@ from calls import (
 )
 from conftest import OPERATOR, _kb, exported
 from kb import client as kb_client
-from slices import waits_on
 
 LINKING_TYPE = copy.deepcopy(DECISION_TYPE)
 LINKING_TYPE["schema"]["properties"]["supersedes"]["ref"]["parts"] = True
@@ -323,7 +322,7 @@ def test_a_link_that_waits_moved_to_another_holder_or_altered_where_it_is_held_i
     assert list(check(client).violations) == []
 
 
-# An item with no name, which only a file imported or seeded can hold, is told by where it stands.
+# An item whose file gave it no name, which an import names as a write does, and whose link into it waits all the same.
 def _imported(directory, root, tmp_path):
     assert _kb("init", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR}).returncode == 0
     return _kb("import", str(directory), cwd=root, env={"KB_ACTOR": OPERATOR})
@@ -349,7 +348,7 @@ def _a_decision_whose_link_waits_in_an_option_with_no_name(tmp_path, landed):
     ran = landed(directory, root, tmp_path)
     assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
     client = kb_client.connect(root)
-    assert "id" not in held.artifact(root, LINKER)["options"][1]
+    assert held.artifact(root, LINKER)["options"][1]["id"] == "second"
     assert not request(client, "decision", "Prices are reviewed monthly", {"sections": SECTIONS, "options": OPTIONS}).faults
     return root, client
 
@@ -373,7 +372,6 @@ def test_a_link_that_waits_in_an_item_with_no_name_still_waits_once_its_target_i
 
 
 @LANDED
-@waits_on("180.2")
 def test_a_change_that_leaves_a_link_waiting_in_an_item_with_no_name_lands_and_the_link_still_waits(tmp_path, landed):
     root, client = _a_decision_whose_link_waits_in_an_option_with_no_name(tmp_path, landed)
     before = held.text(root, LINKER)
