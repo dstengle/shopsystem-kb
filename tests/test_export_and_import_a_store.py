@@ -15,6 +15,7 @@ from calls import (
 )
 from conftest import OPERATOR, _kb, exported
 import held
+import serving
 from kb import canonical, client as kb_client, signatures, store, values, write
 from kb.content import dumps, loads
 from kb.edits import Import
@@ -1640,6 +1641,67 @@ def test_a_link_under_a_type_only_the_store_holds_lands_on_a_placeholder_with_er
 @given("a directory for import that checks clean", target_fixture="target")
 def _for_import_that_checks_clean(tmp_path):
     return _for_import(tmp_path, lambda client: define(client, WORK_ITEM_TYPE))
+
+
+@given("a server serves that store", target_fixture="address")
+def _a_server_serves_that_store(root, request, before):
+    address = serving.serving(root, request)
+    before["started"] = held.holds(root)
+    return address
+
+
+@given("a directory for import that checks clean, holding a second decision", target_fixture="target")
+def _for_import_holding_a_second_decision(tmp_path):
+    """The export of a store holding the second decision, the type for decisions the store's own and its file taken out."""
+    def fill(client):
+        define(client, DECISION_TYPE)
+        create(client, "decision", {"title": _titled(MONTHLY), "sections": _decision(MONTHLY)["sections"]})
+
+    target = _for_import(tmp_path, fill)
+    (target / _file(type_iri("decision"), 1)).unlink()
+    return target
+
+
+@then("the import is rejected because the store is served, naming the server's address")
+def _import_rejected_as_served(ran, address):
+    assert (ran.returncode, ran.stdout) == (2, "")
+    assert ran.stderr.startswith("kb import: refused: served: ") and address in ran.stderr, ran.stderr
+
+
+@scenario(FEATURE, "Importing into a store a server serves is refused")
+def test_importing_into_a_store_a_server_serves_is_refused():
+    pass
+
+
+def _served_with_a_decision(root, request):
+    """A store holding the type for decisions and a decision, a server serving it; the server's process."""
+    a_decision_type_and_a_decision(_started(root))
+    server = serving.started(root, request)
+    assert server.said().startswith("serving\t")
+    return server
+
+
+def test_the_check_an_export_and_a_backup_are_answered_beside_the_server_that_serves_the_store(root, tmp_path, request):
+    _served_with_a_decision(root, request)
+    target = _for_import(tmp_path, lambda client: define(client, WORK_ITEM_TYPE))
+    exported_to, backup = tmp_path / "exported", tmp_path / "backup.sqlite3"
+    exported_to.mkdir()
+    for ran in (
+        _kb("import", str(target), "--check", cwd=root),
+        _kb("export", str(exported_to), cwd=root),
+        _kb("backup", str(backup), cwd=root),
+    ):
+        assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+
+
+def test_an_import_lands_once_the_server_has_stopped(root, tmp_path, request):
+    server = _served_with_a_decision(root, request)
+    target = _for_import(tmp_path, lambda client: define(client, WORK_ITEM_TYPE))
+    assert _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR}).returncode == 2
+    server.stop()
+    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.holds_artifact(root, type_iri("work-item"))
 
 
 @scenario(FEATURE, "The operator imports the kb directory of an existing store")

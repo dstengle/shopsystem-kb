@@ -1,6 +1,7 @@
 """The operator's commands that are not rpcs, export, the import check, the import, the backup and the restore, over
 one store, each run inside kb.boundary's one boundary: the store opened first (but for a restore, which makes it),
-the command's values made, one call into the domain, and any refusal or escaping exception its faults."""
+the command's values made, one call into the domain, and any refusal or escaping exception its faults. The import writes, so it is
+refused while a server owns the store, as a change asked of the store directly is."""
 from pathlib import Path
 from typing import NamedTuple
 
@@ -23,6 +24,7 @@ class Operator:
     def __init__(self, root):
         """Over the store at root."""
         self._root = root
+        self._hosted = False  # no server hosts an operator: a command that writes is refused while one owns the store
 
     @boundary(export.Exported)
     def export(self, directory: str, held):
@@ -35,7 +37,7 @@ class Operator:
         """A directory read as a set for import into the store, its errors and what would be skipped; nothing written."""
         return examining.checked(held, roots.directory(directory))
 
-    @boundary(examining.Checked)
+    @boundary(examining.Checked, writes=lambda request: True)
     def import_(self, request: Importing, held):
         """A directory checked, then landed in the store as one set signed by the role, with a message naming it."""
         signed = signatures.signed(kb_pb2.Signature(role=request.role, message=f"import {request.directory}"))
