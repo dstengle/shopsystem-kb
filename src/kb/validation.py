@@ -90,7 +90,7 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
 
     kb's own rules read a node only where JSON Schema found it in the shape they read it in.
     """
-    errors = _errors(content, compose(schema, corpus), corpus)
+    errors = misshapen(content, schema, corpus)
     faults = [
         kb_pb2.Fault(artifact=artifact_id, place=_place(error), rule=error.validator, message=error.message)
         for error in errors
@@ -114,8 +114,10 @@ def unlanded(content: dict, schema: dict, corpus, waited=frozenset(), imported: 
     ]
 
 
-def _errors(content: dict, composed: dict, corpus) -> list:
-    """JSON Schema's every error."""
+def misshapen(content: dict, schema: dict, corpus) -> list:
+    """JSON Schema's every error of content against a type's schema composed with kb's structural rules, as
+    `unlanded` takes them to pass over the links they leave unread."""
+    composed = compose(schema, corpus)
     return list(Draft202012Validator(composed, registry=registry(corpus)).iter_errors(content))
 
 
