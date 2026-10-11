@@ -21,9 +21,10 @@ def imported(store: Port, directory: Named, signed: Signed, skip_errors: bool,
     artifacts of its kind; the store's own type that describes types is kept, and so is every artifact, and every
     version of a type, the store already holds as its file gives it, which has no entry in the history. A directory
     holding a file that differs from what the store holds at its IRI is refused with one fault for each such IRI,
-    whether or not errors are skipped, and nothing is written. A directory with errors and no difference is refused with the check's report, and nothing is written; or, with errors skipped, every artifact
-    lands but the broken files and the files that would be skipped, and the report says which they are and why. Files
-    under the place passed over, when one is given, are not offered. The store's write lock is held from before the
+    whether or not errors are skipped, and nothing is written. A directory with errors and no difference is refused
+    with the check's report, and nothing is written; or, with errors skipped, every artifact lands but the broken files and the files that would be
+    skipped, and the report says which they are and why. Files under the place passed over, when one is given, are not
+    offered. The store's write lock is held from before the
     directory is read to the landing, so what is identical is judged against the store as it stands when the set
     lands, and nothing lands between them."""
     with store.exclusive():
@@ -40,7 +41,7 @@ def _imported(store: Port, directory: Named, signed: Signed, skip_errors: bool, 
     if report.errors and not skip_errors:
         return Checked([file_refusals.check_failed(len(report.errors))], report.errors, report.skipped)
     taken = _taken(offered, report)
-    if not taken:
+    if not taken and not _sound(offered, report):
         return Checked([file_refusals.nothing_lands()], report.errors, report.skipped)
     held = comparing.compared(store, list(taken.values())).identical
     landing = {name: each for name, each in taken.items() if name not in held}
@@ -54,6 +55,13 @@ def _differing(offered: list[Offered]) -> list[ArtifactId]:
     """The IRIs at which the files examined differ from what the store holds, each once, in the order of names."""
     found = {each.id for each in offered if any(fault.rule == rules.DIFFERS for fault in each.errors)}
     return sorted(found, key=names.order)
+
+
+def _sound(offered: list[Offered], report: Checked) -> bool:
+    """Whether any file is sound: no error, not to be skipped, the type that describes types included, which is passed
+    over."""
+    left_out = {skipped.file for skipped in report.skipped}
+    return any(each.name is not None and not each.errors and each.file not in left_out for each in offered)
 
 
 def _taken(offered: list[Offered], report: Checked) -> dict[ArtifactId, Offered]:

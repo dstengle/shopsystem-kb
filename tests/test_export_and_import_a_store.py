@@ -17,9 +17,10 @@ from calls import (
 from conftest import OPERATOR, _kb, exported
 import held
 import serving
-from kb import canonical, client as kb_client, signatures, sqlite_store, store, values, write
+from kb import canonical, client as kb_client, names, signatures, sqlite_store, store, values, write
 from kb.content import dumps, loads
 from kb.edits import Import
+from kb.examining import METASCHEMA_ID
 from kb.signatures import Signed
 
 FEATURE = "export-and-import-a-store.feature"
@@ -183,6 +184,28 @@ def _export_of(root, to):
     return {file: (to / file).read_bytes() for file in _files(to)}
 
 
+@pytest.mark.parametrize("how", [(), ("--skip-errors",)], ids=["plainly", "with errors skipped"])
+@pytest.mark.parametrize("artifacts", [False, True], ids=["a fresh store", "a store holding artifacts"])
+def test_a_directory_holding_only_the_type_that_describes_types_matching_the_stores_lands_nothing_and_is_not_refused(
+    root, tmp_path, artifacts, how,
+):
+    client = _started(root)
+    if artifacts:
+        _decisions_and_a_work_item(client)
+    everything = tmp_path / "everything"
+    _export_of(root, everything)
+    target = tmp_path / "only"
+    _put(target, _read(everything, str(METASCHEMA_ID), 1), 1)
+    before, history = held.holds(root), held.history(client)
+
+    checked = _kb("import", "--check", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (checked.returncode, _report(checked)[-1][0]) == (0, "clean"), checked.stdout
+    ran = _kb("import", *how, str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", ""), ran.stderr
+    assert (held.holds(root), held.history(client)) == (before, history)
+
+
 def test_a_stores_own_export_imported_into_it_lands_nothing_adds_no_history_entry_and_exports_the_same_bytes(
     root, tmp_path,
 ):
@@ -336,12 +359,22 @@ def test_a_file_that_differs_from_what_the_store_holds_at_its_iri_lands_nothing(
     _export_of(root, target)
     _put(target, {**_read(target, WEEKLY), "title": "Price reviews happen daily"})
     _put(target, _decision(iri("decision", "a-third")))
-    before, history = held.holds(root), held.history(client)
 
-    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    _differs_at(root, target, {_file(WEEKLY): WEEKLY})
+    assert not held.holds_artifact(root, iri("decision", "a-third"))
 
-    assert ran.returncode != 0
-    assert (held.holds(root), held.history(client)) == (before, history)
+
+def test_a_type_and_an_artifact_under_it_that_both_differ_are_refused_in_the_order_of_names(root, tmp_path):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": LOOSE_NOTE})
+    create(client, "note", {"title": "Held", "flag": True, "count": 1, "meta": {"b": 1, "a": 2}})
+    note = type_iri("note")
+    target = tmp_path / "exported"
+    _export_of(root, target)
+    _put(target, {**_read(target, note, 1), "title": "Memo"}, 1)
+    _put(target, {**_read(target, HELD_NOTE), "title": "Other"})
+
+    _differs_at(root, target, {_file(note, 1): note, _file(HELD_NOTE): HELD_NOTE})
 
 
 LOOSE_NOTE = {"type": "object", "required": ["title"], "properties": {
@@ -392,7 +425,7 @@ def _differs_at(root, target, differing, others=()):
         ran = _kb("import", *how, str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
         refused = ran.stderr.splitlines()
         assert (ran.returncode, ran.stdout, len(refused)) == (2, checked.stdout, len(set(differing.values()))), ran.stderr
-        for line, name in zip(refused, sorted(set(differing.values()))):
+        for line, name in zip(refused, sorted(set(differing.values()), key=names.order)):
             assert line.startswith("kb import: refused: differs: ") and repr(name) in line, ran.stderr
         assert (held.holds(root), held.history(client)) == (before, history)
 

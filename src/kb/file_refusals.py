@@ -66,7 +66,8 @@ def differs(file: str, iri: str) -> kb_pb2.Fault:
     the type the store holds there keeps or could gain."""
     return kb_pb2.Fault(
         artifact=file, rule=rules.DIFFERS,
-        message=f"it differs from what the store holds at {iri!r}, and an import replaces nothing the store holds",
+        message=f"it differs from what the store holds at {iri!r}, or is a version the store does not keep there, "
+                f"and an import replaces nothing the store holds",
     )
 
 
