@@ -1,14 +1,14 @@
 """A store started in the client's own process, off the wire: `init`, which `kb` publishes, and the operator's
 `kb init` calls, and `NotStarted`, what it raises when it refuses; `refused`, where `init` would refuse to start one,
 asked before anything is made; and `prepared`, a step a start takes on the filesystem first. Each runs inside the
-servicer's one boundary: its values made first, then one call into the domain, and any refusal or escaping exception
+kb.boundary's one boundary: its values made first, then one call into the domain, and any refusal or escaping exception
 its faults."""
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
 
 from kb import roots, signatures, store, write
-from kb.servicer import boundary, guarded
+from kb.boundary import boundary, guarded
 
 
 class NotStarted(Exception):

@@ -1,12 +1,12 @@
 """The operator's commands that are not rpcs, export, the import check, the import, the backup and the restore, over
-one store, each run inside the servicer's one boundary: the store opened first (but for a restore, which makes it),
+one store, each run inside kb.boundary's one boundary: the store opened first (but for a restore, which makes it),
 the command's values made, one call into the domain, and any refusal or escaping exception its faults."""
 from pathlib import Path
 from typing import NamedTuple
 
 from kb import backups, examining, export, importing, roots, signatures
 from kb.contract import kb_pb2
-from kb.servicer import boundary
+from kb.boundary import boundary
 
 
 class Importing(NamedTuple):

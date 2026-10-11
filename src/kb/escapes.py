@@ -1,4 +1,4 @@
-"""The fault an exception that escapes the domain becomes, at the servicer's one boundary: the client's clock failing,
+"""The fault an exception that escapes the domain becomes, at kb.boundary's one boundary: the client's clock failing,
 the store busy, a store made by an earlier or a later kb, a database that cannot be read, and anything else."""
 import sqlite3
 

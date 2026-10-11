@@ -20,7 +20,8 @@ import grpc
 from kb import served, store
 from kb.addresses import Address
 from kb.contract import kb_pb2, kb_pb2_grpc
-from kb.servicer import KbServicer, boundary
+from kb.boundary import boundary
+from kb.servicer import KbServicer
 from kb.values import TYPE_KIND, type_of
 
 WORKERS = 8  # calls answered at once
