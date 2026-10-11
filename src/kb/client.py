@@ -61,7 +61,7 @@ class Client:
         if refusal is not None:
             return responses.refused(response, [refusal])
         if found.address is not None:
-            if self._clock is not None and getattr(KbServicer, rpc).writes:
+            if self._clock is not None and getattr(KbServicer, rpc).writes(request):
                 return responses.refused(response, [refusals.clock_with_a_server()])
             return network.called(found.address, rpc, request, response)
         return getattr(KbServicer(found.root, self._clock), rpc)(request, None)

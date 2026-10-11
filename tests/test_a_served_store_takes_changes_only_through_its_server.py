@@ -1,7 +1,7 @@
 """While `kb serve` owns a store, every rpc that writes, asked of the store directly, is refused with `served`, naming
-the server's address, and writes nothing, while every read is answered; a server killed without warning leaves the
-store taking changes again; and a second server on a served store is refused before it listens, the first serving on
-(the plan's decisions 1 to 4)."""
+the server's address, and writes nothing, while every read is answered, a set asked to be checked only among them; a
+server killed without warning leaves the store taking changes again; and a second server on a served store is refused
+before it listens, the first serving on (the plan's decisions 1 to 4)."""
 import pytest
 
 from calls import (
@@ -58,6 +58,22 @@ READING = {
     "Placeholders": lambda: kb_pb2.PlaceholdersRequest(),
     "Export": lambda: kb_pb2.ExportRequest(),
 }
+
+
+CHECKING = {rpc: WRITING[rpc] for rpc in ("BatchCreate", "BatchReplace")}
+
+
+@pytest.mark.parametrize("rpc", CHECKING)
+def test_a_set_asked_of_a_served_store_directly_to_be_checked_only_is_answered_and_writes_nothing(root, request, rpc):
+    client = _started(root)
+    serving.serving(root, request)
+    before = held.holds(root), held.history(client)
+    asked = CHECKING[rpc]()
+    asked.check_only = True
+    answered = answer(getattr(client, rpc)(asked))
+    assert not answered.refused, answered.faults
+    assert (answered.batch, len(answered.results)) == ("", 1)
+    assert (held.holds(root), held.history(client)) == before
 
 
 @pytest.mark.parametrize("rpc", WRITING)

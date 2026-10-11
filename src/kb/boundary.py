@@ -29,16 +29,22 @@ def guarded(clock):
     return read_it
 
 
-def boundary(response, opens: bool = True, at_one_moment: bool = False, writes: bool = False):
+def never(request) -> bool:
+    """What a call that never writes, whatever its request, says of each: that it does not."""
+    return False
+
+
+def boundary(response, opens: bool = True, at_one_moment: bool = False, writes=never):
     """The rpc or the operator's command, over the store opened for it unless it starts one, every read it makes
     seeing the store at one moment when it only reads, answered with a response of this type: what it gave, or a
-    refusal when anything in it is refused or any exception escapes it. An rpc that writes is refused while a server
-    owns the store, unless this servicer is the one that server hosts, and says it writes (`writes`)."""
+    refusal when anything in it is refused or any exception escapes it. A call that writes is refused while a server
+    owns the store, unless this servicer is the one that server hosts; whether a call writes is asked of its request
+    (`writes`), which the rpc carries for whoever else must know."""
     def wrap(rpc):
         @functools.wraps(rpc)
         def run(self, request, context=None):
             try:
-                if writes and not self._hosted:
+                if writes(request) and not self._hosted:
                     served.unserved(self._root)
                 if not opens:
                     return responses.answered(response, rpc(self, request))
@@ -70,7 +76,7 @@ def streamed(response):
                     message, more = _next(response, given)
                     if message is not None:
                         yield message
-        run.writes = False
+        run.writes = never
         return run
     return wrap
 

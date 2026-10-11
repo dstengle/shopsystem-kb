@@ -84,19 +84,20 @@ class InOrder:
 
 
 class _OneAtATime:
-    """The servicer a server hosts, each rpc that writes taken under the server's lock (`Server.taking`), so changes
-    are taken one at a time in the order they come to it; every other rpc as the servicer answers it."""
+    """The servicer a server hosts, each call that writes taken under the server's lock (`Server.taking`), so changes
+    are taken one at a time in the order they come to it; every other call as the servicer answers it. Whether a
+    call writes is asked of its request, as the servicer marks its rpc (`writes`)."""
 
     def __init__(self, servicer: KbServicer, server: "Server"):
         self._servicer, self._server = servicer, server
 
     def __getattr__(self, name):
         rpc = getattr(self._servicer, name)
-        if not getattr(rpc, "writes", False):
-            return rpc
 
         @functools.wraps(rpc)
         def taken(request, context=None):
+            if not rpc.writes(request):
+                return rpc(request, context)
             with self._server.taking:
                 return rpc(request, context)
         return taken

@@ -86,6 +86,11 @@ def replacing_many(request: kb_pb2.BatchReplaceRequest) -> tuple[list, Signed]:
     ])
 
 
+def checked_only(request: kb_pb2.BatchCreateRequest | kb_pb2.BatchReplaceRequest) -> bool:
+    """Whether a set of creates or of replacements asks to be checked only, so that nothing of it lands."""
+    return request.check_only
+
+
 def adding_many(request: kb_pb2.BatchAddRequest) -> tuple[list, Signed]:
     """An BatchAdd as the domain takes it: a set of items added, signed."""
     return _many(request.signature, [
