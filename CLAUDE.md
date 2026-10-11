@@ -98,7 +98,7 @@ module that does not own it.
 
 ## Size and shape
 
-- No module over 250 lines; `servicer.py` under 100. When a change would
+- No module over 250 lines; `servicer.py` under 150. When a change would
   cross a limit, split first.
 - A function does one thing at one level of abstraction; if it needs a
   comment to separate its phases, it is two functions.
