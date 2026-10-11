@@ -13,7 +13,7 @@ from calls import (
     DECISION_TYPE, add, add_many, added, check, define, iri, placeholders, read, remove, replace, replace_many,
     replaced, replacing, request, start_a_store, targets,
 )
-from conftest import _kb
+from conftest import OPERATOR, _kb, exported
 from kb import client as kb_client
 
 LINKING_TYPE = copy.deepcopy(DECISION_TYPE)
@@ -320,3 +320,63 @@ def test_a_link_that_waits_moved_to_another_holder_or_altered_where_it_is_held_i
     assert held.text(root, LINKER) == before
     assert _listed(placeholders(client)) == _waiting_at(*HELD_BY[holder][1:])
     assert list(check(client).violations) == []
+
+
+# An item with no name, which only a file imported or seeded can hold, is told by where it stands.
+def _imported(directory, root, tmp_path):
+    assert _kb("init", str(root), cwd=tmp_path, env={"KB_ACTOR": OPERATOR}).returncode == 0
+    return _kb("import", str(directory), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+
+def _seeded(directory, root, tmp_path):
+    return _kb("init", str(root), "--seed", str(directory), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+
+
+def _a_decision_whose_link_waits_in_an_option_with_no_name(tmp_path, landed):
+    """A client over a store made from a directory of files, as `landed` lands it, in which the second option of a
+    decision carries no `id` and holds a link into the option "rollback" of a second decision, the second created
+    afterwards with no such option."""
+    def fill(client):
+        define(client, LINKING_TYPE)
+        assert not request(client, "decision", "Price reviews happen weekly", IN_AN_ITEM).faults
+
+    directory = exported(tmp_path, fill)
+    (file,) = [each for each in directory.rglob("*.yaml") if "id: second\n" in each.read_text()]
+    file.write_text(file.read_text().replace("id: second\n    title: Second", "title: Second", 1))
+    root = tmp_path / "landed"
+    root.mkdir()
+    ran = landed(directory, root, tmp_path)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    client = kb_client.connect(root)
+    assert "id" not in held.artifact(root, LINKER)["options"][1]
+    assert not request(client, "decision", "Prices are reviewed monthly", {"sections": SECTIONS, "options": OPTIONS}).faults
+    return root, client
+
+
+LANDED = pytest.mark.parametrize("landed", [_imported, _seeded], ids=["imported", "seeded"])
+NO_NAME = _waiting_at("replaces", "options/1/replaces")
+
+
+def _says_the_link_waits(root, client):
+    """The placeholders rpc, the store's check and `kb validate` each list the link, and nothing is violated."""
+    assert _listed(placeholders(client)) == NO_NAME
+    checked = check(client)
+    assert (list(checked.violations), _listed(checked)) == ([], NO_NAME)
+    validated = _kb("validate", cwd=root, env={})
+    assert (validated.returncode, validated.stdout) == (0, f"placeholder\t{ROLLBACK}\t{LINKER}\toptions/1/replaces\n")
+
+
+@LANDED
+def test_a_link_that_waits_in_an_item_with_no_name_still_waits_once_its_target_is_created_without_the_part(tmp_path, landed):
+    _says_the_link_waits(*_a_decision_whose_link_waits_in_an_option_with_no_name(tmp_path, landed))
+
+
+@LANDED
+def test_a_change_that_leaves_a_link_waiting_in_an_item_with_no_name_lands_and_the_link_still_waits(tmp_path, landed):
+    root, client = _a_decision_whose_link_waits_in_an_option_with_no_name(tmp_path, landed)
+    before = held.text(root, LINKER)
+    changed = replace(client, LINKER, AGAIN[1], path="sections/rationale")
+    assert not changed.faults, changed.faults
+    assert held.text(root, LINKER) != before
+    assert held.artifact(root, LINKER)["options"][1]["replaces"] == ROLLBACK
+    _says_the_link_waits(root, client)

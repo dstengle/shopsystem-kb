@@ -1,8 +1,9 @@
 """The SQLite adapter's checks of a set inside its landing transaction, each on the store as the set finds it or
-leaves it: each change's revision and that of every type it was read through compared with the one it was read at, every link it hands
-landing, on a held artifact or, its target not held, under a held type the link carries and may land on, one into a
-part its held target lacks landing only when it says it waits and its artifact held that very link waiting before the
-set, told as the port tells one link from another (`port.told`: by what holds it, never where it stands), nothing outside it linking into what it removes or drops, and each entry's id held once."""
+leaves it: each change's revision and that of every type it was read through compared with the one it was read at,
+every link it hands landing, on a held artifact or, its target not held, under a held type the link carries and may
+land on, one into a part its held target lacks landing only when it says it waits and its artifact held that very
+link waiting before the set, told as the port tells one link from another (`port.told`: by what holds it, never
+where it stands), nothing outside it linking into what it removes or drops, and each entry's id held once."""
 from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded, held_waiting, told
 from kb.sqlite_reads import Reads
 

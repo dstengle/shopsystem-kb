@@ -2,9 +2,9 @@
 language cannot say, checked in code: required sections in their declared order, and links that land on an artifact
 the corpus holds, or a part inside it, of a kind the type allows, or wait on an IRI it does not hold, under a held
 type the field allows, or already wait, as the store held them, on a part their held target lacks
-(decision/a-link-that-waits-keeps-waiting), each told by what holds it, never by where it stands in a list. Every fault comes back together; kb's rules pass
-over a node JSON Schema found misshapen. kb's keywords are read through kb.composition. What is checked, and the
-corpus it is checked against, are given; nothing here finds or opens a file.
+(decision/a-link-that-waits-keeps-waiting), each told by what holds it, never by where it stands in a list. Every
+fault comes back together; kb's rules pass over a node JSON Schema found misshapen. kb's keywords are read through
+kb.composition. What is checked, and the corpus it is checked against, are given; nothing here finds or opens a file.
 """
 from jsonschema import Draft202012Validator
 from jsonschema_specifications import REGISTRY as SPECIFICATIONS

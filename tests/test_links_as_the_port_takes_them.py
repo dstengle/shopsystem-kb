@@ -65,8 +65,9 @@ def test_a_link_says_it_waits_only_when_it_is_among_those_the_store_held_waiting
     assert marks(frozenset({("", "", ArtifactId(type_iri("decision")), "", 0)})) == [False, False]
 
 
-def test_a_link_says_what_holds_it_by_name_the_artifact_or_the_item_wherever_the_item_stands(root):
-    """Decision 14 of batch 35: an item is named, never counted."""
+def test_a_link_says_what_holds_it_the_artifact_or_the_item_by_name_or_with_no_name_by_where_it_stands(root):
+    """Decision 14 of batch 35: an item is told by its name, wherever it stands; one with no name, which only a file
+    imported can hold, by where it stands, and so is what it holds."""
     start_a_store(root)
     client = kb_client.connect(root)
     linking = copy.deepcopy(DECISION_TYPE)
@@ -75,7 +76,7 @@ def test_a_link_says_what_holds_it_by_name_the_artifact_or_the_item_wherever_the
     }
     define(client, linking)
     options = [{"id": "first", "title": "First"}, {"id": "second", "title": "Second", "replaces": [str(HELD), str(HELD)]},
-               {"title": "Unnamed", "replaces": [str(HELD)]}]
+               {"title": "Unnamed", "replaces": [str(HELD)]}, {"id": 4, "title": "Numbered", "replaces": [str(HELD)]}]
     artifact = {"id": iri("decision", "b"), "type": type_iri("decision") + "@1", "supersedes": str(HELD), "options": options}
     with store.opened(root) as opened:
         draft = Draft(opened)
@@ -83,10 +84,11 @@ def test_a_link_says_what_holds_it_by_name_the_artifact_or_the_item_wherever_the
         handed = links.handed(ArtifactId(iri("decision", "b")), artifact, draft, composition.conformed(artifact, draft))
     assert [(each.place, each.holder) for each in carried] == [
         ("supersedes", ""), ("options/1/replaces/0", "options/second"), ("options/1/replaces/1", "options/second"),
-        ("options/2/replaces/0", None),
+        ("options/2/replaces/0", "options/2"), ("options/3/replaces/0", "options/3"),
     ]
     assert [(each.place, each.holder) for each in handed[1:]] == [(each.place, each.holder) for each in carried]
     assert links.told(carried) == [
         ("supersedes", "", HELD, "", 0), ("replaces", "options/second", HELD, "", 0),
-        ("replaces", "options/second", HELD, "", 1), None,
+        ("replaces", "options/second", HELD, "", 1), ("replaces", "options/2", HELD, "", 0),
+        ("replaces", "options/3", HELD, "", 0),
     ]

@@ -1,7 +1,7 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-and those links as the port takes them, each saying the held type its target sits under, what holds it, by name,
-and whether it is one the store already held waiting, and what tells each from every other (`port.told`). The checks,
-removal, reads and walks all read links here."""
+and those links as the port takes them, each saying the held type its target sits under, what holds it, by name, or
+where it stands when it has none, and whether it is one the store already held waiting, and what tells each from
+every other (`port.told`). The checks, removal, reads and walks all read links here."""
 import dataclasses
 from typing import NamedTuple
 
@@ -13,13 +13,14 @@ class Link(NamedTuple):
     """One link an artifact carries: the field that holds it, the place of that field in the artifact, the name it
     points at, the field's `ref`, which says what it may land on, whether the field is one of the artifact's own,
     holding the link alone or in a list, rather than a field of one of its items, and what holds the field, by name
-    (`port.Link.holder`): nothing for the artifact, the place of the item by its name, None for one with no name."""
+    (`port.Link.holder`): nothing for the artifact, the place of the item by its name, or, for an item with no name,
+    by where it stands."""
     field: str
     place: str
     target: str
     ref: dict
     own: bool
-    holder: str | None = ""
+    holder: str = ""
 
 
 def references(schema: dict, corpus) -> dict[str, dict]:
@@ -87,10 +88,10 @@ def inside(artifact: dict, schema: dict, corpus, node) -> list[Link]:
 
 
 def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus, within, entered: bool,
-              holder: str | None) -> list[Link]:
+              holder: str) -> list[Link]:
     """The links in one node, an artifact or an item, and in the items inside it, its place in the artifact before each
     of theirs; a node's own fields are read only once within, or a node it sits inside, has been entered. `holder`
-    is the node by name."""
+    is the node as `_held` tells it."""
     entered = entered or node is within
     found = _fields(node, refs, at, holder) if entered else []
     for collection, part in parts.items():
@@ -103,20 +104,20 @@ def _links_in(node: dict, refs: dict[str, dict], parts: dict, at: str, corpus, w
             if isinstance(item, dict):
                 found += _links_in(
                     item, item_refs, declared(item_schema, corpus)["parts"], f"{at}{collection}/{index}/", corpus,
-                    within, entered, _named(holder, collection, item),
+                    within, entered, _held(holder, collection, item, index),
                 )
     return found
 
 
-def _named(holder: str | None, collection: str, item: dict) -> str | None:
-    """An item by name: its collection and its name after what holds it; None for an item with no name, or in one."""
+def _held(holder: str, collection: str, item: dict, index: int) -> str:
+    """An item as a link it holds is told by: its collection and its name after what holds it, so wherever it stands
+    there; one with no name, which only a file imported can hold, by where it stands."""
     name = item.get("id")
-    if holder is None or not isinstance(name, str):
-        return None
-    return names.placed((holder, collection, name) if holder else (collection, name))
+    step = name if isinstance(name, str) else str(index)
+    return names.placed((holder, collection, step) if holder else (collection, step))
 
 
-def _fields(node: dict, refs: dict[str, dict], at: str, holder: str | None) -> list[Link]:
+def _fields(node: dict, refs: dict[str, dict], at: str, holder: str) -> list[Link]:
     """The links in a node's own fields, each alone or in a list."""
     found = []
     for field, ref in refs.items():
