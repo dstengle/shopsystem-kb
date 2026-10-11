@@ -12,6 +12,7 @@ from calls import (
     CLIENT, DECISION_TYPE, check, create, define, iri, journal, listing, moment, next_version, start_a_store,
 )
 import held
+import slices
 from kb import cli, client as kb_client, served, store
 
 
@@ -22,6 +23,12 @@ def pytest_configure(config):
         tags.update(re.findall(r"@(slice-\d+(?:\.\d+)?)", feature.read_text()))
     for tag in sorted(tags):
         config.addinivalue_line("markers", f"{tag}: scenario of that slice in the plan")
+    slices.configure(config, Path(config.rootpath, slices.PLAN))
+
+
+def pytest_collection_modifyitems(config, items):
+    """A test of a slice the living plan has not built is expected to fail (tests/slices.py)."""
+    slices.expect_failures(config, items)
 
 
 def _guard_starts(rootpath, base_temp):

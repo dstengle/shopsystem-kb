@@ -107,6 +107,15 @@ module that does not own it.
 
 - `make dev` once; `make test` runs the suite in this checkout's virtualenv, in parallel (`-n auto`), the operator's commands run in-process (one test runs the installed `kb`); during red-green run the slice's marker (`-m slice-N`), and the whole suite once per slice;
   `make contract` regenerates the stubs after `kb.proto` changes.
+- The suite is green between slices: `make test` reports 0 failed, and a failure is a regression. A test carrying a
+  `slice-<n>` marker (a scenario from its feature's `@slice-<n>` tag, a plain test from `slices.waits_on("<n>")`) is
+  expected to fail while the living plan (`docs/superpowers/plans/2026-09-24-kb-slices.md`) lists slice n with a
+  Status other than `green` (`tests/slices.py`): it still runs, its failure is counted as `xfailed` with the reason
+  "slice <n> not built", and its passing before the plan says green as `xpassed`, never as a failure. A slice the plan
+  no longer lists is built, and its tests run for real; a plan that cannot be read stops the run. While a slice is
+  being built, `-m slice-N --runxfail` runs its scenarios for real results, red on their own assertions and then
+  green; `-rxX` lists the expected failures and the unexpected passes with their reasons. The suite record reads
+  "N passed, M expected to fail, K unexpectedly passing, 0 failed" (pytest's `passed`, `xfailed`, `xpassed`).
 - `make image` builds kb's image from the checkout (`shopsystem-kb:dev`); `make image-check` builds its own and checks
   it serves a store beside its callers in a throwaway compose project (`docker/image_check.py`), leaving nothing
   behind. Neither is part of `make test`; a release that fails `image-check` does not ship.
