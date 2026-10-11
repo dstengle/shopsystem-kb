@@ -276,13 +276,13 @@ def _ask_for_the_placeholders(client):
 @then("the client is given the first IRI and the second IRI and nothing else")
 def _given_the_two_iris(asked):
     assert not asked.faults, asked.faults
-    assert sorted((each.id, each.part) for each in asked.placeholders) == sorted(
-        [(NOT_HELD["first"], ""), (NOT_HELD["second"], "")])
+    assert sorted(each.id for each in asked.placeholders) == sorted([NOT_HELD["first"], NOT_HELD["second"]])
 
 
 @then("each comes with these links into it and no others:")
 def _each_with_its_links(asked, datatable):
     given = [
-        (each.id, link.artifact, link.field, link.place) for each in asked.placeholders for link in each.links
+        (each.id, link.artifact, link.field, link.place, link.part)
+        for each in asked.placeholders for link in each.links
     ]
-    assert sorted(given) == sorted(_links(datatable))
+    assert sorted(given) == sorted((*link, "") for link in _links(datatable))

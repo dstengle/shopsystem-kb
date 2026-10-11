@@ -561,31 +561,36 @@ message BatchRemoveResponse {
   }
 }
 
-// Asks for every placeholder: each IRI a link points at that the store
-// does not hold.
+// Asks for every placeholder: each IRI a link lands on nothing at, because
+// the store does not hold it or because what it holds there lacks the part
+// the link names.
 message PlaceholdersRequest {
 }
 
-// A link into a placeholder: the artifact holding it, the field, and the
-// link's place in that artifact.
+// A link into a placeholder: the artifact holding it, the field, the
+// link's place in that artifact, and the part of the placeholder's IRI it
+// names.
 message Linking {
   string artifact = 1;
   string field = 2;
   string place = 3;
+  string part = 4;  // the place of the part the link points into; empty when it names the whole IRI
 }
 
-// An IRI linked to and not held, or, when its links point into a part,
-// that IRI and the part's place, with every link into it, in the order of
-// the names of the artifacts holding them. Nothing is stored for it: it is
-// there while a link points at it.
+// An IRI with every link that lands on nothing there, once however many
+// links name it or parts of it. Either the store does not hold the IRI,
+// and every link to it or into a part of it is given; or it holds an
+// artifact there that lacks a part some links name, and only those links
+// are given, each carrying its part. The links come in the order of the
+// names of the artifacts holding them, then of their places there.
+// Nothing is stored for a placeholder: it is there while a link names it.
 message Placeholder {
   string id = 1;
-  string part = 2;  // the place of the part the links point into; empty for the IRI itself
-  repeated Linking links = 3;
+  repeated Linking links = 2;
 }
 
-// The placeholders, in the order of their names. Links to what the store
-// holds are left out.
+// The placeholders, in the order of their names. A link that lands on an
+// artifact the store holds, or on a part that artifact has, is left out.
 message Placeholders {
   repeated Placeholder placeholders = 1;
 }

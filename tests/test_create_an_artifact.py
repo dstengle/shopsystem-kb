@@ -893,9 +893,9 @@ def _the_placeholders_give_that_iri(client, created):
     asked = placeholders(client)
     assert not asked.faults, asked.faults
     assert [
-        (each.id, each.part, [(link.artifact, link.field, link.place) for link in each.links])
+        (each.id, [(link.artifact, link.field, link.place, link.part) for link in each.links])
         for each in asked.placeholders
-    ] == [(NOT_HELD, "", [(created.id, "supersedes", "supersedes")])]
+    ] == [(NOT_HELD, [(created.id, "supersedes", "supersedes", "")])]
 
 
 @when(

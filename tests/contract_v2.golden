@@ -257,10 +257,10 @@ message Linking
   artifact = 1 singular string
   field = 2 singular string
   place = 3 singular string
+  part = 4 singular string
 message Placeholder
   id = 1 singular string
-  part = 2 singular string
-  links = 3 repeated kb.v2.Linking
+  links = 2 repeated kb.v2.Linking
 message Placeholders
   placeholders = 1 repeated kb.v2.Placeholder
 message PlaceholdersResponse

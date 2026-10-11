@@ -71,15 +71,16 @@ def found(store: Port, asked: Searching) -> kb_pb2.Found:
 
 
 def placeholders(store: Port) -> kb_pb2.Placeholders:
-    """Every placeholder, each IRI a link points at that the store does not hold, or the part a link names that
-    what it holds there lacks, once, in the order of their names, with every link into it: the artifact holding the
-    link, the field and the link's place there."""
-    waited = itertools.groupby(store.waiting(), key=lambda each: (str(each.target), each.part))
+    """Every placeholder, each IRI a link lands on nothing at (the store does not hold it, or what it holds there
+    lacks the part the link names), once, in the order of their names, with every such link: the artifact holding
+    it, the field, the link's place there and the part of the IRI it names, in the port's order."""
+    waited = itertools.groupby(store.waiting(), key=lambda each: str(each.target))
     return kb_pb2.Placeholders(placeholders=[
-        kb_pb2.Placeholder(id=target, part=part, links=[
-            kb_pb2.Linking(artifact=str(each.source), field=each.field, place=each.place) for each in into
+        kb_pb2.Placeholder(id=target, links=[
+            kb_pb2.Linking(artifact=str(each.source), field=each.field, place=each.place, part=each.part)
+            for each in into
         ])
-        for (target, part), into in waited
+        for target, into in waited
     ])
 
 

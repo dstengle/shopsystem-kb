@@ -3,7 +3,7 @@
 None; `kb.contract.kb_pb2`'s being importable, as package `kb.v2`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
 `place`; the reads `Read`, `List`, `Follow`, `Search`, `History` and `Placeholders`, the signed `Snapshot` and the
-`Check`, each answering its result or a refusal; that a placeholder is given by its IRI, its part and the links into it; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
+`Check`, each answering its result or a refusal; that a placeholder is given by its IRI and the links into it, each with the part it names; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
 faults; that each item an `BatchAdd` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
 import dataclasses
@@ -193,9 +193,9 @@ def test_each_read_the_snapshot_and_the_check_answer_their_result_or_a_refusal(r
     assert _fields(f"{rpc}Response") == {"result", "refusal"}
 
 
-def test_a_placeholder_is_given_by_its_iri_its_part_and_the_links_into_it():
-    assert _fields("Placeholder") == {"id", "part", "links"}
-    assert _fields("Linking") == {"artifact", "field", "place"}
+def test_a_placeholder_is_given_by_its_iri_and_the_links_into_it_each_with_the_part_it_names():
+    assert _fields("Placeholder") == {"id", "links"}
+    assert _fields("Linking") == {"artifact", "field", "place", "part"}
     assert _field_type("Placeholders", "placeholders") == "Placeholder"
     assert _field_type("Placeholder", "links") == "Linking"
     for message, field in (("Placeholders", "placeholders"), ("Placeholder", "links")):

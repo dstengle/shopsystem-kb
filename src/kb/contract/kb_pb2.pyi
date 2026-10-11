@@ -648,24 +648,24 @@ class PlaceholdersRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class Linking(_message.Message):
-    __slots__ = ("artifact", "field", "place")
+    __slots__ = ("artifact", "field", "place", "part")
     ARTIFACT_FIELD_NUMBER: _ClassVar[int]
     FIELD_FIELD_NUMBER: _ClassVar[int]
     PLACE_FIELD_NUMBER: _ClassVar[int]
+    PART_FIELD_NUMBER: _ClassVar[int]
     artifact: str
     field: str
     place: str
-    def __init__(self, artifact: _Optional[str] = ..., field: _Optional[str] = ..., place: _Optional[str] = ...) -> None: ...
+    part: str
+    def __init__(self, artifact: _Optional[str] = ..., field: _Optional[str] = ..., place: _Optional[str] = ..., part: _Optional[str] = ...) -> None: ...
 
 class Placeholder(_message.Message):
-    __slots__ = ("id", "part", "links")
+    __slots__ = ("id", "links")
     ID_FIELD_NUMBER: _ClassVar[int]
-    PART_FIELD_NUMBER: _ClassVar[int]
     LINKS_FIELD_NUMBER: _ClassVar[int]
     id: str
-    part: str
     links: _containers.RepeatedCompositeFieldContainer[Linking]
-    def __init__(self, id: _Optional[str] = ..., part: _Optional[str] = ..., links: _Optional[_Iterable[_Union[Linking, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., links: _Optional[_Iterable[_Union[Linking, _Mapping]]] = ...) -> None: ...
 
 class Placeholders(_message.Message):
     __slots__ = ("placeholders",)

@@ -182,7 +182,8 @@ class Port(Protocol):
 
     def waiting(self) -> list[Linking]:
         """Every link that lands on nothing held: one whose target is not held, or into a part its held target lacks;
-        never an implicit one. By the name it points at, then the part, then the artifact holding it, then as handed."""
+        never an implicit one. By the name it points at, whatever part of it, then the artifact holding it, then as
+        handed."""
 
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:

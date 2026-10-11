@@ -475,9 +475,9 @@ def test_the_links_landing_on_nothing_held_are_given_by_what_they_point_at_then_
     assert store.waiting() == [
         port.Linking(name("work/w"), "uses", "uses/2", name("decision/a"), ""),
         port.Linking(name("note/n"), "about", "about", name("decision/b"), ""),
+        port.Linking(name("note/n"), "into", "into/1", name("decision/b"), "options/x"),
         port.Linking(name("work/w"), "uses", "uses/0", name("decision/b"), ""),
         port.Linking(name("work/w"), "uses", "uses/3", name("decision/b"), ""),
-        port.Linking(name("note/n"), "into", "into/1", name("decision/b"), "options/x"),
     ]
 
 
@@ -485,7 +485,9 @@ def test_a_link_into_a_part_of_an_iri_not_held_still_waits_when_what_is_created_
     land(store, put("schema/decision", {"title": "Decision"}))
     to = lambda place, part: link("into", place, "decision/later", ["decision"], part, under="schema/decision")
     land(store, put("note/n", {}, links=[to("into/0", "options/a"), to("into/1", "options/b"), to("into/2", "")]))
-    assert [each.place for each in store.waiting()] == ["into/2", "into/0", "into/1"]
+    assert [(each.place, each.part) for each in store.waiting()] == [
+        ("into/0", "options/a"), ("into/1", "options/b"), ("into/2", ""),
+    ]
     land(store, put("decision/later", {}, parts=["options/b"]))
     assert store.waiting() == [port.Linking(name("note/n"), "into", "into/0", name("decision/later"), "options/a")]
 
