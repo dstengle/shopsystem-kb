@@ -53,11 +53,11 @@ Feature: Check the store
   @slice-170
   Scenario: A store holding links to IRIs it does not hold lists each placeholder with what links to it
     Pins that a link to something the store does not hold is reported as a placeholder with every link into it, so each can be found and filled, and never mixed in with what is wrong or what is behind.
-    Given a store holding a decision that links to an IRI the store does not hold from one of its fields and again from one of its sections
+    Given a store holding a decision that links to an IRI the store does not hold from one of its fields and again from one of its items
     And the store holds another decision that breaks a rule of its type
     And the store holds a third decision that conforms to a version of the decision type a later version has followed
     When the client checks the store
-    Then the IRI is listed as a placeholder with each link into it: the decision and the field, and the decision and the section
+    Then the IRI is listed as a placeholder with each link into it: the decision and the field, and the decision and the item
     And the placeholder is listed apart from the violations and from the artifacts behind their type
 
   @slice-170
