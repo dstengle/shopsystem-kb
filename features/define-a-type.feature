@@ -247,6 +247,7 @@ Feature: Define a type
       | refers to a shape the first type's first version defines |
       | is built on the first type's first version              |
 
+  @slice-166.2
   Scenario: Removing a type while a link waits on an IRI under it is refused
     Pins that a placeholder holds its type in place: a link waiting on something not yet written keeps the type it will be written under.
     Given a tag type the store holds, with no artifacts of its kind, and a decision that links to a tag the store does not hold
@@ -254,6 +255,7 @@ Feature: Define a type
     Then the removal is rejected because something still points at it, naming the decision
     And the store still holds the tag type
 
+  @slice-166.3
   Scenario Outline: Defining a type under another type's IRI, over what already sits there, is refused
     Pins that a new type cannot take over what was written or linked under an older one: an IRI's type is settled by what already sits there.
     Given a decision type the store holds, and <what sits there>

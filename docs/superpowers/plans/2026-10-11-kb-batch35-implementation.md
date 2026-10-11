@@ -222,3 +222,38 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 - [ ] **Tests the decisions break:** none.
 - [ ] **Verify:** `.venv/bin/python -m pytest -q -m slice-168` gives 4 passed, and `make test` shows no new failure.
 - [ ] **Checkpoint:** the reply carries the checkpoint entry for slice 168 (this task is in a lane).
+
+---
+
+Tasks 8 and 9 were added on 2026-10-11 from slice 165.7's review (decision/a-types-place-is-settled-by-what-sits-under-it). They run after Task 3 and before the lanes.
+
+11. **A type holding placeholders is not removed.** A removal of a type is refused, with the reason and rule a removal carries while artifacts of its kind exist, while any stored link's target is an IRI not held whose nearest held type is that type; the refusal names each linking artifact once, in kb's order, beside whatever else stands in the way. It is checked against the state the whole set leaves and holds at landing: a link landing under the type at the same moment as its removal does not leave both landed.
+12. **A type is not defined over what sits under another.** A define of a type T at an IRI under a held type U's IRI is refused, with rule `identity`, while the store holds an artifact that conforms to a version of U at an IRI under T's, or a stored link waits on an IRI under T's that is not held; the refusal names each such IRI. A define with nothing under it is accepted as today, and so is a type whose IRI sits under no other type's. It holds at landing against a create or a link landing under T's IRI at the same moment.
+
+### Task 8: Slice 166.2. A type is not removed while a link waits under it
+
+Review: per-task
+Model: opus
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-166.2`, 1 scenario, 1 collected): define-a-type / Removing a type while a link waits on an IRI under it is refused.
+- [ ] **Why it is red today:** no steps; the removal lands, and the store's check then reports a link violation on the artifact that holds the link.
+- [ ] **Where the change lands** (about 4 production, 3 test): the read of links waiting under a type (`port.py`, `sqlite_reads.py`, the draft's equivalent), the removal's refusal where slice 165.1 put the referring-types refusal (`drafting.py`), the adapter's landing check for the race (`sqlite_checks.py`) only if the domain's draft under the write lock (slice 165.1's rule for a set that removes a type) does not already hold it; `tests/test_define_a_type.py`, `tests/test_the_storage_port.py`, one module for the race.
+- [ ] **Decisions applied:** 11, 1.
+- [ ] **Tests the decisions break:** `tests/test_the_storage_port.py`, slice 165.7's case of a type removed while a link waits under it (it pins that the removal lands at the port): rewritten to what the port must now do, or kept if the refusal is the domain's alone and the port still lands what it is handed; the implementer says which and why.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-166.2"` gives 1 passed; the race in both orders by a plain test with `at_once`; `make test` shows no new failure.
+- [ ] **Checkpoint:** `plan status 166.2 green`, then `plan log "Suite: ..."`.
+
+### Task 9: Slice 166.3. A type is not defined over what already sits under another
+
+Review: per-task
+Model: opus
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-166.3`, 1 scenario outline, 2 collected): define-a-type / Defining a type under another type's IRI, over what already sits there, is refused (a held decision; a link waiting on a decision not held).
+- [ ] **Why it is red today:** no steps; the define lands, after which the held decision sits under a type it was not checked against, and an artifact of the new type may be created where the link waits for a decision.
+- [ ] **Where the change lands** (about 4 production, 2 test): what sits under an IRI, held or waited on (`port.py`, `sqlite_reads.py`, the draft's equivalent, reusing Task 8's read where it serves), the define's refusal beside slice 158's identity check (`edits.py` or `drafting.py`, `refusals.py`); `tests/test_define_a_type.py`, one module for the race.
+- [ ] **Decisions applied:** 12, 1.
+- [ ] **Tests the decisions break:** any existing test that defines a type under another type's IRI above held artifacts and expects it to land (the batch 32 review's reproduction was a probe, not a test; the scout found none). One that breaks is a `BLOCKED` reply naming it, unless its setup alone can change with no assertion changed.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-166.3"` gives 2 passed; the race (a create under the new type's IRI at the same moment as its define) in both orders by a plain test; `make test` shows no new failure.
+- [ ] **Checkpoint:** `plan status 166.3 green`, then `plan log "Suite: ..."`.
