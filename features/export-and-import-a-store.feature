@@ -2,7 +2,7 @@
 Feature: Export and import a store
   Narrator: the operator
 
-  @slice-174
+  @slice-165.3
   Scenario Outline: The operator exports the store to a directory that is empty or does not exist
     Pins what an export is: one readable file per artifact placed by its IRI, a type written only as its versions, each version as it stood, saying who the artifact is before what it holds, all taken from a single moment of the store.
     Given a store holding a type for decisions at two versions, a type for work items at one version, two decisions and a work item
@@ -19,6 +19,7 @@ Feature: Export and import a store
       | is empty       |
       | does not exist |
 
+  @slice-165.3
   Scenario: An artifact that conforms to an earlier version of its type is exported in the order that version declares
     Pins that an export shows each artifact as the version it conforms to declares it, so its file does not change shape when its type moves on.
     Given a store holding a note type whose first version declares a summary then a body and whose second declares the body then the summary
@@ -157,6 +158,7 @@ Feature: Export and import a store
     Then the store's history gains one import entry for each of the five artifacts
     And in the history each type's import entry comes before the import entries of the artifacts of its kind
 
+  @slice-165.6
   Scenario: A store holding an artifact behind its type comes back from its export as it was
     Pins that an export carries everything a store needs to read its artifacts again: every version of a type travels, and an artifact left at an earlier version is still held to that version after the import.
     Given a store holding a note type at two versions, the second requiring an owner the first does not, and a note that conforms to the first version, with no owner
