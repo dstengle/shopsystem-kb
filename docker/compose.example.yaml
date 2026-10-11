@@ -1,8 +1,9 @@
 # kb served beside its callers: the README's "Running kb in Docker". Callers reach it by its service name, kb:50051,
-# through the connection a compose config gives them; no port is published to the host.
+# through the connection a compose config gives them; no port is published to the host. KB_VERSION names the release
+# of kb to build, the version in its pyproject.toml, tagged v<version>: `KB_VERSION=<version> docker compose up`.
 services:
   kb:
-    build: https://github.com/dstengle/shopsystem-kb.git#v0.7.0
+    build: https://github.com/dstengle/shopsystem-kb.git#v${KB_VERSION:?set KB_VERSION to the release of kb to build}
     environment:
       KB_ACTOR: operator            # needed only when the store is started
     volumes:

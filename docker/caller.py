@@ -2,8 +2,8 @@
 `KB_ROOT=/kb-connection`, where a compose config puts the connection `kb/server.yaml`. Every call goes through
 `kb.client.connect()` and so over the network to the server the connection names.
 
-    python caller.py change        reads the seeded decision, defines the note type, creates a note, prints its id
-    python caller.py read <id>     reads the artifact named, prints its id and title
+    python caller.py change        reads the seeded decision, defines the note type, creates a note, prints its IRI
+    python caller.py read <id>     reads the artifact at the IRI named, prints its IRI and title
 
 It exits 0 when each call answers as it should, and 1, naming the call, when one does not.
 """
@@ -13,7 +13,9 @@ from kb.client import connect
 from kb.content import dumps
 from kb.contract import kb_pb2
 
-SEEDED = "decision/price-reviews-happen-weekly"
+TYPE_OF_TYPES = "https://missingmass.io/kb/type"
+NOTE = "https://shop.example/kb/note"
+SEEDED = "https://shop.example/kb/decision/price-reviews-happen-weekly"
 NOTE_TYPE = {
     "version": 1,
     "schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]},
@@ -35,10 +37,11 @@ def read(client, artifact_id: str):
     )))
 
 
-def create(client, kind: str, title: str, content: dict) -> str:
-    """A Create of the kind given, answering the name kb gave it."""
-    return answered(f"Create {kind}", client.Create(kb_pb2.CreateRequest(
-        kind=kind, title=title, content=dumps(content), signature=CALLER,
+def create(client, at: str, kind: str, title: str, content: dict) -> str:
+    """A Create at the IRI given, conforming to the first version of the type at the IRI `kind`, answering the IRI
+    the store holds it at."""
+    return answered(f"Create {at}", client.Create(kb_pb2.CreateRequest(
+        id=at, type=f"{kind}@1", title=title, content=dumps(content), signature=CALLER,
     ))).id
 
 
@@ -47,8 +50,8 @@ def change(client) -> None:
     seeded = read(client, SEEDED)
     if seeded.title != "Price reviews happen weekly":
         sys.exit(f"Read {SEEDED} answered the title {seeded.title!r}")
-    create(client, "schema", "Note", NOTE_TYPE)
-    print(create(client, "note", "Served from a container", {}))
+    create(client, NOTE, TYPE_OF_TYPES, "Note", NOTE_TYPE)
+    print(create(client, f"{NOTE}/served-from-a-container", NOTE, "Served from a container", {}))
 
 
 def main(argv: list[str]) -> None:

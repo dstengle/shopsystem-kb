@@ -28,6 +28,8 @@ KB = Path(sys.executable).parent / "kb"
 ROLE_LINE = "kb serve: refused: actor: a store can only be started under a role, named through KB_ACTOR"
 PATIENCE = 180
 SERVE = "kb serve /data --listen 0.0.0.0:50051 --start"  # the image's default command, run under a shell
+TYPE_OF_TYPES = "https://missingmass.io/kb/type"
+TYPES_AT = "https://shop.example/kb/"  # where the seed's type and the caller's (docker/caller.py) are defined
 DECISION_TYPE = {
     "version": 1,
     "schema": {
@@ -41,7 +43,8 @@ DECISION = {"sections": [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]}
-LOST = "id: widget/lost\ntype: widget\nschema_version: 1\nrevision: 1\ntitle: Lost\n"
+LOST_AT = "shop.example/kb/widget/lost.yaml"  # its place in the export layout, the host and path of its IRI
+LOST = f"id: {TYPES_AT}widget/lost\ntype: {TYPES_AT}widget@1\nrevision: 1\ntitle: Lost\n"
 
 
 class Failed(Exception):
@@ -84,14 +87,17 @@ def seeds(scratch: Path) -> dict[str, dict[str, str]]:
     kb.init(source, "operator")
     client = connect(source)
     signed = kb_pb2.Signature(role="operator", message="Seed the image check")
-    for kind, title, content in (("schema", "Decision", DECISION_TYPE),
-                                 ("decision", "Price reviews happen weekly", DECISION)):
-        created = client.Create(kb_pb2.CreateRequest(kind=kind, title=title, content=dumps(content), signature=signed))
+    decision = TYPES_AT + "decision"
+    for at, kind, title, content in (
+            (decision, TYPE_OF_TYPES, "Decision", DECISION_TYPE),
+            (f"{decision}/price-reviews-happen-weekly", decision, "Price reviews happen weekly", DECISION)):
+        created = client.Create(kb_pb2.CreateRequest(
+            id=at, type=f"{kind}@1", title=title, content=dumps(content), signature=signed))
         holds(created.WhichOneof("outcome") == "result", "the seed is made", str(created))
     ran = subprocess.run([str(KB), "export", str(exported)], cwd=source, capture_output=True, text=True)
     holds(ran.returncode == 0, "the seed is exported", ran.stderr)
     clean = {str(f.relative_to(exported)): f.read_text() for f in sorted(exported.rglob("*.yaml"))}
-    return {"seed": clean, "refused-seed": {**clean, "widget/lost.yaml": LOST}}
+    return {"seed": clean, "refused-seed": {**clean, LOST_AT: LOST}}
 
 
 def project_file(image: str, seeded: dict[str, dict[str, str]]) -> dict:
@@ -139,7 +145,7 @@ def checks(compose: "Compose") -> None:
 def refused_seed_leaves_no_store(compose: "Compose") -> None:
     ran = compose.run("refused-seed", "init", "/data", "--seed", "/seed")
     holds(ran.returncode == 2, "a refused seed exits 2", ran)
-    holds(any(line.startswith("error\twidget/lost") for line in ran.stdout.splitlines()),
+    holds(any(line.startswith(f"error\t{LOST_AT}\t") for line in ran.stdout.splitlines()),
           "a refused seed's report is shown", ran)
     holds("kb init: refused: " in ran.stderr, "a refused seed is refused", ran)
     listed = compose.run("kb", "-A", "/data", entrypoint="ls")
@@ -167,7 +173,7 @@ def a_caller_reads_and_changes(compose: "Compose") -> str:
     ran = compose.run("agent", "change")
     holds(ran.returncode == 0, "a caller reads and changes through kb:50051", ran)
     created = ran.stdout.strip()
-    holds(created.startswith("note/"), "the caller's change is named", ran)
+    holds(created.startswith(f"{TYPES_AT}note/"), "the caller's change is named", ran)
     passed(f"a second container reaches kb:50051 through a compose config, reads the seed and creates {created}")
     return created
 
@@ -217,11 +223,11 @@ def a_store_its_user_cannot_write(compose: "Compose") -> None:
 def an_empty_data_its_user_cannot_write(compose: "Compose") -> None:
     ran = compose.run("unwritable", "-c", f"{SERVE}; refused=$?; ls -A /data; exit $refused", entrypoint="sh")
     holds(ran.returncode == 2, "an empty /data its user cannot write exits 2", ran)
-    refusals = [line for line in ran.stderr.splitlines() if line.startswith("kb serve: refused: ")]
-    holds(any("Permission denied" in line for line in refusals), "it is refused, the refusal naming its cause", ran)
+    refusals = [line for line in ran.stderr.splitlines() if line.startswith("kb serve: refused: root: ")]
+    holds(any("'/data'" in line for line in refusals), "it is refused with root, naming the directory", ran)
     holds("Traceback" not in ran.stderr, "no traceback", ran)
     holds(ran.stdout == "", "nothing is left in /data", ran)
-    passed("an empty /data its user cannot write exits 2 with kb serve's refusal, no traceback, nothing made in it")
+    passed("an empty /data its user cannot write exits 2 refused with root, naming it, no traceback, nothing made in it")
 
 
 class Compose:
