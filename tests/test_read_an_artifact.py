@@ -542,6 +542,11 @@ def _the_decision_also_points_at_an_iri_not_held(client):
     assert not changed.faults, changed.faults
 
 
+_WAITED = kb_pb2.Placeholder(id=NOT_HELD, links=[kb_pb2.Linking(artifact=DECISION, field="revisits", place="revisits")])
+"""The one link of the decision that lands on nothing held, as a read gives it: the whole of what a read marks, so
+a link that lands is shown unmarked by the list holding this alone."""
+
+
 @pytest.fixture
 def came_back(request):
     """What the scenario's read gave, and whether it was read at a glance rather than whole."""
@@ -564,9 +569,7 @@ def _the_link_is_marked_and_not_filled_in(came_back):
     if at_a_glance:
         _the_stub_is_marked_as_not_held(given)
         return
-    assert list(given.placeholders) == [kb_pb2.Placeholder(id=NOT_HELD, links=[
-        kb_pb2.Linking(artifact=DECISION, field="revisits", place="revisits"),
-    ])]
+    assert list(given.placeholders) == [_WAITED]
     assert loads(given.content)["revisits"] == NOT_HELD
 
 
@@ -576,7 +579,7 @@ def _the_link_that_lands_carries_no_mark(came_back):
     if at_a_glance:
         assert [stub.not_held for stub in given.references if stub.id == OLDER] == [False]
     else:
-        assert OLDER not in [placeholder.id for placeholder in given.placeholders]
+        assert list(given.placeholders) == [_WAITED]
 
 
 @when("the client reads the rationale of the decision", target_fixture="shown")

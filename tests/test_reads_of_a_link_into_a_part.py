@@ -105,7 +105,7 @@ def test_the_inbound_count_of_the_artifact_the_part_is_in_counts_the_link(client
 
 
 def waiting(part):
-    """The note's link as a whole read gives it when it lands on nothing held: under the decision's IRI, with the
+    """The note's link as a read gives it when it lands on nothing held: under the decision's IRI, with the
     part of it the link names."""
     return [kb_pb2.Placeholder(id=MONTHLY, links=[
         kb_pb2.Linking(artifact=NOTE, field="about", place="about", part=part),
@@ -122,11 +122,22 @@ def test_read_whole_a_link_into_a_part_its_held_artifact_has_carries_no_mark(cli
     assert not answered(read(client, NOTE, whole=True, depth=depth)).placeholders
 
 
-def test_a_link_into_a_part_its_held_artifact_lacks_is_marked_read_whole_and_its_stub_is_not(client, not_held):
+def test_a_link_into_a_part_its_held_artifact_lacks_is_marked_read_whole_and_at_a_glance(client, not_held):
     """The decision created after the link, without the option the link names: the link lands on nothing held, which
-    a whole read says with the part; at a glance the stub is of the decision, which is held, and carries no mark."""
+    a whole read and a read at a glance both say with the part; at a glance the stub is of the decision, which is
+    held, and so is not marked as not held."""
     create(client, "decision", {"title": "Price reviews happen monthly", "sections": SECTIONS})
     assert list(answered(read(client, NOTE, whole=True)).placeholders) == waiting("options/go-monthly")
-    assert list(answered(read(client, NOTE)).references) == [kb_pb2.Stub(
+    shown = answered(read(client, NOTE))
+    assert list(shown.placeholders) == waiting("options/go-monthly")
+    assert list(shown.references) == [kb_pb2.Stub(
         field="about", id=MONTHLY, type=type_iri("decision") + "@1", title="Price reviews happen monthly", fields="{}\n",
     )]
+
+
+def test_at_a_glance_a_link_into_a_part_of_an_iri_not_held_is_marked_with_the_part(client, not_held):
+    assert list(answered(read(client, NOTE)).placeholders) == waiting("options/go-monthly")
+
+
+def test_at_a_glance_a_link_into_a_part_its_held_artifact_has_carries_no_mark(client, held):
+    assert not answered(read(client, NOTE)).placeholders

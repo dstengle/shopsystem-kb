@@ -2,8 +2,9 @@
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too.
 A link to an IRI the store does not hold is never followed: its stub is the IRI alone, marked as not held, and read
 whole it stays a name. A link into a part of an artifact is read as a link to that artifact, and read whole it stays
-the reference written. A whole read gives, beside its content, each link the artifact carries that lands on nothing
-held: on an IRI the store does not hold, or on a part the artifact it holds there lacks."""
+the reference written. A read at a glance or whole gives, beside its content, each link it shows that lands on nothing
+held, on an IRI the store does not hold or on a part the artifact it holds there lacks: the links of the artifact
+read and, read whole following links, of each artifact filled in. A section shows no link and gives none."""
 from dataclasses import replace
 
 from kb import composition, links, names, places, refusals, settled, values
@@ -95,22 +96,25 @@ def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
 
 
 def _whole(store: Port, locator: Locator, depth: int) -> kb_pb2.Artifact:
-    found = _resolved(store, locator.id, depth, {str(locator.id)})
+    shown: dict[str, dict] = {}
+    found = _resolved(store, locator.id, depth, {str(locator.id)}, shown)
     response = _response(found, dumps(settled.content(found)))
-    response.placeholders.extend(_placeholders(store, store.artifact(locator.id)))
+    response.placeholders.extend(_placeholders(store, list(shown.values())))
     return response
 
 
-def _placeholders(store: Port, found: dict) -> list[kb_pb2.Placeholder]:
-    """Each IRI a link the artifact carries lands on nothing at, in the order of their names, with those links in the
-    order the artifact holds them, each saying the part of the IRI it names."""
+def _placeholders(store: Port, shown: list[dict]) -> list[kb_pb2.Placeholder]:
+    """Each IRI a link of the artifacts shown lands on nothing at, in the order of their names, with those links, the
+    artifacts holding them in the order of their names and each one's links in the order it holds them, each saying
+    whose it is and the part of the IRI it names."""
     waited: dict[str, list] = {}
-    for link in links.carried(found, composition.artifact_schema(found, store)["schema"], store):
-        target = values.target(link.target)
-        if not _lands(store, target):
-            waited.setdefault(str(target.id), []).append(kb_pb2.Linking(
-                artifact=found["id"], field=link.field, place=link.place, part=names.placed(target.place),
-            ))
+    for found in sorted(shown, key=lambda each: names.order(each["id"])):
+        for link in links.carried(found, composition.artifact_schema(found, store)["schema"], store):
+            target = values.target(link.target)
+            if not _lands(store, target):
+                waited.setdefault(str(target.id), []).append(kb_pb2.Linking(
+                    artifact=found["id"], field=link.field, place=link.place, part=names.placed(target.place),
+                ))
     return [kb_pb2.Placeholder(id=name, links=waited[name]) for name in sorted(waited, key=names.order)]
 
 
@@ -137,6 +141,7 @@ def _summary(store: Port, locator: Locator) -> kb_pb2.Artifact:
     response = _response(found, dumps(_summary_fields(found, declared)))
     for link in links.carried(found, schema, store):
         response.references.append(stub(store, link.field, values.target(link.target).id))
+    response.placeholders.extend(_placeholders(store, [found]))
     for collection in declared["parts"]:
         for item in found.get(collection, []):
             response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
@@ -152,19 +157,21 @@ def _response(found: dict, content: str) -> kb_pb2.Artifact:
     )
 
 
-def _resolved(store: Port, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
+def _resolved(store: Port, artifact_id: ArtifactId, depth: int, on_path: set, shown: dict[str, dict]) -> dict:
     """The artifact as stored, each link in its own fields followed depth steps with the target, itself resolved, in
     place of its name; a link inside one of its items stays a name. A target on the path already being filled in
     stays a name, so a loop ends, and so does one the store does not hold; a link into a part of an artifact stays
-    the reference written, a part being no artifact."""
+    the reference written, a part being no artifact. Each artifact given, this one and those filled in, is put in
+    `shown` as stored, once."""
     found = store.artifact(artifact_id)
+    shown.setdefault(str(artifact_id), found)
     if depth < 1:
         return found
     def fill(target):
         linked = values.target(target)
         if linked.place or target in on_path or not store.holds(linked.id):
             return target
-        return _resolved(store, linked.id, depth - 1, on_path | {target})
+        return _resolved(store, linked.id, depth - 1, on_path | {target}, shown)
     resolved = dict(found)
     carried = links.carried(found, composition.artifact_schema(found, store)["schema"], store)
     for field in {link.field for link in carried if link.own}:

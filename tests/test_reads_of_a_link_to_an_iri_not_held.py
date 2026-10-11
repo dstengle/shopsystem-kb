@@ -1,7 +1,8 @@
 """No held artifact is unreadable for a link it holds to an IRI the store does not hold (decision 7 of batch 35):
 every read level, a Follow each way and a list answer, the IRI not held coming back as the IRI alone, marked as not
-held, with no kind, title or fields, never filled in and never walked on from, and a whole read giving the link
-beside its content as landing on nothing held. Through the contract."""
+held, with no kind, title or fields, never filled in and never walked on from, and a read at a glance or whole
+giving beside its content each link it shows that lands on nothing held, the links of each artifact it fills in
+among them. Through the contract."""
 import pytest
 
 from calls import TAG_TYPE, create, define, iri, listing, read, refs, start_a_store, tagged_decision_type, type_iri
@@ -18,6 +19,7 @@ SECTIONS = [
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
 BARE = kb_pb2.Stub(field="supersedes", id=NOT_HELD, not_held=True)
+WAITED = kb_pb2.Placeholder(id=NOT_HELD, links=[kb_pb2.Linking(artifact=WEEKLY, field="supersedes", place="supersedes")])
 
 
 @pytest.fixture
@@ -108,11 +110,23 @@ def test_a_list_of_its_kind_gives_it_with_the_link_as_the_iri_it_names(client):
 
 @pytest.mark.parametrize("depth", [0, 1, 2])
 def test_read_whole_the_link_is_marked_as_landing_on_nothing_held_and_the_link_that_lands_is_not(client, depth):
-    assert list(answered(read(client, WEEKLY, whole=True, depth=depth)).placeholders) == [
-        kb_pb2.Placeholder(id=NOT_HELD, links=[kb_pb2.Linking(artifact=WEEKLY, field="supersedes", place="supersedes")]),
-    ]
+    assert list(answered(read(client, WEEKLY, whole=True, depth=depth)).placeholders) == [WAITED]
 
 
-def test_at_a_glance_and_by_section_nothing_is_given_beside_the_stubs(client):
-    assert not answered(read(client, WEEKLY)).placeholders
+def test_at_a_glance_the_link_is_marked_beside_the_stubs_and_a_section_which_shows_no_link_gives_none(client):
+    assert list(answered(read(client, WEEKLY)).placeholders) == [WAITED]
     assert not answered(read(client, WEEKLY, section="Rationale")).placeholders
+
+
+@pytest.mark.parametrize("depth, marked", [(0, []), (1, [WAITED]), (2, [WAITED])])
+def test_read_whole_following_links_the_link_of_an_artifact_filled_in_is_marked_naming_that_artifact(client, depth, marked):
+    """The daily decision supersedes the weekly one, held, whose own links show only once it is filled in: the one
+    to an IRI not held is then marked as the weekly decision's, and neither the link to it nor its tag, which land."""
+    assert list(answered(read(client, DAILY, whole=True, depth=depth)).placeholders) == marked
+
+
+@pytest.mark.parametrize("depth, marked", [(0, []), (1, []), (2, [WAITED])])
+def test_read_whole_following_links_two_steps_the_link_of_an_artifact_two_steps_away_is_marked(client, depth, marked):
+    create(client, "decision", {"title": "Price reviews happen hourly", "supersedes": DAILY, "sections": SECTIONS})
+    hourly = iri("decision", "price-reviews-happen-hourly")
+    assert list(answered(read(client, hourly, whole=True, depth=depth)).placeholders) == marked

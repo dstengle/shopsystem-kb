@@ -117,9 +117,13 @@ message ReadRequest {
 // An artifact at the level read: its identity and its content at that
 // level; a summary's content is the fields the type shows at a glance,
 // with a stub of each reference target and of each part, and inbound
-// counts. Read whole, following links or not, each link it carries that
-// lands on nothing held is given beside the content, where the link
-// stays as written: a link that lands is not among them.
+// counts. Read at a glance or whole, each link the read shows that lands
+// on nothing held, on an IRI the store does not hold or on a part the
+// artifact held there lacks, is given beside the content, where the link
+// stays as written: the links of the artifact read and, read whole
+// following links, of each artifact filled in, at every step followed,
+// each saying whose it is. A link that lands is not among them. A
+// section shows no link, and its read gives none.
 message Artifact {
   reserved 2, 3;
   reserved "kind", "schema_version";
@@ -131,7 +135,7 @@ message Artifact {
   repeated Stub references = 7;
   repeated PartStub parts = 8;
   repeated InboundCount inbound = 9;
-  repeated Placeholder placeholders = 11;  // a whole read's: each IRI a link of it lands on nothing at, with those links
+  repeated Placeholder placeholders = 11;  // each IRI a link shown, of it or of an artifact filled in, lands on nothing at, with those links
 }
 
 // A refusal: a bad locator, a name the store lacks, a place or a section
@@ -143,9 +147,13 @@ message ReadResponse {
   }
 }
 
-// An artifact in brief. A link's stub is of the artifact the link points
+// An artifact in brief: one a list or a search gives, one a walk
+// reaches, or one a link of an artifact read at a glance points at.
+// When it is the stub of a link, it is of the artifact the link points
 // at or into a part of; when the store does not hold that artifact the
-// stub is its IRI alone, marked as not held.
+// stub is its IRI alone, marked as not held. A link into a part its held
+// artifact lacks has that artifact's stub, not so marked: the read's
+// placeholders say that it lands on nothing held.
 message Stub {
   reserved 3;
   reserved "kind";
@@ -154,7 +162,7 @@ message Stub {
   string type = 6;  // the IRI of the type version it conforms to
   string title = 4;
   string fields = 5;   // canonical YAML
-  bool not_held = 7;  // the store holds nothing at its IRI, which a link points at
+  bool not_held = 7;  // the stub of a link, at a glance or walked to: the store holds nothing at its IRI; never said of a part
 }
 
 message PartStub {
