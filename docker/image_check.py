@@ -26,6 +26,8 @@ CHECKOUT = Path(__file__).resolve().parent.parent
 CALLER = Path(__file__).resolve().parent / "caller.py"
 KB = Path(sys.executable).parent / "kb"
 ROLE_LINE = "kb serve: refused: actor: a store can only be started under a role, named through KB_ACTOR"
+# What kb says of a root it cannot write (src/kb/store.py), as the operator of the container sees it.
+UNWRITABLE = "a store is started in a directory kb can write, and '/data' is not one"
 PATIENCE = 180
 SERVE = "kb serve /data --listen 0.0.0.0:50051 --start"  # the image's default command, run under a shell
 TYPE_OF_TYPES = "https://missingmass.io/kb/type"
@@ -223,11 +225,12 @@ def a_store_its_user_cannot_write(compose: "Compose") -> None:
 def an_empty_data_its_user_cannot_write(compose: "Compose") -> None:
     ran = compose.run("unwritable", "-c", f"{SERVE}; refused=$?; ls -A /data; exit $refused", entrypoint="sh")
     holds(ran.returncode == 2, "an empty /data its user cannot write exits 2", ran)
-    refusals = [line for line in ran.stderr.splitlines() if line.startswith("kb serve: refused: root: ")]
-    holds(any("'/data'" in line for line in refusals), "it is refused with root, naming the directory", ran)
+    refusals = [line for line in ran.stderr.splitlines() if line.startswith("kb serve: refused: ")]
+    holds(len(refusals) == 1 and refusals[0].startswith("kb serve: refused: root: "), "one refusal, of the root", ran)
+    holds(UNWRITABLE in refusals[0], "it names the directory and the cause, that kb cannot write there", ran)
     holds("Traceback" not in ran.stderr, "no traceback", ran)
     holds(ran.stdout == "", "nothing is left in /data", ran)
-    passed("an empty /data its user cannot write exits 2 refused with root, naming it, no traceback, nothing made in it")
+    passed("an empty /data its user cannot write exits 2 with one line, root, naming it and the cause, nothing made")
 
 
 class Compose:
