@@ -141,13 +141,17 @@ PLACEHOLDERS = [
 
 
 @given("it holds a decision that does not fit its type")
-def _it_holds_a_decision_that_does_not_fit():
-    """The store whose content the operator did not write holds one: the decision edited by hand."""
+def _it_holds_a_decision_that_does_not_fit(root):
+    """The store whose content the operator did not write holds one, the decision edited by hand, and no other."""
+    assert [fault.artifact for fault in check(kb_client.connect(root)).violations] == [MONTHLY]
 
 
 @given("it holds a decision that conforms to a version of its type a later version has followed")
-def _it_holds_a_decision_behind_its_type():
+def _it_holds_a_decision_behind_its_type(root):
     """The store whose content the operator did not write holds them: its decisions conform to the first version."""
+    assert [(stale.artifact, stale.schema_version) for stale in check(kb_client.connect(root)).stale] == [
+        (WEEKLY, 1), (MONTHLY, 1),
+    ]
 
 
 @given(
@@ -224,8 +228,9 @@ def _nothing_else_to_find(root):
 
 @then("the store checks clean")
 def _the_store_checks_clean(ran):
+    """The check does not fail, and says nothing but the one link into the placeholder."""
     assert (ran.returncode, ran.stderr) == (0, "")
-    assert _listed(ran, "violation") == []
+    assert ran.stdout.splitlines() == PLACEHOLDERS[:1]
 
 
 @when("the operator asks what the command line offers", target_fixture="ran")

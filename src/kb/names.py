@@ -85,6 +85,12 @@ def linked(text: str) -> tuple[str, str]:
     return name, place
 
 
+def pointing(name, place: str) -> str:
+    """A link written as a field holds it, which `linked` reads back: the name it points at and, after `#`, the place
+    inside that artifact, when it names one."""
+    return f"{name}#{place}" if place else str(name)
+
+
 def placed(steps) -> str:
     """A place inside an artifact as it is written: its steps, each a collection, an item's or a section's name, or a
     field, joined by slashes."""
