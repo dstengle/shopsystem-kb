@@ -87,7 +87,7 @@ class KbServicer(kb_pb2_grpc.KbServicer):
 
     @streamed(kb_pb2.ExportResponse)
     def Export(self, request, held):
-        return map(responses.exported, export.taken(held))
+        return map(responses.exported, export.taken(held, requests.exporting(request)))
 
     @changing(kb_pb2.SnapshotResponse)
     def Snapshot(self, request, held):

@@ -1,11 +1,13 @@
 """Export through the contract, bound to its feature: the steps of the scenarios built so far, each export asked of
 the client as any rpc is and its stream read through `calls`."""
+import re
+
 import pytest
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 import held
-from calls import (DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, answer, create, define, export, filed, iri, journal,
-                   next_version, replace, start_a_store, type_iri)
+from calls import (DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, answer, create, define, export, exporting, filed, iri,
+                   journal, next_version, replace, slug, start_a_store, type_iri)
 from kb import client as kb_client
 from kb.content import dumps, loads
 from kb.contract import kb_pb2
@@ -179,3 +181,61 @@ def _one_file_for_each_version(exported):
 def _each_at_the_type_place_and_number(exported):
     placed = {place: loads(text)["version"] for place, text in exported.files if loads(text)["id"] == type_iri("decision")}
     assert placed == {filed(type_iri("decision"), number): number for number in (1, 2, 3)}
+
+
+BELOW = r'(decision|work item) whose path below its type is "([^"]+)"'
+
+
+@given(parsers.re(rf"a store holding (?P<named>an? {BELOW}.*)"))
+def _artifacts_below_their_types(root, client, named):
+    """Each decision and work item the step names, at the path below its type the step gives it."""
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    define(client, WORK_ITEM_TYPE)
+    for kind, path in re.findall(BELOW, named):
+        content = {"sections": SECTIONS} if kind == "decision" else {}
+        create(client, slug(kind), {"title": path, **content}, at=iri(slug(kind), path))
+
+
+@when(parsers.parse('the client exports selecting the path "{path}"'), target_fixture="stream")
+def _exports_selecting_a_path(client, path):
+    return client.Export(exporting(path=path))
+
+
+@then(parsers.re(r"the client is given the files? of (?P<these>the (?:decision|work item) at .*)"),
+      target_fixture="selected")
+def _given_the_files_of_these(root, exported, these):
+    """The whole export, and in it the file of each artifact the step names, showing what the store holds of it;
+    the places of those files are what the next step holds every file given against."""
+    assert exported.complete, exported.faults
+    files = dict(exported.files)
+    named = [iri(slug(kind), path) for kind, path in re.findall(r'(decision|work item) at "([^"]+)"', these)]
+    for name in named:
+        assert loads(files[filed(name)]) == held.artifact(root, name)
+    return [filed(name) for name in named]
+
+
+@then("the client is given no other file")
+def _given_no_other_file(exported, selected):
+    assert sorted(place for place, _ in exported.files) == sorted(selected)
+
+
+@when("the client exports selecting the type for decisions", target_fixture="stream")
+def _exports_selecting_a_type(client):
+    return client.Export(exporting("decision"))
+
+
+@then("the client is given the files of the two decisions", target_fixture="selected")
+def _given_the_files_of_the_two_decisions(root, exported, made):
+    """The whole export, and in it each decision's file, showing what the store holds of it."""
+    assert exported.complete, exported.faults
+    files = dict(exported.files)
+    for name in made[:2]:
+        assert loads(files[filed(name)]) == held.artifact(root, name)
+    return [filed(name) for name in made[:2]]
+
+
+@when(parsers.parse('the client exports selecting the path "{path}" and the type for decisions together'),
+      target_fixture="stream")
+def _exports_selecting_a_path_and_a_type(client, path):
+    return client.Export(exporting("decision", path))

@@ -61,6 +61,13 @@ class Listing:
     path: Below | None = None
 
 
+@dataclass(frozen=True)
+class Selection:
+    """What an export is narrowed to: a kind, a path below the type, both, or, with neither, nothing."""
+    kind: Kind | None = None
+    path: Below | None = None
+
+
 def reading(request: kb_pb2.ReadRequest) -> Reading:
     """The level asked for, a summary when none is: a whole read's depth, a section read's title. A locator naming a
     type's version is a read of that version, its locator the type's."""
@@ -112,6 +119,17 @@ def listing(request: kb_pb2.ListRequest) -> Listing:
     if faults:
         raise Refused(faults)
     return Listing(kind, dict(request.fields), request.form == kb_pb2.ListRequest.IDS, path)
+
+
+def exporting(request: kb_pb2.ExportRequest) -> Selection:
+    """What an export is narrowed to, its kind and its path below the type, each when given; both faults when both
+    fail."""
+    faults = []
+    kind = _converted(values.kind, request.kind, faults)
+    path = _converted(values.below, request.path, faults)
+    if faults:
+        raise Refused(faults)
+    return Selection(kind, path)
 
 
 def _converted(convert, text: str, faults: list, always: bool = False):

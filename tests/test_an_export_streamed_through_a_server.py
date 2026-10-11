@@ -127,8 +127,8 @@ class Slowly:
     def __init__(self):
         self._taken, self._go = kb_export.taken, threading.Event()
 
-    def __call__(self, store):
-        for count, given in enumerate(self._taken(store)):
+    def __call__(self, store, asked):
+        for count, given in enumerate(self._taken(store, asked)):
             yield given
             if count == 1:
                 assert self._go.wait(serving.PATIENCE), "the export was never let go on"

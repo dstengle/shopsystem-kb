@@ -3,13 +3,15 @@ gives, `<dir>/<host>/<segment>/.../<segment>.yaml`, and a type as its versions, 
 other, each at the type's place and its number, `<dir>/<host>/.../<segment>@<n>.yaml` (export-and-import-a-store).
 Each artifact's entries are written in the order the version of its type it conforms to declares; its content,
 revision and type version are written as the store holds them, a type's version with the content, the revision and
-the title it was made with."""
+the title it was made with. Through the contract an export may be narrowed to a kind, a path below the type, or
+both (decision/export-selections-combine); the operator's is always the whole store."""
 from dataclasses import dataclass, field
 from typing import Iterator, NamedTuple
 
 from kb import canonical, composition, file_refusals, names, settled
 from kb.port import Port
 from kb.port_values import TypeVersion
+from kb.requests import Selection
 from kb.roots import Named
 from kb.values import Kind, Refused, Version
 
@@ -33,17 +35,22 @@ class Position(NamedTuple):
     entry: str
 
 
-def taken(store: Port) -> Iterator[File | Position]:
-    """The store's files, each read as it is asked for, then the position they reflect. The caller holds the store
-    at one moment from before the first is asked for until the position is given."""
-    yield from files(store)
+def taken(store: Port, asked: Selection = Selection()) -> Iterator[File | Position]:
+    """The files of what the export asked for selects, each read as it is asked for, then the position they
+    reflect, the store's whatever was selected. The caller holds the store at one moment from before the first is
+    asked for until the position is given."""
+    yield from files(store, asked)
     yield Position(store.landed_last())
 
 
-def files(store: Port) -> Iterator[File]:
+def files(store: Port, asked: Selection = Selection()) -> Iterator[File]:
     """Every artifact the store holds and every version it holds of every type, each at its place as canonical
-    text, read as it is asked for."""
-    for name in store.ids():
+    text, read as it is asked for. Asked for a kind, a path below the type or both, only the artifacts the port
+    gives for them (`Port.ids`): those of that kind, of whatever kind when none is asked for, that the path
+    selects. Raises Refused, before any file is given, for a kind the store holds no type for."""
+    if asked.kind is not None:
+        composition.kind_type(asked.kind, store)
+    for name in store.ids(asked.kind, None, asked.path):
         artifact = store.artifact(name)
         if settled.typed(artifact):
             yield from _versions(store, name)

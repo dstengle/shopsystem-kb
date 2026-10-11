@@ -692,8 +692,12 @@ class PlaceholdersResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Placeholders, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ExportRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("path", "kind")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    kind: str
+    def __init__(self, path: _Optional[str] = ..., kind: _Optional[str] = ...) -> None: ...
 
 class ExportedFile(_message.Message):
     __slots__ = ("place", "text")

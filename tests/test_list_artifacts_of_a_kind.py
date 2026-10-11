@@ -3,7 +3,9 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import DECISION_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, iri, listing, refs, search, start_a_store, version_iri
+import held
+from calls import (DECISION_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, export, iri, listing, refs, search,
+                   start_a_store, type_iri, version_iri)
 from kb import client as kb_client
 from kb.content import loads
 
@@ -128,7 +130,14 @@ CALLS = {
         lambda client: search(client, "restocking", type_name="invoice"),
     "follows the links into a decision, only from artifacts of that kind":
         lambda client: refs(client, MONTHLY, 1, inward=True, type_name="invoice"),
+    "exports only the artifacts of that kind":
+        lambda client: export(client, "invoice"),
 }
+
+
+@given(parsers.parse('a store that holds no type for the kind "{kind}"'))
+def _no_type_for_the_kind(root, kind):
+    assert not held.holds_artifact(root, type_iri(kind))
 
 
 @when(parsers.re(f"the client (?P<call>{'|'.join(map(re.escape, CALLS))})"), target_fixture="answered")
@@ -140,4 +149,4 @@ def _ask_by_that_kind(client, call):
 def _rejected_for_its_kind(answered):
     assert [(fault.artifact, fault.place, fault.rule) for fault in answered.faults] == [("", "", "kind")]
     assert "a kind must name a type the store holds" in answered.faults[0].message
-    assert "'invoice'" in answered.faults[0].message
+    assert repr(type_iri("invoice")) in answered.faults[0].message

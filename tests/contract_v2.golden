@@ -272,6 +272,8 @@ message PlaceholdersResponse
   result = 1 singular kb.v2.Placeholders oneof outcome
   refusal = 2 singular kb.v2.Refusal oneof outcome
 message ExportRequest
+  path = 1 singular string
+  kind = 2 singular string
 message ExportedFile
   place = 1 singular string
   text = 2 singular string

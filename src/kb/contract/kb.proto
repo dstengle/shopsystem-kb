@@ -627,8 +627,16 @@ message PlaceholdersResponse {
   }
 }
 
-// Asks for the whole store as its canonical files.
+// Asks for the store as its canonical files: the whole store, or, with a
+// path, a kind or both, only the files of the artifacts they select. A
+// path selects the artifacts whose path below their own type begins with
+// its segments, whole segments only, whatever their type; a kind, named
+// by its type's IRI as a list's is, those of that type; both, those of
+// that type the path selects. A kind the store holds no type for is
+// refused as a list by it is.
 message ExportRequest {
+  string path = 1;
+  string kind = 2;
 }
 
 // One file of an export: its place below the directory an export is

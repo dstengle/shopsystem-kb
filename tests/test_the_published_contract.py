@@ -181,7 +181,7 @@ READS = {
     "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
     "Check": ("CheckRequest", set(), "Checked", {"violations", "stale", "placeholders"}),
     "Placeholders": ("PlaceholdersRequest", set(), "Placeholders", {"placeholders"}),
-    "Export": ("ExportRequest", set(), "Exported", {"file", "end"}),
+    "Export": ("ExportRequest", {"path", "kind"}, "Exported", {"file", "end"}),
 }
 
 

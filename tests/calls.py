@@ -520,9 +520,16 @@ def placeholders(client):
     return answer(client.Placeholders(kb_pb2.PlaceholdersRequest()))
 
 
-def export(client):
-    """The whole store exported through the contract, the stream read to its end."""
-    return answer(client.Export(kb_pb2.ExportRequest()))
+def export(client, type_name="", path=""):
+    """The store exported through the contract, whole, or only what the type, the path below the type, or both
+    select, the stream read to its end."""
+    return answer(client.Export(exporting(type_name, path)))
+
+
+def exporting(type_name="", path=""):
+    """An export's request: of the whole store, or of what a type, by its short name or its IRI, a path below the
+    type, or both select."""
+    return kb_pb2.ExportRequest(path=path, kind=type_iri(type_name) if type_name else "")
 
 
 def next_version(client, kind, type_content, sections=None):
