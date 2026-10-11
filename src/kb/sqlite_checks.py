@@ -18,7 +18,8 @@ class Checks(Reads):
         return held
 
     def _unmoved(self, changes: list[Change]) -> None:
-        """Conflict when a type a change was read through stands at another revision than the one it was read at."""
+        """Conflict when a type a change was read through stands at another revision than the one it was read at,
+        an IRI read as holding nothing, at revision 0, among them."""
         for type_id, read in {each for change in changes for each in change.through}:
             self._compared(type_id, read)
 

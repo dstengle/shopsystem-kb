@@ -10,9 +10,10 @@ import pytest
 
 import at_once
 from calls import (
-    DECISION_TYPE, TAG_TYPE, TYPES, check, create, create_many, created, creating, define, iri, placeholders, read,
-    remove, request, start_a_store, type_iri,
+    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, TYPES, check, create, create_many, created, creating, define, iri,
+    placeholders, read, remove, replacing, request, start_a_store, type_iri,
 )
+from kb import changes
 from kb import client as kb_client
 
 SECTIONS = [{"title": "Purpose", "body": "Ship what is ready.\n"}, {"title": "Rationale", "body": "Small steps.\n"}]
@@ -102,6 +103,7 @@ def test_a_define_at_an_iri_already_held_is_refused_for_that_alone(client):
 def test_only_what_sits_under_the_new_types_iri_stands_in_the_way(client):
     create(client, "decision", decision("Ship weekly"), at=iri("decision", "major/ship-weekly"))
     create(client, "decision", decision("Ship daily", iri("decision", "minority")))
+    create(client, "decision", decision("Ship monthly"), at=iri("decision", "minority/a"))
     refused = defined(client)
     assert sitting(refused) == [], refused.faults
 
@@ -177,3 +179,74 @@ def test_a_link_landing_after_the_define_of_a_type_above_what_it_waits_on_is_ref
     assert read(client, LINKING).faults and not read(client, MINOR).faults
     assert list(placeholders(client).placeholders) == []
     assert not check(client).violations
+
+
+def test_a_create_some_way_below_its_type_is_drafted_once_when_nothing_lands_meanwhile(root, client):
+    create_it = at_once.OnAThread(root, "Create", creating("decision", "Ship weekly", untitled(WAITED_ON), at=SITTING))
+    landed = at_once.landed_second(create_it, lambda: None)
+    assert not landed.faults, landed.faults
+    assert create_it.drafts == 1
+
+
+def test_a_change_to_an_artifact_holding_a_link_that_waits_some_way_below_its_type_is_drafted_once(root, client):
+    create(client, "decision", decision("Ship daily", WAITED_ON))
+    replace_it = at_once.OnAThread(root, "Replace", replacing(LINKING, untitled(WAITED_ON)))
+    landed = at_once.landed_second(replace_it, lambda: None)
+    assert not landed.faults, landed.faults
+    assert replace_it.drafts == 1
+
+
+def test_a_link_drafted_to_a_held_artifact_does_not_land_waiting_under_a_type_defined_once_it_was_removed(root, client):
+    """The link is drafted and stamped while what it lands on is held; as it is handed to the store, that artifact is
+    removed and a type defined above where it was; the link would wait on an IRI of a type its field does not
+    allow."""
+    create(client, "decision", decision("Ship monthly"), at=WAITED_ON)
+
+    def first():
+        assert not remove(client, WAITED_ON).faults
+        assert not defined(client).faults
+
+    faults = at_once.handed_after(root, changes.creating(creating("decision", "Ship daily", untitled(WAITED_ON))), first)
+    assert faults == [(LINKING, "supersedes", "ref")]
+    assert read(client, LINKING).faults and not read(client, MINOR).faults
+    assert list(placeholders(client).placeholders) == []
+    assert not check(client).violations
+
+
+def test_a_create_below_an_artifact_is_refused_once_that_artifact_made_way_for_a_type(root, client):
+    """A decision is held at `decision/minor`, between the new decision's IRI and its type's; while the create is
+    held, that decision is removed and a type defined where it was, standing at the revision the decision stood
+    at."""
+    create(client, "decision", decision("Minor"), at=MINOR)
+    create_it = at_once.OnAThread(root, "Create", creating("decision", "Ship weekly", untitled(), at=SITTING))
+
+    def first():
+        assert not remove(client, MINOR).faults
+        assert not defined(client).faults
+
+    landed = at_once.landed_second(create_it, first)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in landed.faults] == [(SITTING, "", "identity")]
+    assert read(client, SITTING).faults and not check(client).violations
+
+
+def test_a_type_held_under_the_type_of_types_iri_does_not_stand_in_the_way_of_a_define_above_it(client):
+    """A type's IRI is free (decision/type-iris-are-free): it does not belong to the type of types by where it
+    sits."""
+    assert not defined(client, at=TYPE_OF_TYPES + "/shop/tag").faults
+    assert not defined(client, at=TYPE_OF_TYPES + "/shop").faults
+    assert not check(client).violations
+
+
+def test_a_link_waiting_under_the_type_of_types_iri_stands_in_the_way_of_a_define_above_it(client):
+    schema = copy.deepcopy(DECISION_TYPE["schema"])
+    schema["properties"]["supersedes"]["ref"]["targets"] = [TYPE_OF_TYPES]
+    describing = iri("decision", "describing")
+    assert not request(client, TYPES, "Describing", {"version": 1, "schema": schema}, at=describing).faults
+    assert not defined(client, at=TYPE_OF_TYPES + "/shop/held").faults
+    waited_on = TYPE_OF_TYPES + "/shop/tag"
+    create(client, describing, decision("Ship daily", waited_on), at=iri("decision", "describing/ship-daily"))
+    refused = defined(client, at=TYPE_OF_TYPES + "/shop")
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [
+        (TYPE_OF_TYPES + "/shop", "", "identity"),
+    ]
+    assert repr(waited_on) in refused.faults[0].message

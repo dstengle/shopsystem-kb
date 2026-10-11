@@ -1,16 +1,15 @@
 """The write path: a set drafted and checked (kb.drafting); only when every change passes is each entry's stamp
 settled by the clock and the set handed to the port, which lands every change and one entry per operation naming the
 set in one transaction. When another change lands between the draft and the landing, an artifact the set changes or a
-type it was read through having moved or been removed, the port refuses it, and the set is
-drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again; so
-is a set that removes a type, whose draft found no other type reading it and no link waiting on an IRI under it, of
-which the port compares nothing, and a set that defines a type, or that creates an artifact or hands a link to an IRI
-not held with an IRI between it and its type's, where a type may be defined (kb.standing). A
-fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store and recording a
-snapshot land through the port too."""
+type it was read through having moved or been removed, or something having landed where the set was drafted over
+nothing, at an IRI a type could be defined at nearer to what it makes or links to, the port refuses it, and the set is
+drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again; a
+set of which the port compares nothing that would show what landed since lands only so, as its draft says
+(`drafting.Drafted.locked`). A fault anywhere refuses the whole set with every fault found, and nothing is written.
+Starting a store and recording a snapshot land through the port too."""
 from typing import NamedTuple
 
-from kb import canonical, drafting, journal, port, query, refusals, search, settled, standing, store, values
+from kb import canonical, drafting, journal, port, query, refusals, search, settled, store, values
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
@@ -58,12 +57,12 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
     """The set drafted against the store as it stands, each entry's moment read from the clock, then landed. When
     another change lands between the draft and the landing, the set is drafted, stamped and landed again while the
     port holds the write lock, where a change that says the revision it read is compared again, and refused if its
-    artifact moved; a set that removes a type lands only there, where no type reading it can be made, and no link to
-    an IRI not held under it landed, between its draft and its landing; so does a set that defines a type, under
-    whose IRI nothing can land meanwhile, and one a type defined meanwhile could move to another type. Raises
-    Refused with every fault, having written nothing."""
+    artifact moved, and one a type defined meanwhile stands nearer to is refused as not of its type, or its link as
+    one its field does not allow; a set its draft says lands only there (a removal of a type, a define of one, a
+    change below an artifact a type could take the place of) is never landed as first drafted. Raises Refused with
+    every fault, having written nothing."""
     drafted, moments = _readied(held, operations, clock)
-    if not _lands_only_locked(drafted):
+    if not drafted.locked:
         try:
             return _landing(held, drafted, moments, signed)
         except port.Conflict:
@@ -77,16 +76,6 @@ def _readied(held: port.Port, operations: list, clock: journal.Clock | None) -> 
     before the write lock is asked for, a set refused or a clock that fails never taking it."""
     drafted = drafting.drafted(held, operations)
     return drafted, journal.moments(len(drafted.changes), clock)
-
-
-def _lands_only_locked(drafted: drafting.Drafted) -> bool:
-    """Whether a set lands only as drafted while the write lock is held: one that removes a type, which the port
-    compares nothing of that would show a type reading it was made since, or a link landed that waits under it; and
-    one that defines a type, or creates or links where a type may be defined above (kb.standing), of which the port
-    compares nothing that would show what landed under the new type's IRI, or the type, since."""
-    return any(drafting.removes_a_type(change) for change in drafted.changes) or any(
-        standing.movable(change, drafted.draft) for change in drafted.handed
-    )
 
 
 def _landing(held: port.Port, drafted: drafting.Drafted, moments: list, signed: Signed) -> Landed:

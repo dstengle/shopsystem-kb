@@ -51,6 +51,10 @@ class Draft:
             return False
         return artifact_id in self._pending or self._store.holds(artifact_id)
 
+    def changed(self, artifact_id: ArtifactId) -> bool:
+        """Whether the draft put or removed what stands at an IRI."""
+        return artifact_id in self._pending or artifact_id in self._removed
+
     def artifact(self, artifact_id: ArtifactId) -> dict:
         if artifact_id in self._pending:
             return self._pending[artifact_id]

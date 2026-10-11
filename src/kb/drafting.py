@@ -1,7 +1,8 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
 the operations before it left it, then every change checked, its content, its links and a type as a type, against the
 store as the whole set leaves it; each change then as the port takes it, with the revisions of
-the types it was read through. The imports a set makes of one type's versions are handed one after another, in the order of
+the types it was read through and the IRIs where a type could be defined nearer, as holding nothing (kb.standing);
+and whether the set lands only as drafted while the write lock is held. The imports a set makes of one type's versions are handed one after another, in the order of
 their numbers whatever order the set gave them in, each the version its file names at the revision its file gives, read
 at the revision the one before it left the type at; an imported artifact is checked, and its links read, through the
 version of its type its file names. Only
@@ -11,7 +12,7 @@ from typing import NamedTuple
 
 from kb import (
     canonical, composition, definitions, edits, fault_order, links, names, places, port, refusals, requests,
-    search, settled, validation, values,
+    search, settled, standing, validation, values,
 )
 from kb.draft import Draft
 from kb.edits import Change
@@ -19,12 +20,16 @@ from kb.values import Refused
 
 
 class Drafted(NamedTuple):
-    """A set drafted against the store as it stood: the draft, its changes, their texts, and the changes as the port
-    takes them."""
+    """A set drafted against the store as it stood: the draft, its changes, their texts, the changes as the port
+    takes them, and whether it lands only as drafted while the write lock is held, the port comparing nothing that
+    would show what landed since: a set that removes a type (a type made that reads it, a link landed that waits
+    under it), one that defines a type (an artifact or a link landed under its IRI), and one that makes or links
+    to something below an artifact where a type could be defined in that artifact's place (kb.standing)."""
     draft: Draft
     changes: list[Change]
     texts: list[str | None]
     handed: list[port.Change]
+    locked: bool
 
 
 def drafted(held: port.Port, operations: list) -> Drafted:
@@ -37,7 +42,9 @@ def drafted(held: port.Port, operations: list) -> Drafted:
         _handed(draft, change, read, last[change.artifact_id] == index)
         for index, (change, read) in enumerate(zip(changes, _read_at(changes), strict=True))
     ]
-    return Drafted(draft, changes, texts, handed)
+    handed, below = standing.guarded(handed, draft)
+    locked = below or any(removes_a_type(change) or defines_a_type(change) for change in changes)
+    return Drafted(draft, changes, texts, handed, locked)
 
 
 def _by_number(operations: list) -> list:
@@ -110,6 +117,11 @@ def _faults(draft: Draft, outcome: Change | list) -> list:
 def removes_a_type(change: Change) -> bool:
     """Whether a change removes a type."""
     return change.left is None and names.version(change.type)[0] == names.TYPES
+
+
+def defines_a_type(change: Change) -> bool:
+    """Whether a change is the create of a type."""
+    return change.op == "create" and names.version(change.type)[0] == names.TYPES
 
 
 def _read_by(draft: Draft, removal: Change) -> list:
