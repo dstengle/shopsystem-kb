@@ -1,4 +1,1 @@
 # Tests that pass although their slice is not built: they run as ordinary tests. One node id a line; remove an id when its slice lands.
-tests/test_export_and_import_a_store.py::test_each_error_is_reported_by_file_and_reason[cannot be read as YAML 1.2-it cannot be read as YAML 1.2]
-tests/test_export_and_import_a_store.py::test_each_error_is_reported_by_file_and_reason[is not in canonical form-it is not in canonical form]
-tests/test_export_and_import_a_store.py::test_each_error_is_reported_by_file_and_reason[has content that does not fit its type-its content does not fit its type]

@@ -2042,6 +2042,56 @@ def _the_work_item_waits_at_that_iri(root):
 
 EARLY, LATER = iri("note", "early"), iri("decision", "later")
 KEEP = "options/keep"
+ANSWERING_TYPE = copy.deepcopy(DECISION_TYPE)  # decisions carry options, and may link to an option of another
+ANSWERING_TYPE["schema"]["properties"]["answers"] = {
+    "type": "string", "ref": {"targets": targets("decision"), "cardinality": "one", "parts": True, "on_delete": "refuse"},
+}
+FIRST_DECISION, ANSWERING = iri("decision", "first-decision"), iri("decision", "second-decision")
+
+
+def _the_first_decision_with_no_option(client):
+    create(client, "decision", {"title": "First decision", "sections": _sections("Purpose", "Rationale")})
+
+
+@given("a store holding a type for decisions whose decisions carry options and may link to an option of another")
+def _a_store_with_decisions_that_may_link_to_an_option(root):
+    define(_started(root), ANSWERING_TYPE)
+
+
+@given(parsers.parse("a decision with no option held by {holder}"), target_fixture="holder")
+def _a_decision_with_no_option_held_by(root, holder):
+    """The store is given the decision here; the directory is given it as it is made."""
+    if holder == "the store":
+        _the_first_decision_with_no_option(kb_client.connect(root))
+    return holder
+
+
+@given(
+    "a directory for import that checks clean, holding a second decision whose link names an option of the first",
+    target_fixture="target",
+)
+def _for_import_with_a_decision_linking_to_an_option_the_first_lacks(root, tmp_path, holder):
+    """The export of a store whose second decision was written before the first, which was then created with no
+    option; without the first decision's file when the store imported into is the one that holds it."""
+    def fill(client):
+        define(client, ANSWERING_TYPE)
+        create(client, "decision", {
+            "title": "Second decision", "sections": _sections("Purpose", "Rationale"), "answers": f"{FIRST_DECISION}#{KEEP}",
+        })
+        _the_first_decision_with_no_option(client)
+
+    target = _for_import(tmp_path, fill)
+    if holder == "the store":
+        (Path(target) / _file(FIRST_DECISION)).unlink()
+    assert (Path(target) / _file(FIRST_DECISION)).exists() != held.holds_artifact(root, FIRST_DECISION)
+    assert _report(_kb("import", str(target), "--check", cwd=root)) == [["clean", f"{target} checks clean for import"]]
+    return target
+
+
+@then("the second decision's link waits on a placeholder for that option of the first decision")
+def _the_second_decision_waits_for_the_option(root):
+    assert "options" not in held.artifact(root, FIRST_DECISION)
+    assert _waiting_for(root) == [(FIRST_DECISION, ANSWERING, "answers", KEEP)]
 
 
 def _a_note_waiting_on_an_option_its_decision_was_created_without(client):
