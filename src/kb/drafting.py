@@ -43,7 +43,7 @@ def drafted(held: port.Port, operations: list) -> Drafted:
         for index, (change, read) in enumerate(zip(changes, _read_at(changes), strict=True))
     ]
     handed, below = standing.guarded(handed, draft)
-    locked = below or any(removes_a_type(change) or defines_a_type(change) for change in changes)
+    locked = below or any(standing.removes_a_type(change) or standing.defines_a_type(change) for change in changes)
     return Drafted(draft, changes, texts, handed, locked)
 
 
@@ -106,38 +106,12 @@ def _faults(draft: Draft, outcome: Change | list) -> list:
         return [
             refusals.still_linked(str(outcome.artifact_id), each.source, each.place)
             for each in draft.links_in(outcome.artifact_id) if each.source != outcome.artifact_id
-        ] + _read_by(draft, outcome)
+        ] + standing.in_the_way(draft, outcome)
     faults = [*outcome.faults, *_fits(draft, outcome)]
     typed = composition.artifact_kind(outcome.left) == values.TYPE_KIND
     if not faults and typed:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return _in_order(draft, outcome, faults)
-
-
-def removes_a_type(change: Change) -> bool:
-    """Whether a change removes a type."""
-    return change.left is None and names.version(change.type)[0] == names.TYPES
-
-
-def defines_a_type(change: Change) -> bool:
-    """Whether a change is the create of a type."""
-    return change.op == "create" and names.version(change.type)[0] == names.TYPES
-
-
-def _read_by(draft: Draft, removal: Change) -> list:
-    """What still stands in the way of a type's removal as the set leaves the store: each type any held version of
-    which reads a version of it, each artifact holding a link to an IRI not held that belonged to it, and, beside
-    either, each artifact of its kind, every one once, in the order of their names. None for a type nothing reads or
-    waits under, whose artifacts the port finds, and for anything that is not a type."""
-    removed = removal.artifact_id
-    if not removes_a_type(removal):
-        return []
-    waiting = [each.source for each in draft.waiting() if composition.nearest_was(each.target, removed, draft)]
-    standing = {*composition.readers(removed, draft), *waiting}
-    if not standing:
-        return []
-    standing = sorted(standing | set(draft.ids(values.Kind(str(removed)))), key=names.order)
-    return [refusals.still_linked(str(removed), each, "") for each in standing]
 
 
 def _in_order(draft: Draft, change: Change, faults: list) -> list:

@@ -6,7 +6,7 @@ before the set lands would stand nearer to what it makes or links to than the ty
 as holding nothing, so the port refuses the set once something has landed at one."""
 import dataclasses
 
-from kb import composition, names, port, values
+from kb import composition, names, port, refusals, values
 
 TYPE_OF_TYPES = values.type_of(values.TYPE_KIND)
 
@@ -65,3 +65,29 @@ def _between(artifact_id: values.ArtifactId, type_id: values.ArtifactId) -> list
     """The IRIs an IRI sits under that sit under a type's; none for an IRI that does not sit under the type's."""
     above = names.above(artifact_id)
     return [values.ArtifactId(each) for each in above[:above.index(str(type_id))]] if str(type_id) in above else []
+
+
+def removes_a_type(change) -> bool:
+    """Whether a change removes a type."""
+    return change.left is None and names.version(change.type)[0] == names.TYPES
+
+
+def defines_a_type(change) -> bool:
+    """Whether a change is the create of a type."""
+    return change.op == "create" and names.version(change.type)[0] == names.TYPES
+
+
+def in_the_way(draft, removal) -> list:
+    """What still stands in the way of a type's removal as the set leaves the store: each type any held version of
+    which reads a version of it, each artifact holding a link to an IRI not held that belonged to it, and, beside
+    either, each artifact of its kind, every one once, in the order of their names. None for a type nothing reads or
+    waits under, whose artifacts the port finds, and for anything that is not a type."""
+    removed = removal.artifact_id
+    if not removes_a_type(removal):
+        return []
+    waiting = [each.source for each in draft.waiting() if composition.nearest_was(each.target, removed, draft)]
+    blocking = {*composition.readers(removed, draft), *waiting}
+    if not blocking:
+        return []
+    blocking = sorted(blocking | set(draft.ids(values.Kind(str(removed)))), key=names.order)
+    return [refusals.still_linked(str(removed), each, "") for each in blocking]
