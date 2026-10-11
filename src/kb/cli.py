@@ -6,7 +6,8 @@ Each command is one call on the client, or on one of the operator's commands bes
 or to restore one, on kb.staging, or, to serve, on kb.server, a store started first on kb.staging when a start is asked
 for and the root holds none, and taken back there should it then not be served.
 A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
-exits 1. A store served is served until the process is told to stop, and then exits 0.
+exits 1, and one that finds only placeholders, or artifacts behind their type, exits 0. A store served is served
+until the process is told to stop, and then exits 0.
 """
 import argparse
 import os
@@ -143,7 +144,8 @@ def _unservable(listen: str, unservable: ValueError) -> int:
 
 
 def _validate() -> int:
-    """Check the store this directory finds: every violation, then every artifact behind its type, one to a line."""
+    """Check the store this directory finds: every violation, then every artifact behind its type, then every link
+    into a placeholder, one to a line. Only a violation makes the check fail."""
     answered = kb_client.connect().Check(kb_pb2.CheckRequest())
     if answered.WhichOneof("outcome") == "refusal":
         return _refused("validate", answered.refusal.faults)
@@ -153,6 +155,9 @@ def _validate() -> int:
     for stale in checked.stale:
         print(f"stale\t{stale.artifact}\tchecked against version {stale.schema_version} of its type, "
               f"which is at {stale.current}")
+    for placeholder in checked.placeholders:
+        for link in placeholder.links:
+            print("\t".join(("placeholder", placeholder.id, link.artifact, link.place)))
     return VIOLATED if checked.violations else 0
 
 
