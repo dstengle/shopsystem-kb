@@ -1,9 +1,9 @@
 """What names a create's artifact and the items in what an operation puts in the draft: the IRI a create gives, which
 the type it names must be the nearest held one under and nothing may be held at, and a type's free of any other
 type's place (kb.standing); and the items of a new or a revised artifact named, those it held kept
-(kb.names decides what a name looks like and whether it is free); and a type's content given the number of its
+(kb.item_names decides what a name looks like and whether it is free); and a type's content given the number of its
 version."""
-from kb import composition, names, refusals, standing, values
+from kb import composition, item_names, refusals, standing, values
 from kb.draft import Draft
 
 
@@ -27,16 +27,16 @@ def identity(draft: Draft, creation, type_id: values.ArtifactId) -> list:
 
 def items(draft: Draft, declared: dict, content: dict) -> None:
     """The items of a new artifact's content named, each as its collection's item type declares."""
-    names.items(declared["parts"], content, False, _parts(draft))
+    item_names.items(declared["parts"], content, False, _parts(draft))
 
 
 def revised(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content: dict, current: dict) -> tuple:
     """The items of a revised artifact's content named, those it held kept. Returns the faults of the names its items
     hand back that the artifact did not hold, with any of which no item is named."""
-    held = names.held(declared["parts"], current)
-    misnamed = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
+    held = item_names.held(declared["parts"], current)
+    misnamed = [refusals.misnamed(artifact_id, found) for found in item_names.handed_back(declared, content, held)]
     if not misnamed:
-        names.items(declared["parts"], content, True, _parts(draft))
+        item_names.items(declared["parts"], content, True, _parts(draft))
     return tuple(misnamed)
 
 

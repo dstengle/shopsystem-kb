@@ -3,7 +3,7 @@ and a part by its id, which may end in a field. A place is resolved here, once, 
 saying why nothing stands there."""
 from typing import NamedTuple
 
-from kb import names, refusals, settled
+from kb import item_names, names, refusals, settled
 from kb.values import Locator, Refused
 
 
@@ -85,5 +85,5 @@ def _index(collection: str, items, name: str) -> int | None:
 def _name(collection: str, item: dict) -> str | None:
     """How a place names an item: a section by its title's name, a part by its id."""
     if collection == "sections":
-        return names.slug(item["title"]) if isinstance(item.get("title"), str) else None
+        return item_names.slug(item["title"]) if isinstance(item.get("title"), str) else None
     return item.get("id")

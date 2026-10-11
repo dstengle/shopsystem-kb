@@ -3,7 +3,7 @@ Storage takes only these values, never a string that came from a request."""
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from kb import canonical, names, rules, settled
+from kb import canonical, item_names, names, rules, settled
 from kb.content import loads
 from kb.contract import kb_pb2
 
@@ -222,9 +222,9 @@ def item(text: str) -> Content:
 def _titled(tree: dict) -> Content:
     """An item whose title, when it has one, is text whatever it was written as, as an artifact's is, and leaves a
     name to be made from it."""
-    title = names.title(tree.get("title"))
+    title = item_names.title(tree.get("title"))
     if title is None:
         return Content(tree)
-    if not names.slug(title):
+    if not item_names.slug(title):
         return Content(tree, (("title", rules.TITLE, _leaves_nothing(title)),))
     return Content({**tree, "title": title})

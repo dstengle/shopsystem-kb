@@ -2,7 +2,7 @@
 kb.values and type checks in kb.validation; what neither owns is made here, so no domain module names a contract type."""
 from kb import names, rules
 from kb.contract import kb_pb2
-from kb.names import Misnamed
+from kb.item_names import Misnamed
 from kb.values import ArtifactId, Locator
 
 
