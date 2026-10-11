@@ -668,3 +668,69 @@ def test_a_type_defined_again_where_one_was_removed_stands_at_its_first_version_
     assert store.type_version(first) == port.TypeVersion(first, again.content, 1, "Note 1")
     with pytest.raises(KeyError):
         store.type_version(Version(kind("note"), 2))
+
+
+def versions_as_files_give_them(*made):
+    """Changes landing versions of the type of notes in one set, as an import hands them: each `(number, revision)`
+    the version its file names at the revision its file gives, read at the revision the one before it left the type
+    at, 0 for the first."""
+    changes, read = [], 0
+    for number, revision in made:
+        change, version = note_type(number, read=read, schema={"n": number})
+        changes.append((dataclasses.replace(change, revision=revision), version))
+        read = revision
+    return changes
+
+
+def test_two_versions_of_a_type_landed_in_one_set_at_revisions_of_their_own_read_back_as_made_the_type_at_the_higher(
+        store):
+    (made, first), (changed, second) = versions_as_files_give_them((1, 3), (2, 7))
+    land(store, made, changed)
+    assert store.type_version(first) == port.TypeVersion(first, made.content, 3, "Note 1")
+    assert store.type_version(second) == port.TypeVersion(second, changed.content, 7, "Note 2")
+    assert store.versions(name("schema/note")) == [1, 2]
+    assert store.artifact(name("schema/note")) == changed.content
+    assert [short(each) for each in store.ids()] == ["schema/note"]
+    land(store, note_type(3, read=7)[0])
+    assert store.versions(name("schema/note")) == [1, 2, 3]
+
+
+def test_a_set_landing_two_versions_of_a_type_and_an_artifact_linked_to_that_type_does_not_conflict_with_itself(store):
+    land(store, dataclasses.replace(put("schema/tag", {"title": "Tag"}), version=port.Versioned(Version(kind("tag"), 1), "Tag")))
+    (made, first), (changed, second) = versions_as_files_give_them((1, 1), (2, 2))
+    of_its_type = dataclasses.replace(link("type", "", "schema/note", ["schema"]), implicit=True)
+    note = dataclasses.replace(
+        put("note/a", {"title": "A"}, links=[of_its_type]), through=((name("schema/tag"), 1),),
+    )
+    land(store, made, changed, note)
+    assert store.versions(name("schema/note")) == [1, 2]
+    assert store.type_version(first).content == made.content
+    assert store.type_version(second).content == changed.content
+    assert store.artifact(name("note/a")) == {"title": "A"}
+    with pytest.raises(port.Linked):
+        land(store, removal("schema/note", 2))
+
+
+def test_a_set_landing_two_versions_of_a_type_that_is_refused_leaves_neither(store):
+    before = written(store)
+    (made, first), (changed, second) = versions_as_files_give_them((1, 1), (2, 2))
+    with pytest.raises(port.Conflict):
+        land(store, made, changed, put("note/b", {"title": "B"}, read=4))
+    assert written(store) == before
+    assert store.versions(name("schema/note")) == []
+    for version in (first, second):
+        with pytest.raises(KeyError):
+            store.type_version(version)
+
+
+def test_a_reader_holding_one_moment_sees_neither_of_two_versions_a_set_lands_meanwhile_and_then_both(opener, store):
+    (made, first), (changed, second) = versions_as_files_give_them((1, 1), (2, 2))
+    with store.at_one_moment():
+        assert store.versions(name("schema/note")) == []
+        with opener() as other:
+            land(other, made, changed)
+        assert store.versions(name("schema/note")) == []
+        assert not store.holds(name("schema/note"))
+    assert store.versions(name("schema/note")) == [1, 2]
+    assert store.type_version(first).content == made.content
+    assert store.artifact(name("schema/note")) == changed.content

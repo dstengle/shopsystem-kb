@@ -1,9 +1,10 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
 the operations before it left it, then every change checked, its content, its links and a type as a type, against the
 store as the whole set leaves it; each change then as the port takes it, with the revisions of
-the types it was read through. Only what the set changes is handed: a type's change restates the links of no
-artifact, which stay as the version it conforms to declares them. A fault anywhere refuses the whole set with every
-fault found."""
+the types it was read through. The imports a set makes of one type's versions are handed one after another, each the
+version its file names at the revision its file gives, read at the revision the one before it left the type at. Only
+what the set changes is handed: a type's change restates the links of no artifact, which stay as the version it
+conforms to declares them. A fault anywhere refuses the whole set with every fault found."""
 from typing import NamedTuple
 
 from kb import (
@@ -30,8 +31,22 @@ def drafted(held: port.Port, operations: list) -> Drafted:
     changes = _drafted(draft, operations)
     texts = _serialised(changes)
     last = {change.artifact_id: index for index, change in enumerate(changes)}
-    handed = [_handed(draft, change, last[change.artifact_id] == index) for index, change in enumerate(changes)]
+    handed = [
+        _handed(draft, change, read, last[change.artifact_id] == index)
+        for index, (change, read) in enumerate(zip(changes, _read_at(changes), strict=True))
+    ]
     return Drafted(draft, changes, texts, handed)
+
+
+def _read_at(changes: list[Change]) -> list[int]:
+    """The revision each change read its artifact at: the one before the one it leaves; or, for an import, which
+    keeps the revision its file gives, the one the set's change before it left that artifact at, 0, as not held, for
+    the first. So the versions of one type a set imports land one after another, the type standing at the last."""
+    left, read = {}, []
+    for change in changes:
+        read.append(left.get(change.artifact_id, 0) if change.op == "import" else change.revision - 1)
+        left[change.artifact_id] = change.revision
+    return read
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:
@@ -153,14 +168,13 @@ def _serialised(changes: list[Change]) -> list[str | None]:
     return texts
 
 
-def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
-    """A change as the port takes it, read at the revision before the one it leaves, or, for an import, as not held:
+def _handed(draft: Draft, change: Change, read: int, last: bool) -> port.Change:
+    """A change as the port takes it, read at the revision given:
     its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
     artifact, its links and the places of its parts as the set leaves them, read through the type it was checked
     against, with the revisions of the types that version is read through, each kb: reference followed at the version
     it names, that the set leaves as they are; every change that leaves a type with those of the types the version it
     makes reads."""
-    read = 0 if change.op == "import" else change.revision - 1
     if change.left is None:
         return port.Change(change.artifact_id, None, read=read, revision=change.revision)
     searched, kind = tuple(search.searchable(change.left)), composition.artifact_kind(change.left)

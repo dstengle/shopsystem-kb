@@ -736,6 +736,99 @@ def _lands_as_one_signed_set(ran, root, target):
     }
 
 
+def _a_note_type_at_two_versions(client):
+    """A note type made and then changed, so the store holds two versions of it, and no note."""
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    changed = change_type(client, "note", _note_type("body", "summary"))
+    assert not changed.faults, changed.faults
+
+
+def _import_into_a_fresh_store(root, target):
+    start_a_store(root)
+    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+
+
+def test_a_directory_holding_two_versions_of_a_type_and_no_artifact_of_it_lands_each_as_its_file_gives_it(
+    root, tmp_path,
+):
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_two_versions)
+    assert _version_files(target, note) == [_file(note, 1), _file(note, 2)]
+
+    _import_into_a_fresh_store(root, target)
+
+    assert held.versions(root) == {TYPE_OF_TYPES: [1], note: [1, 2]}
+    for number in (1, 2):
+        assert canonical.dump(held.version(root, note, number)) == (target / _file(note, number)).read_text("utf-8")
+    assert held.text(root, note) == (target / _file(note, 2)).read_text("utf-8")
+    assert held.names(root) == sorted([TYPE_OF_TYPES, note])
+
+
+def test_the_history_of_an_import_holds_one_entry_for_each_version_file_of_a_type_in_the_order_of_their_numbers(
+    root, tmp_path,
+):
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_two_versions)
+
+    _import_into_a_fresh_store(root, target)
+
+    entries = _imported(root)
+    assert [(entry.op, entry.artifact, entry.revision, entry.type) for entry in entries] == [
+        ("import", note, 1, version_iri(TYPE_OF_TYPES, 1)), ("import", note, 2, version_iri(TYPE_OF_TYPES, 1)),
+    ]
+    assert len({entry.batch for entry in entries}) == 1 and len({entry.digest for entry in entries}) == 2
+
+
+def test_version_files_of_a_type_land_with_the_revision_and_title_each_gives_the_type_standing_at_the_highest(
+    root, tmp_path,
+):
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_two_versions)
+    given = {1: (3, "Note"), 2: (7, "Memo")}
+    for number, (revision, title) in given.items():
+        _put(target, {**_read(target, note, number), "revision": revision, "title": title}, number)
+
+    _import_into_a_fresh_store(root, target)
+
+    assert held.versions(root)[note] == [1, 2]
+    for number, (revision, title) in given.items():
+        kept = held.version(root, note, number)
+        assert (kept["version"], kept["revision"], kept["title"]) == (number, revision, title)
+    standing = held.artifact(root, note)
+    assert (standing["version"], standing["revision"], standing["title"]) == (2, 7, "Memo")
+    assert [(entry.artifact, entry.revision) for entry in _imported(root)] == [(note, 3), (note, 7)]
+
+
+def test_version_files_of_a_type_land_in_the_order_of_their_numbers_not_of_their_files_names(root, tmp_path):
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_two_versions)
+    for was, number in ((2, 10), (1, 2)):
+        _put(target, {**_read(target, note, was), "version": number, "revision": number}, number)
+    (target / _file(note, 1)).unlink()
+    assert _version_files(target, note) == [_file(note, 10), _file(note, 2)]
+
+    _import_into_a_fresh_store(root, target)
+
+    assert held.versions(root)[note] == [2, 10]
+    assert held.text(root, note) == (target / _file(note, 10)).read_text("utf-8")
+    assert [(entry.artifact, entry.revision) for entry in _imported(root)] == [(note, 2), (note, 10)]
+
+
+def test_a_type_at_two_versions_lands_beside_a_type_at_one_and_its_artifact(root, tmp_path):
+    def fill(client):
+        _a_note_type_at_two_versions(client)
+        define(client, WORK_ITEM_TYPE)
+        create(client, "work-item", {"title": "Stands alone"})
+
+    note, target = type_iri("note"), _for_import(tmp_path, fill)
+
+    _import_into_a_fresh_store(root, target)
+
+    assert held.versions(root) == {TYPE_OF_TYPES: [1], note: [1, 2], type_iri("work-item"): [1]}
+    assert [entry.artifact for entry in _imported(root)] == [
+        note, note, type_iri("work-item"), iri("work-item", "stands-alone"),
+    ]
+    for file in _files(target):
+        assert (target / file).read_text(encoding="utf-8") == canonical.dump(_held_at(root, file)), file
+
+
 @scenario(
     FEATURE,
     "The operator imports a directory that checks clean, and the history shows each type landing before its artifacts",
