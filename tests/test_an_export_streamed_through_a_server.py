@@ -5,12 +5,16 @@ unread ends; a server that stops or is killed partway ends the stream with `unre
 reached gives it as the stream's one message; and an export is answered while the server is writing a change and
 holds another waiting.
 
-A server sends ahead of a client that is not reading only as much as the connection takes, so over a store holding
-one large artifact it is still partway through the stream, the store held at its one moment, while the client holds
-the first message; how far it has read by then is the connection's affair, so the test of the one moment holds the
-server's reading itself (`Slowly`). The servers here run in the test's own process unless a test kills one, so what a server holds
-open is what this process holds open."""
+A server sends ahead of a client that is not reading as much as the connection takes, about 2 MB, and so finishes a
+small store's export unaided whatever its client does. "Partway" is therefore made true at the export's source, never
+by the store's size: where a client or a server stops partway, the server's export has no end (`Endless`), so it is
+still giving files, the store held at its one moment, until its client stops or it is stopped, and can let the store
+go for no other reason; and the test of the one moment holds the server's reading itself (`Slowly`). The servers here
+run in the test's own process unless a test kills one, so what a server holds open is what this process holds open,
+and its export is this process's to make endless. The one server run as a program, to be killed, cannot be given
+such an export: its test rests on a large artifact and on timing, and says so."""
 import gc
+import itertools
 import os
 import sqlite3
 import subprocess
@@ -29,7 +33,8 @@ from kb import export as kb_export
 from kb import served, server
 from kb.contract import kb_pb2
 
-LARGE = 600_000  # characters in one artifact: more than a server sends ahead of a client that is not reading
+LARGE = 600_000  # characters in one artifact: a third of a second of a server's work, never more than it sends ahead
+PADDING = "x" * 200_000  # one file of an export with no end: ten or so are all a connection takes ahead of its client
 
 # A client in a program of its own, working where the connection is found: it reads the first message of an export,
 # says so, and waits for a line; given one, it ends as a program ends, the stream still unread.
@@ -56,9 +61,42 @@ def root(root):
 
 @pytest.fixture
 def large(root):
-    """The store holding a large tag too, so a server is partway through an export while its client holds the first
-    message."""
+    """The store holding a large tag too, which a server takes a moment to export: no more than that, see the one
+    test that uses it."""
     create(kb_client.connect(root), "tag", {"title": "Large", "summary": "x" * LARGE})
+
+
+class Endless:
+    """`export.taken` as the server calls it, but that the first export asked has no end: after the store's files it
+    gives more files for ever and never the position. The server can end that stream, and let the store go, only
+    because its client stopped or it was itself stopped; `ended` says whether it has. Every later export is as it
+    is."""
+
+    def __init__(self):
+        self._taken, self._asked, self._ended = kb_export.taken, 0, threading.Event()
+
+    def __call__(self, store, asked):
+        self._asked += 1
+        return self._taken(store, asked) if self._asked > 1 else self._without_end(store, asked)
+
+    def _without_end(self, store, asked):
+        try:
+            yield from (given for given in self._taken(store, asked) if isinstance(given, kb_export.File))
+            for count in itertools.count():
+                yield kb_export.File(f"padding/{count}.yaml", PADDING)
+        finally:
+            self._ended.set()
+
+    def ended(self):
+        return self._ended.is_set()
+
+
+@pytest.fixture
+def endless(monkeypatch):
+    """The server in this process gives an export with no end to the first client that asks."""
+    endless = Endless()
+    monkeypatch.setattr(kb_export, "taken", endless)
+    return endless
 
 
 @pytest.fixture
@@ -97,12 +135,18 @@ def _asked():
 
 def _partway(root):
     """An export asked through the server and read as far as its first message, the server still partway through
-    it."""
+    it: the test has made its export one that is (`Endless`, `Slowly`)."""
     stream = _asked()
     first = next(stream)
     assert first.result.WhichOneof("part") == "file"
     assert held.database_open(root) != []
     return first, stream
+
+
+def _still_giving(root, endless):
+    """The server is partway through the export that has no end, the store held open for it."""
+    assert not endless.ended()
+    assert held.database_open(root) != []
 
 
 def _let_go(root):
@@ -185,10 +229,12 @@ def _ended(program):
     assert (said, program.returncode) == (("", ""), 0)
 
 
-def _what_a_stopped_client_leaves(root, hosting):
-    """Nothing held: the store is let go, a change lands through the server and the log is free of readers, an
-    export is answered whole, and the server stops and lets the store go."""
+def _what_a_stopped_client_leaves(root, hosting, endless):
+    """Nothing held: the store is let go, which the server, its export having no end, does only because its client
+    stopped; a change lands through the server and the log is free of readers, an export is answered whole, and the
+    server stops and lets the store go."""
     _let_go(root)
+    assert endless.ended()
     client = kb_client.connect()
     create(client, "tag", {"title": "Landed afterwards"})
     with sqlite3.connect(Path(root) / "kb" / "store.sqlite3") as other:
@@ -202,28 +248,31 @@ def _what_a_stopped_client_leaves(root, hosting):
 
 @pytest.mark.parametrize("stops", [_closes, _lets_go])
 def test_a_client_that_stops_reading_partway_through_a_server_leaves_nothing_held(
-        root, large, hosting, nothing_lost, stops):
+        root, endless, hosting, nothing_lost, stops):
     _, stream = _partway(root)
+    _still_giving(root, endless)
     stops(stream)
     del stream
     gc.collect()
-    _what_a_stopped_client_leaves(root, hosting)
+    _what_a_stopped_client_leaves(root, hosting, endless)
 
 
 @pytest.mark.parametrize("stops", [_ended, _killed])
 def test_a_clients_program_that_stops_with_an_export_partway_leaves_nothing_held(
-        root, large, arranged, hosting, nothing_lost, stops):
+        root, endless, arranged, hosting, nothing_lost, stops):
     program = _in_a_program(arranged)
-    assert held.database_open(root) != []
+    _still_giving(root, endless)
     stops(program)
-    _what_a_stopped_client_leaves(root, hosting)
+    _what_a_stopped_client_leaves(root, hosting, endless)
 
 
 def test_a_server_stopped_partway_through_an_export_ends_the_stream_with_unreachable_and_lets_the_store_go(
-        root, large, hosting, nothing_lost, monkeypatch):
+        root, endless, hosting, nothing_lost, monkeypatch):
     monkeypatch.setattr(server, "GRACE", 0.1)
     first, stream = _partway(root)
+    _still_giving(root, endless)
     hosting.stop()
+    assert endless.ended()
     assert held.database_open(root) == []
     served.owned(root).close()
     cut_short = answer([first, *stream])
@@ -235,6 +284,9 @@ def test_a_server_stopped_partway_through_an_export_ends_the_stream_with_unreach
 
 def test_a_server_killed_partway_through_an_export_ends_the_stream_with_unreachable(
         root, large, arranged, request):
+    """The server is a program, so its export cannot be made endless from here: it is partway only for as long as
+    the large artifact takes it, and this test rests on killing it within that time. Late, it fails on `not
+    complete`, loudly; it never passes falsely."""
     serve = serving.started(root, request)
     address = serve.said().split("\t")[-1]
     serving.connection(arranged, address)
