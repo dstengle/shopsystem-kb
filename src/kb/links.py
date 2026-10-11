@@ -1,5 +1,6 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-and those links as the port takes them. The checks, removal, reads and walks all read links here."""
+and those links as the port takes them, one to a target not held saying the held type it sits under. The checks,
+removal, reads and walks all read links here."""
 from typing import NamedTuple
 
 from kb import composition, names, port, values
@@ -31,8 +32,10 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
 def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
     the kinds its field allows, read through the type given, the version of its type the artifact conforms to,
-    whatever its type stands at. Every artifact carries one implicit link, first, to the artifact of its type. A value
-    that could name nothing, which a type changed after it was written can leave in a link field, is not handed."""
+    whatever its type stands at, and, for a target the corpus does not hold, the held type its IRI sits under
+    (`port.Link.under`). Every artifact carries one implicit link, first, to the artifact of its type, which says
+    nothing of what that sits under. A value that could name nothing, which a type changed after it was written can
+    leave in a link field, is not handed."""
     kind = composition.artifact_kind(artifact)
     found = [port.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True)]
     for link in carried(artifact, typed["schema"], corpus):
@@ -44,8 +47,15 @@ def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) 
             continue
         found.append(port.Link(
             link.field, link.place, target.id, names.placed(target.place), tuple(link.ref["targets"]),
+            under=_under(target.id, corpus),
         ))
     return found
+
+
+def _under(target: values.ArtifactId, corpus) -> values.ArtifactId | None:
+    """The held type a target the corpus does not hold sits under; None for a held target, or one under no held
+    type."""
+    return None if corpus.holds(target) else composition.nearest_type(target, corpus)
 
 
 def inside(artifact: dict, schema: dict, corpus, node) -> list[Link]:

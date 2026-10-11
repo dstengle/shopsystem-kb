@@ -1,6 +1,7 @@
 """The SQLite adapter's checks of a set inside its landing transaction, each on the store as the set finds it or
 leaves it: each change's revision and that of every type it was read through compared with the one it was read at, every link it hands
-landing, nothing outside it linking into what it removes or drops, and each entry's id held once."""
+landing, on a held artifact or, its target not held, under a held type the link carries and may land on, nothing
+outside it linking into what it removes or drops, and each entry's id held once."""
 from kb.port import Change, Conflict, Entry, Linked, Linking, Unlanded
 from kb.sqlite_reads import Reads
 
@@ -25,7 +26,7 @@ class Checks(Reads):
         return [place for (place,) in self._rows("SELECT place FROM parts WHERE artifact = ?", str(artifact))]
 
     def _integral(self, changes: list[Change], before: dict) -> None:
-        """Unlanded for every link the set hands that lands on nothing held or on a kind it may not land on; then
+        """Unlanded for every link the set hands that does not land (`_lands`); then
         Linked for every link from outside the set into an artifact the set removes or a part it drops."""
         last = {change.artifact: change for change in changes}
         unlanded = [
@@ -47,10 +48,21 @@ class Checks(Reads):
             raise Linked(linked)
 
     def _lands(self, link) -> bool:
+        """Whether a link lands: on a held artifact of a kind it may land on, and on a part that artifact holds when
+        it names one; or, its target not held, on an IRI under a type the link vouches for."""
         rows = self._rows("SELECT kind FROM artifacts WHERE id = ?", str(link.target))
-        if not rows or rows[0][0] not in link.kinds:
+        if not rows:
+            return self._vouched(link)
+        if rows[0][0] not in link.kinds:
             return False
         return not link.part or link.part in self._parts(link.target)
+
+    def _vouched(self, link) -> bool:
+        """Whether a link to an IRI not held carries a type that is held and is one it may land on; never an
+        implicit link, so no artifact lands under a type not held."""
+        if link.implicit or link.under is None or str(link.under) not in link.kinds:
+            return False
+        return self.holds(link.under)
 
     def _unheld(self, entries: list[Entry]) -> None:
         """Conflict when an entry's id is already held, or given twice."""

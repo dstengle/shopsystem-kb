@@ -4,7 +4,7 @@ Above the port stay names, content checks, sections and items, signatures, fault
 adapter keeps the artifacts, their content at every revision, the links both ways, the search rows and the history,
 and lands a set of changes whole or not at all. An adapter keeps the versions of a type it is handed, each
 as made, and knows nothing of what a type declares: a change says the kind of its artifact, its type's IRI, and a link
-says which kinds it may land on.
+says which kinds it may land on and, for a target kb found not held, the held type that target sits under.
 
 The port refuses with the exceptions named here. None of them is published, and kb translates them above the port.
 """
@@ -21,13 +21,17 @@ class Link:
     """A link a change hands with an artifact's content: the field holding it, its place in the artifact, the artifact
     it lands on, the place of the part inside that artifact it lands on (empty for the artifact itself), and the kinds
     it may land on. An implicit link is kb's own bookkeeping: it holds what it lands on in place, and refuses its
-    removal like any link, but no read of links, counts or walks shows it."""
+    removal like any link, but no read of links, counts or walks shows it. `under` is the held type kb found the
+    target's IRI to sit under when it found the target not held, None for a target it found held: a link to an IRI
+    not held lands only when the adapter holds that type and its IRI is among `kinds`, nothing but the link's target
+    kept for it, and an implicit link never does."""
     field: str
     place: str
     target: ArtifactId
     part: str
     kinds: tuple[str, ...]
     implicit: bool = False
+    under: ArtifactId | None = None
 
 
 @dataclass(frozen=True)
@@ -130,7 +134,8 @@ class Linked(Refusal):
 
 
 class Unlanded(Refusal):
-    """A link the set hands lands on nothing the set leaves held, or on an artifact of a kind it may not land on."""
+    """A link the set hands lands on an artifact of a kind it may not land on, on a part its artifact lacks, or on an
+    IRI the set leaves not held with no held type it may land on carried."""
 
     def __init__(self, links: list[Linking]):
         super().__init__(links)
@@ -199,5 +204,7 @@ class Port(Protocol):
         when anything is at path; a copy that fails leaves nothing there."""
 
     def land(self, changes: list[Change], entries: list[Entry]) -> None:
-        """The changes, in order, and the entries, as one set, or nothing. Raises Conflict, Linked or Unlanded; and
-        Busy, as `exclusive` does, when another change holds the write lock longer than the store waits for it."""
+        """The changes, in order, and the entries, as one set, or nothing. Every link is checked against the store as
+        the set leaves it: one to a held artifact by that artifact's kind and parts, one to an IRI not held by the
+        type it carries (`Link.under`). Raises Conflict, Linked or Unlanded; and Busy, as `exclusive` does, when
+        another change holds the write lock longer than the store waits for it."""

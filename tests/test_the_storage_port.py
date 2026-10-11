@@ -70,8 +70,10 @@ def removal(text, read):
     return port.Change(name(text), None, read=read, revision=read + 1)
 
 
-def link(field, place, target, kinds, part=""):
-    return port.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds))
+def link(field, place, target, kinds, part="", under=None):
+    """A link as kb hands it; `under` the held type kb says a target not held sits under, as the cases name it."""
+    return port.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds),
+                     under=under and name(under))
 
 
 def entry(entry_id, at=T0, seq=1, batch="", artifact="", role="tester", execution=""):
@@ -230,25 +232,148 @@ def test_two_writers_to_one_artifact_on_two_connections_the_second_is_refused(op
     assert store.artifact(name("note/a"))["by"] == 1 + outcomes.index(None)
 
 
-def test_a_removal_and_a_new_link_to_it_on_two_connections_never_both_land(opener, store):
-    land(store, put("decision/d", {"title": "D"}), put("note/n", {"title": "N"}))
-    linking = put("note/n", {"title": "N", "about": "decision/d"}, read=1,
-                  links=[link("about", "about", "decision/d", ["decision"])])
-    removing, adding = _race(opener, [removal("decision/d", 1)], [linking])
-    assert (removing is None) != (adding is None)
-    assert isinstance(removing or adding, port.Linked if removing else port.Unlanded)
+def _a_removal_and_a_new_link_to_it(store):
+    """A store holding a decision, its type and a note; the decision's removal, and the note linked to it anew, the
+    link carrying the held type the decision's IRI sits under."""
+    land(store, put("schema/decision", {"title": "Decision"}), put("decision/d", {"title": "D"}),
+         put("note/n", {"title": "N"}))
+    about = link("about", "about", "decision/d", ["decision"], under="schema/decision")
+    return removal("decision/d", 1), put("note/n", {"title": "N", "about": "decision/d"}, read=1, links=[about])
+
+
+def test_a_removal_landing_second_on_another_connection_is_refused_for_the_link_that_landed_first(opener, store):
+    removing, linking = _a_removal_and_a_new_link_to_it(store)
+    with opener() as one, opener() as other:
+        land(one, linking)
+        with pytest.raises(port.Linked) as refused:
+            land(other, removing)
+    assert refused.value.links == [port.Linking(name("note/n"), "about", "about", name("decision/d"), "")]
+    assert store.holds(name("decision/d"))
+    assert store.links_in(name("decision/d")) == refused.value.links
+
+
+def test_a_link_landing_second_on_another_connection_lands_on_the_iri_the_removal_left_unheld(opener, store):
+    removing, linking = _a_removal_and_a_new_link_to_it(store)
+    with opener() as one, opener() as other:
+        land(one, removing)
+        land(other, linking)
+    assert not store.holds(name("decision/d"))
+    assert store.artifact(name("note/n")) == {"title": "N", "about": "decision/d"}
+    assert store.links_in(name("decision/d")) == [
+        port.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
+    ]
+
+
+def test_a_removal_and_a_new_link_to_it_let_go_at_once_are_each_judged_against_what_the_other_left(opener, store):
+    removing, linking = _a_removal_and_a_new_link_to_it(store)
+    removed, linked = _race(opener, [removing], [linking])
+    assert linked is None
+    assert store.links_in(name("decision/d")) == [
+        port.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
+    ]
+    if store.holds(name("decision/d")):
+        assert isinstance(removed, port.Linked)
+    else:
+        assert removed is None
+
+
+def test_a_link_to_an_iri_not_held_and_a_create_at_that_iri_let_go_at_once_both_land(opener, store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    about = link("about", "about", "decision/d", ["decision"], under="schema/decision")
+    outcomes = _race(opener, [put("note/n", {"title": "N"}, links=[about])], [put("decision/d", {"title": "D"})])
+    assert outcomes == [None, None]
+    assert store.links_in(name("decision/d")) == [
+        port.Linking(name("note/n"), "about", "about", name("decision/d"), ""),
+    ]
+    with pytest.raises(port.Linked):
+        land(store, removal("decision/d", 1))
 
 
 def test_a_link_must_land_on_an_artifact_or_part_of_a_kind_it_allows(store):
     land(store, put("decision/d", {"title": "D"}, parts=["options/a"]))
     land(store, put("note/fine", {}, links=[link("about", "about", "decision/d", ["decision"], "options/a")]))
-    for target, kinds, part in (("decision/d", ["work"], ""), ("decision/gone", ["decision"], ""),
-                                ("decision/d", ["decision"], "options/b")):
+    for target, kinds, part in (("decision/d", ["work"], ""), ("decision/d", ["decision"], "options/b")):
         wrong = link("about", "about", target, kinds, part)
         with pytest.raises(port.Unlanded) as refused:
             land(store, put("note/wrong", {}, links=[wrong]))
         assert refused.value.links == [port.Linking(name("note/wrong"), "about", "about", name(target), part)]
     assert not store.holds(name("note/wrong"))
+
+
+def test_a_link_to_an_iri_not_held_lands_when_it_carries_a_held_type_it_allows(store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    about = link("about", "about", "decision/gone", ["work", "decision"], under="schema/decision")
+    land(store, put("note/fine", {"about": "decision/gone"}, links=[about]))
+    assert store.artifact(name("note/fine")) == {"about": "decision/gone"}
+    assert not store.holds(name("decision/gone"))
+    assert store.links_in(name("decision/gone")) == [
+        port.Linking(name("note/fine"), "about", "about", name("decision/gone"), ""),
+    ]
+
+
+@pytest.mark.parametrize("kinds, under", [
+    (["decision"], None),
+    (["work"], "schema/decision"),
+    (["work"], "schema/work"),
+    (["decision"], "decision/d"),
+], ids=["carrying none", "a held type it does not allow", "a type not held", "a held artifact it does not allow"])
+def test_a_link_to_an_iri_not_held_is_refused_unless_the_type_it_carries_is_held_and_allowed(store, kinds, under):
+    land(store, put("schema/decision", {"title": "Decision"}), put("decision/d", {"title": "D"}))
+    before = written(store)
+    wrong = link("about", "about", "decision/gone", kinds, under=under)
+    with pytest.raises(port.Unlanded) as refused:
+        land(store, put("note/wrong", {}, links=[wrong]))
+    assert refused.value.links == [port.Linking(name("note/wrong"), "about", "about", name("decision/gone"), "")]
+    assert written(store) == before
+
+
+def test_a_link_to_a_held_artifact_is_checked_by_its_kind_whatever_type_the_link_carries(store):
+    land(store, put("schema/decision", {"title": "Decision"}), put("schema/work", {"title": "Work"}),
+         put("decision/d", {"title": "D"}, parts=["options/a"]))
+    for kinds, part in ((["work"], ""), (["decision"], "options/b")):
+        wrong = link("about", "about", "decision/d", kinds, part, under=f"schema/{kinds[0]}")
+        with pytest.raises(port.Unlanded):
+            land(store, put("note/wrong", {}, links=[wrong]))
+    land(store, put("note/fine", {}, links=[link("about", "about", "decision/d", ["decision"], under="schema/work")]))
+
+
+def test_an_artifact_whose_own_type_is_not_held_is_refused_whatever_its_implicit_link_carries(store):
+    """No artifact lands under a type the store does not hold: the link to its type never lands on an IRI not held."""
+    land(store, put("schema/schema", {"title": "Schema"}))
+    before = written(store)
+    of_its_type = dataclasses.replace(
+        link("", "", "schema/note", ["schema"], under="schema/schema"), implicit=True,
+    )
+    with pytest.raises(port.Unlanded) as refused:
+        land(store, put("note/a", {"title": "A"}, links=[of_its_type]))
+    assert refused.value.links == [port.Linking(name("note/a"), "", "", name("schema/note"), "")]
+    assert written(store) == before
+    with pytest.raises(port.Unlanded):
+        land(store, put("note/a", {"title": "A"}, links=[dataclasses.replace(of_its_type, under=None)]))
+
+
+def test_an_artifact_created_at_an_iri_a_link_already_names_is_what_the_link_lands_on_from_then(store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    about = link("about", "about", "decision/later", ["decision"], under="schema/decision")
+    land(store, put("note/n", {"about": "decision/later"}, links=[about]))
+    assert store.ids(kind("decision")) == []
+    land(store, put("decision/later", {"title": "Later"}))
+    into = [port.Linking(name("note/n"), "about", "about", name("decision/later"), "")]
+    assert store.links_in(name("decision/later")) == into
+    assert store.inbound(name("decision/later")) == {(type_iri("note"), "about"): 1}
+    with pytest.raises(port.Linked) as refused:
+        land(store, removal("decision/later", 1))
+    assert refused.value.links == into
+
+
+def test_a_link_to_an_iri_not_held_is_refused_once_the_type_it_carries_has_been_removed(opener, store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    about = link("about", "about", "decision/gone", ["decision"], under="schema/decision")
+    with opener() as one, opener() as other:
+        land(one, removal("schema/decision", 1))
+        with pytest.raises(port.Unlanded):
+            land(other, put("note/n", {"about": "decision/gone"}, links=[about]))
+    assert store.ids() == []
 
 
 def test_two_new_artifacts_in_one_set_that_link_each_other_land(store):
