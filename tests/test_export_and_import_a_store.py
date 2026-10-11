@@ -10,7 +10,7 @@ from ruamel.yaml import YAML
 
 from calls import (
     DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
-    filed, iri, journal, kb_ref, listing, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
+    filed, iri, journal, kb_ref, listing, placeholders, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
@@ -1009,6 +1009,10 @@ NOTES, NOTE = _file(type_iri("note"), 1), _file(iri("note", "stock-is-low"))  # 
 TASKS, TASK = _file(type_iri("task"), 1), _file(iri("task", "count-the-stock"))
 
 
+def _sections(*titles):
+    return [{"title": title, "body": "Costs move weekly.\n"} for title in titles]
+
+
 def _decisions_at(client, number):
     """The type for decisions defined, and revised when it is to stand at version 2."""
     define(client, DECISION_TYPE)
@@ -1019,9 +1023,9 @@ def _decisions_at(client, number):
 
 def _a_decision_of_the_type(client):
     """A decision conforming to the version the type for decisions stands at."""
-    create(client, "decision", {"title": "Review prices on Fridays", "sections": [
-        {"title": title, "body": "Costs move weekly.\n"} for title in ("Purpose", "Rationale", "Consequences")
-    ]})
+    create(client, "decision", {
+        "title": "Review prices on Fridays", "sections": _sections("Purpose", "Rationale", "Consequences"),
+    })
 
 
 def _breaks(target, name, number):
@@ -1117,6 +1121,43 @@ def _reported_as_skipped_with_its_chain(ran, files, skipped):
     }, ran.stdout
 
 
+BROKEN, SECOND = iri("decision", "broken"), iri("decision", "second")
+
+
+def _a_decision_with_an_error_and_one_linking(tmp_path):
+    """A decision missing the section its type requires second, and a second decision that supersedes it."""
+    def fill(client):
+        _decisions_at(client, 1)
+        define(client, WORK_ITEM_TYPE)
+        create(client, "work-item", {"title": "Stands alone"})
+        create(client, "decision", {"title": "Broken", "sections": _sections("Purpose", "Rationale")})
+        create(client, "decision", {"title": "Second", "supersedes": BROKEN, "sections": _sections("Purpose", "Rationale")})
+
+    target = _for_import(tmp_path, fill)
+    broken = _read(target, BROKEN)
+    _put(target, {**broken, "sections": broken["sections"][:1]})
+    return target, {_file(BROKEN): "error"}
+
+
+TOGETHER_WITH = {
+    "a type for decisions, a decision with an error, and a second decision that links to it":
+        _a_decision_with_an_error_and_one_linking,
+}
+
+
+@given(
+    parsers.parse(
+        "a directory for import holding a type for work items whose link field allows decisions, and a work item, "
+        "together with {broken}"
+    ),
+    target_fixture="target",
+)
+def _for_import_with_errors_to_skip(tmp_path, broken, files):
+    target, left_out = TOGETHER_WITH[broken](tmp_path)
+    files.update(left_out)
+    return target
+
+
 @when("the operator imports the directory with errors skipped, saying which role they are", target_fixture="ran")
 def _kb_import_skipping_errors(root, target):
     return _kb("import", str(target), "--skip-errors", cwd=root, env={"KB_ACTOR": OPERATOR})
@@ -1130,18 +1171,40 @@ def _the_work_item_lands(ran, root, target):
 
 
 LEFT_OUT = {
-    "the decision with an error and the decision that links to it": [iri("decision", "broken"), iri("decision", "linking")],
-    "the three decisions": [iri("decision", "broken"), iri("decision", "linking"), iri("decision", "onward")],
-    "the type for decisions and the decision": [type_iri("decision"), iri("decision", "of-the-type")],
+    "the decision with an error": [_file(BROKEN)],
 }
+
+
+def _directory_files(target):
+    """Every file a directory for import holds but its copy of the type that describes types, sorted."""
+    found = sorted(str(path.relative_to(target)) for path in Path(target).rglob("*.yaml"))
+    return [file for file in found if file != _file(TYPE_OF_TYPES, 1)]
+
+
+def _iri_of(file):
+    """The IRI of the artifact a file's place gives: a type's, without its version."""
+    return "https://" + file.removesuffix(".yaml").partition("@")[0]
 
 
 @then(parsers.parse("{left_out} do not land"))
 def _left_out(root, target, files, left_out):
     assert sorted(LEFT_OUT[left_out]) == sorted(files)
-    landing = sorted(set(_exported_names(target)) - set(files))
-    assert held.names(root) == sorted([*landing, TYPE_OF_TYPES])
-    assert sorted(entry.artifact for entry in _imported(root)) == landing
+    landing = [file for file in _directory_files(target) if file not in files]
+    assert _held_files(root) == sorted([*landing, _file(TYPE_OF_TYPES, 1)])
+    assert sorted(entry.artifact for entry in _imported(root)) == sorted(_iri_of(file) for file in landing)
+
+
+def _waiting(root):
+    """Each IRI a link in the store waits on, with the artifacts whose links wait there."""
+    asked = placeholders(kb_client.connect(root))
+    assert not asked.faults, asked.faults
+    return {each.id: [link.artifact for link in each.links] for each in asked.placeholders}
+
+
+@then("the second decision lands, its link landing on a placeholder at the IRI of the decision with an error")
+def _the_second_decision_waits_on_the_broken_one(root, target):
+    assert held.text(root, SECOND) == (Path(target) / _file(SECOND)).read_text(encoding="utf-8")
+    assert _waiting(root) == {BROKEN: [SECOND]}
 
 
 @then("the operator is told what was skipped and why")
@@ -1149,10 +1212,7 @@ def _told_what_was_skipped(ran, files):
     told = {
         line[1]: "error" if line[0] == "error" else line[2] for line in _report(ran) if line[0] in ("error", "skipped")
     }
-    assert told == {
-        _file(name): " -> ".join(_file(part) for part in why.split(" -> ")) if why != "error" else why
-        for name, why in files.items()
-    }, ran.stdout
+    assert told == files, ran.stdout
 
 
 @given("a directory for import that checks clean", target_fixture="target")
