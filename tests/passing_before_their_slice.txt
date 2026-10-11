@@ -1,7 +1,4 @@
 # Tests that pass although their slice is not built: they run as ordinary tests. One node id a line; remove an id when its slice lands.
-tests/test_add_an_item_to_a_collection.py::test_an_added_item_s_title_becomes_its_name_read_as_text_refused_if_it_leaves_nothing["!!!"-the item is rejected because a title must leave something to make a name from]
-tests/test_add_an_item_to_a_collection.py::test_an_added_item_s_title_becomes_its_name_read_as_text_refused_if_it_leaves_nothing[the number 12 rather than text-the name the client is given for the new item is made from the text "12"]
-tests/test_add_an_item_to_a_collection.py::test_an_added_item_s_title_becomes_its_name_read_as_text_refused_if_it_leaves_nothing[the yes-or-no true rather than text-the name the client is given for the new item is made from the text "true"]
 tests/test_export_and_import_a_store.py::test_each_error_is_reported_by_file_and_reason[cannot be read as YAML 1.2-it cannot be read as YAML 1.2]
 tests/test_export_and_import_a_store.py::test_each_error_is_reported_by_file_and_reason[is not in canonical form-it is not in canonical form]
 tests/test_export_and_import_a_store.py::test_each_error_is_reported_by_file_and_reason[has content that does not fit its type-its content does not fit its type]

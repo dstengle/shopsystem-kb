@@ -113,11 +113,6 @@ def test_an_artifact_created_giving_a_part_a_name_that_is_not_a_plain_name_is_re
     pass
 
 
-@scenario("name-artifacts-and-items.feature", "An artifact created giving two parts of one collection the same name is refused")
-def test_an_artifact_created_giving_two_parts_of_one_collection_the_same_name_is_refused():
-    pass
-
-
 @scenario("name-artifacts-and-items.feature", "An artifact keeps the IRI it was created with for life")
 def test_an_artifact_keeps_the_iri_it_was_created_with_for_life():
     pass
@@ -1358,3 +1353,126 @@ def test_removing_the_artifact_that_filled_a_placeholder_is_refused_for_the_link
     refused = remove(client, NOT_HELD)
     assert [(fault.rule, fault.artifact) for fault in refused.faults] == [("on_delete", linking.id)], refused.faults
     assert not read(client, NOT_HELD).faults
+
+
+# What a decision may carry beside its sections, as the Given says it: the collection's name and what its items hold.
+UNTITLED_ITEMS = {"type": "object", "properties": {"says": {"type": "string"}}}
+CARRYING = {
+    "a collection of options": ("options", DECISION_TYPE["schema"]["parts"]["options"]["items"]),
+    "a collection of options, each with a title": ("options", DECISION_TYPE["schema"]["parts"]["options"]["items"]),
+    "a collection whose items carry no title": ("checks", UNTITLED_ITEMS),
+}
+WITH_PARTS = iri("decision", "weekly-reviews")
+
+
+@given(
+    parsers.re(
+        'a store holding a decision type at "(?P<type_iri>[^"]+)" whose decisions may carry '
+        f"(?P<collection>{'|'.join(map(re.escape, CARRYING))})$"
+    ),
+    target_fixture="client",
+)
+def _store_with_a_decision_type_carrying(root, before, type_iri, collection):
+    name, items = CARRYING[collection]
+    carrying = copy.deepcopy(DECISION_TYPE)
+    carrying["schema"]["parts"] = {name: {"items": items}}
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, carrying, at=type_iri)
+    before.update(held=held.holds(root))
+    return client
+
+
+def _create_with_parts(client, collection, parts):
+    return request(
+        client, "decision", "Weekly reviews", {"sections": SECTIONS, collection: parts}, message="Record it", at=WITH_PARTS,
+    )
+
+
+def _parts_held(client, collection):
+    return content.loads(read(client, WITH_PARTS, whole=True).content)[collection]
+
+
+@when(
+    parsers.parse('the client creates a decision carrying an option it names "{name}", saying which role and why'),
+    target_fixture="created",
+)
+def _create_naming_an_option(client, name):
+    return _create_with_parts(client, "options", [{"title": "Go monthly"}, {"id": name, "title": "Review prices every week"}])
+
+
+@then(parsers.parse('the option is named "{name}"'))
+def _the_option_is_named(client, created, name):
+    assert not created.faults, created.faults
+    assert _parts_held(client, "options")[1] == {"id": name, "title": "Review prices every week"}
+
+
+@then("the artifact is rejected because a part's name is a plain name")
+def _rejected_as_not_a_plain_name(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [(fault.artifact, fault.rule) for fault in created.faults] == [(WITH_PARTS, "item-name")]
+    assert created.faults[0].message.startswith("a part's name is a plain name")
+    assert repr("Keep Weekly!") in created.faults[0].message
+
+
+@then("the refusal names the place of that option")
+def _the_refusal_names_the_options_place(created):
+    [fault] = created.faults
+    assert fault.place == "options/1/id"
+
+
+UNNAMED = {
+    'an option titled "Keep weekly reviews"': ("options", {"title": "Keep weekly reviews"}),
+    "an item": ("checks", {"says": "Lights off"}),
+}
+NAMED_FROM = {
+    "from its title, as an added item would be": ("options", "keep-weekly-reviews"),
+    "from its place, as an added item would be": ("checks", "1"),
+}
+
+
+@when(
+    parsers.re(
+        f"the client creates a decision carrying (?P<part>{'|'.join(map(re.escape, UNNAMED))}) with no name, "
+        "saying which role and why$"
+    ),
+    target_fixture="created",
+)
+def _create_carrying_an_unnamed_part(client, part):
+    collection, sent = UNNAMED[part]
+    return {"response": _create_with_parts(client, collection, [sent]), "sent": sent}
+
+
+@then(parsers.re(f"the part is named (?P<how>{'|'.join(map(re.escape, NAMED_FROM))})$"))
+def _the_part_is_named_by_the_store(client, created, how):
+    collection, name = NAMED_FROM[how]
+    assert not created["response"].faults, created["response"].faults
+    assert "id" not in created["sent"]
+    assert _parts_held(client, collection) == [{"id": name, **created["sent"]}]
+
+
+RESTOCK_STEPS = [{"title": "Count the shelf"}, {"id": "draft", "title": "Write the order", "body": "From the counts."}]
+
+
+@given(parsers.parse('a store holding a process at "{at}" whose steps include one named draft'), target_fixture="client")
+def _store_with_a_process_holding_a_step_named_draft(root, at):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, PROCESS_TYPE)
+    create(client, "process", {"title": "Restock", "steps": RESTOCK_STEPS}, at=at)
+    return client
+
+
+@when(parsers.re('the client reads "(?P<part>[^"#]+#[^"]+)"$'), target_fixture="shown")
+def _read_by_a_parts_iri(client, part):
+    return {"asked": part, "given": answer(client.Read(kb_pb2.ReadRequest(
+        locator=kb_pb2.Locator(id=part), whole=kb_pb2.ReadRequest.Whole(),
+    )))}
+
+
+@then("the client is given the step named draft of that process")
+def _given_the_step_named_draft(shown):
+    given = shown["given"]
+    assert not given.faults, given.faults
+    assert shown["asked"] == f"{given.id}#steps/draft"
+    assert RESTOCK_STEPS[1] in content.loads(given.content)["steps"]

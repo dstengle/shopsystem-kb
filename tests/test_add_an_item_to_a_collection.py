@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    PROCESS_TYPE, add, adding, answer, check, create, define, iri, journal, read, replace, start_a_store, targets,
-    type_iri, version_iri,
+    DECISION_TYPE, PROCESS_TYPE, add, adding, answer, check, create, define, iri, journal, read, replace, request,
+    start_a_store, targets, type_iri, version_iri,
 )
 import at_once
 import held
@@ -31,6 +31,11 @@ def test_an_item_s_title_with_capitals_and_punctuation_gives_a_plain_name():
 
 @scenario("name-artifacts-and-items.feature", "Two items created with the same title in one collection, neither given a name, are given names of their own")
 def test_two_items_created_with_the_same_title_in_one_collection_neither_given_a_name_are():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An artifact created giving two parts of one collection the same name is refused")
+def test_an_artifact_created_giving_two_parts_of_one_collection_the_same_name_is_refused():
     pass
 
 
@@ -509,3 +514,76 @@ def _in_the_order_they_landed(client, landed):
     assert _steps(client) == [
         *STEPS, {"id": "count-the-float", **OTHER_STEP}, {"id": "check-the-card-reader", **DIFFERENT_STEP},
     ]
+
+
+@then(
+    "the name the client is given for the new item is that title in lower case, with each run of anything that is "
+    "not a letter or a digit turned into a single hyphen, and no hyphen at either end"
+)
+def _named_plainly_from_its_title(client, added):
+    assert added["sent"] == {"title": "Count stock: shelf, then back room!"}
+    assert added["response"].id == "count-stock-shelf-then-back-room"
+    assert _steps(client)[-1] == {"id": "count-stock-shelf-then-back-room", **added["sent"]}
+
+
+DECISION = iri("decision", "price-reviews-happen-weekly")
+DECISION_SECTIONS = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs move weekly.\n"},
+]
+
+
+@given(
+    parsers.parse('a store holding a decision type at "{type_iri}" whose decisions may carry a collection of options'),
+    target_fixture="client",
+)
+def _store_with_a_decision_type(root, before, type_iri):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE, at=type_iri)
+    before.update(held=held.holds(root))
+    return client
+
+
+def _create_a_decision(client, options):
+    content = {"sections": DECISION_SECTIONS, "options": options}
+    return request(client, "decision", "Price reviews happen weekly", content, message="Record it", at=DECISION)
+
+
+@when(
+    "the client creates a decision carrying two options with the same title, neither given a name, saying which role "
+    "and why",
+    target_fixture="created",
+)
+def _create_with_two_options_titled_alike(client):
+    return _create_a_decision(client, [{"title": "Keep weekly"}, {"title": "Keep weekly", "body": "As it is now."}])
+
+
+@then("each option is given a name of its own, the second the name of the first with a number added")
+def _each_named_the_second_numbered(client, created):
+    assert not created.faults, created.faults
+    assert loads(read(client, DECISION, whole=True).content)["options"] == [
+        {"id": "keep-weekly", "title": "Keep weekly"},
+        {"id": "keep-weekly-2", "title": "Keep weekly", "body": "As it is now."},
+    ]
+
+
+@when(
+    parsers.parse('the client creates a decision carrying two options it names both "{name}", saying which role and why'),
+    target_fixture="created",
+)
+def _create_naming_two_options_alike(client, name):
+    return _create_a_decision(client, [{"id": name, "title": "Keep weekly"}, {"id": name, "title": "Go monthly"}])
+
+
+@then("the artifact is rejected because a part's name is unique in its collection")
+def _rejected_as_named_twice(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in created.faults] == [(DECISION, "options/1/id", "item-name")]
+    assert created.faults[0].message.startswith("a part's name is unique in its collection")
+
+
+@then(parsers.parse('the refusal names "{name}"'))
+def _the_refusal_names_the_name_given_twice(created, name):
+    [fault] = created.faults
+    assert repr(name) in fault.message
