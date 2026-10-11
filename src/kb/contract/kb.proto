@@ -601,7 +601,8 @@ message Linking {
 // and every link to it or into a part of it is given; or it holds an
 // artifact there that lacks a part some links name, and only those links
 // are given, each carrying its part. The links come in the order of the
-// names of the artifacts holding them, then of their places there.
+// names of the artifacts holding them, each artifact's in the order they
+// sit in it.
 // Nothing is stored for a placeholder: it is there while a link names it.
 message Placeholder {
   string id = 1;
