@@ -4,12 +4,13 @@ set in one transaction. When another change lands between the draft and the land
 type it was read through having moved or been removed, the port refuses it, and the set is
 drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again; so
 is a set that removes a type, whose draft found no other type reading it and no link waiting on an IRI under it, of
-which the port compares nothing. A
+which the port compares nothing, and a set that defines a type, or that creates an artifact or hands a link to an IRI
+not held with an IRI between it and its type's, where a type may be defined (kb.standing). A
 fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store and recording a
 snapshot land through the port too."""
 from typing import NamedTuple
 
-from kb import canonical, drafting, journal, port, query, refusals, search, settled, store, values
+from kb import canonical, drafting, journal, port, query, refusals, search, settled, standing, store, values
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
@@ -58,8 +59,9 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
     another change lands between the draft and the landing, the set is drafted, stamped and landed again while the
     port holds the write lock, where a change that says the revision it read is compared again, and refused if its
     artifact moved; a set that removes a type lands only there, where no type reading it can be made, and no link to
-    an IRI not held under it landed, between its draft and its landing. Raises Refused with every fault, having
-    written nothing."""
+    an IRI not held under it landed, between its draft and its landing; so does a set that defines a type, under
+    whose IRI nothing can land meanwhile, and one a type defined meanwhile could move to another type. Raises
+    Refused with every fault, having written nothing."""
     drafted, moments = _readied(held, operations, clock)
     if not _lands_only_locked(drafted):
         try:
@@ -79,8 +81,12 @@ def _readied(held: port.Port, operations: list, clock: journal.Clock | None) -> 
 
 def _lands_only_locked(drafted: drafting.Drafted) -> bool:
     """Whether a set lands only as drafted while the write lock is held: one that removes a type, which the port
-    compares nothing of that would show a type reading it was made since, or a link landed that waits under it."""
-    return any(drafting.removes_a_type(change) for change in drafted.changes)
+    compares nothing of that would show a type reading it was made since, or a link landed that waits under it; and
+    one that defines a type, or creates or links where a type may be defined above (kb.standing), of which the port
+    compares nothing that would show what landed under the new type's IRI, or the type, since."""
+    return any(drafting.removes_a_type(change) for change in drafted.changes) or any(
+        standing.movable(change, drafted.draft) for change in drafted.handed
+    )
 
 
 def _landing(held: port.Port, drafted: drafting.Drafted, moments: list, signed: Signed) -> Landed:

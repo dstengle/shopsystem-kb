@@ -7,7 +7,7 @@ conforming to the version of its type that file names, which the draft must hold
 import copy
 from typing import NamedTuple
 
-from kb import changes, composition, names, places, refusals, settled, values
+from kb import changes, composition, names, places, refusals, settled, standing, values
 from kb.draft import Draft
 from kb.values import ArtifactId, Refused
 
@@ -88,15 +88,19 @@ def _named(draft: Draft, creation: changes.Create) -> dict:
 
 def _identity(draft: Draft, creation: changes.Create, type_id: ArtifactId) -> list:
     """The faults of the IRI a create gives: an artifact's belongs to the type its create names, the nearest held
-    type it sits under, while a type's is any IRI its client chooses; and neither a create before it in its set
-    carries it, said once and as the set's, nor does the draft hold anything at it."""
-    name, faults = creation.name, []
-    if type_id != values.type_of(values.TYPE_KIND) and composition.nearest_type(name, draft) != type_id:
+    type it sits under, while a type's is any IRI its client chooses under which nothing yet belongs to another type
+    (kb.standing); and neither a create before it in its set carries it, said once and as the set's, nor does the
+    draft hold anything at it."""
+    name, faults, defines = creation.name, [], type_id == values.type_of(values.TYPE_KIND)
+    if not defines and composition.nearest_type(name, draft) != type_id:
         faults.append(refusals.not_under(name, type_id))
     if creation.carried:
         faults += creation.carried
     elif draft.holds(name):
         faults.append(refusals.already_held(name))
+    elif defines:
+        other, sitting = standing.under(name, draft)
+        faults += [refusals.belongs(name, each, other) for each in sitting]
     return faults
 
 

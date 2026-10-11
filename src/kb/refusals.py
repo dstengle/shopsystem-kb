@@ -46,6 +46,15 @@ def not_under(artifact_id: ArtifactId, type_id: ArtifactId) -> kb_pb2.Fault:
     )
 
 
+def belongs(type_id: ArtifactId, sitting: ArtifactId, other: ArtifactId) -> kb_pb2.Fault:
+    """A define of a type at an IRI under another type's, under which an artifact of that other type is held, or
+    a link waits on an IRI not held: the IRI that sits there."""
+    return kb_pb2.Fault(
+        artifact=str(type_id), rule=rules.IDENTITY,
+        message=f"an IRI keeps the type it was written or linked under; {str(sitting)!r} belongs to {str(other)!r}",
+    )
+
+
 def already_held(artifact_id: ArtifactId) -> kb_pb2.Fault:
     """A create at an IRI the store already holds something at."""
     return kb_pb2.Fault(

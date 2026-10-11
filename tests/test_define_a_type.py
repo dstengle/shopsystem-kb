@@ -916,3 +916,35 @@ def _rejected_naming_the_decision(attempt):
 def _the_tag_type_still_held(client):
     standing = read(client, type_iri("tag"), whole=True)
     assert not standing.faults, standing.faults
+
+
+BETWEEN, SITTING = iri("decision", "minor"), iri("decision", "minor/ship-weekly")
+SECTIONS = [{"title": "Purpose", "body": "Ship what is ready.\n"}, {"title": "Rationale", "body": "Small steps.\n"}]
+SITS_THERE = {
+    "a decision the store holds at an IRI two segments below the type's":
+        lambda client: create(client, "decision", {"title": "Ship weekly", "sections": SECTIONS}, at=SITTING),
+    "a link waiting on a decision the store does not hold, at an IRI two segments below the type's":
+        lambda client: create(client, "decision", {"title": "Ship daily", "supersedes": SITTING, "sections": SECTIONS}),
+}
+
+
+@given(parsers.re(f"a decision type the store holds, and (?P<sits_there>{'|'.join(map(re.escape, SITS_THERE))})"))
+def _a_decision_type_and_what_sits_two_segments_below(client, sits_there):
+    define(client, DECISION_TYPE)
+    SITS_THERE[sits_there](client)
+    assert read(client, BETWEEN).faults
+    assert bool(read(client, SITTING).faults) == sits_there.startswith("a link")
+
+
+@when("the client defines a type at an IRI between the decision type's and that one", target_fixture="attempt")
+def _define_a_type_between(root, client):
+    before = held.holds(root)
+    response = request(client, "schema", "Minor", {"version": 1, "schema": TAG_TYPE["schema"]}, at=BETWEEN)
+    return {"response": response, "before": before, "after": held.holds(root)}
+
+
+@then("the type is rejected because what sits under it already belongs to the decision type, naming that IRI")
+def _rejected_for_what_sits_under_it(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(BETWEEN, "", "identity")]
+    assert repr(SITTING) in faults[0].message and repr(type_iri("decision")) in faults[0].message
