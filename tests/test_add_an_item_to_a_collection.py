@@ -364,12 +364,25 @@ def _nothing_written(attempt):
     assert attempt["after"] == attempt["before"]
 
 
+UNHELD_TYPE_IRI = "https://shop.example/kb/gadget/count-the-change"
+
+
+@when(
+    "the client adds a step that points at an IRI under a type the store does not hold, saying which role and why",
+    target_fixture="attempt",
+)
+def _add_a_step_pointing_under_a_type_not_held(client):
+    before = read(client, PROCESS, whole=True)
+    response = add(client, PROCESS, "steps", {"title": "Count the change", "uses": UNHELD_TYPE_IRI})
+    return {"response": response, "before": before}
+
+
 @then("the item is rejected because a link must land on a node of a kind the type allows")
 def _rejected_for_its_link(attempt):
     assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
         (PROCESS, "steps/2/uses", "ref"),
     ]
-    assert repr(iri("step", "count-the-change")) in attempt["response"].faults[0].message
+    assert repr(UNHELD_TYPE_IRI) in attempt["response"].faults[0].message
 
 
 def _steps_must_name_a_role(client):
