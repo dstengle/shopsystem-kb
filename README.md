@@ -172,9 +172,9 @@ volumes:
   release's version (the `version` in its `pyproject.toml`) in the environment `docker compose` runs in, as in
   `KB_VERSION=<version> docker compose up`; with none set, compose refuses, saying so. Every `docker compose`
   command shown here reads the file and so needs it: export `KB_VERSION`, or put `KB_VERSION=<version>` in a `.env`
-  file beside the compose file, once. The tag exists once that
-  release is tagged and the repository is reachable from where you build. Until then, build from a checkout: `build: <path to the checkout>`, or `make image`
-  in the checkout and `image: shopsystem-kb:dev` in place of `build:`.
+  file beside the compose file, once. The tag exists once that release is tagged and the repository is reachable
+  from where you build. Until then, build from a checkout: `build: <path to the checkout>`, or `make image` in the
+  checkout and `image: shopsystem-kb:dev` in place of `build:`.
 - The example sets no `restart:` policy on purpose: a refusal (no `KB_ACTOR` on an empty volume, a store it cannot
   open) would restart the container in a loop. Once the store is set up and served, add `restart: unless-stopped` if
   you want it.
