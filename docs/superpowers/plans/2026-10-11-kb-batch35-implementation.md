@@ -264,6 +264,8 @@ Tasks 10 and 11 were added on 2026-10-11 from the batch's branch review. Task 10
 
 13. **A link that waits keeps waiting.** A change to an artifact (a replacement of the whole or of a node, an item added or removed, any change in a set) that leaves in place a link into a part its held target lacks, as the store holds that link before the change (the same field and place, the same target IRI and part), lands, and the link still waits. A link the change adds, or alters in target or part, into a part a held artifact lacks is refused as today (`ref`). A create is always new. The port's landing check accepts the same: the domain says on the link that it already waits, as it says the held type an unheld target sits under, and the adapter accepts a link so marked only when the store already holds that very link for that artifact. The store's check lists it as a placeholder by the same judgement (it replaces slice 170's own rule in `check.py`).
 
+14. **Which link is "that link"** (added after Task 10's review). A waiting link is the same link, left as it is, when the artifact before and after the change holds a link to the same target IRI and part in the same field of the same thing: the artifact itself, or the item of the same name in the same collection. Where it stands in a list (an item's position among its collection's items; a link's position among a field's several links) does not count, so removing or reordering other items or other links of the field leaves it waiting. A link moved to another field or another item is new.
+
 ### Task 10: Slice 170.1. A link that waits keeps waiting when its artifact changes
 
 Review: per-task
