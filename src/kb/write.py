@@ -11,7 +11,7 @@ drafted the same way, against the store at one moment, and answered as it would 
 from typing import NamedTuple
 
 from kb import (
-    canonical, drafting, journal, names, places, port, port_values, query, refusals, search, settled, store, values,
+    canonical, drafting, journal, names, port, port_values, query, refusals, search, settled, store, values,
 )
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
@@ -77,27 +77,11 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
 
 def checked(held: port.Port, operations: list) -> Landed:
     """The set as landing it would answer, and nothing landed: drafted and checked as `land` drafts it, against the
-    store as it stands at one moment, a change that says the revision it read compared there, then refused as the port
-    would refuse its landing. It takes no write lock, reads no clock and mints no id, so it has no name and is never
-    busy. Raises Refused with every fault landing it would give."""
+    store as it stands at one moment, a change that says the revision it read compared there. It takes no write lock,
+    reads no clock and mints no id, so it has no name and is never busy. Raises Refused with every fault landing it
+    would give."""
     with held.at_one_moment():
-        drafted = drafting.drafted(held, operations)
-        linked = _linked_into_what_is_dropped(held, drafted)
-    if linked:
-        raise Refused(linked)
-    return Landed("", _results(drafted))
-
-
-def _linked_into_what_is_dropped(held: port.Port, drafted: drafting.Drafted) -> list:
-    """The faults of every link from outside the set into a part an artifact held before the set and the set leaves
-    it without: what the port refuses a landing for as `Linked`, found here by reading."""
-    last = {change.artifact: change for change in drafted.handed}
-    return [
-        refusals.still_linked(_named(drafted.draft, each), each.source, each.place)
-        for artifact, change in last.items() if held.holds(artifact)
-        for each in held.links_in(artifact)
-        if each.source not in last and each.part in set(places.parts(held.artifact(artifact))) - set(change.parts)
-    ]
+        return Landed("", _results(drafting.drafted(held, operations)))
 
 
 def _results(drafted: drafting.Drafted) -> list[Result]:
