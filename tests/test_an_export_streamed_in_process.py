@@ -1,10 +1,14 @@
 """An export's stream in the client's own process, in the cases no scenario names (the plan's decisions 2 and 8,
 Review Focus 1 to 3): a change landing while a client reads an export slowly is not in it; a client that stops
 reading leaves the store let go; every refusal every rpc gives arrives as the stream's one message, and a failure after
-files were given as its last; and a store restored from a backup gives the backed-up store's position."""
+files were given as its last; what a client does to the stream is the client's, its own exception raised to it
+and a stream closed, let go or read on whatever thread; and a store restored from a backup gives the backed-up
+store's position."""
 import gc
 import os
 import sqlite3
+import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -115,6 +119,96 @@ def test_a_failure_after_files_were_given_ends_the_stream_with_a_refusal_and_no_
     assert [message.WhichOneof("outcome") for message in cut_short.messages] == ["result"] * 5 + ["refusal"]
     assert len(cut_short.files) == 5 and not cut_short.complete
     assert [fault.rule for fault in cut_short.faults] == ["unreadable"]
+    assert _open_in(root) == []
+
+
+def test_a_failure_partway_through_the_files_ends_the_stream_with_a_refusal_and_no_end(root, client, monkeypatch):
+    reads, read = [], sqlite_reads.Reads.artifact
+
+    def fails_at_the_third(self, artifact_id):
+        reads.append(artifact_id)
+        if len(reads) == 3:
+            raise sqlite3.DatabaseError("database disk image is malformed")
+        return read(self, artifact_id)
+    monkeypatch.setattr(sqlite_reads.Reads, "artifact", fails_at_the_third)
+    cut_short = export(client)
+    outcomes = [message.WhichOneof("outcome") for message in cut_short.messages]
+    assert outcomes[-1] == "refusal" and outcomes[:-1] == ["result"] * len(cut_short.files)
+    assert 0 < len(cut_short.files) < 5 and not cut_short.complete
+    assert [fault.rule for fault in cut_short.faults] == ["unreadable"]
+    assert _open_in(root) == []
+
+
+class Mine(Exception):
+    """An exception of the client's own, which the store never raises."""
+
+
+def test_an_exception_the_client_throws_into_the_stream_is_raised_to_it_and_the_store_is_let_go(root, client):
+    stream = _asked(client)
+    assert next(stream).result.WhichOneof("part") == "file"
+    with pytest.raises(Mine, match="thrown into the stream"):
+        stream.throw(Mine("thrown into the stream"))
+    assert _open_in(root) == []
+    assert list(stream) == []
+
+
+def test_an_exception_of_the_clients_own_in_a_stage_reading_the_stream_is_raised_to_it(root, client):
+    def stage():
+        yield from _asked(client)
+    reading = stage()
+    assert next(reading).result.WhichOneof("part") == "file"
+    with pytest.raises(Mine):
+        reading.throw(Mine("the stage's own"))
+    assert _open_in(root) == []
+
+
+def _on_another_thread(act):
+    """What the act raised on a thread of its own, or None."""
+    raised = []
+
+    def acted():
+        try:
+            act()
+        except BaseException as error:  # whatever it is, the test is told
+            raised.append(error)
+    thread = threading.Thread(target=acted)
+    thread.start()
+    thread.join(30)
+    assert not thread.is_alive()
+    return raised[0] if raised else None
+
+
+@pytest.fixture
+def unraisable(monkeypatch):
+    """Every exception raised where nothing could be told of it, such as while a stream let go is finalised."""
+    seen = []
+    monkeypatch.setattr(sys, "unraisablehook", lambda raised: seen.append(repr(raised.exc_value)))
+    return seen
+
+
+def test_a_stream_closed_on_another_thread_ends_quietly_with_the_store_let_go_at_once(root, client, unraisable):
+    stream = _asked(client)
+    assert next(stream).result.WhichOneof("part") == "file"
+    assert _on_another_thread(stream.close) is None
+    assert _open_in(root) == []  # with no collection run: let go by the time the close returned
+    assert list(stream) == [] and unraisable == []
+    create(client, "tag", {"title": "Landed at once"})
+
+
+def test_a_stream_let_go_on_another_thread_ends_quietly_with_the_store_let_go(root, client, unraisable):
+    kept = [_asked(client)]
+    assert next(kept[0]).result.WhichOneof("part") == "file"
+    assert _on_another_thread(kept.clear) is None
+    assert _open_in(root) == [] and unraisable == []
+
+
+def test_a_stream_read_on_more_than_one_thread_is_the_whole_export(root, client):
+    before = export(client)
+    stream, read = _asked(client), []
+    assert _on_another_thread(lambda: read.append(next(stream))) is None
+    assert _on_another_thread(lambda: read.append(next(stream))) is None
+    whole = answer([*read, *stream])
+    assert whole.complete and (whole.files, whole.position) == (before.files, before.position)
     assert _open_in(root) == []
 
 

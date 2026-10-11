@@ -56,19 +56,40 @@ def streamed(response):
     the store at one moment: the store and that moment are kept until the stream ends, its caller closes it or lets
     it go, or it fails, and no longer. Each thing the rpc gives becomes a message of this type as it is asked for.
     A refusal anywhere, or any exception that escapes, becomes one more message, the refusal: the stream's only
-    message when nothing had been given, and its last otherwise, in place of whatever was still to come."""
+    message when nothing had been given, and its last otherwise, in place of whatever was still to come. Only what is
+    raised while the store is read is refused so: no message is given from inside the guarded block, so what the
+    caller does to the stream is the caller's. An exception it throws in is raised to it as itself, and a stream it
+    closes or lets go ends without another message, the store let go first in both; and on whatever thread it reads,
+    closes or lets go, the store's connection being held to none."""
     def wrap(rpc):
         @functools.wraps(rpc)
         def run(self, request, context=None):
-            try:
-                with store.opened(self._root) as held, held.at_one_moment():
-                    for given in rpc(self, request, held):
-                        yield responses.answered(response, given)
-            except Exception as error:
-                yield _refusal(response, error)
+            with contextlib.closing(_given(rpc, self, request)) as given:
+                more = True
+                while more:
+                    message, more = _next(response, given)
+                    if message is not None:
+                        yield message
         run.writes = False
         return run
     return wrap
+
+
+def _given(rpc, servicer, request):
+    """What the rpc gives, each as it is asked for, the store open and at one moment until it is closed."""
+    with store.opened(servicer._root, any_thread=True) as held, held.at_one_moment():
+        yield from rpc(servicer, request, held)
+
+
+def _next(response, given):
+    """The stream's next message and whether another may follow it: what the rpc gives next; or the refusal, the
+    last, when reading it was refused or raised; or no message when the rpc has given everything."""
+    try:
+        return responses.answered(response, next(given)), True
+    except StopIteration:
+        return None, False
+    except Exception as error:
+        return _refusal(response, error), False
 
 
 def _refusal(response, error: Exception):

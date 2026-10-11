@@ -65,14 +65,17 @@ def make(path: Path) -> None:
 
 
 @contextlib.contextmanager
-def opened(path: Path) -> Iterator["SqliteStore"]:
-    """The database at path, open read-write until the block ends. Raises Unreadable, naming it, when it cannot be
-    opened, which creates nothing, or when any statement finds it damaged, which shows only once one is made; Busy
-    when a writer waited BUSY seconds for the write lock and another connection still held it."""
+def opened(path: Path, any_thread: bool = False) -> Iterator["SqliteStore"]:
+    """The database at path, open read-write until the block ends, its connection held to the thread that opened it
+    unless `any_thread`, which whoever asks for must then use on one thread at a time. Raises Unreadable, naming it,
+    when it cannot be opened, which creates nothing, or when any statement finds it damaged, which shows only once
+    one is made; Busy when a writer waited BUSY seconds for the write lock and another connection still held it."""
     supported()
     _writable(path)
     try:
-        db = sqlite3.connect(_uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None)
+        db = sqlite3.connect(
+            _uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None, check_same_thread=not any_thread,
+        )
     except sqlite3.OperationalError as error:
         raise Unreadable(f"{path}: {error}") from None
     try:

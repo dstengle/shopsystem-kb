@@ -89,12 +89,12 @@ class LaterKb(Exception):
         self.root = root
 
 
-def opened(root) -> contextlib.AbstractContextManager[Port]:
-    """The store at root, open until the block ends: the database beside its marker, handed to the adapter. Raises,
-    opening nothing, EarlierKb when the marker is the one an earlier kb wrote, and LaterKb when it is any other but
-    this kb's own or cannot be read at all."""
+def opened(root, any_thread: bool = False) -> contextlib.AbstractContextManager[Port]:
+    """The store at root, open until the block ends: the database beside its marker, handed to the adapter, to be
+    used on whatever thread when asked so. Raises, opening nothing, EarlierKb when the marker is the one an earlier
+    kb wrote, and LaterKb when it is any other but this kb's own or cannot be read at all."""
     _told_apart(Path(root))
-    return sqlite_store.opened(Path(root) / DATABASE)
+    return sqlite_store.opened(Path(root) / DATABASE, any_thread)
 
 
 def _told_apart(root: Path) -> None:

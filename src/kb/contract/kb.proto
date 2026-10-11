@@ -643,7 +643,8 @@ message ExportedFile {
 // The end of an export: every file has been given. The position is the
 // position in the history the files reflect, the `id` of the last history
 // entry landed when the store stood at the export's moment; it names
-// that entry and promises no order between two positions.
+// that entry and promises no order between two positions. It is empty
+// when no entry has landed.
 message ExportEnd {
   string position = 1;
 }
