@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
-- One task per slice, in slice order (Task 4 carries two slices that are step definitions only). The plan holds no code. The implementer writes the steps and the code under bdd-red-green, after the red run.
-- Each task has a `Review:` and a `Model:` line, and the controller dispatches by them. In this batch `Review: per-task` goes only to the tasks that change the adapter's landing check or add an rpc; every other task is covered by the batch's branch review, which reviews it with a task review's care. `Model:` is chosen by the work: `opus` where behaviour, integrity or the contract changes, `sonnet` where a task is step definitions or a refactor.
+- One task per slice, in slice order (Tasks 4 and 7 are slices 167 and 168; Task 7 runs after Task 4, before Task 6). The plan holds no code. The implementer writes the steps and the code under bdd-red-green, after the red run.
+- Each task has a `Review:` and a `Model:` line, and the controller dispatches by them. `Review: per-task` with `Model: opus` goes to a task that touches concurrency, the published contract, data integrity or moving stored data. `Review: batch-end` with `Model: sonnet` goes to every other task, and gets no task review because the batch's branch review covers it.
 - CLAUDE.md's rules hold:
   - No module under `src/kb/` may pass 250 lines, and `servicer.py` must stay under 150 (it is at 137). A module that would pass its limit is split first; a new module gets a row in CLAUDE.md's map.
   - Rule 1: no broad `except` outside `servicer.py`'s wrapper.
@@ -23,7 +23,7 @@
   - Rule 6: only `names.py` decides what an IRI looks like or which IRIs one sits under.
   - The adapter knows nothing of what a type declares: what it must check about a link, the domain hands it on the link.
   - When a task changes what a module owns, it changes that module's row in CLAUDE.md's map too.
-- An implementer may change an existing test's setup, with no assertion changed, where the task's decisions require it, and may rewrite tests written earlier in this batch that pinned an interim state; each such change is listed in its report. Changing what any other existing test asserts is allowed only where the task's "Tests the decisions break" lists it; otherwise it is a `BLOCKED` reply naming the test.
+- An implementer may change what an existing test asserts only where its task's "Tests the decisions break" lists it. Any other existing test that the decisions break is a `BLOCKED` reply naming it.
 - At this batch's end, every scenario tagged up to `@slice-170` passes. Every failing test is then a scenario tagged `@slice-171` onward, or the published contract's rule-name test (slice 182, rule `differs`).
 
 ### Execution rules
@@ -34,7 +34,7 @@
 - **Fresh fixes.** Findings go to a fresh `bdd-implementer` as a fix round, with the report and the findings file, then to a scoped re-review. No agent is resumed. The branch review's reply is the one long reply the controller reads: it saves the issues to fix now as a findings file for the fix round.
 - **Lanes.** Tasks in different lanes may run at once, each lane in its own git worktree and branch with its own virtualenv, and the dispatch tells each implementer it is in a lane. This replaces subagent-driven-development's rule against parallel implementers, for lanes only. Tasks in one lane run in order; a task with no `Lane:` runs in the main worktree, in order, and not beside a lane. A lane's task is reviewed in its lane, before the merge. A lane's implementer never commits the plan: its reply carries the checkpoint entry. The controller merges the lanes one at a time, runs the suite after each merge, and writes each slice's Status, the checkpoint entry from the reply and the `Suite:` entry itself with `plan`.
 
-Tasks 4 and 5 carry `Lane:` lines: their files are disjoint and neither needs the other's code.
+Tasks 4 and 7 (lane A, in order) and Task 5 (lane B) carry `Lane:` lines: the two lanes' files are disjoint and neither needs the other's code.
 
 ### Binding values, verbatim from the spec
 
@@ -56,6 +56,8 @@ Tasks 4 and 5 carry `Lane:` lines: their files are disjoint and neither needs th
 7. **Reads before slice 169** (slice 166's guard). Once a link to an unheld IRI can be stored, a read of the linking artifact must not fail: at a glance its stub is the IRI alone, with no kind, title or fields; a whole read following links leaves it as the IRI, not filled in; Follow gives the same bare stub and does not walk on from it. Slice 169 then adds the mark the spec asks for to these.
 8. **Inbound counts** count links from held artifacts into a held artifact, as today; a placeholder is never read, so it has none to show.
 9. **Removal** (decision/removal-still-refused-under-placeholders; decision/a-link-to-a-removed-artifact-waits-on-a-placeholder). A removal is refused while anything points at its target, as today; a link made after the removal lands on a placeholder.
+
+10. **Every link carries the held type its target sits under** (added after Task 1, whose port takes it only for a target not held). `links.handed` fills it for a held target too, so a link drafted while its target was held, whose target is removed before it lands, lands as a link to an IRI not held instead of being refused at the port: the second row of change-the-store's outline. The adapter still checks a held target as it does today and reads the carried type only when the target is not held.
 
 ## Review Focus
 
@@ -91,7 +93,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 
 ### Task 2: Slice 166. A link to an IRI not held lands, and its artifact still reads
 
-Review: batch-end
+Review: per-task
 Model: opus
 Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
@@ -102,9 +104,10 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 - [ ] **Where the change lands** (3 production, 3 test):
   - `src/kb/validation.py`: a link to an IRI not held is accepted when the nearest held type it sits under is one the field allows, into a part when the field may point into a part (decisions 1 to 3); refused as today otherwise.
   - `src/kb/read.py`, `src/kb/query.py`: decision 7's guard.
+  - `src/kb/links.py`: decision 10 (one line of what `handed` fills), with the port's conformance case of a link drafted to a held target that is removed before it lands.
   - `tests/test_read_an_artifact.py`, `tests/test_remove_an_artifact.py` (the outline's binding and steps), one test module for Review Focus 3's plain tests.
   - CLAUDE.md's rows for `validation.py`, `read.py`, `query.py`.
-- [ ] **Decisions applied:** 1, 2, 3, 7, 8, 9. Review Focus 1 (through the contract), 3, 5.
+- [ ] **Decisions applied:** 1, 2, 3, 7, 8, 9, 10. Review Focus 1 (through the contract), 3, 5.
 - [ ] **Tests the decisions break:**
   - `tests/test_remove_an_artifact.py`, the binding and steps of the old outline "A removal and a new link to the same artifact made at once never both land" (its title and second row changed in the feature): rebound to the new title; the step "the new decision is rejected because a link must land on a node of a kind the type allows" gives way to the new row's Then (the new decision lands, its link on a placeholder at the removed tag's IRI; the store holds the new decision and not the tag). The first row's assertions stay.
   - Tests asserting a link to an IRI not held is refused where the IRI sits under a held type the field allows: none found by the scout beyond the above; the refusals under a type not held or not allowed (`tests/test_create_an_artifact.py`, `tests/test_add_an_item_to_a_collection.py`) stay as they are.
@@ -137,32 +140,28 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 - [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-166.1"` gives 2 passed, and `make test` shows no new failure.
 - [ ] **Checkpoint:** `plan status 166.1 green`, then `plan log "Suite: ..."`.
 
-### Task 4: Slices 167 and 168. A placeholder is typed by the type its IRI sits under, and filled by creating what it names
+### Task 4: Slice 167. A placeholder is typed by the type its IRI sits under
 
 Review: batch-end
 Model: sonnet
 Lane: A
 Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
-- [ ] **Scenarios** (`@slice-167`, 4 scenarios, 4 collected; `@slice-168`, 4 scenarios, 4 collected), all check-a-change:
+- [ ] **Scenarios** (`@slice-167`, 4 scenarios, 4 collected), all check-a-change:
   - An artifact pointing at an IRI under a type the store does not hold is refused
   - An artifact pointing at an IRI the store does not hold, under a type the link does not allow, is refused
   - An item pointing at an IRI under a type the store does not hold is refused
   - An artifact with several faults reports them all
-  - An artifact pointing into a part of an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder
-  - An artifact pointing into a part a held artifact does not have is refused
-  - Creating an artifact at an IRI links already point at fills the placeholder
-  - Creating an artifact without the part a link points into leaves that link on a placeholder
-- [ ] **Why it is red today:** step definitions only; the behaviour is Tasks 1 to 3's. The scout found the Givens and Whens whose wording changed or is missing (an IRI "under a type the store does not hold"; "under the process type" with its process-type Given; the decision type that "may link to the decision they supersede or into one of its options"; "a decision that supersedes a decision the store does not hold, at an IRI under the decision type").
+- [ ] **Why it is red today:** step definitions only; the refusals hold already. The scout found the Givens and Whens whose wording changed or is missing (an IRI "under a type the store does not hold"; "under the process type" with its process-type Given; the item's step).
 - [ ] **Where the change lands** (0 production, 2 test): `tests/test_create_an_artifact.py`, `tests/test_add_an_item_to_a_collection.py`. If a scenario is red on behaviour once its steps exist, that is a finding: stop and report `BLOCKED` with the Then line and what the store answered; production is not this task's.
-- [ ] **Decisions applied:** 1, 2, 3, 4, 5. Review Focus 4 (the plain test of the removal refused after filling).
+- [ ] **Decisions applied:** 1, 2.
 - [ ] **Tests the decisions break:** none: the existing refusal steps (`_rejected_for_the_link`, `_rejected_with_both_faults`, `_rejected_for_its_link`) are reused as they assert.
-- [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-167 or slice-168"` gives 8 passed, and `make test` shows no new failure.
-- [ ] **Checkpoint:** the reply carries the checkpoint entries for slices 167 and 168 (this task is in a lane).
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m slice-167` gives 4 passed, and `make test` shows no new failure.
+- [ ] **Checkpoint:** the reply carries the checkpoint entry for slice 167 (this task is in a lane).
 
 ### Task 5: Slice 169. Reads mark a link that lands on nothing held
 
-Review: batch-end
+Review: per-task
 Model: opus
 Lane: B
 Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
@@ -179,7 +178,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 
 ### Task 6: Slice 170. The check lists placeholders apart from violations
 
-Review: batch-end
+Review: per-task
 Model: opus
 Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
 
@@ -200,3 +199,22 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
   - `.venv/bin/python -m pytest -q -m slice-170` gives 5 passed.
   - `make test` passes every scenario tagged up to `@slice-170`. Every failure is a scenario tagged `@slice-171` onward, or the rule-name test.
 - [ ] **Checkpoint:** `plan status 170 green`, then `plan log "Suite: ..."`.
+
+### Task 7: Slice 168. A placeholder is filled by creating what it names
+
+Review: batch-end
+Model: sonnet
+Lane: A
+Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0/scripts
+
+- [ ] **Scenarios** (`@slice-168`, 4 scenarios, 4 collected), all check-a-change:
+  - An artifact pointing into a part of an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder
+  - An artifact pointing into a part a held artifact does not have is refused
+  - Creating an artifact at an IRI links already point at fills the placeholder
+  - Creating an artifact without the part a link points into leaves that link on a placeholder
+- [ ] **Why it is red today:** step definitions only; the behaviour is Tasks 1 to 3's. Missing: the decision type that "may link to the decision they supersede or into one of its options", and "a decision that supersedes a decision the store does not hold, at an IRI under the decision type".
+- [ ] **Where the change lands** (0 production, 1 test): `tests/test_create_an_artifact.py`. If a scenario is red on behaviour once its steps exist, that is a finding: stop and report `BLOCKED` with the Then line and what the store answered; production is not this task's.
+- [ ] **Decisions applied:** 3, 4, 5. Review Focus 4 (the plain test of the removal refused after filling).
+- [ ] **Tests the decisions break:** none.
+- [ ] **Verify:** `.venv/bin/python -m pytest -q -m slice-168` gives 4 passed, and `make test` shows no new failure.
+- [ ] **Checkpoint:** the reply carries the checkpoint entry for slice 168 (this task is in a lane).
