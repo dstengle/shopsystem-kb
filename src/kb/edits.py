@@ -1,13 +1,13 @@
 """What each operation of a set does to the draft: a new artifact, a whole or placed replacement, an item added to a
 collection, an artifact removed. Each acts on the draft as the operations before it left it, on a copy of what it was
 asked to put there, so the same set can act again on another draft, and is refused there with every fault it finds in
-what it names, the revisions it makes and the names of its items; what its content and links come to is checked once
-the whole set has acted (kb.write). An import puts an artifact in the draft whole, as the file it came from gives it,
+what it names, the revisions it makes and the names of its items (kb.naming); what its content and links come to is
+checked once the whole set has acted (kb.write). An import puts an artifact in the draft whole, as its file gives it,
 conforming to the version of its type that file names, which the draft must hold."""
 import copy
 from typing import NamedTuple
 
-from kb import changes, composition, names, places, refusals, settled, standing, values
+from kb import changes, composition, naming, names, places, refusals, settled, values
 from kb.draft import Draft
 from kb.values import ArtifactId, Refused
 
@@ -62,16 +62,16 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     schema = _named(draft, creation)
     type_id = values.type_of(creation.version.kind)
     faults = [
-        *_identity(draft, creation, type_id), *creation.title_faults,
+        *naming.identity(draft, creation, type_id), *creation.title_faults,
         *creation.content.refusal(str(creation.name)),
     ]
     if faults:
         raise Refused(faults)
     content = copy.deepcopy(creation.content.tree)
     if type_id == values.type_of(values.TYPE_KIND):
-        _numbered(draft, creation.name, content)
+        naming.numbered(draft, creation.name, content)
     declared = composition.declared(schema["schema"], draft)
-    names.items(declared["parts"], content, False, _item_parts(draft))
+    naming.items(draft, declared, content)
     artifact = settled.given(content, str(creation.name), str(creation.version), 1, creation.title)
     draft.put(creation.name, settled.order(artifact, declared))
     return creation.name
@@ -84,24 +84,6 @@ def _named(draft: Draft, creation: changes.Create) -> dict:
         return composition.version_schema(creation.version, draft)
     except Refused as refused:
         raise Refused([*creation.carried, *refused.faults])
-
-
-def _identity(draft: Draft, creation: changes.Create, type_id: ArtifactId) -> list:
-    """The faults of the IRI a create gives: an artifact's belongs to the type its create names, the nearest held
-    type it sits under, while a type's is any IRI its client chooses under which nothing yet belongs to another type
-    (kb.standing); and neither a create before it in its set carries it, said once and as the set's, nor does the
-    draft hold anything at it."""
-    name, faults, defines = creation.name, [], type_id == values.type_of(values.TYPE_KIND)
-    if not defines and composition.nearest_type(name, draft) != type_id:
-        faults.append(refusals.not_under(name, type_id))
-    if creation.carried:
-        faults += creation.carried
-    elif draft.holds(name):
-        faults.append(refusals.already_held(name))
-    elif defines:
-        other, sitting = standing.under(name, draft)
-        faults += [refusals.belongs(name, each, other) for each in sitting]
-    return faults
 
 
 def _replace(draft: Draft, replacement: changes.Replace) -> Change:
@@ -188,29 +170,12 @@ def _revise(draft: Draft, artifact_id: ArtifactId, current: dict, content: dict,
     kind = composition.artifact_kind(current)
     schema = composition.version_schema(version, draft)
     declared = composition.declared(schema["schema"], draft)
-    held = names.held(declared["parts"], current)
-    misnamed = [refusals.misnamed(artifact_id, found) for found in names.handed_back(declared, content, held)]
-    if not misnamed:
-        names.items(declared["parts"], content, True, _item_parts(draft))
+    misnamed = naming.revised(draft, artifact_id, declared, content, current)
     if kind == values.TYPE_KIND:
-        _numbered(draft, artifact_id, content)
+        naming.numbered(draft, artifact_id, content)
     artifact = settled.given(content, current["id"], str(version), current["revision"] + 1, current["title"])
     draft.put(artifact_id, settled.order(artifact, declared))
-    return tuple(misnamed)
-
-
-def _numbered(draft: Draft, type_id: ArtifactId, content: dict) -> None:
-    """A type's content given, as its `version`, the number kb makes this version of it at, over any number its
-    client sent or none; what a client sent there that is no number stays, for the type of types to refuse."""
-    number, sent = draft.numbered(type_id), content.get("version", 0)
-    if isinstance(sent, (int, float)) and not isinstance(sent, bool):
-        content["version"] = number
-
-
-def _item_parts(draft: Draft):
-    """What gives the collections an item's type declares, read through its composition, from the declaration of the
-    collection the item is in."""
-    return lambda part: composition.declared(part.get("items", {}), draft)["parts"]
+    return misnamed
 
 
 def _content_of(artifact: dict) -> dict:
