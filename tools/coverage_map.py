@@ -3,8 +3,10 @@
     coverage_map.py tests-for TARGET   the passing tests that execute TARGET: a file (src/kb/examining.py), a line
                                        (src/kb/examining.py:40) or a function (kb.drafting.Draft.waited)
     coverage_map.py unexecuted         the lines of src/kb no passing test executes, per file, as ranges, with a total
+                                       for each file and one for all
 
-Plain text, one item per line."""
+A TARGET that is not a file under src/kb, or a line of one that is not a statement inside a function, is refused:
+an empty answer always means no passing test executes it. Plain text, one item per line."""
 import ast
 import sys
 from pathlib import Path
@@ -12,6 +14,7 @@ from pathlib import Path
 DATA = ".coverage-map"
 PASSED = ".coverage-map.passed"
 SOURCE = "src/kb"
+WATCHED = (SOURCE, "tests", "features")
 STALE = "run make coverage-map"
 
 
@@ -43,9 +46,10 @@ def function_lines(source: str, qualified: str) -> range:
 
 def locate(root: Path, target: str) -> tuple[Path, range | None]:
     """The file a target names, and the lines of it (None for all): `path`, `path:line` or `module.function`."""
-    path, _, line = target.partition(":")
+    path, lined, line = target.partition(":")
     if path.endswith(".py"):
-        return (root / path), (range(int(line), int(line) + 1) if line else None)
+        file = _source_file(root, path)
+        return file, (_statement(root, file, f"{path}:{line}", line) if lined else None)
     parts = path.split(".")
     for cut in range(len(parts), 0, -1):
         file = root / SOURCE / Path(*parts[1:cut]).with_suffix(".py") if parts[0] == "kb" and cut > 1 else None
@@ -56,9 +60,33 @@ def locate(root: Path, target: str) -> tuple[Path, range | None]:
     raise SystemExit(f"{target!r} names no file or function of {SOURCE}")
 
 
+def _source_file(root: Path, path: str) -> Path:
+    """The file under src/kb a path from the checkout's top names, or the refusal saying it names none."""
+    file = root / path
+    if not file.is_file() or (root / SOURCE).resolve() not in file.resolve().parents:
+        raise SystemExit(f"{path} is not a file under {SOURCE}")
+    return file
+
+
+def _statement(root: Path, file: Path, target: str, line: str) -> range:
+    """That one line of the file, or the refusal saying it is not a statement inside a function."""
+    if not line.isdecimal() or int(line) not in statements(root, file):
+        raise SystemExit(f"{target} is not a statement inside a function, so no test can be said to execute it")
+    return range(int(line), int(line) + 1)
+
+
+def statements(root: Path, file: Path) -> set[int]:
+    """The lines of a file the map can hold: its statements, as coverage counts them, inside a function's body."""
+    import coverage
+    config = root / "pyproject.toml"
+    cov = coverage.Coverage(data_file=None, config_file=str(config) if config.is_file() else False)  # sources only
+    return set(cov.analysis2(str(file.resolve()))[1]) & body_lines(file.read_text())
+
+
 def newest(root: Path) -> float:
-    """When the newest file under src/kb or tests/ was last written."""
-    return max(f.stat().st_mtime for top in (SOURCE, "tests") for f in (root / top).rglob("*")
+    """When the newest file under src/kb, tests/ or features/ was last written: a row added to a feature's
+    Examples table adds a test without touching either of the others."""
+    return max(f.stat().st_mtime for top in WATCHED for f in (root / top).rglob("*")
                if f.is_file() and "__pycache__" not in f.parts)
 
 
@@ -67,7 +95,7 @@ def check_fresh(root: Path) -> None:
         if not (root / name).is_file():
             raise SystemExit(f"{name} is missing: {STALE}")
     if (root / DATA).stat().st_mtime < newest(root):
-        raise SystemExit(f"{DATA} is older than src/kb or tests: {STALE}")
+        raise SystemExit(f"{DATA} is older than {SOURCE}, tests or features: {STALE}")
 
 
 def passing(root: Path) -> set[str]:
@@ -102,18 +130,23 @@ def tests_for(root: Path, target: str) -> list[str]:
 
 
 def unexecuted(root: Path) -> list[str]:
-    import coverage
-    cov = coverage.Coverage(data_file=None, config_file=str(root / "pyproject.toml"))  # reads sources only, never the map
     reached = executed(root)
-    out = []
-    for file in sorted((root / SOURCE).rglob("*.py")):
-        if "_pb2" in file.name:
-            continue
-        statements = set(cov.analysis2(str(file.resolve()))[1]) & body_lines(file.read_text())
-        left = sorted(line for line in statements if not reached.get(str(file.resolve()), {}).get(line))
-        if left:
-            out.append(f"{file.relative_to(root)}: {', '.join(ranges(left))} ({len(left)} of {len(statements)})")
-    return out
+    files = [file for file in sorted((root / SOURCE).rglob("*.py")) if "_pb2" not in file.name]
+    return report([(str(file.relative_to(root)), *_left(root, file, reached.get(str(file.resolve()), {})))
+                   for file in files])
+
+
+def _left(root: Path, file: Path, reached: dict) -> tuple[list[int], int]:
+    """A file's statements no passing test executed, and how many statements it has."""
+    held = statements(root, file)
+    return sorted(line for line in held if not reached.get(line)), len(held)
+
+
+def report(files: list[tuple[str, list[int], int]]) -> list[str]:
+    """Each file with lines left unexecuted, as ranges, with how many of its lines they are; then the total."""
+    out = [f"{name}: {', '.join(ranges(left))} ({len(left)} of {count})" for name, left, count in files if left]
+    lines, held = sum(len(left) for _, left, _ in files), sum(count for _, _, count in files)
+    return out + [f"total: {lines} of {held} lines inside functions, in {len(out)} of {len(files)} files"]
 
 
 def main(argv: list[str]) -> int:

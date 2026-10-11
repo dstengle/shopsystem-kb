@@ -14,6 +14,8 @@ TESTS = Path(__file__).resolve().parent
 CONFTEST = """\
 from pathlib import Path
 
+import pytest
+
 import slices
 
 
@@ -24,6 +26,11 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     slices.expect_failures(config, items)
+
+
+@pytest.hookimpl(optionalhook=True, tryfirst=True)
+def pytest_testnodedown(node, error):
+    slices.stop_with(node)
 """
 
 PLAN = """\
@@ -84,10 +91,11 @@ def _tree(tmp_path, slice, passes, plan=PLAN, listed=()):
     return tree
 
 
-def _run(tree):
-    """pytest run over the tree as a program of its own, its expected failures listed with their reasons."""
+def _run(tree, *more, cache="no:cacheprovider"):
+    """pytest run over the tree as a program of its own, its expected failures listed with their reasons, with any
+    more arguments; without the cache of what failed last, unless `cache` names a plugin to keep it out instead."""
     return subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-rxX", "-p", "no:cacheprovider"],
+        [sys.executable, "-m", "pytest", "-q", "-rxX", "-p", cache, *more],
         cwd=tree, env={**os.environ, "PYTHONPATH": str(TESTS)}, capture_output=True, text=True,
     )
 
@@ -196,3 +204,99 @@ def test_a_selection_that_leaves_a_listed_test_out_does_not_fail_the_run(tmp_pat
     )
     assert ran.returncode == 5, ran.stdout + ran.stderr
     assert "listed.txt" not in ran.stdout + ran.stderr
+
+
+def _with_status(slice, status):
+    """The plan with that slice's Status line written as given."""
+    head, _, rest = PLAN.partition(f"## Slice {slice}:")
+    before, _, after = rest.partition("- Status:")
+    return f"{head}## Slice {slice}:{before}- Status: {status}\n{after.partition(chr(10))[2]}"
+
+
+@pytest.mark.parametrize(
+    "status", ["Green", "GREEN", "done", "`green`", "**green**", "", "green with fixes", "greenish: nearly"],
+)
+def test_a_status_the_plan_script_does_not_know_stops_the_run_naming_the_slice_and_the_status(tmp_path, status):
+    ran = _run(_tree(tmp_path, "171", passes=False, plan=_with_status("171", status)))
+    assert ran.returncode == 1, ran.stdout + ran.stderr
+    assert f"slice 171 has the Status {status!r}" in ran.stderr
+    assert "xfailed" not in ran.stdout and "passed" not in ran.stdout
+
+
+def test_a_slice_with_no_status_stops_the_run_naming_the_slice(tmp_path):
+    plan = PLAN.replace("- Status: planned: waits on slice 170\n", "")
+    ran = _run(_tree(tmp_path, "171", passes=False, plan=plan))
+    assert ran.returncode == 1, ran.stdout + ran.stderr
+    assert "slice 171 has no Status" in ran.stderr
+    assert "xfailed" not in ran.stdout
+
+
+def test_only_the_word_before_the_colon_decides_a_status(tmp_path):
+    ran = _run(_tree(tmp_path, "171", passes=False, plan=_with_status("171", "green: blocked no longer, not planned")))
+    assert (ran.returncode, _summary(ran)) == (1, "1 failed"), ran.stdout + ran.stderr
+
+
+def test_a_slice_numbered_as_deep_as_the_plan_script_allows_is_read(tmp_path):
+    plan = PLAN.replace("## Slice 171: Not begun", "## Slice 166.1.1: Deeper\n- Kind: enabling\n- Check: one\n"
+                        "- Status: planned\n\n## Slice 171: Not begun")
+    ran = _run(_tree(tmp_path, "166.1.1", passes=False, plan=plan))
+    assert (ran.returncode, _summary(ran)) == (0, "1 xfailed"), ran.stdout + ran.stderr
+    assert "XFAIL test_tagged.py::test_tagged - slice 166.1.1 not built" in ran.stdout
+
+
+@pytest.mark.parametrize("slice, listed, named", [
+    ("171", [LISTED, "test_tagged.py::test_gone"], "test_tagged.py::test_gone (no collected test has it)"),
+    ("166", [LISTED], f"{LISTED} (its slice is not one the plan lists as not built)"),
+], ids=["an id no test has", "an id whose slice is built"])
+def test_a_list_that_is_wrong_stops_a_run_in_parallel_with_the_same_message(tmp_path, slice, listed, named):
+    tree = _tree(tmp_path, slice, passes=True, listed=listed)
+    alone, ran = _run(tree), _run(tree, "-n", "2")
+    refusal = f"refusing to run: {tree / 'listed.txt'!s} lists tests it should not: {named}"
+    assert refusal in alone.stdout + alone.stderr
+    assert ran.returncode == 1, ran.stdout + ran.stderr
+    assert refusal in ran.stdout + ran.stderr
+    assert "INTERNALERROR" not in ran.stdout + ran.stderr
+    assert "passed" not in ran.stdout
+
+
+def test_a_list_that_is_right_runs_in_parallel(tmp_path):
+    ran = _run(_tree(tmp_path, "171", passes=True, listed=[LISTED]), "-n", "2")
+    assert (ran.returncode, _summary(ran)) == (0, "1 passed"), ran.stdout + ran.stderr
+
+
+OTHER = """
+
+def test_other():
+    import os
+    assert not os.environ.get("OTHER_FAILS")
+"""
+
+
+def _tree_with_another_test(tmp_path):
+    """A tree whose file holds a listed test, passing before its slice is built, and another test beside it."""
+    tree = _tree(tmp_path, "171", passes=True, listed=[LISTED])
+    with (tree / "test_tagged.py").open("a") as file:
+        file.write(OTHER)
+    return tree
+
+
+def test_a_run_of_one_test_by_its_id_in_a_file_holding_a_listed_test_is_not_refused(tmp_path):
+    ran = _run(_tree_with_another_test(tmp_path), "test_tagged.py::test_other")
+    assert (ran.returncode, _summary(ran)) == (0, "1 passed"), ran.stdout + ran.stderr
+
+
+def test_a_run_by_id_still_refuses_a_listed_test_it_collects_whose_slice_is_built(tmp_path):
+    tree = _tree(tmp_path, "166", passes=True, listed=[LISTED])
+    ran = _run(tree, LISTED)
+    assert ran.returncode == 1, ran.stdout + ran.stderr
+    assert f"{LISTED} (its slice is not one the plan lists as not built)" in ran.stdout + ran.stderr
+
+
+def test_a_run_of_what_failed_last_in_a_file_holding_a_listed_test_is_not_refused(tmp_path, monkeypatch):
+    tree = _tree_with_another_test(tmp_path)
+    monkeypatch.setenv("OTHER_FAILS", "1")
+    first = _run(tree, cache="no:nothing_by_this_name")
+    assert (first.returncode, _summary(first)) == (1, "1 failed, 1 passed"), first.stdout + first.stderr
+    ran = _run(tree, "--lf", cache="no:nothing_by_this_name")
+    assert (ran.returncode, _summary(ran)) == (1, "1 failed"), ran.stdout + ran.stderr
+    assert "refusing to run" not in ran.stdout + ran.stderr

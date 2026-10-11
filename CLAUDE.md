@@ -105,14 +105,16 @@ module that does not own it.
 
 ## Working here
 
-- `make dev` once; `make test` runs the suite in this checkout's virtualenv, in parallel (`-n auto`), the operator's commands run in-process (one test runs the installed `kb`); during red-green run the slice's marker (`-m slice-N`), and the whole suite once per slice;
+- `make dev` once; `make test` runs the suite in this checkout's virtualenv, in parallel (`-n auto`), the operator's commands run in-process (one test runs the installed `kb`); during red-green run the slice's marker for real results (`-m slice-N --runxfail`; without `--runxfail` a slice not built shows `xfailed`, exit 0), and the whole suite once per slice. A slice's whole-suite run for the record is made after `plan status N green`: before that the slice's own failing scenarios are still expected failures, and "0 failed" says nothing about them;
   `make contract` regenerates the stubs after `kb.proto` changes.
 - The suite is green between slices: `make test` reports 0 failed, and a failure is a regression. A test carrying a
   `slice-<n>` marker (a scenario from its feature's `@slice-<n>` tag, a plain test from `slices.waits_on("<n>")`) is
   expected to fail while the living plan (`docs/superpowers/plans/2026-09-24-kb-slices.md`) lists slice n with a
   Status other than `green` (`tests/slices.py`): it still runs, its failure is counted as `xfailed` with the reason
   "slice <n> not built", and its passing before the plan says green as `xpassed`, never as a failure. A slice the plan
-  no longer lists is built, and its tests run for real; a plan that cannot be read stops the run. While a slice is
+  no longer lists is built, and its tests run for real; a plan that cannot be read, or that gives a slice a Status
+  the plan script does not know (the text before its first colon is `planned`, `in progress`, `green` or `blocked`),
+  stops the run. While a slice is
   being built, `-m slice-N --runxfail` runs its scenarios for real results, red on their own assertions and then
   green; `-rxX` lists the expected failures and the unexpected passes with their reasons. The suite record reads
   "N passed, M expected to fail, K unexpectedly passing, 0 failed" (pytest's `passed`, `xfailed`, `xpassed`).
@@ -127,10 +129,11 @@ module that does not own it.
   both git-ignored). It takes about 80 s (against 25 s for `make test`) and is not part of `make test`. Tests that
   start another program (the installed `kb`, `at_once.InAnotherProgram`, `tests/serving.py`'s programs) are not
   traced; the in-process ones, the operator's commands among them, are. `make coverage-ask ARGS="..."`
-  (`tools/coverage_map.py`) answers from it, in plain text, and refuses a map missing or older than `src/kb` or
-  `tests/` ("run make coverage-map"): `ARGS="tests-for src/kb/examining.py"` (or `src/kb/draft.py:127`, or
+  (`tools/coverage_map.py`) answers from it, in plain text, and refuses a map missing or older than `src/kb`,
+  `tests/` or `features/` ("run make coverage-map"), and a target that is not a file under `src/kb` or a line that
+  is not a statement inside a function: `ARGS="tests-for src/kb/examining.py"` (or `src/kb/draft.py:127`, or
   `kb.draft.Draft.waited`) names the passing tests that execute a file, a line or a function; `ARGS="unexecuted"`
-  gives, per file, the lines inside functions no passing test executes, as ranges with a count. A module's own
+  gives, per file, the lines inside functions no passing test executes, as ranges with a count, and a total for all. A module's own
   top level runs at import, before any test, and is not asked after.
 - Behaviour comes from `features/`; code is written red-green against a
   scenario, one at a time, and never adds behaviour no scenario asks for.

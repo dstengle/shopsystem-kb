@@ -32,6 +32,12 @@ def pytest_collection_modifyitems(config, items):
     slices.expect_failures(config, items)
 
 
+@pytest.hookimpl(optionalhook=True, tryfirst=True)
+def pytest_testnodedown(node, error):
+    """In a run in parallel, a worker that refused the list of tests passing before their slice stops the run."""
+    slices.stop_with(node)
+
+
 def _guard_starts(rootpath, base_temp):
     """Where the guard looks for a store, upward from each: the checkout, the system's temporary directory, and
     pytest's own base temp root, wherever `--basetemp` or `TMPDIR` puts it. A seam a demonstration can point
