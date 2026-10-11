@@ -90,7 +90,7 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 - The operator's commands run in the container: `docker compose run --rm kb validate`, or `docker compose exec kb kb validate` against the running server (a read, which a served store answers).
 - The log says `serving\t0.0.0.0:50051` once the store is served, and any refusal.
 - A caller gets its connection from a compose `configs:` entry mounted as `kb/server.yaml` under the directory its `KB_ROOT` names, and reaches kb by its service name (`kb:50051`).
-- An example compose file ships as `docker/compose.example.yaml` and is shown in the README: a `kb` service built from `https://github.com/dstengle/shopsystem-kb.git#v0.7.0` with `KB_ACTOR` and a named volume `kb-store` at `/data`, and a caller with `KB_ROOT: /kb-connection`, the config `kb-connection` (`address: kb:50051`) mounted at `/kb-connection/kb/server.yaml`, depending on `kb` being healthy.
+- An example compose file ships as `docker/compose.example.yaml` and is shown in the README: a `kb` service built from `https://github.com/dstengle/shopsystem-kb.git#v${KB_VERSION}`, the tag of the release of kb to build, which compose refuses to go without with `KB_ACTOR` and a named volume `kb-store` at `/data`, and a caller with `KB_ROOT: /kb-connection`, the config `kb-connection` (`address: kb:50051`) mounted at `/kb-connection/kb/server.yaml`, depending on `kb` being healthy.
 - The README gains "Running kb in Docker": the compose example, the seed step, the operator's commands, the empty-store trap (`up` before seeding starts an empty store, over which `kb init --seed` is refused; nothing is lost in an empty store, so `docker compose down -v` and seed again), and the bind mount's ownership.
 
 ## Not yet
