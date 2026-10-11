@@ -2,7 +2,7 @@
 id: capability/check-a-change
 title: Check a change
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision, decision/faults-ordered-by-reading-order-then-rule-name, decision/0024-a-link-may-land-on-a-placeholder, decision/0027-each-type-version-is-its-own-iri, decision/an-artifact-keeps-its-version, decision/links-into-parts-of-placeholders]
+rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision, decision/faults-ordered-by-reading-order-then-rule-name, decision/0024-a-link-may-land-on-a-placeholder, decision/0027-each-type-version-is-its-own-iri, decision/an-artifact-keeps-its-version, decision/links-into-parts-of-placeholders, decision/a-link-that-waits-keeps-waiting]
 formulated_as: features/check-a-change.feature
 ---
 
@@ -23,6 +23,7 @@ Every create, change and added item is checked against a version of its type and
 - If an artifact points at an IRI the store does not hold, under a type the store holds that the link field does not allow, the artifact is refused because a link must land on a node of a kind the type allows.
 - When the client creates an artifact at an IRI that links already point at, those links land on the new artifact, and the IRI is no longer a placeholder.
 - When the client creates an artifact at an IRI a link points into a part of, and the new artifact has no such part, that link stays on a placeholder and is listed as any placeholder is.
+- When the client changes an artifact that holds a link waiting on a part its target does not have, and the change leaves that link as it is, the change is accepted and the link still waits; a link the change adds or alters is checked as any new link is.
 - If an artifact has several faults, it is refused with every one of them, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
 - If an artifact has faults found by different rules, such as a shape its type does not allow and a missing section, it is refused with all of them together, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
 - If an artifact is refused with several faults, they are given in the order its places stand in the artifact as it would read back, which is the order its type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and faults at one place come in the alphabetical order of the names of the rules they break.
