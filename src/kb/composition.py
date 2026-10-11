@@ -92,6 +92,15 @@ def declared(schema: dict, corpus) -> dict:
     return whole
 
 
+def declared_at(held: dict, place: tuple, corpus) -> dict:
+    """What the item type at the end of a place declares, walking from what a node declares (`held`) through each
+    collection the place names (every other step). A collection not declared declares nothing, nor does what is
+    below it."""
+    for collection in place[::2]:
+        held = declared(held["parts"].get(collection, {}).get("items", {}), corpus)
+    return held
+
+
 def kind_type(kind: values.Kind, corpus) -> values.ArtifactId:
     """The type a kind names. Raises Refused when the corpus holds none, or holds there an artifact that is not a
     type, since a kind must name a type the store holds, wherever it is given."""

@@ -6,10 +6,7 @@ the reference written. A read at a glance or whole gives, beside its content, ea
 held, on an IRI the store does not hold or on a part the artifact it holds there lacks: the links of the artifact
 read and, read whole following links, of each artifact filled in. A section shows no link and gives none. A read that
 names a part gives that part and nothing else of its artifact, at the level asked, beside its artifact's identity."""
-from dataclasses import replace
-from typing import NamedTuple
-
-from kb import composition, links, names, places, refusals, settled, values
+from kb import composition, links, names, parts, places, refusals, settled, values, versions
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
@@ -21,7 +18,7 @@ def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     """The artifact at the level asked, or, when the locator's place names a part of it, that part. Raises Refused
     for a name the store lacks, a place or a section it holds nothing at."""
     if reading.version is not None:
-        return _version(store, reading)
+        return artifact(*versions.as_read(store, reading))
     locator = reading.locator
     if not store.holds(locator.id):
         raise Refused([refusals.not_found(locator.id)])
@@ -29,66 +26,10 @@ def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     if locator.place:
         places.resolve(found, locator)
     if reading.level == "section":
-        return _section(found, "" if _node(found, locator) is found else names.placed(locator.place), reading.section)
+        return _section(found, "" if parts.node(found, locator) is found else names.placed(locator.place), reading.section)
     if reading.level == "whole":
-        return _whole(store, _read(store, found, locator), reading.depth)
-    return _summary(store, _read(store, found, locator))
-
-
-class _Read(NamedTuple):
-    """What a read gives: the artifact, the node of it read (the artifact itself, or the part its place names), what
-    that node's type declares, the links the node carries, in its own fields and in its items at every depth, and
-    how a link says that node holds it (`links.Link.holder`)."""
-    found: dict
-    node: dict
-    declared: dict
-    links: list
-    holder: str
-
-
-def _node(found: dict, locator: Locator) -> dict:
-    """What of an artifact a read gives: the part its place names, when it names one, otherwise the artifact."""
-    names_part = locator.place and places.holds_part(found, locator.place)
-    return places.node(found, locator) if names_part else found
-
-
-def _read(store: Port, found: dict, locator: Locator) -> _Read:
-    schema = composition.artifact_schema(found, store)["schema"]
-    declared, node = composition.declared(schema, store), _node(found, locator)
-    if node is found:
-        return _Read(found, found, declared, links.carried(found, schema, store), "")
-    for collection in locator.place[::2]:
-        declared = composition.declared(declared["parts"].get(collection, {}).get("items", {}), store)
-    inside = links.inside(found, schema, store, node)
-    return _Read(found, node, declared, inside, names.placed(locator.place))
-
-
-def _version(store: Port, reading: Reading) -> kb_pb2.Artifact:
-    """A version of a type, read as the artifact it was made as, under the version's IRI, with the revision and the
-    title it was made with. Raises Refused when the store keeps no such version."""
-    version = reading.version
-    held = composition.kept(values.type_of(version.kind), version.number, store)
-    if held is None:
-        raise Refused([refusals.not_found(ArtifactId(str(version)))])
-    at = ArtifactId(str(version))
-    made = {**held.content, "id": str(at), "revision": held.revision, "title": held.title}
-    return artifact(_Kept(store, at, made), replace(reading, locator=Locator(at, reading.locator.place), version=None))
-
-
-class _Kept:
-    """The store with one artifact put over it, as a version of a type is read as an artifact; all else is the store's."""
-
-    def __init__(self, store: Port, artifact_id: ArtifactId, made: dict):
-        self._store, self._id, self._made = store, artifact_id, made
-
-    def holds(self, artifact_id: ArtifactId) -> bool:
-        return artifact_id == self._id or self._store.holds(artifact_id)
-
-    def artifact(self, artifact_id: ArtifactId) -> dict:
-        return self._made if artifact_id == self._id else self._store.artifact(artifact_id)
-
-    def __getattr__(self, name):
-        return getattr(self._store, name)
+        return _whole(store, parts.read(store, found, locator), reading.depth)
+    return _summary(store, parts.read(store, found, locator))
 
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
@@ -126,7 +67,7 @@ def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
     )
 
 
-def _whole(store: Port, read: _Read, depth: int) -> kb_pb2.Artifact:
+def _whole(store: Port, read: parts.Read, depth: int) -> kb_pb2.Artifact:
     """The node whole: an artifact's content, or a part as its artifact holds it, its name with it; the links in the
     node's own fields followed as far as asked."""
     filled_in: dict[str, dict] = {}
@@ -173,11 +114,11 @@ def _section(found: dict, part: str, title: str) -> kb_pb2.Artifact:
     return _response(found, dumps(section))
 
 
-def _summary(store: Port, read: _Read) -> kb_pb2.Artifact:
+def _summary(store: Port, read: parts.Read) -> kb_pb2.Artifact:
     """The node at a glance: for an artifact the fields its type shows at a glance, for a part, whose type shows
     none, its name and its title; a stub of each thing a link in it points at and of each of its parts; and, for an
     artifact, how many point at it or at a part inside it, by their type and the field they use."""
-    response = _response(read.found, dumps(_glance(read)))
+    response = _response(read.found, dumps(parts.glance(read)))
     for link in read.links:
         response.references.append(stub(store, link.field, values.target(link.target).id))
     response.placeholders.extend(_placeholders(store, {read.found["id"]: read.links}))
@@ -188,12 +129,6 @@ def _summary(store: Port, read: _Read) -> kb_pb2.Artifact:
         for (type_name, field), count in store.inbound(ArtifactId(read.found["id"])).items():
             response.inbound.append(kb_pb2.InboundCount(kind=type_name, field=field, count=count))
     return response
-
-
-def _glance(read: _Read) -> dict:
-    if read.node is read.found:
-        return _summary_fields(read.found, read.declared)
-    return {key: read.node[key] for key in ("id", "title") if key in read.node}
 
 
 def _response(found: dict, content: str) -> kb_pb2.Artifact:

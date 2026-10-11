@@ -137,12 +137,7 @@ def _collections_at(draft: Draft, locator: values.Locator) -> dict:
     """The collections the version of its type the artifact conforms to declares where the locator's last step stands: the artifact's own, or those of the
     item type of each collection the place passes through on the way."""
     declared = composition.declared(composition.conformed(draft.artifact(locator.id), draft)["schema"], draft)
-    for collection in locator.place[:-1:2]:
-        part = declared["parts"].get(collection)
-        if part is None:
-            return {}
-        declared = composition.declared(part.get("items", {}), draft)
-    return declared["parts"]
+    return composition.declared_at(declared, locator.place[:-1], draft)["parts"]
 
 
 def _delete(draft: Draft, removal: changes.Remove) -> Change:
