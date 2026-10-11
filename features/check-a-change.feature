@@ -73,6 +73,14 @@ Feature: Check a change
     Then the client is given the IRI the artifact keeps for life and its first version
     And asked for the placeholders, the client is given the IRI the link points at, with the first decision linking to it
 
+  Scenario: Changing an artifact that holds a link waiting on a part its target lacks leaves the link waiting
+    Pins that a link left waiting by someone else's create does not lock the artifact that holds it: its other content can still change, and only a link the change itself makes is judged anew.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede or into one of its options, and may carry a collection of options
+    And a decision that supersedes the option "rollback" of a second decision, the second created afterwards with no option named "rollback"
+    When the client replaces the first decision's rationale, leaving what it supersedes as it is, saying which role and why
+    Then the change is accepted
+    And asked for the placeholders, the client is still given the IRI the link points at, with the first decision linking to it
+
   @slice-167
   Scenario: An artifact with several faults reports them all
     Pins that a refusal is a full account rather than the first complaint, so a client can fix everything in one more attempt and the store is untouched meanwhile.
