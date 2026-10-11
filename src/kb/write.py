@@ -9,7 +9,7 @@ set of which the port compares nothing that would show what landed since lands o
 Starting a store and recording a snapshot land through the port too."""
 from typing import NamedTuple
 
-from kb import canonical, drafting, journal, port, query, refusals, search, settled, store, values
+from kb import canonical, drafting, journal, names, port, query, refusals, search, settled, store, values
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
@@ -117,7 +117,7 @@ def _named(draft: Draft, link: port.Linking) -> str:
 
 def _landing_on(link: port.Linking) -> str:
     """Where a link lands, as it is written: the artifact, and the place of the part inside it after `#`."""
-    return f"{link.target}#{link.part}" if link.part else str(link.target)
+    return names.pointing(link.target, link.part)
 
 
 def record(held: port.Port, named: list, signed: Signed, clock: journal.Clock | None = None) -> str:
