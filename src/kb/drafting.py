@@ -6,7 +6,7 @@ the types it was read through and the IRIs where a type could be defined nearer,
 and whether the set lands only as drafted while the write lock is held. The imports a set makes of one type's versions are handed one after another, in the order of
 their numbers whatever order the set gave them in, each the version its file names at the revision its file gives, read
 at the revision the one before it left the type at, the first at the revision the store's type stands at when
-it is a version the store does not keep; an imported artifact is checked, and its links read, through the
+it is a version above the one that type stands at; an imported artifact is checked, and its links read, through the
 version of its type its file names. Only
 what the set changes is handed: a type's change restates the links of no artifact, which stay as the version it
 conforms to declares them. A fault anywhere refuses the whole set with every fault found."""
@@ -68,8 +68,8 @@ def _by_number(operations: list) -> list:
 def _read_at(held: port.Port, changes: list[Change]) -> list[int]:
     """The revision each change read its artifact at: the one before the one it leaves; or, for an import, which
     keeps the revision its file gives, the one the set's change before it left that artifact at, and for the first
-    the one the store's type stands at when it brings a version the store does not keep, else 0, as not held. So the
-    versions of one type a set imports land one after another, the type standing at the last."""
+    the one the store's type stands at when it brings a version above the one that type stands at, else 0, as not
+    held. So the versions of one type a set imports land one after another, the type standing at the last."""
     left, read = {}, []
     for change in changes:
         before = left.get(change.artifact_id)
@@ -82,13 +82,13 @@ def _read_at(held: port.Port, changes: list[Change]) -> list[int]:
 
 
 def _gained_at(held: port.Port, change: Change) -> int:
-    """The revision a type the store holds stands at, for an import of a version of it the store does not keep; 0
-    for any other import, which lands only where nothing is held."""
+    """The revision a type the store holds stands at, for an import of a version of it above the one it stands at;
+    0 for any other import, which lands only where nothing is held."""
     if not (settled.typed(change.left) and held.holds(change.artifact_id)):
         return 0
-    if change.left["version"] in held.versions(change.artifact_id):
-        return 0
-    return held.artifact(change.artifact_id)["revision"]
+    stands = held.artifact(change.artifact_id)
+    above = settled.typed(stands) and stands["version"] < change.left["version"]
+    return stands["revision"] if above else 0
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:

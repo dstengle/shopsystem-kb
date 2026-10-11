@@ -10,7 +10,8 @@ from ruamel.yaml import YAML
 
 from calls import (
     DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
-    filed, iri, journal, listing, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
+    filed, iri, journal, listing, next_version, read, refs, remove, replace, request, start_a_store, targets, type_iri,
+    version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
@@ -174,10 +175,6 @@ def _import_into(root, target):
     return ran
 
 
-def _import_entries(root):
-    return [entry for entry in held.history(kb_client.connect(root)) if entry.op == "import"]
-
-
 def _export_of(root, to):
     ran = _kb("export", str(to), cwd=root)
     assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
@@ -212,7 +209,7 @@ def test_a_type_the_store_holds_gains_a_version_by_import_and_the_versions_it_ke
     standing = held.artifact(root, note)
     assert (standing["version"], standing["revision"], standing["title"]) == (2, 7, "Memo")
     assert canonical.dump(held.version(root, note, 1)) == (target / _file(note, 1)).read_text("utf-8")
-    assert [(entry.artifact, entry.revision) for entry in _import_entries(root)] == [(note, 7)]
+    assert [(entry.artifact, entry.revision) for entry in _imported(root)] == [(note, 7)]
     assert held.artifact(root, iri("note", "held"))["type"] == version_iri("note", 1)
 
 
@@ -227,7 +224,96 @@ def test_an_import_lands_in_a_store_holding_other_artifacts_which_are_left_as_th
 
     assert held.names(root) == sorted([*before, *_exported_names(target)])
     assert held.history(client)[:len(history)] == history
-    assert sorted(entry.artifact for entry in _import_entries(root)) == _exported_names(target)
+    assert sorted(entry.artifact for entry in _imported(root)) == _exported_names(target)
+
+
+DECIDED = iri("decision", "prices-follow-costs")
+
+
+@given("a store holding a type for work items and a work item")
+def _a_store_with_a_work_item(root):
+    client = _started(root)
+    define(client, WORK_ITEM_TYPE)
+    create(client, "work-item", {"title": "Stands alone"})
+
+
+@given(
+    "a directory for import that checks clean, holding both versions of a type for decisions and a decision at "
+    "revision 3 written against version 2 of the type for decisions",
+    target_fixture="target",
+)
+def _for_import_with_a_decision_at_revision_3(tmp_path):
+    def fill(client):
+        define(client, DECISION_TYPE)
+        assert not next_version(client, "decision", DECISION_TYPE).faults
+        content = _decision(DECIDED)
+        create(client, "decision", {"title": content["title"], "sections": content["sections"]})
+        for body in ("Costs move monthly.\n", "Costs move daily.\n"):
+            sections = [content["sections"][0], {"title": "Rationale", "body": body}]
+            assert not replace(client, DECIDED, {"sections": sections}).faults
+
+    target = _for_import(tmp_path, fill)
+    assert _version_files(target, type_iri("decision")) == [_file(type_iri("decision"), number) for number in (1, 2)]
+    decision = _read(target, DECIDED)
+    assert (decision["revision"], decision["type"]) == (3, version_iri("decision", 2))
+    return target
+
+
+@then("the decision lands at the same IRI and with the same title, at revision 3, written against version 2 of the type for decisions")
+def _the_decision_lands_as_it_was(root, target):
+    landed, given = held.artifact(root, DECIDED), _read(target, DECIDED)
+    assert (landed["id"], landed["title"]) == (DECIDED, given["title"])
+    assert (landed["revision"], landed["type"]) == (3, version_iri("decision", 2))
+    assert held.text(root, DECIDED) == (target / _file(DECIDED)).read_text(encoding="utf-8")
+
+
+@then("the type for decisions lands at the same IRI and with the same title, at the revision and type version the directory gives it")
+def _the_decision_type_lands_as_it_was(root, target):
+    decision = type_iri("decision")
+    landed, given = held.artifact(root, decision), _read(target, decision, 2)
+    assert (landed["id"], landed["title"]) == (decision, given["title"])
+    assert (landed["revision"], landed["type"], landed["version"]) == (given["revision"], given["type"], 2)
+    for number in (1, 2):
+        assert canonical.dump(held.version(root, decision, number)) == (target / _file(decision, number)).read_text("utf-8")
+
+
+@given("a store holding a type for decisions and a decision")
+def _a_store_with_a_decision(root, before):
+    client = _started(root)
+    a_decision_type_and_a_decision(client)
+    before.update(decision=held.text(root, WEEKLY), history=held.history(client))
+
+
+@given(
+    "a directory for import that checks clean, holding that decision at the same IRI with the same content and the "
+    "same type version, and a second decision",
+    target_fixture="target",
+)
+def _for_import_with_the_held_decision_and_a_second(tmp_path):
+    """The export of a store holding the two decisions, the held one's file given another revision, which is not
+    compared; the type for decisions is the store's, and its file is taken out."""
+    def fill(client):
+        a_decision_type_and_a_decision(client)
+        create(client, "decision", {"title": _titled(MONTHLY), "sections": _decision(MONTHLY)["sections"]})
+
+    target = _for_import(tmp_path, fill)
+    (target / _file(type_iri("decision"), 1)).unlink()
+    _put(target, {**_read(target, WEEKLY), "revision": 5})
+    return target
+
+
+@then("the decision the store held is passed over, left as the store held it")
+def _the_held_decision_is_passed_over(ran, root, before):
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.text(root, WEEKLY) == before["decision"]
+    assert WEEKLY not in [entry.artifact for entry in held.history(kb_client.connect(root))[len(before["history"]):]]
+
+
+@then("the second decision lands")
+def _the_second_decision_lands(root, target, before):
+    assert held.text(root, MONTHLY) == (target / _file(MONTHLY)).read_text(encoding="utf-8")
+    gained = held.history(kb_client.connect(root))[len(before["history"]):]
+    assert [(entry.op, entry.artifact) for entry in gained] == [("import", MONTHLY)]
 
 
 def test_a_file_whose_item_carries_no_name_is_passed_over_when_it_is_imported_a_second_time(root, tmp_path):
@@ -920,16 +1006,14 @@ def _kb_import(root, target):
 
 
 def _imported(root):
-    """The entries an import left in the store's history: every entry after its starting one."""
-    entries = held.history(kb_client.connect(root))
-    assert entries[0].message == "initialise store", entries[0]
-    return entries[1:]
+    """The entries an import left in the store's history: the import's own, whatever the store held before it."""
+    return [entry for entry in held.history(kb_client.connect(root)) if entry.op == "import"]
 
 
 @then("everything in the directory lands as one set, signed by that role, with a message naming the directory")
 def _lands_as_one_signed_set(ran, root, target):
     assert (ran.returncode, ran.stderr) == (0, "")
-    assert held.names(root) == sorted([*_exported_names(target), TYPE_OF_TYPES])
+    assert set(_exported_names(target)) <= set(held.names(root))
     entries = _imported(root)
     assert sorted(entry.artifact for entry in entries) == _exported_names(target)
     assert {(entry.batch, entry.actor.role, entry.message) for entry in entries} == {
@@ -1189,34 +1273,51 @@ def test_each_type_lands_before_its_artifacts():
     pass
 
 
+@given("a store holding a type for notes and a note")
+def _a_store_with_a_note(root, before):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    create(client, "note", {"title": "Held", "summary": "It is held.", "body": "Before the import.\n"})
+    before.update(history=held.history(client))
+
+
 @given(
-    "a directory for import that checks clean, holding a type for decisions, a type for work items, two decisions and "
-    "a work item",
+    "a directory for import that checks clean, holding a type for decisions at two versions, a type for work items at "
+    "one version, two decisions and a work item",
     target_fixture="target",
 )
-def _for_import_with_two_types(tmp_path):
-    return _for_import(tmp_path)
+def _for_import_with_six_files(tmp_path):
+    def fill(client):
+        _decisions_and_a_work_item(client)
+        assert not next_version(client, "decision", DECISION_TYPE).faults
+
+    target = _for_import(tmp_path, fill)
+    assert [file for file in _files(target) if file != _file(TYPE_OF_TYPES, 1)] == sorted([
+        _file(type_iri("decision"), 1), _file(type_iri("decision"), 2), _file(type_iri("work-item"), 1),
+        _file(WEEKLY), _file(MONTHLY), _file(MONDAYS),
+    ])
+    return target
 
 
-@then(
-    "the store's history holds its starting entry followed by one import entry for each of the five artifacts, and "
-    "nothing else"
-)
-def _one_import_entry_each(ran, root):
+@then("the store's history gains one import entry for each of the six files")
+def _one_import_entry_for_each_file(ran, root, target, before):
     assert (ran.returncode, ran.stderr) == (0, "")
-    entries = _imported(root)
-    assert sorted(entry.artifact for entry in entries) == sorted(
-        [type_iri("decision"), type_iri("work-item"), WEEKLY, MONTHLY, MONDAYS],
-    )
-    assert {entry.op for entry in entries} == {"import"}
+    history = held.history(kb_client.connect(root))
+    assert history[:len(before["history"])] == before["history"]
+    gained = history[len(before["history"]):]
+    assert {entry.op for entry in gained} == {"import"}
+    assert sorted(entry.artifact for entry in gained) == sorted([
+        type_iri("decision"), type_iri("decision"), type_iri("work-item"), WEEKLY, MONTHLY, MONDAYS,
+    ])
 
 
-@then("in the history each type's import entry comes before the import entries of the artifacts of its kind")
+@then("in the history every import entry of a type comes before the import entries of the artifacts of its kind")
 def _types_first(root):
     landed = [entry.artifact for entry in _imported(root)]
     for kind in ("decision", "work-item"):
-        of_kind = [index for index, name in enumerate(landed) if name.startswith(f"{kind}/")]
-        assert of_kind and landed.index(f"schema/{kind}") < min(of_kind), landed
+        of_type = [index for index, name in enumerate(landed) if name == type_iri(kind)]
+        of_kind = [index for index, name in enumerate(landed) if name.startswith(f"{type_iri(kind)}/")]
+        assert of_type and of_kind and max(of_type) < min(of_kind), landed
 
 
 @scenario(FEATURE, "Importing a directory that holds an error is refused")
