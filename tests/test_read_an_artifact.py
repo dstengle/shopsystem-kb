@@ -528,6 +528,57 @@ def _points_back_as_a_name(whole):
     assert loads(whole.content)["supersedes"]["supersedes"] == DAILY
 
 
+NOT_HELD = iri("decision", "price-reviews-happen-daily")
+
+
+@given("the decision also points at a decision under an IRI the store does not hold")
+def _the_decision_also_points_at_an_iri_not_held(client):
+    """The decision type gains a second link field, and the decision a link in it to an IRI nothing is held at."""
+    schema = tagged_decision_type()["schema"]
+    schema["properties"]["revisits"] = schema["properties"]["supersedes"]
+    assert not change_type(client, "decision", schema).faults
+    content = loads(read(client, DECISION, whole=True).content)
+    changed = replace(client, DECISION, {**content, "revisits": NOT_HELD}, version=version_iri("decision", 2))
+    assert not changed.faults, changed.faults
+
+
+@pytest.fixture
+def came_back(request):
+    """What the scenario's read gave, and whether it was read at a glance rather than whole."""
+    try:
+        return request.getfixturevalue("summary"), True
+    except pytest.FixtureLookupError:
+        return request.getfixturevalue("whole"), False
+
+
+@then("the stub of the link to that IRI is marked as not held")
+def _the_stub_is_marked_as_not_held(summary):
+    assert [stub for stub in summary.references if stub.id == NOT_HELD] == [
+        kb_pb2.Stub(field="revisits", id=NOT_HELD, not_held=True),
+    ]
+
+
+@then("the link to that IRI comes back marked as landing on nothing held, and is not filled in")
+def _the_link_is_marked_and_not_filled_in(came_back):
+    given, at_a_glance = came_back
+    if at_a_glance:
+        _the_stub_is_marked_as_not_held(given)
+        return
+    assert list(given.placeholders) == [kb_pb2.Placeholder(id=NOT_HELD, links=[
+        kb_pb2.Linking(artifact=DECISION, field="revisits", place="revisits"),
+    ])]
+    assert loads(given.content)["revisits"] == NOT_HELD
+
+
+@then("the link to the older decision carries no such mark")
+def _the_link_that_lands_carries_no_mark(came_back):
+    given, at_a_glance = came_back
+    if at_a_glance:
+        assert [stub.not_held for stub in given.references if stub.id == OLDER] == [False]
+    else:
+        assert OLDER not in [placeholder.id for placeholder in given.placeholders]
+
+
 @when("the client reads the rationale of the decision", target_fixture="shown")
 def _read_the_rationale(client):
     return read(client, DECISION, section="Rationale")

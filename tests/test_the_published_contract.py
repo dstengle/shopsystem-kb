@@ -162,14 +162,14 @@ def test_the_small_values_name_kinds_and_places_in_the_specs_words():
     assert _fields("Refusal") == {"faults"}
     assert _fields("Locator") == {"id", "place"}
     assert _fields("Fault") == {"artifact", "place", "rule", "message"}
-    assert _fields("Stub") == {"field", "id", "type", "title", "fields"}
+    assert _fields("Stub") == {"field", "id", "type", "title", "fields", "not_held"}
     assert _fields("InboundCount") == {"kind", "field", "count"}
     assert "place" in _fields("Entry") and "path" not in _fields("Entry")
 
 
 READS = {
     "Read": ("ReadRequest", {"locator", "summary", "whole", "section"}, "Artifact", {
-        "id", "type", "revision", "title", "content", "references", "parts", "inbound",
+        "id", "type", "revision", "title", "content", "references", "parts", "inbound", "placeholders",
     }),
     "List": ("ListRequest", {"kind", "fields", "form"}, "Listed", {"stubs", "ids"}),
     "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind"}, "Followed", {"reached"}),

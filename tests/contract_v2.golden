@@ -47,6 +47,7 @@ message Artifact
   references = 7 repeated kb.v2.Stub
   parts = 8 repeated kb.v2.PartStub
   inbound = 9 repeated kb.v2.InboundCount
+  placeholders = 11 repeated kb.v2.Placeholder
 message ReadResponse
   result = 1 singular kb.v2.Artifact oneof outcome
   refusal = 2 singular kb.v2.Refusal oneof outcome
@@ -56,6 +57,7 @@ message Stub
   type = 6 singular string
   title = 4 singular string
   fields = 5 singular string
+  not_held = 7 singular bool
 message PartStub
   collection = 1 singular string
   id = 2 singular string

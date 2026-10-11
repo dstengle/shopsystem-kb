@@ -117,7 +117,9 @@ message ReadRequest {
 // An artifact at the level read: its identity and its content at that
 // level; a summary's content is the fields the type shows at a glance,
 // with a stub of each reference target and of each part, and inbound
-// counts.
+// counts. Read whole, following links or not, each link it carries that
+// lands on nothing held is given beside the content, where the link
+// stays as written: a link that lands is not among them.
 message Artifact {
   reserved 2, 3;
   reserved "kind", "schema_version";
@@ -129,6 +131,7 @@ message Artifact {
   repeated Stub references = 7;
   repeated PartStub parts = 8;
   repeated InboundCount inbound = 9;
+  repeated Placeholder placeholders = 11;  // a whole read's: each IRI a link of it lands on nothing at, with those links
 }
 
 // A refusal: a bad locator, a name the store lacks, a place or a section
@@ -140,6 +143,9 @@ message ReadResponse {
   }
 }
 
+// An artifact in brief. A link's stub is of the artifact the link points
+// at or into a part of; when the store does not hold that artifact the
+// stub is its IRI alone, marked as not held.
 message Stub {
   reserved 3;
   reserved "kind";
@@ -148,6 +154,7 @@ message Stub {
   string type = 6;  // the IRI of the type version it conforms to
   string title = 4;
   string fields = 5;   // canonical YAML
+  bool not_held = 7;  // the store holds nothing at its IRI, which a link points at
 }
 
 message PartStub {

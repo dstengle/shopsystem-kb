@@ -70,7 +70,7 @@ def test_at_a_glance_a_link_into_a_part_of_a_held_artifact_gives_the_stub_of_tha
 
 
 def test_at_a_glance_a_link_into_a_part_of_an_iri_not_held_gives_the_iri_alone(client, not_held):
-    assert list(answered(read(client, NOTE)).references) == [kb_pb2.Stub(field="about", id=MONTHLY)]
+    assert list(answered(read(client, NOTE)).references) == [kb_pb2.Stub(field="about", id=MONTHLY, not_held=True)]
 
 
 @pytest.mark.parametrize("store", ["held", "not_held"])
@@ -91,7 +91,7 @@ def test_followed_outward_a_link_into_a_part_of_a_held_artifact_reaches_it_and_w
 
 @pytest.mark.parametrize("depth", [1, 2])
 def test_followed_outward_a_link_into_a_part_of_an_iri_not_held_reaches_the_iri_alone(client, not_held, depth):
-    assert outward(client, depth) == [(kb_pb2.Stub(field="about", id=MONTHLY), [("about", MONTHLY)])]
+    assert outward(client, depth) == [(kb_pb2.Stub(field="about", id=MONTHLY, not_held=True), [("about", MONTHLY)])]
 
 
 def test_followed_inward_to_the_artifact_the_part_is_in_the_linking_artifact_is_reached(client, held):
@@ -102,3 +102,31 @@ def test_followed_inward_to_the_artifact_the_part_is_in_the_linking_artifact_is_
 def test_the_inbound_count_of_the_artifact_the_part_is_in_counts_the_link(client, held):
     inbound = answered(read(client, MONTHLY)).inbound
     assert [(each.kind, each.field, each.count) for each in inbound] == [(type_iri("note"), "about", 1)]
+
+
+def waiting(part):
+    """The note's link as a whole read gives it when it lands on nothing held: under the decision's IRI, with the
+    part of it the link names."""
+    return [kb_pb2.Placeholder(id=MONTHLY, links=[
+        kb_pb2.Linking(artifact=NOTE, field="about", place="about", part=part),
+    ])]
+
+
+@pytest.mark.parametrize("depth", [0, 1, 2])
+def test_read_whole_a_link_into_a_part_of_an_iri_not_held_is_marked_as_landing_on_nothing_held(client, not_held, depth):
+    assert list(answered(read(client, NOTE, whole=True, depth=depth)).placeholders) == waiting("options/go-monthly")
+
+
+@pytest.mark.parametrize("depth", [0, 1, 2])
+def test_read_whole_a_link_into_a_part_its_held_artifact_has_carries_no_mark(client, held, depth):
+    assert not answered(read(client, NOTE, whole=True, depth=depth)).placeholders
+
+
+def test_a_link_into_a_part_its_held_artifact_lacks_is_marked_read_whole_and_its_stub_is_not(client, not_held):
+    """The decision created after the link, without the option the link names: the link lands on nothing held, which
+    a whole read says with the part; at a glance the stub is of the decision, which is held, and carries no mark."""
+    create(client, "decision", {"title": "Price reviews happen monthly", "sections": SECTIONS})
+    assert list(answered(read(client, NOTE, whole=True)).placeholders) == waiting("options/go-monthly")
+    assert list(answered(read(client, NOTE)).references) == [kb_pb2.Stub(
+        field="about", id=MONTHLY, type=type_iri("decision") + "@1", title="Price reviews happen monthly", fields="{}\n",
+    )]

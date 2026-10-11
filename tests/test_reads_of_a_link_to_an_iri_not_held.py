@@ -1,7 +1,7 @@
 """No held artifact is unreadable for a link it holds to an IRI the store does not hold (decision 7 of batch 35):
-every read level, a Follow each way and a list answer, the IRI not held coming back as the IRI alone, with no kind,
-title or fields, never filled in and never walked on from. Through the contract. The mark the spec asks for on such a
-link is slice 169's."""
+every read level, a Follow each way and a list answer, the IRI not held coming back as the IRI alone, marked as not
+held, with no kind, title or fields, never filled in and never walked on from, and a whole read giving the link
+beside its content as landing on nothing held. Through the contract."""
 import pytest
 
 from calls import TAG_TYPE, create, define, iri, listing, read, refs, start_a_store, tagged_decision_type, type_iri
@@ -17,7 +17,7 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
-BARE = kb_pb2.Stub(field="supersedes", id=NOT_HELD)
+BARE = kb_pb2.Stub(field="supersedes", id=NOT_HELD, not_held=True)
 
 
 @pytest.fixture
@@ -104,3 +104,15 @@ def test_a_list_of_its_kind_gives_it_with_the_link_as_the_iri_it_names(client):
         (DAILY, {"supersedes": WEEKLY}), (WEEKLY, {"supersedes": NOT_HELD}),
     ]
     assert list(answered(listing(client, "decision", ids_only=True)).ids) == [DAILY, WEEKLY]
+
+
+@pytest.mark.parametrize("depth", [0, 1, 2])
+def test_read_whole_the_link_is_marked_as_landing_on_nothing_held_and_the_link_that_lands_is_not(client, depth):
+    assert list(answered(read(client, WEEKLY, whole=True, depth=depth)).placeholders) == [
+        kb_pb2.Placeholder(id=NOT_HELD, links=[kb_pb2.Linking(artifact=WEEKLY, field="supersedes", place="supersedes")]),
+    ]
+
+
+def test_at_a_glance_and_by_section_nothing_is_given_beside_the_stubs(client):
+    assert not answered(read(client, WEEKLY)).placeholders
+    assert not answered(read(client, WEEKLY, section="Rationale")).placeholders

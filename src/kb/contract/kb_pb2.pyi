@@ -107,7 +107,7 @@ class ReadRequest(_message.Message):
     def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., summary: _Optional[_Union[ReadRequest.Summary, _Mapping]] = ..., whole: _Optional[_Union[ReadRequest.Whole, _Mapping]] = ..., section: _Optional[_Union[ReadRequest.Section, _Mapping]] = ...) -> None: ...
 
 class Artifact(_message.Message):
-    __slots__ = ("id", "type", "revision", "title", "content", "references", "parts", "inbound")
+    __slots__ = ("id", "type", "revision", "title", "content", "references", "parts", "inbound", "placeholders")
     ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
@@ -116,6 +116,7 @@ class Artifact(_message.Message):
     REFERENCES_FIELD_NUMBER: _ClassVar[int]
     PARTS_FIELD_NUMBER: _ClassVar[int]
     INBOUND_FIELD_NUMBER: _ClassVar[int]
+    PLACEHOLDERS_FIELD_NUMBER: _ClassVar[int]
     id: str
     type: str
     revision: int
@@ -124,7 +125,8 @@ class Artifact(_message.Message):
     references: _containers.RepeatedCompositeFieldContainer[Stub]
     parts: _containers.RepeatedCompositeFieldContainer[PartStub]
     inbound: _containers.RepeatedCompositeFieldContainer[InboundCount]
-    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ...) -> None: ...
+    placeholders: _containers.RepeatedCompositeFieldContainer[Placeholder]
+    def __init__(self, id: _Optional[str] = ..., type: _Optional[str] = ..., revision: _Optional[int] = ..., title: _Optional[str] = ..., content: _Optional[str] = ..., references: _Optional[_Iterable[_Union[Stub, _Mapping]]] = ..., parts: _Optional[_Iterable[_Union[PartStub, _Mapping]]] = ..., inbound: _Optional[_Iterable[_Union[InboundCount, _Mapping]]] = ..., placeholders: _Optional[_Iterable[_Union[Placeholder, _Mapping]]] = ...) -> None: ...
 
 class ReadResponse(_message.Message):
     __slots__ = ("result", "refusal")
@@ -135,18 +137,20 @@ class ReadResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Artifact, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class Stub(_message.Message):
-    __slots__ = ("field", "id", "type", "title", "fields")
+    __slots__ = ("field", "id", "type", "title", "fields", "not_held")
     FIELD_FIELD_NUMBER: _ClassVar[int]
     ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
+    NOT_HELD_FIELD_NUMBER: _ClassVar[int]
     field: str
     id: str
     type: str
     title: str
     fields: str
-    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., fields: _Optional[str] = ...) -> None: ...
+    not_held: bool
+    def __init__(self, field: _Optional[str] = ..., id: _Optional[str] = ..., type: _Optional[str] = ..., title: _Optional[str] = ..., fields: _Optional[str] = ..., not_held: _Optional[bool] = ...) -> None: ...
 
 class PartStub(_message.Message):
     __slots__ = ("collection", "id", "title")

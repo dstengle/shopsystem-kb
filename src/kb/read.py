@@ -1,10 +1,12 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too.
-A link to an IRI the store does not hold is never followed: its stub is the IRI alone, and read whole it stays a name.
-A link into a part of an artifact is read as a link to that artifact, and read whole it stays the reference written."""
+A link to an IRI the store does not hold is never followed: its stub is the IRI alone, marked as not held, and read
+whole it stays a name. A link into a part of an artifact is read as a link to that artifact, and read whole it stays
+the reference written. A whole read gives, beside its content, each link the artifact carries that lands on nothing
+held: on an IRI the store does not hold, or on a part the artifact it holds there lacks."""
 from dataclasses import replace
 
-from kb import composition, links, places, refusals, settled, values
+from kb import composition, links, names, places, refusals, settled, values
 from kb.content import dumps
 from kb.contract import kb_pb2
 from kb.requests import Reading
@@ -59,9 +61,9 @@ class _Kept:
 
 def stub(store: Port, field: str, target_id: ArtifactId) -> kb_pb2.Stub:
     """An artifact in brief, under the field that reached it: its identity and the fields its type shows at a glance.
-    An IRI the store does not hold, which a link may point at, is given as the IRI alone."""
+    An IRI the store does not hold, which a link may point at, is given as the IRI alone, marked as not held."""
     if not store.holds(target_id):
-        return kb_pb2.Stub(field=field, id=str(target_id))
+        return kb_pb2.Stub(field=field, id=str(target_id), not_held=True)
     target = store.artifact(target_id)
     return _stub(field, target, _shown(store, target))
 
@@ -94,7 +96,29 @@ def _stub(field: str, target: dict, shown: dict) -> kb_pb2.Stub:
 
 def _whole(store: Port, locator: Locator, depth: int) -> kb_pb2.Artifact:
     found = _resolved(store, locator.id, depth, {str(locator.id)})
-    return _response(found, dumps(settled.content(found)))
+    response = _response(found, dumps(settled.content(found)))
+    response.placeholders.extend(_placeholders(store, store.artifact(locator.id)))
+    return response
+
+
+def _placeholders(store: Port, found: dict) -> list[kb_pb2.Placeholder]:
+    """Each IRI a link the artifact carries lands on nothing at, in the order of their names, with those links in the
+    order the artifact holds them, each saying the part of the IRI it names."""
+    waited: dict[str, list] = {}
+    for link in links.carried(found, composition.artifact_schema(found, store)["schema"], store):
+        target = values.target(link.target)
+        if not _lands(store, target):
+            waited.setdefault(str(target.id), []).append(kb_pb2.Linking(
+                artifact=found["id"], field=link.field, place=link.place, part=names.placed(target.place),
+            ))
+    return [kb_pb2.Placeholder(id=name, links=waited[name]) for name in sorted(waited, key=names.order)]
+
+
+def _lands(store: Port, target: Locator) -> bool:
+    """Whether a link lands on something held: the artifact it names, and the part of it when it names one."""
+    if not store.holds(target.id):
+        return False
+    return not target.place or places.holds_part(store.artifact(target.id), target.place)
 
 
 def _section(store: Port, locator: Locator, title: str) -> kb_pb2.Artifact:
