@@ -345,7 +345,7 @@ class SearchResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Found, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class FollowRequest(_message.Message):
-    __slots__ = ("locator", "depth", "direction", "via", "kind")
+    __slots__ = ("locator", "depth", "direction", "via", "kind", "path")
     class Direction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         OUT: _ClassVar[FollowRequest.Direction]
@@ -357,12 +357,14 @@ class FollowRequest(_message.Message):
     DIRECTION_FIELD_NUMBER: _ClassVar[int]
     VIA_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
     locator: Locator
     depth: int
     direction: FollowRequest.Direction
     via: str
     kind: str
-    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ..., direction: _Optional[_Union[FollowRequest.Direction, str]] = ..., via: _Optional[str] = ..., kind: _Optional[str] = ...) -> None: ...
+    path: str
+    def __init__(self, locator: _Optional[_Union[Locator, _Mapping]] = ..., depth: _Optional[int] = ..., direction: _Optional[_Union[FollowRequest.Direction, str]] = ..., via: _Optional[str] = ..., kind: _Optional[str] = ..., path: _Optional[str] = ...) -> None: ...
 
 class Hop(_message.Message):
     __slots__ = ("field", "id")
@@ -395,7 +397,7 @@ class FollowResponse(_message.Message):
     def __init__(self, result: _Optional[_Union[Followed, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
 
 class ListRequest(_message.Message):
-    __slots__ = ("kind", "fields", "form")
+    __slots__ = ("kind", "fields", "form", "path")
     class Form(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STUBS: _ClassVar[ListRequest.Form]
@@ -412,10 +414,12 @@ class ListRequest(_message.Message):
     KIND_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
     FORM_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
     kind: str
     fields: _containers.ScalarMap[str, str]
     form: ListRequest.Form
-    def __init__(self, kind: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ..., form: _Optional[_Union[ListRequest.Form, str]] = ...) -> None: ...
+    path: str
+    def __init__(self, kind: _Optional[str] = ..., fields: _Optional[_Mapping[str, str]] = ..., form: _Optional[_Union[ListRequest.Form, str]] = ..., path: _Optional[str] = ...) -> None: ...
 
 class Listed(_message.Message):
     __slots__ = ("stubs", "ids")

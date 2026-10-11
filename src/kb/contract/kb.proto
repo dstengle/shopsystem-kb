@@ -341,6 +341,7 @@ message FollowRequest {
   Direction direction = 3;
   string via = 4;
   string kind = 5;
+  string path = 6;  // the path below the type that every artifact reached is narrowed to
 }
 
 // One step of a route: the link taken and the name it landed on. Going
@@ -382,6 +383,7 @@ message ListRequest {
   string kind = 1;
   map<string, string> fields = 2;
   Form form = 3;
+  string path = 4;  // the path below the type that the artifacts listed are narrowed to
 }
 
 // The matches in the order the store holds them, as stubs or as names.

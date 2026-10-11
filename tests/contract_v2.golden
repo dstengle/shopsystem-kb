@@ -142,6 +142,7 @@ message FollowRequest
   direction = 3 singular kb.v2.FollowRequest.Direction
   via = 4 singular string
   kind = 5 singular string
+  path = 6 singular string
   enum Direction
     OUT = 0
     IN = 1
@@ -160,6 +161,7 @@ message ListRequest
   kind = 1 singular string
   fields = 2 repeated kb.v2.ListRequest.FieldsEntry
   form = 3 singular kb.v2.ListRequest.Form
+  path = 4 singular string
   message FieldsEntry
     key = 1 singular string
     value = 2 singular string

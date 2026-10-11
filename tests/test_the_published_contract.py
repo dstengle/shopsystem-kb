@@ -173,8 +173,8 @@ READS = {
     "Read": ("ReadRequest", {"locator", "summary", "whole", "section"}, "Artifact", {
         "id", "type", "revision", "title", "content", "references", "parts", "inbound", "placeholders",
     }),
-    "List": ("ListRequest", {"kind", "fields", "form"}, "Listed", {"stubs", "ids"}),
-    "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind"}, "Followed", {"reached"}),
+    "List": ("ListRequest", {"kind", "fields", "form", "path"}, "Listed", {"stubs", "ids"}),
+    "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind", "path"}, "Followed", {"reached"}),
     "Search": ("SearchRequest", {"text", "kind", "scope"}, "Found", {"matches"}),
     "History": ("HistoryRequest", {"artifact", "role", "execution", "since", "batch"}, "Entries", {"entries"}),
     "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
