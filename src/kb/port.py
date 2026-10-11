@@ -23,8 +23,9 @@ class Link:
     it may land on. An implicit link is kb's own bookkeeping: it holds what it lands on in place, and refuses its
     removal like any link, but no read of links, counts or walks shows it. `under` is the held type kb found the
     target's IRI to sit under, held or not, None for one under no held type; it is read only when the target is not
-    held as the link lands, as one removed since the link was drafted is not: a link to an IRI not held lands only when the adapter holds that type and its IRI is among `kinds`, nothing but the link's target
-    kept for it, and an implicit link never does."""
+    held as the link lands, as one removed since the link was drafted is not: a link to an IRI not held lands only
+    when the adapter holds that type and its IRI is among `kinds`, nothing but the link's target kept for it, and an
+    implicit link never does."""
     field: str
     place: str
     target: ArtifactId

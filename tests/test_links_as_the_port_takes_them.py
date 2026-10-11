@@ -41,7 +41,7 @@ def handed(corpus, supersedes):
     (iri("note", "nothing-here"), None),
     (str(HELD), DECISION),
 ], ids=["not held, under a held type", "not held, deeper under it", "not held, under no held type", "held"])
-def test_a_link_carries_the_held_type_a_target_not_held_sits_under(corpus, target, under):
+def test_a_link_carries_the_held_type_its_target_sits_under_held_or_not(corpus, target, under):
     of_its_type, supersedes = handed(corpus, target)
     assert (supersedes.target, supersedes.under) == (ArtifactId(target), under)
     assert (of_its_type.implicit, of_its_type.under) == (True, None)

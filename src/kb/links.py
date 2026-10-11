@@ -33,9 +33,10 @@ def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) 
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
     the kinds its field allows, read through the type given, the version of its type the artifact conforms to,
     whatever its type stands at, and the held type its target's IRI sits under (`port.Link.under`), held or not,
-    since a held target may be removed before the link lands and the link then waits on its IRI. Every artifact carries one implicit link, first, to the artifact of its type, which says
-    nothing of what that sits under. A value that could name nothing, which a type changed after it was written can
-    leave in a link field, is not handed."""
+    since a held target may be removed before the link lands and the link then waits on its IRI. Every artifact
+    carries one implicit link, first, to the artifact of its type, which says nothing of what that sits under. A
+    value that could name nothing, which a type changed after it was written can leave in a link field, is not
+    handed."""
     kind = composition.artifact_kind(artifact)
     found = [port.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True)]
     for link in carried(artifact, typed["schema"], corpus):

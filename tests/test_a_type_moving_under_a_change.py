@@ -136,10 +136,10 @@ def test_a_create_naming_an_earlier_version_carries_the_links_that_version_makes
 
 
 def test_a_create_naming_an_earlier_version_is_held_to_the_links_that_version_makes(root):
-    client = kb_client.connect(root)
-    start_a_store(root)
     """The earlier version makes `about` a link and `beside` none, the later the other way round; the store holds
     neither tag, so each link the note makes is one to an IRI not held, under the tag type its field allows."""
+    client = kb_client.connect(root)
+    start_a_store(root)
     for type_content in [TAG_TYPE, _typed("Note", {"about": LINKED, "beside": ABOUT})]:
         define(client, type_content)
     later = _typed("Note", {"about": ABOUT, "beside": LINKED})["schema"]
