@@ -2,8 +2,12 @@
 store at all or a whole one."""
 import signal
 
-from calls import DECISION_TYPE, a_decision_type_and_a_decision, define
+from calls import (
+    DECISION_TYPE, TYPE_OF_TYPES, a_decision_type_and_a_decision, change_type, check, create, define, iri, read,
+    type_iri, version_iri,
+)
 from conftest import OPERATOR, _kb, exported
+from kb.content import loads
 import grpc
 
 import held
@@ -24,7 +28,7 @@ def test_a_seed_directory_that_is_the_directory_set_up_leaves_no_half_store(tmp_
         assert held.everything_in(root) == before
     else:
         assert held.apart_from_the_store(root) == before["apart"]
-        assert held.names(root) == ["decision/price-reviews-happen-weekly", "schema/decision", "schema/schema"]
+        assert held.names(root) == sorted([iri("decision", "price-reviews-happen-weekly"), type_iri("decision"), TYPE_OF_TYPES])
 
 
 def test_a_seeded_setup_in_a_directory_the_operator_cannot_write_is_refused_and_leaves_it_as_it_was(tmp_path, root):
@@ -49,6 +53,38 @@ def test_a_seeded_setup_interrupted_exits_without_a_traceback_and_leaves_no_stor
     assert ran.returncode == -signal.SIGINT
     assert "Traceback" not in ran.stderr, ran.stderr
     assert held.holds_nothing(root)
+
+
+def _a_note_behind_its_type(client):
+    """A note type, a note of its first version, with no owner, and the type's second version, requiring one."""
+    def typed(*required):
+        properties = {name: {"type": "string"} for name in ("title", "body", "owner")}
+        return {"type": "object", "properties": properties, "required": ["title", *required]}
+
+    define(client, {"title": "Note", "version": 1, "schema": typed()})
+    create(client, "note", {"title": "Stock count", "body": "Count on Fridays."})
+    assert not change_type(client, "note", typed("owner")).faults
+
+
+def test_a_store_seeded_from_a_directory_holding_two_versions_of_a_type_holds_both_and_reads_the_artifact_behind_it(
+    tmp_path, root,
+):
+    """`kb init --seed` lands a seed through the import: every version file of a type lands, and an artifact left at
+    the earlier one reads there, listed by the check as behind its type and not as a violation."""
+    seed, note = exported(tmp_path, _a_note_behind_its_type), iri("note", "stock-count")
+    ran = _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert held.versions(root) == {TYPE_OF_TYPES: [1], type_iri("note"): [1, 2]}
+    for number in (1, 2):
+        kept = held.version(root, type_iri("note"), number)
+        assert kept["schema"]["required"] == ["title", "owner"][:number], number
+    client = kb_client.connect(root)
+    whole = read(client, note, whole=True)
+    assert not whole.refused, whole.faults
+    assert (whole.type, whole.revision, loads(whole.content)) == (version_iri("note", 1), 1, {"body": "Count on Fridays."})
+    checked = check(client)
+    assert list(checked.violations) == []
+    assert [(each.artifact, each.schema_version, each.current) for each in checked.stale] == [(note, 1, 2)]
 
 
 def _staged_store(root):
@@ -79,7 +115,7 @@ def test_a_seeded_setup_after_one_was_killed_lands_the_seed_and_leaves_nothing_s
     ran = _kb("init", str(root), "--seed", str(seed), cwd=tmp_path, env={"KB_ACTOR": OPERATOR})
     assert (ran.returncode, ran.stderr) == (0, "")
     assert sorted(path.name for path in root.iterdir()) == ["kb"]
-    assert held.names(root) == ["decision/price-reviews-happen-weekly", "schema/decision", "schema/schema"]
+    assert held.names(root) == sorted([iri("decision", "price-reviews-happen-weekly"), type_iri("decision"), TYPE_OF_TYPES])
 
 
 def test_serving_with_start_after_a_seeded_setup_was_killed_starts_and_serves_a_store_as_if_nothing_were_there(
@@ -92,7 +128,7 @@ def test_serving_with_start_after_a_seeded_setup_was_killed_starts_and_serves_a_
     said = serving.started(root, request, "127.0.0.1:0", "--start", env={"KB_ACTOR": OPERATOR}).said()
     assert said.startswith("serving\t127.0.0.1:"), said
     assert sorted(path.name for path in root.iterdir()) == ["kb"]
-    assert held.names(root) == ["schema/schema"]
+    assert held.names(root) == [TYPE_OF_TYPES]
     with grpc.insecure_channel(said.removeprefix("serving\t")) as channel:
         answered = kb_pb2_grpc.KbStub(channel).History(kb_pb2.HistoryRequest())
     assert [entry.actor.role for entry in answered.result.entries] == [OPERATOR]

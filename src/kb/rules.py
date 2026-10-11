@@ -1,4 +1,4 @@
-"""The name of every rule a fault of kb's own carries, which kb publishes (decision/published-contract-v1)."""
+"""The name of every rule a fault of kb's own carries, which kb publishes (decision/published-contract-v2)."""
 
 NOT_FOUND = "not-found"
 KIND = "kind"
@@ -29,5 +29,6 @@ PLACEMENT = "placement"
 SERVED = "served"
 CONNECTION = "connection"
 UNREACHABLE = "unreachable"
+DIFFERS = "differs"
 
 ALL = tuple(value for name, value in sorted(globals().items()) if name.isupper() and name != "ALL")

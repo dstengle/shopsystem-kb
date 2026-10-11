@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shopsystem-kb"
-version = "0.8.0"
+version = "0.9.0"
 description = "A schema-typed, graph-oriented artifact store behind one versioned contract"
 requires-python = ">=3.11"
 dependencies = [
@@ -22,8 +22,10 @@ kb = "kb.cli:main"
 [project.optional-dependencies]
 dev = [
   "pytest>=9,<10",
-  "pytest-bdd>=8.1.0",
+  "pytest-bdd>=8.1.0,<9",
   "pytest-xdist>=3.6",
+  "coverage>=7.6",
+  "pytest-cov>=6",
   "grpcio-tools>=1.84.0",
 ]
 
@@ -36,3 +38,7 @@ kb = ["contract/*.proto"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 bdd_features_base_dir = "features"
+
+[tool.coverage.run]
+source = ["src/kb"]
+data_file = ".coverage-map"

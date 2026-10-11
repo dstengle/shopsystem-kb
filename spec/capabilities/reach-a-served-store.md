@@ -2,7 +2,7 @@
 id: capability/reach-a-served-store
 title: Reach a served store
 narrator: the client
-rests_on: [decision/0020-a-server-found-where-the-store-is, decision/published-contract-v1-in-0-6-0, decision/runtime-shape, decision/write-lock-and-expected-revision, decision/contract-v1, decision/starting-leaves-the-wire, decision/serving-built, decision/served-store-marked-by-a-lock, decision/served-store-rules, decision/a-server-stamps-with-its-own-clock]
+rests_on: [decision/0020-a-server-found-where-the-store-is, decision/published-contract-v2, decision/runtime-shape, decision/write-lock-and-expected-revision, decision/contract-v1, decision/contract-v2, decision/starting-leaves-the-wire, decision/serving-built, decision/served-store-marked-by-a-lock, decision/served-store-rules, decision/a-server-stamps-with-its-own-clock]
 formulated_as: features/reach-a-served-store.feature
 ---
 
@@ -32,7 +32,7 @@ Several clients share one store through a server that hosts the same contract ov
 - The network transport is `grpc.server` hosting the same servicer an in-process client reaches, called over a gRPC channel with the same method names, requests and responses; when the search stops at `kb/server.yaml`, `connect` calls the address it names. `connect` chooses the transport on each call.
 - While it serves, the server holds a lock of the operating system on a file of the store's own, inside `kb/`, which says the address it serves at. The lock goes when the server's process does.
 - The refusals carry kb's own rules: a connection that cannot be read or names no address, `connection`; a server that cannot be reached or stops answering, `unreachable`; a change asked of a served store by a client that found it directly, `served`; a change asked of a server by a client readied with a clock, `clock`.
-- The contract's package is `kb.v1`, so a client of one version calling a server of another is refused by the transport rather than answered wrongly.
+- The contract's package is `kb.v2`, so a client of `kb.v1` calling a server of `kb.v2`, or the other way, is refused by the transport rather than answered wrongly.
 - There is no `Init` rpc; a store is started by `kb init` or `kb.init` (start-a-store).
 - Reads run alongside a change being written.
 - Across containers a server is the only way to share a store, since SQLite over a network filesystem is not safe.

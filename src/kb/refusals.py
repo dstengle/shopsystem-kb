@@ -2,7 +2,7 @@
 kb.values and type checks in kb.validation; what neither owns is made here, so no domain module names a contract type."""
 from kb import names, rules
 from kb.contract import kb_pb2
-from kb.names import Misnamed
+from kb.item_names import Misnamed
 from kb.values import ArtifactId, Locator
 
 
@@ -17,6 +17,57 @@ def no_type(kind_name: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         rule=rules.KIND,
         message=f"a kind must name a type the store holds; the store holds no type called {kind_name!r}",
+    )
+
+
+def no_version(version: str) -> kb_pb2.Fault:
+    """A type version the store does not hold, named by a create."""
+    return kb_pb2.Fault(
+        rule=rules.VERSION,
+        message=f"a create names a version of a type the store holds; the store holds no version {version!r}",
+    )
+
+
+def not_later(artifact_id: ArtifactId, version: str, conforms: str) -> kb_pb2.Fault:
+    """A replacement naming a version its artifact cannot move to: an earlier one, another type's, or one not held."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.VERSION,
+        message=f"an artifact moves only to a later version of its own type that the store holds; {version!r} is "
+        f"not one for an artifact conforming to {conforms!r}",
+    )
+
+
+def not_under(artifact_id: ArtifactId, type_id: ArtifactId) -> kb_pb2.Fault:
+    """A create at an IRI that does not belong to the type it names: the nearest held type it sits under is another,
+    or none."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.IDENTITY,
+        message=f"an artifact's IRI sits under its type's IRI; {str(artifact_id)!r} is not an IRI of {str(type_id)!r}",
+    )
+
+
+def belongs(type_id: ArtifactId, sitting: ArtifactId, other: ArtifactId) -> kb_pb2.Fault:
+    """A define of a type at an IRI under another type's, under which an artifact of that other type is held, or
+    a link waits on an IRI not held: the IRI that sits there."""
+    return kb_pb2.Fault(
+        artifact=str(type_id), rule=rules.IDENTITY,
+        message=f"an IRI keeps the type it was written or linked under; {str(sitting)!r} belongs to {str(other)!r}",
+    )
+
+
+def already_held(artifact_id: ArtifactId) -> kb_pb2.Fault:
+    """A create at an IRI the store already holds something at."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.IDENTITY,
+        message=f"an IRI names one artifact; the store already holds one at {str(artifact_id)!r}",
+    )
+
+
+def carried_twice(artifact_id: ArtifactId) -> kb_pb2.Fault:
+    """A create at an IRI a create before it in its set carries."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), rule=rules.IDENTITY,
+        message=f"an IRI names one artifact; the set carries {str(artifact_id)!r} on more than one create",
     )
 
 
@@ -78,7 +129,7 @@ def unlanded(artifact: str, place: str, target: str) -> kb_pb2.Fault:
 
 
 MISNAMED = {
-    "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
+    "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {unfit}",
     "repeated": "the items of a collection each have a name of their own; {name!r} is on more than one",
     "unknown": "a name on an item names an item already in that collection; {collection!r} held no item named {name!r}",
 }
@@ -87,7 +138,27 @@ MISNAMED = {
 def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=str(artifact_id), place=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
-        message=MISNAMED[found.why].format(name=found.name, collection=found.collection),
+        message=MISNAMED[found.why].format(name=found.name, collection=found.collection, unfit=_unfit(found.name)),
+    )
+
+
+def _unfit(name) -> str:
+    """What is said of a name given that is not a plain name: text as it was given, and anything else, which has no
+    one way of being written, as not text."""
+    return f"{name!r} is not" if isinstance(name, str) else "a name is text, and what was given is not"
+
+
+PART_MISNAMED = {
+    "not-plain": "a part's name is a plain name of lower-case letters, digits and single hyphens; {unfit}",
+    "repeated": "a part's name is unique in its collection; {name!r} is on more than one",
+}
+
+
+def misnamed_part(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
+    """A name a create gives a part that the part may not carry, at the part's place in what the create carried."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), place=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
+        message=PART_MISNAMED[found.why].format(name=found.name, unfit=_unfit(found.name)),
     )
 
 
@@ -95,77 +166,12 @@ def unwritable(artifact_id: ArtifactId, problem: str, place: str = "") -> kb_pb2
     return kb_pb2.Fault(artifact=str(artifact_id), place=place, rule=rules.CONTENT, message=problem)
 
 
-def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
+def no_section(artifact_id: ArtifactId, title: str, part: str = "") -> kb_pb2.Fault:
+    """An artifact lacking the section asked, or, for a part's place, that part, named by its IRI, which holds none."""
     return kb_pb2.Fault(
-        artifact=str(artifact_id), place="sections", rule=rules.NOT_FOUND,
-        message=f"{str(artifact_id)!r} holds no section titled {title!r}",
+        artifact=str(artifact_id), place=part or "sections", rule=rules.NOT_FOUND,
+        message=f"{names.pointing(artifact_id, part)!r} holds no section titled {title!r}",
     )
-
-
-def not_an_import_directory(named: str) -> kb_pb2.Fault:
-    """A name offered for import that is not a directory."""
-    return kb_pb2.Fault(rule=rules.ROOT, message=f"an import is read from a directory; {named!r} is not one")
-
-
-def not_an_export_directory(named: str) -> kb_pb2.Fault:
-    """A name an export is to be written into that is not a directory."""
-    return kb_pb2.Fault(
-        rule=rules.ROOT, message=f"an export is written into a directory; {named!r} is not a directory",
-    )
-
-
-def export_would_overwrite(named: str) -> kb_pb2.Fault:
-    """A directory an export is to be written into that already holds something."""
-    return kb_pb2.Fault(rule=rules.ROOT, message=f"an export never overwrites; {named!r} already holds something")
-
-
-def backup_would_overwrite(named: str) -> kb_pb2.Fault:
-    """A place a backup is to be written at where anything already is."""
-    return kb_pb2.Fault(rule=rules.ROOT, message=f"a backup never overwrites; {named!r} already holds something")
-
-
-def backup_cannot_be_written(named: str, problem: str) -> kb_pb2.Fault:
-    """A place a backup cannot be written at: nothing there is the store's own."""
-    return kb_pb2.Fault(rule=rules.ROOT, message=f"a backup cannot be written at {named!r}: {problem}")
-
-
-def unreadable_file(file: str, problem: str) -> kb_pb2.Fault:
-    """A file offered for import that cannot be read as YAML 1.2."""
-    return kb_pb2.Fault(artifact=file, rule=rules.UNREADABLE, message=f"it cannot be read as YAML 1.2: {problem}")
-
-
-def not_canonical(file: str, problem: str) -> kb_pb2.Fault:
-    """A file offered for import that is not in canonical form, its place in the directory included."""
-    return kb_pb2.Fault(artifact=file, rule=rules.CONTENT, message=f"it is not in canonical form: {problem}")
-
-
-def no_type_offered(file: str, kind_name: str) -> kb_pb2.Fault:
-    """A file offered for import of a kind neither the directory nor the store holds a type for."""
-    return kb_pb2.Fault(
-        artifact=file, rule=rules.KIND,
-        message=f"a kind must name a type the directory or the store holds; neither holds a type called {kind_name!r}",
-    )
-
-
-def not_fresh(held: int) -> kb_pb2.Fault:
-    """An import into a store that holds artifacts besides the type that describes types."""
-    return kb_pb2.Fault(
-        rule=rules.STORE,
-        message=f"import goes only into a freshly started store; this one holds {held} artifact(s) besides the type "
-                f"that describes types",
-    )
-
-
-def check_failed(errors: int) -> kb_pb2.Fault:
-    """An import of a directory whose check found errors, with none skipped."""
-    return kb_pb2.Fault(
-        rule=rules.CONTENT, message=f"the check found {errors} error(s) in the directory, and nothing was written",
-    )
-
-
-def nothing_lands() -> kb_pb2.Fault:
-    """An import that would land nothing."""
-    return kb_pb2.Fault(rule=rules.OPERATIONS, message="nothing in the directory would land, and nothing was written")
 
 
 def clock_failed(problem: str) -> kb_pb2.Fault:
@@ -177,28 +183,11 @@ def unreadable(problem: str) -> kb_pb2.Fault:
     return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"the store's database cannot be read: {problem}")
 
 
-def earlier_kb(root: str, files: str) -> kb_pb2.Fault:
-    """A store an earlier kb made, and how to move it: the directory holding its files imported into a new store."""
+def earlier_kb(root: str) -> kb_pb2.Fault:
+    """A store an earlier kb made, which this kb can neither read nor move."""
     return kb_pb2.Fault(rule=rules.UNREADABLE, message=(
-        f"the store at {root} was made by an earlier version of kb, in a form this kb cannot read; start a new store "
-        f"and import the old one's files, from {files}"
+        f"the store at {root} was made by an earlier version of kb, which this kb cannot read or move"
     ))
-
-
-def not_a_backup(file: str) -> kb_pb2.Fault:
-    """A file offered for restore that is not a backup kb made."""
-    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"{file!r} is not a backup kb made")
-
-
-def backup_by_earlier_kb(file: str) -> kb_pb2.Fault:
-    """A backup an earlier kb made, which this kb cannot read as a store."""
-    return kb_pb2.Fault(rule=rules.UNREADABLE, message=f"{file!r} was made by an earlier kb, which this kb cannot read")
-
-
-def backup_by_later_kb(file: str) -> kb_pb2.Fault:
-    """A backup a later kb made, which that kb is needed to read."""
-    return kb_pb2.Fault(
-        rule=rules.UNREADABLE, message=f"{file!r} was made by a later version of kb, which is needed to read it")
 
 
 def later_kb(root: str) -> kb_pb2.Fault:

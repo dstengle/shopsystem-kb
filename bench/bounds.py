@@ -2,7 +2,8 @@
 `python bench/bounds.py [N]`. Exits 0 only when every bound holds.
 
 The store is built in a fresh directory under the system's temp, removed after, and reached only through
-`kb.client.connect`, as a client reaches it. The graph has about three links per artifact: a few hundred tags;
+`kb.client.connect`, as a client reaches it. Every artifact is named by an IRI under its type's, the types defined at
+IRIs under `https://bench.example/kb/`. The graph has about three links per artifact: a few hundred tags;
 decisions, each linking to two tags and most to the decision before; work items, each linking to two decisions. It
 is landed through BatchCreate in sets of 100, and what a set cost to land is printed as the store grows. Every figure is
 the median of 20 calls."""
@@ -29,12 +30,26 @@ SET = 100
 SIGNATURE = kb_pb2.Signature(role="bench", message="bench")
 WORDS = "restocking shelves pricing weekly review supplier till opening closing inventory".split()
 
+TYPES_AT = "https://bench.example/kb/"
+TYPE_OF_TYPES = "https://missingmass.io/kb/type"
+
+
+def kind(name: str) -> str:
+    """The IRI of the type of a kind given by its short name."""
+    return TYPES_AT + name
+
+
+def iri(name: str, path: str) -> str:
+    """The IRI of an artifact of a kind, under its type's."""
+    return f"{kind(name)}/{path}"
+
+
 TAG = {"title": "Tag", "version": 1,
        "schema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}}
 
 
 def _links(targets: str, many: bool) -> dict:
-    ref = {"targets": [targets], "cardinality": "many" if many else "one", "parts": False, "on_delete": "refuse"}
+    ref = {"targets": [kind(targets)], "cardinality": "many" if many else "one", "parts": False, "on_delete": "refuse"}
     if many:
         return {"type": "array", "items": {"type": "string"}, "ref": ref}
     return {"type": "string", "ref": ref}
@@ -62,8 +77,9 @@ def answered(response):
     return response.result
 
 
-def creation(kind: str, title: str, content: dict) -> kb_pb2.CreateItem:
-    return kb_pb2.CreateItem(kind=kind, title=title, content=dumps(content))
+def creation(name: str, path: str, title: str, content: dict) -> kb_pb2.CreateItem:
+    """A create of a kind's first version, at the path given under its type's IRI."""
+    return kb_pb2.CreateItem(id=iri(name, path), type=f"{kind(name)}@1", title=title, content=dumps(content))
 
 
 def applied(client, creates) -> kb_pb2.BatchCreated:
@@ -91,17 +107,17 @@ def operations(n: int):
     """Every creation that builds the store, in an order in which each link lands on something already made."""
     tags, decisions, items = shape(n)
     for i in range(tags):
-        yield creation("tag", f"T {i}", {})
+        yield creation("tag", f"t-{i}", f"T {i}", {})
     for i in range(decisions):
-        yield creation("decision", f"D {i}", {
+        yield creation("decision", f"d-{i}", f"D {i}", {
             "sections": [{"title": "Purpose", "body": f"{WORDS[i % 10]} {WORDS[i * 7 % 10]}\n"},
                          {"title": "Rationale", "body": f"Because {i}.\n"}],
-            "tags": [f"tag/t-{i % tags}", f"tag/t-{(i * 3 + 1) % tags}"],
-            **({"supersedes": f"decision/d-{i - 1}"} if i % 10 else {}),
+            "tags": [iri("tag", f"t-{i % tags}"), iri("tag", f"t-{(i * 3 + 1) % tags}")],
+            **({"supersedes": iri("decision", f"d-{i - 1}")} if i % 10 else {}),
         })
     for i in range(items):
-        yield creation("work-item", f"W {i}", {"decisions": [f"decision/d-{i % decisions}",
-                                                             f"decision/d-{(i * 5 + 2) % decisions}"]})
+        yield creation("work-item", f"w-{i}", f"W {i}", {"decisions": [
+            iri("decision", f"d-{i % decisions}"), iri("decision", f"d-{(i * 5 + 2) % decisions}")]})
 
 
 def build(client, n: int) -> None:
@@ -124,7 +140,8 @@ def build(client, n: int) -> None:
 def figures(client, n: int) -> list[tuple[str, str, float]]:
     """Each figure measured: its bound (empty for one logged only), what it is, and its median in ms."""
     tags, decisions, items = shape(n)
-    decision, tag, item = f"decision/d-{decisions // 2}", f"tag/t-{tags // 2}", f"work-item/w-{items // 2}"
+    decision, tag = iri("decision", f"d-{decisions // 2}"), iri("tag", f"t-{tags // 2}")
+    item = iri("work-item", f"w-{items // 2}")
 
     def summary(name):
         return lambda: answered(client.Read(kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=name))))
@@ -138,7 +155,8 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
 
     def create():
         created.append(answered(client.Create(kb_pb2.CreateRequest(
-            kind="tag", title=f"Loose {next(made)}", content=dumps({}), signature=SIGNATURE))).id)
+            id=iri("tag", f"loose-{next(made)}"), type=f"{kind('tag')}@1", title="Loose", content=dumps({}),
+            signature=SIGNATURE))).id)
 
     written = iter(created)
     removed = iter(created)
@@ -158,7 +176,7 @@ def figures(client, n: int) -> list[tuple[str, str, float]]:
 
     def a_set():
         start = next(sets) * SET
-        applied(client, [creation("tag", f"Batch {start + i}", {}) for i in range(SET)])
+        applied(client, [creation("tag", f"batch-{start + i}", f"Batch {start + i}", {}) for i in range(SET)])
     measured.append(("set of 100 changes", f"BatchCreate of {SET} creates", timed(a_set)))
     return measured
 
@@ -169,9 +187,9 @@ def main(n: int) -> int:
     with tempfile.TemporaryDirectory(prefix="kb-bench-") as root:
         kb.init(root, "bench")
         client = connect(root)
-        for definition in (TAG, DECISION, WORK_ITEM):
+        for name, definition in (("tag", TAG), ("decision", DECISION), ("work-item", WORK_ITEM)):
             answered(client.Create(kb_pb2.CreateRequest(
-                kind="schema", title=definition["title"], signature=SIGNATURE,
+                id=kind(name), type=f"{TYPE_OF_TYPES}@1", title=definition["title"], signature=SIGNATURE,
                 content=dumps({key: value for key, value in definition.items() if key != "title"}))))
         started = time.perf_counter()
         build(client, n)

@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, answer, create, define, journal, moment, start_a_store
+from calls import DECISION_TYPE, answer, create, define, iri, journal, moment, start_a_store
 import calls
 import serving
 from kb import canonical, client as kb_client, testing as kb_testing
@@ -16,7 +16,7 @@ from kb.contract import kb_pb2
 
 scenarios("serve-a-store-for-tests.feature")
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},

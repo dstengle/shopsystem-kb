@@ -2,26 +2,41 @@
 must be, its content without them, an artifact given them, and the order its entries are written in, as its type
 declares them."""
 
-SETTLED = {"id": str, "type": str, "schema_version": int, "revision": int, "title": str}
+from kb import names
+
+SETTLED = {"id": str, "type": str, "revision": int, "title": str}
 IDENTITY = tuple(SETTLED)
 
 
 def identified(artifact: dict) -> bool:
-    """Whether an artifact as written opens with the keys naming it, in their order, each what it must be."""
+    """Whether an artifact as written opens with the keys naming it, in their order, each what it must be: its `id`
+    an IRI and its `type` a type version's IRI."""
     if list(artifact)[:len(IDENTITY)] != list(IDENTITY):
         return False
-    return all(
-        isinstance(artifact[key], kind) and not isinstance(artifact[key], bool) for key, kind in SETTLED.items()
-    )
+    if not all(isinstance(artifact[key], each) and not isinstance(artifact[key], bool) for key, each in SETTLED.items()):
+        return False
+    return names.iri(artifact["id"]) and names.version(artifact["type"]) is not None
 
 
-def given(content: dict, artifact_id: str, kind: str, schema_version: int, revision: int, title: str) -> dict:
-    """The content as an artifact: with its name, its kind, the version of its type it was checked against, its own
-    version and its title."""
-    return {
-        **content,
-        "id": artifact_id, "type": kind, "schema_version": schema_version, "revision": revision, "title": title,
-    }
+def given(content: dict, artifact_id: str, type_version: str, revision: int, title: str) -> dict:
+    """The content as an artifact: with its IRI, the IRI of the version of its type it conforms to, its own revision
+    and its title."""
+    return {**content, "id": artifact_id, "type": type_version, "revision": revision, "title": title}
+
+
+def kind(artifact: dict) -> str:
+    """The IRI of the type an artifact is of: its type version's IRI without the version."""
+    return names.version(artifact["type"])[0]
+
+
+def typed(artifact: dict) -> bool:
+    """Whether an artifact is a type: of the kind of the type that describes types."""
+    return kind(artifact) == names.TYPES
+
+
+def version(artifact: dict) -> int:
+    """The number of the version of its type an artifact conforms to."""
+    return names.version(artifact["type"])[1]
 
 
 def content(artifact: dict) -> dict:

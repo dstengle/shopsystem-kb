@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from typing import Callable, NamedTuple
 
 from kb import canonical, values
-from kb.port import Entry, Port
+from kb.port import Port
+from kb.port_values import Entry
 from kb.signatures import Signed
 
 Clock = Callable[[], datetime]
@@ -91,7 +92,7 @@ def fingerprint(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def change(*, signed: Signed, op: str, artifact: str, path: str, revision: int, schema_version: int,
+def change(*, signed: Signed, op: str, artifact: str, path: str, revision: int, type: str,
            text: str | None, stamp: Stamp, batch: str = "") -> Entry:
     """The entry of one change, under its settled stamp. A change made alone names itself as its batch. The
     fingerprint is of the text the change leaves; a removal leaves none, so its entry's fingerprint is empty."""
@@ -103,7 +104,7 @@ def change(*, signed: Signed, op: str, artifact: str, path: str, revision: int, 
         "artifact": artifact,
         "path": path,
         "revision": revision,
-        "schema_version": schema_version,
+        "type": type,
         "digest": fingerprint(text) if text is not None else "",
         "message": signed.message,
         "batch": batch or stamp.id,

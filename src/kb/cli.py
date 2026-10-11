@@ -1,12 +1,14 @@
 """kb's own command line, for the operator: set a store up, empty or seeded from a directory of files, check one,
-export one, back one up, restore a backup, check a directory for import, import one into a freshly started store, and
-serve one to callers over the network. Nothing else; every other change to content goes through a client.
+export one, back one up, restore a backup, check a directory for import, import one into a store (fresh or already
+holding artifacts), and serve one to callers over the network. Nothing else;
+every other change to content goes through a client.
 
 Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded
 or to restore one, on kb.staging, or, to serve, on kb.server, a store started first on kb.staging when a start is asked
 for and the root holds none, and taken back there should it then not be served.
 A refusal is printed to stderr and exits 2, an import's after the check's report; a check that finds a violation
-exits 1. A store served is served until the process is told to stop, and then exits 0.
+exits 1, and one that finds only placeholders, or artifacts behind their type, exits 0. A store served is served
+until the process is told to stop, and then exits 0.
 """
 import argparse
 import os
@@ -16,7 +18,7 @@ from pathlib import Path
 
 import kb
 from kb import client as kb_client
-from kb import addresses, rules, server, staging
+from kb import addresses, reports, rules, server, staging
 from kb.contract import kb_pb2
 from kb.values import Refused
 
@@ -33,7 +35,7 @@ def main(argv=None) -> int:
     commands.add_parser("validate", help="check the store found here, or the one KB_ROOT names")
     exporting = commands.add_parser("export", help="write the store found here, or the one KB_ROOT names, out as files")
     exporting.add_argument("directory", help="an empty directory, or one that does not exist, for the files")
-    importing = commands.add_parser("import", help="bring a directory of files into a freshly started store")
+    importing = commands.add_parser("import", help="bring a directory of files into a store")
     importing.add_argument("directory", help="the directory of files, laid out as an export lays them out")
     how = importing.add_mutually_exclusive_group()
     how.add_argument("--check", action="store_true", help="only check the directory, writing nothing")
@@ -82,7 +84,7 @@ def _init(root: str, seed: str | None) -> int:
         return _refused("init", refused.faults)
     except KeyboardInterrupt:
         return _interrupted()
-    _reported(imported)
+    reports.imported(imported)
     return _refused("init", imported.faults) if imported.faults else 0
 
 
@@ -143,16 +145,13 @@ def _unservable(listen: str, unservable: ValueError) -> int:
 
 
 def _validate() -> int:
-    """Check the store this directory finds: every violation, then every artifact behind its type, one to a line."""
+    """Check the store this directory finds: every violation, then every artifact behind its type, then every link
+    into a placeholder, with the part it names, one to a line. Only a violation makes the check fail."""
     answered = kb_client.connect().Check(kb_pb2.CheckRequest())
     if answered.WhichOneof("outcome") == "refusal":
         return _refused("validate", answered.refusal.faults)
     checked = answered.result
-    for fault in checked.violations:
-        print("\t".join(("violation", fault.artifact, fault.place, fault.rule, fault.message)))
-    for stale in checked.stale:
-        print(f"stale\t{stale.artifact}\tchecked against version {stale.schema_version} of its type, "
-              f"which is at {stale.current}")
+    reports.checked(checked)
     return VIOLATED if checked.violations else 0
 
 
@@ -189,7 +188,7 @@ def _import_check(directory: str) -> int:
     checked = kb_client.import_check(directory)
     if checked.faults:
         return _refused("import", checked.faults)
-    _reported(checked)
+    reports.imported(checked)
     if checked.errors:
         return VIOLATED
     print(f"clean\t{directory} checks clean for import")
@@ -205,19 +204,10 @@ def _import(directory: str, skip_errors: bool) -> int:
             rule=rules.ACTOR, message="an import lands only under a role, named through KB_ACTOR",
         )])
     imported = kb_client.import_(directory, role, skip_errors)
-    _reported(imported)
+    reports.imported(imported)
     if imported.faults:
         return _refused("import", imported.faults)
     return 0
-
-
-def _reported(checked) -> None:
-    """The check's report: every error, then every file that would be skipped with the chain of files leading to a
-    broken one, one to a line."""
-    for fault in checked.errors:
-        print("\t".join(("error", fault.artifact, fault.rule, fault.message)))
-    for skipped in checked.skipped:
-        print("\t".join(("skipped", skipped.file, " -> ".join(skipped.chain))))
 
 
 def _refused(command: str, faults) -> int:

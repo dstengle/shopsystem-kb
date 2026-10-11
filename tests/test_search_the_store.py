@@ -1,6 +1,6 @@
 from pytest_bdd import given, scenario, then, when
 
-from calls import DECISION_TYPE, create, define, search, start_a_store
+from calls import DECISION_TYPE, create, define, iri, search, start_a_store, version_iri
 from kb import client as kb_client
 
 
@@ -72,16 +72,16 @@ def _search_the_prose(client):
 @then("each result comes with the title of the section it matched and a snippet of it")
 def _section_and_snippet(found):
     assert {(match.stub.id, match.section) for match in found} == {
-        ("decision/restock-on-thursdays", "Rationale"),
-        ("decision/price-reviews-happen-weekly", "Purpose"),
-        ("process/open-the-shop", "Before opening"),
+        (iri("decision", "restock-on-thursdays"), "Rationale"),
+        (iri("decision", "price-reviews-happen-weekly"), "Purpose"),
+        (iri("process", "open-the-shop"), "Before opening"),
     }
     assert all("restocking" in match.snippet.lower() for match in found)
 
 
 @then("the one whose section mentions restocking most often comes first")
 def _most_often_first(found):
-    assert (found[0].stub.id, found[0].section) == ("decision/restock-on-thursdays", "Rationale")
+    assert (found[0].stub.id, found[0].section) == (iri("decision", "restock-on-thursdays"), "Rationale")
 
 
 @when("the client searches the prose for restocking among decisions only", target_fixture="found")
@@ -93,8 +93,8 @@ def _search_the_decisions(client):
 
 @then("the client is given the two decisions and not the process")
 def _the_two_decisions(found):
-    assert {match.stub.id for match in found} == {"decision/restock-on-thursdays", "decision/price-reviews-happen-weekly"}
-    assert all(match.stub.kind == "decision" for match in found)
+    assert {match.stub.id for match in found} == {iri("decision", "restock-on-thursdays"), iri("decision", "price-reviews-happen-weekly")}
+    assert all(match.stub.type == version_iri("decision") for match in found)
 
 
 @when("the client searches the fields and the prose for restocking", target_fixture="found")
@@ -107,10 +107,10 @@ def _search_fields_and_prose(client):
 @then("the client is also given a decision whose title mentions restocking")
 def _the_decision_by_its_title(found):
     assert [(match.stub.id, match.field, match.section, match.snippet) for match in found if match.field] == [
-        ("decision/restocking-needs-two-people", "title", "", "Restocking needs two people"),
+        (iri("decision", "restocking-needs-two-people"), "title", "", "Restocking needs two people"),
     ]
     assert {(match.stub.id, match.section) for match in found if not match.field} == {
-        ("decision/restock-on-thursdays", "Rationale"),
-        ("decision/price-reviews-happen-weekly", "Purpose"),
-        ("process/open-the-shop", "Before opening"),
+        (iri("decision", "restock-on-thursdays"), "Rationale"),
+        (iri("decision", "price-reviews-happen-weekly"), "Purpose"),
+        (iri("process", "open-the-shop"), "Before opening"),
     }

@@ -2,78 +2,84 @@
 Feature: Name artifacts and items
   Narrator: the client
 
-  @slice-25
-  Scenario: The name of a new artifact is made from its title, not asked for
-    Pins that names are minted by the store from the title, so a client cannot choose one and never has to invent one.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision titled "Price reviews happen weekly", saying which role and why
-    Then the name the client is given is made from that title
-    And the client never said what the name should be
+  @slice-156
+  Scenario: An artifact created at an IRI of the client's choosing under its type's IRI is held at that IRI
+    Pins that the client names every artifact it creates and the store keeps the name it was given, never one of its own.
+    Given a store holding a decision type at "https://shop.example/kb/decision"
+    When the client creates a decision at "https://shop.example/kb/decision/pricing/weekly-reviews", saying which role and why
+    Then the decision is held at "https://shop.example/kb/decision/pricing/weekly-reviews"
+    And the store made up no other IRI for it
 
-  @slice-8.1
-  Scenario: A second artifact with a title already used gets a name of its own
-    Pins how a clash is settled: the newcomer takes a numbered name and the artifact already there keeps the name everything else points at.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    Given a decision the store already holds, titled "Price reviews happen weekly"
-    When the client creates another decision with that same title, saying which role and why
-    Then the client is given a name of its own for the new decision, the name already taken with a number added
-    And the decision created first keeps the name it had
+  @slice-158
+  Scenario: An artifact created at an IRI not under its type's IRI is refused
+    Pins that where an artifact is named says what kind it is, so an IRI outside its type's is never held.
+    Given a store holding a decision type at "https://shop.example/kb/decision"
+    When the client creates a decision at "https://shop.example/kb/process/weekly-reviews", saying which role and why
+    Then the artifact is rejected because an artifact's IRI sits under its type's IRI
+    And the refusal names "https://shop.example/kb/process/weekly-reviews"
+    And nothing is written
 
-  @slice-25
-  Scenario: Two parts with the same title are given names of their own
-    Pins that parts are named by the same rules as artifacts, including the clash rule, so every part inside a new artifact is addressable from the moment it exists.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision carrying two options with the same title, saying which role and why
+  @slice-158
+  Scenario: An artifact created at an IRI the store already holds an artifact at is refused
+    Pins that an IRI names one artifact: a second create there is refused rather than numbered or put over the first.
+    Given a store holding a decision type at "https://shop.example/kb/decision"
+    Given a decision the store holds at "https://shop.example/kb/decision/weekly-reviews"
+    When the client creates another decision at "https://shop.example/kb/decision/weekly-reviews", saying which role and why
+    Then the artifact is rejected because an IRI names one artifact
+    And the refusal names "https://shop.example/kb/decision/weekly-reviews"
+    And the decision already there reads as it did, at the revision it held
+
+  @slice-158
+  Scenario: An artifact keeps the IRI it was created with for life
+    Pins that changing an artifact never moves it, so anything pointing at its IRI still finds it.
+    Given a store holding a decision type at "https://shop.example/kb/decision"
+    Given a decision the store holds at "https://shop.example/kb/decision/weekly-reviews", changed several times since it was created
+    When the client reads the decision at "https://shop.example/kb/decision/weekly-reviews"
+    Then the client is given the decision, at its latest revision
+
+  @slice-179
+  Scenario: Two items created with the same title in one collection, neither given a name, are given names of their own
+    Pins the clash rule for parts the store names on create: neither is left unnamed, and the second takes the first's name with a number added.
+    Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
+    When the client creates a decision carrying two options with the same title, neither given a name, saying which role and why
     Then each option is given a name of its own, the second the name of the first with a number added
-    And the client never said what either name should be
 
-  @slice-1.6
-  Scenario: A title with capitals and punctuation gives a plain name
-    Pins exactly how a title becomes a name, so the same title always gives the same name and every name is safe to put in a path or a link.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision titled "Price reviews: weekly, from now on!", saying which role and why
-    Then the name the client is given is that title in lower case, with each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end
+  @slice-179
+  Scenario: An item's title with capitals and punctuation gives a plain name
+    Pins exactly how an item's title becomes its name, so the same title always gives the same name and every name is safe to put in an IRI.
+    Given a store holding a process with two steps and a shared step other processes use
+    When the client adds a step titled "Count stock: shelf, then back room!" to the process, saying which role and why
+    Then the name the client is given for the new item is that title in lower case, with each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end
 
-  @slice-1.6
-  Scenario: A title that leaves nothing to make a name from is refused
-    Pins the edge of that rule: rather than invent a name when the title boils down to nothing, the store refuses and says why.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision titled "!!!", saying which role and why
-    Then the artifact is rejected because a title must leave something to make a name from
-
-  @slice-1.5
+  @slice-158
   Scenario: A title that reads as a date is still a title
     Pins that a title is always text: nothing quietly reads it as a date on the way in and hands back something the client never wrote.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    Given a store holding a decision type at "https://shop.example/kb/decision"
     When the client creates a decision titled "2026-09-24", saying which role and why
     Then the title reads back as the text that was written, not as a date
-    And the name the client is given is made from that text
 
-  @slice-1.6
+  @slice-158
   Scenario: A title that reads as yes is still a title
     Pins the same for the words older readers turn into yes and no, which is the classic way a title comes back as something else entirely.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    Given a store holding a decision type at "https://shop.example/kb/decision"
     When the client creates a decision titled "yes", saying which role and why
     Then the title reads back as the text that was written, not as a yes or a no
-    And the name the client is given is made from that text
 
-  @slice-1.18
-  Scenario: A title given as a yes-or-no is still a title
-    Pins that a title is turned into text whatever arrives, so a client that sends an unquoted word still gets a title and a name it can use.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+  @slice-158
+  Scenario: A title given as the yes-or-no true is still a title
+    Pins that a title is turned into text whatever arrives, so a client that sends an unquoted word still gets a title it can use.
+    Given a store holding a decision type at "https://shop.example/kb/decision"
     Given a title for a new decision that is the yes-or-no true rather than text
     When the client creates a decision with that title, saying which role and why
     Then the title reads back as the text "true"
-    And the name the client is given is made from that text
 
-  @slice-1.25
-  Scenario: A title given as a number is still a title
+  @slice-158
+  Scenario: A title given as the number 12 is still a title
     Pins the same for a number, which is how a title like a year or a version arrives when nobody quoted it.
-    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    Given a store holding a decision type at "https://shop.example/kb/decision"
     Given a title for a new decision that is the number 12 rather than text
     When the client creates a decision with that title, saying which role and why
     Then the title reads back as the text "12"
-    And the name the client is given is made from that text
 
   @slice-39
   Scenario: The name of a new item comes from its title
@@ -117,9 +123,9 @@ Feature: Name artifacts and items
     Then every item keeps the name it was given when it was added
     And anything pointing at one of them still lands on the same item
 
-  @slice-80
-  Scenario Outline: An item's title becomes its name by the same rules as an artifact's title
-    Pins that one rule turns a title into a name everywhere: an item's title is read as text whatever it looks like, and a title that leaves nothing to make a name from is refused rather than given an empty name.
+  @slice-179
+  Scenario Outline: An added item's title becomes its name, read as text, refused if it leaves nothing
+    Pins how an added item's title turns into its name: read as text whatever it looks like, and refused rather than given an empty name when it boils down to nothing.
     Given a store holding a process with two steps and a shared step other processes use
     When the client adds a step titled <title> to the process, saying which role and why
     Then <outcome>
@@ -154,12 +160,55 @@ Feature: Name artifacts and items
       | both of which carry the same name                            | the items of a collection each have a name of their own                   |
       | one of which carries a name that is not a plain name         | a name is a plain name of lower-case letters, digits and single hyphens   |
 
-  @slice-87
-  Scenario: A name is free again once what held it has been removed
-    Pins that a name belongs to an artifact for its life and no longer, so the next artifact whose title gives that name simply takes it, at its own first version.
-    Given a store holding a tag nothing points at
-    And a tag a decision points at
-    Given the client has removed the tag nothing points at
-    When the client creates a tag with the title the removed one had, saying which role and why
-    Then the client is given the name the removed tag had, with no number added
-    And the new tag is at its first version
+  @slice-158
+  Scenario: After an artifact has been removed, a new artifact may be created at its IRI
+    Pins that an IRI belongs to an artifact for its life and no longer, so a new artifact may take it, starting over at its own first revision.
+    Given a store holding a tag type at "https://shop.example/kb/tag"
+    Given the client has removed the tag that was held at "https://shop.example/kb/tag/seasonal"
+    When the client creates a tag at "https://shop.example/kb/tag/seasonal", saying which role and why
+    Then the new tag is held at "https://shop.example/kb/tag/seasonal"
+    And the new tag is at its first revision
+
+  @slice-179
+  Scenario: A part is named by its artifact's IRI, # and its place in it
+    Pins how a part inside an artifact is written, so a client can name any part from the artifact's IRI and where the part sits.
+    Given a store holding a process at "https://shop.example/kb/process/restock" whose steps include one named draft
+    When the client reads "https://shop.example/kb/process/restock#steps/draft"
+    Then the client is given the step named draft of that process
+
+  @slice-179
+  Scenario: A part given a name of the client's choosing on create holds that name
+    Pins that a create may name the parts it carries, so the client knows each part's name before the store answers.
+    Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
+    When the client creates a decision carrying an option it names "keep-weekly", saying which role and why
+    Then the option is named "keep-weekly"
+
+  @slice-179
+  Scenario Outline: A part given no name on create is named by the store from its title or its place
+    Pins that a part the client leaves unnamed is named the way an added item is, so every part is addressable from the moment it exists.
+    Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry <collection>
+    When the client creates a decision carrying <part> with no name, saying which role and why
+    Then the part is named <named from>
+
+    Examples:
+      | collection                                     | part                                   | named from                                  |
+      | a collection of options, each with a title     | an option titled "Keep weekly reviews" | from its title, as an added item would be   |
+      | a collection whose items carry no title         | an item                                | from its place, as an added item would be   |
+
+  @slice-179
+  Scenario: An artifact created giving two parts of one collection the same name is refused
+    Pins that a name the client gives a part must tell it apart from the other parts of its collection.
+    Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
+    When the client creates a decision carrying two options it names both "keep-weekly", saying which role and why
+    Then the artifact is rejected because a part's name is unique in its collection
+    And the refusal names "keep-weekly"
+    And nothing is written
+
+  @slice-179
+  Scenario: An artifact created giving a part a name that is not a plain name is refused
+    Pins that a name the client gives a part keeps to the grammar of names the store gives, so every part can be written into an IRI.
+    Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
+    When the client creates a decision carrying an option it names "Keep Weekly!", saying which role and why
+    Then the artifact is rejected because a part's name is a plain name
+    And the refusal names the place of that option
+    And nothing is written

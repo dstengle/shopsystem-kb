@@ -1,5 +1,5 @@
-"""Pins the whole of kb.v1: every message field's name, number, type and label, every enum's values and numbers, and
-the service's methods with their input and output types, against tests/contract_v1.golden. A change to any of them
+"""Pins the whole of kb.v2: every message field's name, number, type and label, every enum's values and numbers, and
+the service's methods with their input and output types, and which answer with a stream, against tests/contract_v2.golden. A change to any of them
 is a change to the published contract, and is made by changing the golden file with it."""
 from pathlib import Path
 
@@ -7,7 +7,7 @@ from google.protobuf import descriptor_pb2
 
 from kb.contract import kb_pb2
 
-GOLDEN = Path(__file__).with_name("contract_v1.golden")
+GOLDEN = Path(__file__).with_name("contract_v2.golden")
 TYPES = {number: name[len("TYPE_"):].lower() for name, number in descriptor_pb2.FieldDescriptorProto.Type.items()}
 
 
@@ -34,7 +34,8 @@ def _message(message, indent=""):
 def _service(service):
     yield f"service {service.name}"
     for method in service.methods:
-        yield f"  rpc {method.name}({method.input_type.full_name}) returns ({method.output_type.full_name})"
+        stream = "stream " if method.server_streaming else ""
+        yield f"  rpc {method.name}({method.input_type.full_name}) returns ({stream}{method.output_type.full_name})"
 
 
 def render():
@@ -49,5 +50,5 @@ def render():
     return "\n".join(lines) + "\n"
 
 
-def test_the_whole_of_the_v1_descriptor_is_the_golden_file():
+def test_the_whole_of_the_v2_descriptor_is_the_golden_file():
     assert render() == GOLDEN.read_text()

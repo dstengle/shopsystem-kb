@@ -3,10 +3,16 @@ import copy
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, refs, remove, tagged_decision_type, replace,
-    start_a_store,
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, iri,
+    leading_decision_type, read, refs, remove, replace, start_a_store, tagged_decision_type, targets, type_iri,
+    version_iri,
 )
 from kb import client as kb_client
+
+
+@scenario("query-the-store.feature", "The client follows links narrowed to a path below the type")
+def test_the_client_follows_links_narrowed_to_a_path_below_the_type():
+    pass
 
 
 @scenario("query-the-store.feature", "The client follows the links out of an artifact")
@@ -39,8 +45,8 @@ def test_a_link_into_a_part_counts_as_a_link_into_the_artifact_holding_it():
     pass
 
 
-OLDER = "decision/prices-are-reviewed-monthly"
-DECISION = "decision/price-reviews-happen-weekly"
+OLDER = iri("decision", "prices-are-reviewed-monthly")
+DECISION = iri("decision", "price-reviews-happen-weekly")
 OLDER_SECTIONS = [
     {"title": "Purpose", "body": "Keep prices current.\n"},
     {"title": "Rationale", "body": "Monthly was enough once.\n"},
@@ -88,9 +94,9 @@ def _follow_two_steps_out(client):
 
 @then("the client is given the older decision and the tag")
 def _older_decision_and_tag(reached):
-    assert [(found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
-        (OLDER, "decision", "Prices are reviewed monthly"),
-        ("tag/pricing", "tag", "pricing"),
+    assert [(found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        (OLDER, version_iri("decision"), "Prices are reviewed monthly"),
+        (iri("tag", "pricing"), version_iri("tag"), "pricing"),
     ]
 
 
@@ -98,11 +104,11 @@ def _older_decision_and_tag(reached):
 def _each_with_its_route(reached):
     assert {found.stub.id: [(hop.field, hop.id) for hop in found.route] for found in reached} == {
         OLDER: [("supersedes", OLDER)],
-        "tag/pricing": [("supersedes", OLDER), ("tags", "tag/pricing")],
+        iri("tag", "pricing"): [("supersedes", OLDER), ("tags", iri("tag", "pricing"))],
     }
 
 
-WORK_ITEMS = ["work-item/move-the-review-to-mondays", "work-item/tell-the-pricing-team"]
+WORK_ITEMS = [iri("work-item", "move-the-review-to-mondays"), iri("work-item", "tell-the-pricing-team")]
 
 
 @when("the client follows the links out of the decision", target_fixture="reached")
@@ -114,8 +120,8 @@ def _follow_out(client):
 
 @then("the client is given a stub of the older decision")
 def _stub_of_the_older_decision(reached):
-    assert [(found.stub.field, found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
-        ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
+    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        ("supersedes", OLDER, version_iri("decision"), "Prices are reviewed monthly"),
     ]
 
 
@@ -128,9 +134,9 @@ def _follow_in(client):
 
 @then("the client is given a stub of each work item")
 def _stub_of_each_work_item(reached):
-    assert [(found.stub.field, found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
-        ("decisions", WORK_ITEMS[0], "work-item", "Move the review to Mondays"),
-        ("decisions", WORK_ITEMS[1], "work-item", "Tell the pricing team"),
+    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        ("decisions", WORK_ITEMS[0], version_iri("work-item"), "Move the review to Mondays"),
+        ("decisions", WORK_ITEMS[1], version_iri("work-item"), "Tell the pricing team"),
     ]
     assert [[(hop.field, hop.id) for hop in found.route] for found in reached] == [
         [("decisions", WORK_ITEMS[0])], [("decisions", WORK_ITEMS[1])],
@@ -152,8 +158,44 @@ def _both_work_items(reached):
     assert [found.stub.id for found in reached] == WORK_ITEMS
 
 
-PROCESS = "process/open-the-shop"
-INTO_A_STEP = "work-item/check-the-till-float"
+ROADMAP = iri("decision", "roadmap")
+PLAIN_WORK_ITEM_TYPE = {"title": "Work item", "version": 1, "schema": TAG_TYPE["schema"]}
+
+
+@given(parsers.parse('a store where a decision at "{path}" below its type points at each of these:'), target_fixture="client")
+def _a_decision_pointing_below_types(root, path, datatable):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, PLAIN_WORK_ITEM_TYPE)
+    define(client, leading_decision_type())
+    pointed_at = below_their_types(datatable)
+    for kind, at in pointed_at:
+        create(client, kind, {"title": at, **({"sections": OLDER_SECTIONS} if kind == "decision" else {})}, at=at)
+    create(client, "decision", {
+        "title": "Roadmap", "leads": [at for _, at in pointed_at], "sections": OLDER_SECTIONS,
+    }, at=iri("decision", path))
+    return client
+
+
+@when(
+    parsers.parse('the client follows the links out of the decision at "{at}", narrowed to the path "{path}" below the type'),
+    target_fixture="reached",
+)
+def _follow_out_narrowed_to_a_path(client, at, path):
+    response = refs(client, iri("decision", at), depth=1, path=path)
+    assert not response.faults, response.faults
+    return list(response.reached)
+
+
+@then("the client is given only these:")
+def _only_these(reached, datatable):
+    assert [(found.stub.id, found.stub.type) for found in reached] == [
+        (at, version_iri(kind)) for kind, at in below_their_types(datatable)
+    ]
+
+
+PROCESS = iri("process", "open-the-shop")
+INTO_A_STEP = iri("work-item", "check-the-till-float")
 
 
 @given(
@@ -165,9 +207,9 @@ def _a_work_item_pointing_into_a_process(client):
     create(client, "process", {"title": "Open the shop", "steps": [{"title": "Unlock the door"}, {"title": "Count the till"}]})
     following = copy.deepcopy(WORK_ITEM_TYPE["schema"])
     following["properties"]["follows"] = {
-        "type": "string", "ref": {"targets": ["process"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
+        "type": "string", "ref": {"targets": targets("process"), "cardinality": "one", "parts": True, "on_delete": "refuse"},
     }
-    revised = replace(client, "schema/work-item", {"version": 2, "schema": following}, message="Let work items follow a step")
+    revised = replace(client, type_iri("work-item"), {"version": 2, "schema": following}, message="Let work items follow a step")
     assert not revised.faults, revised.faults
     create(client, "work-item", {"title": "Check the till float", "follows": f"{PROCESS}#steps/count-the-till"})
 
@@ -188,7 +230,7 @@ def _a_stub_of_the_work_item(reached):
 def _counted_at_a_glance(client):
     summary = read(client, PROCESS)
     assert not summary.faults, summary.faults
-    assert [(count.kind, count.field, count.count) for count in summary.inbound] == [("work-item", "follows", 1)]
+    assert [(count.kind, count.field, count.count) for count in summary.inbound] == [(type_iri("work-item"), "follows", 1)]
 
 
 @then("removing the process is refused while that work item points into it")
@@ -198,7 +240,7 @@ def _removal_refused(client):
     assert read(client, PROCESS).revision == 1
 
 
-NOTE = "note/weekly-reviews-need-cover"
+NOTE = iri("note", "weekly-reviews-need-cover")
 NOTE_TYPE = {
     "title": "Note",
     "version": 1,
@@ -223,9 +265,9 @@ def _a_note_pointing_at_the_decision(client):
 def _a_work_item_pointing_twice(client):
     revised = copy.deepcopy(WORK_ITEM_TYPE["schema"])
     revised["properties"]["follows"] = {
-        "type": "string", "ref": {"targets": ["decision"], "cardinality": "one", "parts": False, "on_delete": "refuse"},
+        "type": "string", "ref": {"targets": targets("decision"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
     }
-    changed = replace(client, "schema/work-item", {"version": 2, "schema": revised}, message="Let work items follow a decision")
+    changed = replace(client, type_iri("work-item"), {"version": 2, "schema": revised}, message="Let work items follow a decision")
     assert not changed.faults, changed.faults
     changed = replace(client, WORK_ITEMS[1], {"decisions": [DECISION], "follows": DECISION}, message="Follow it too")
     assert not changed.faults, changed.faults
@@ -233,13 +275,13 @@ def _a_work_item_pointing_twice(client):
     assert {(found.stub.field, found.stub.id) for found in inward.reached} >= {("decisions", NOTE)}
 
 
-OPENING = "tag/opening"
+OPENING = iri("tag", "opening")
 
 
 @given("a process one of whose steps points at a tag of its own, while another of its steps points at the decision")
 def _a_process_whose_steps_point_out(client):
     process_type = copy.deepcopy(PROCESS_TYPE)
-    process_type["schema"]["parts"]["steps"]["items"]["properties"]["uses"]["ref"]["targets"] = ["tag", "decision"]
+    process_type["schema"]["parts"]["steps"]["items"]["properties"]["uses"]["ref"]["targets"] = targets("tag", "decision")
     define(client, process_type)
     create(client, "tag", {"title": "opening"})
     create(client, "process", {"title": "Open the shop", "steps": [
@@ -257,7 +299,7 @@ def _follow_out_of_a_step(client):
 
 @then("the client is given a stub of that tag and nothing else the process points at")
 def _only_the_tag(reached):
-    assert [(found.stub.field, found.stub.id, found.stub.kind, found.stub.title) for found in reached] == [
-        ("uses", OPENING, "tag", "opening"),
+    assert [(found.stub.field, found.stub.id, found.stub.type, found.stub.title) for found in reached] == [
+        ("uses", OPENING, version_iri("tag"), "opening"),
     ]
     assert [[(hop.field, hop.id) for hop in found.route] for found in reached] == [[("uses", OPENING)]]

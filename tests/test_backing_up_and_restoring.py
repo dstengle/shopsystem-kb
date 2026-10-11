@@ -1,10 +1,11 @@
 """A store backed up and restored, in the cases no scenario names: sets still in the database's write-ahead log are in
 the backup, and a restored store is a store like any other, changed and served at once."""
+import sqlite3
 from pathlib import Path
 
 import grpc
 
-from calls import DECISION_TYPE, check, create, define, start_a_store
+from calls import DECISION_TYPE, check, create, define, iri, start_a_store, type_iri
 from conftest import _kb
 import serving
 import stopping
@@ -46,7 +47,7 @@ def test_a_backup_holds_the_sets_the_write_ahead_log_holds_not_yet_checkpointed(
         assert log.is_file() and log.stat().st_size > 0
         restored = _backed_up_and_restored(root, tmp_path)
     assert kb_client.connect(restored).Read(kb_pb2.ReadRequest(
-        locator=kb_pb2.Locator(id="decision/price-reviews-happen-weekly"), whole=kb_pb2.ReadRequest.Whole(),
+        locator=kb_pb2.Locator(id=iri("decision", "price-reviews-happen-weekly")), whole=kb_pb2.ReadRequest.Whole(),
     )).WhichOneof("outcome") == "result"
 
 
@@ -55,11 +56,11 @@ def test_a_restored_store_is_changed_and_served_at_once(tmp_path, root, request)
     define(kb_client.connect(root), DECISION_TYPE)
     restored = _backed_up_and_restored(root, tmp_path)
     created = create(kb_client.connect(restored), "decision", WEEKLY)
-    assert (created.id, created.revision) == ("decision/price-reviews-happen-weekly", 1)
+    assert (created.id, created.revision) == (iri("decision", "price-reviews-happen-weekly"), 1)
     hosting = serving.hosted(restored, request, clock=None)
     with grpc.insecure_channel(str(hosting.address)) as channel:
-        listed = kb_pb2_grpc.KbStub(channel).List(kb_pb2.ListRequest(kind="decision", form=kb_pb2.ListRequest.IDS))
-    assert list(listed.result.ids) == ["decision/price-reviews-happen-weekly"]
+        listed = kb_pb2_grpc.KbStub(channel).List(kb_pb2.ListRequest(kind=type_iri("decision"), form=kb_pb2.ListRequest.IDS))
+    assert list(listed.result.ids) == [iri("decision", "price-reviews-happen-weekly")]
 
 
 def test_a_backup_of_a_freshly_started_store_restores_to_a_store_that_checks_clean(tmp_path, root):
@@ -148,17 +149,24 @@ def test_a_copy_that_fails_in_the_backups_place_is_refused_naming_it_and_leaves_
 
 
 def _a_store_damaged_inside(root):
-    """A store of sixty decisions whose database opens, its first page whole, but whose pages in the middle are
-    written over by hand behind its back."""
+    """A store of sixty decisions whose database opens, its first page whole, but whose pages holding its artifacts
+    are written over by hand behind its back."""
     start_a_store(root)
     client = kb_client.connect(root)
     define(client, DECISION_TYPE)
     for each in range(60):
         create(client, "decision", {**WEEKLY, "title": f"Price reviews happen weekly {each}"})
     database = Path(root) / "kb" / "store.sqlite3"
+    found = sqlite3.connect(database)
+    try:
+        found.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        size = found.execute("PRAGMA page_size").fetchone()[0]
+        pages = [page for (page,) in found.execute("SELECT pageno FROM dbstat WHERE name = 'artifacts' AND pageno > 1")]
+    finally:
+        found.close()
     whole = bytearray(database.read_bytes())
-    middle = len(whole) // 2
-    whole[middle:middle + 4 * 4096] = b"\xa5" * (4 * 4096)
+    for page in pages:
+        whole[(page - 1) * size:page * size] = b"\xa5" * size
     database.write_bytes(bytes(whole))
 
 

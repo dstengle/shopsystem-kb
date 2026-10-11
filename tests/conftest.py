@@ -8,8 +8,12 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from calls import CLIENT, DECISION_TYPE, create, define, journal, listing, moment, next_version, start_a_store, check
+from calls import (
+    CLIENT, DECISION_TYPE, check, create, define, iri, journal, listing, moment, next_version, start_a_store,
+)
 import held
+import serving
+import slices
 from kb import cli, client as kb_client, served, store
 
 
@@ -20,6 +24,19 @@ def pytest_configure(config):
         tags.update(re.findall(r"@(slice-\d+(?:\.\d+)?)", feature.read_text()))
     for tag in sorted(tags):
         config.addinivalue_line("markers", f"{tag}: scenario of that slice in the plan")
+    slices.configure(config, Path(config.rootpath, slices.PLAN), Path(config.rootpath, "tests", slices.PASSING))
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config, items):
+    """A test of a slice the living plan has not built is expected to fail (tests/slices.py)."""
+    slices.expect_failures(config, items)
+
+
+@pytest.hookimpl(optionalhook=True, tryfirst=True)
+def pytest_testnodedown(node, error):
+    """In a run in parallel, a worker that refused the list of tests passing before their slice stops the run."""
+    slices.stop_with(node)
 
 
 def _guard_starts(rootpath, base_temp):
@@ -111,6 +128,22 @@ def _store_with_content(root):
     })
 
 
+@given("a store holding a decision")
+def _store_holding_a_decision(root):
+    _store_with_content(root)
+
+
+@given("a server serves that store, and the client works where the connection to that server is found",
+       target_fixture="arranged")
+@given("a server the operator runs with kb serve serves that store, and the client works where the connection to "
+       "that server is found", target_fixture="arranged")
+def _served_and_working_where_the_connection_is(root, tmp_path, request, monkeypatch):
+    arranged = tmp_path / "arranged"
+    connection = serving.connection(arranged, serving.serving(root, request))
+    monkeypatch.chdir(arranged)
+    return {"connection": connection, "bytes": connection.read_bytes()}
+
+
 @given("a directory that already has a store inside it, with content in that store", target_fixture="root")
 def _directory_with_a_store_inside(root, before):
     _store_with_content(root)
@@ -140,7 +173,7 @@ def _check_the_store(client):
 
 @then("the store holds no artifact it did not hold before")
 def _no_new_artifact(root, client, attempt):
-    assert [stub.id for stub in listing(client, "decision", ids_only=True).stubs] == attempt["names"]
+    assert list(listing(client, "decision", ids_only=True).ids) == attempt["names"]
     assert held.holds(root) == attempt["files"]
 
 
@@ -217,9 +250,9 @@ def _store_needing_attention(root):
             {"title": "Rationale", "body": "Costs move weekly.\n"},
         ]})
     next_version(client, "decision", DECISION_TYPE)
-    monthly = held.artifact(root, "decision/prices-are-reviewed-monthly")
+    monthly = held.artifact(root, iri("decision", "prices-are-reviewed-monthly"))
     del monthly["sections"][0]["body"]
-    held.plant(root, "decision/prices-are-reviewed-monthly", monthly)
+    held.plant(root, iri("decision", "prices-are-reviewed-monthly"), monthly)
     return root
 
 

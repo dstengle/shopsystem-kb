@@ -4,12 +4,17 @@ import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    DECISION_TYPE, MovingClock, add, create, create_many, created, define, journal, moment, remove, snapshot,
-    replace, start_a_store,
+    DECISION_TYPE, add, create, create_many, created, define, iri, journal, moment, MovingClock, remove, replace,
+    snapshot, start_a_store, version_iri,
 )
 import held
 from kb import client as kb_client
 from kb.contract import kb_pb2
+
+
+@scenario("keep-the-history.feature", "Each entry read from the history gives its position in the history")
+def test_each_entry_read_from_the_history_gives_its_position_in_the_history():
+    pass
 
 
 @scenario("keep-the-history.feature", "Every change leaves an entry")
@@ -77,7 +82,7 @@ def test_a_change_aimed_at_one_place_records_the_place_it_changed():
     pass
 
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SHOPKEEPER = kb_pb2.Actor(role="shopkeeper")
 AGENT = kb_pb2.Actor(role="agent", execution="restock-run-12")
 
@@ -129,6 +134,21 @@ def _read_the_journal_for_the_decision(client):
     return list(response.entries)
 
 
+@when("the client reads the history", target_fixture="entries")
+def _read_the_whole_history(client):
+    response = journal(client)
+    assert not response.faults, response.faults
+    return list(response.entries)
+
+
+@then("each entry the client is given gives its position in the history")
+def _each_entry_gives_its_position(entries):
+    assert entries, "the history gave no entry"
+    positions = [entry.id for entry in entries]
+    assert all(positions), positions
+    assert len(set(positions)) == len(positions), positions
+
+
 @then("there is one entry for each change")
 def _one_entry_for_each_change(entries):
     assert [(entry.op, entry.artifact) for entry in entries] == [("create", DECISION), ("write", DECISION)]
@@ -142,11 +162,11 @@ def _one_entry_for_each_change(entries):
 def _each_entry_says_everything(entries, written):
     assert [
         (entry.at[:10], entry.actor.role, entry.actor.execution, entry.op, entry.artifact, entry.place,
-         entry.revision, entry.schema_version, entry.message)
+         entry.revision, entry.type, entry.message)
         for entry in entries
     ] == [
-        ("2026-09-21", "shopkeeper", "", "create", DECISION, "", 1, 1, "Review prices weekly"),
-        ("2026-09-23", "agent", "restock-run-12", "write", DECISION, "", 2, 1, "Say why weekly"),
+        ("2026-09-21", "shopkeeper", "", "create", DECISION, "", 1, version_iri("decision"), "Review prices weekly"),
+        ("2026-09-23", "agent", "restock-run-12", "write", DECISION, "", 2, version_iri("decision"), "Say why weekly"),
     ]
     assert [entry.digest for entry in entries] == written
     assert [entry.batch for entry in entries] == [entry.id for entry in entries]
@@ -156,8 +176,8 @@ SECTIONS = [
     {"title": "Purpose", "body": "Keep the shop running.\n"},
     {"title": "Rationale", "body": "It was agreed.\n"},
 ]
-TOGETHER = ["decision/restock-on-thursdays", "decision/count-the-till-nightly"]
-ALONE = "decision/close-early-on-sundays"
+TOGETHER = [iri("decision", "restock-on-thursdays"), iri("decision", "count-the-till-nightly")]
+ALONE = iri("decision", "close-early-on-sundays")
 
 
 @given("a store where two artifacts were changed in one go and a third was changed on its own")
@@ -343,7 +363,7 @@ def _changed_five_times(client):
     return [("write", DECISION)] * 5
 
 
-SECOND = "decision/restock-on-thursdays"
+SECOND = iri("decision", "restock-on-thursdays")
 
 
 def _one_of_each(client):
@@ -403,13 +423,13 @@ def _each_its_own_set(entries, made):
     assert len({entry.batch for entry in left}) == len(left)
 
 
-FIRST_GO = ["decision/restock-on-thursdays", "decision/count-the-till-nightly"]
-SECOND_GO = ["decision/close-early-on-sundays", "decision/order-flour-monthly"]
+FIRST_GO = [iri("decision", "restock-on-thursdays"), iri("decision", "count-the-till-nightly")]
+SECOND_GO = [iri("decision", "close-early-on-sundays"), iri("decision", "order-flour-monthly")]
 
 
 def _in_one_go(client, artifacts):
     applied = create_many(client, [
-        created("decision", artifact.split("/")[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
+        created("decision", artifact.rsplit("/", 1)[1].replace("-", " ").capitalize(), {"sections": SECTIONS})
         for artifact in artifacts
     ])
     assert not applied.faults, applied.faults
@@ -558,7 +578,7 @@ def _the_later_landing_comes_after(entries):
     assert datetime.fromisoformat(second.at) < datetime.fromisoformat(first.at)
 
 
-FIRST_ARTIFACT, OTHER_ARTIFACT = DECISION, "decision/restock-on-thursdays"
+FIRST_ARTIFACT, OTHER_ARTIFACT = DECISION, iri("decision", "restock-on-thursdays")
 
 
 def _create_other(client):
@@ -598,7 +618,7 @@ def _opposite_to_landing(entries, landed):
     assert read == landed[::-1]
 
 
-SAME_MOMENT = ["decision/zebra-crossings", "decision/mango-stalls", "decision/apple-carts"]
+SAME_MOMENT = [iri("decision", "zebra-crossings"), iri("decision", "mango-stalls"), iri("decision", "apple-carts")]
 
 
 @given("the client has changed one artifact, and then changed a different artifact", target_fixture="landed")
@@ -606,7 +626,7 @@ def _changed_one_then_a_different_one(client):
     changed = replace(client, FIRST_ARTIFACT, {"sections": SECTIONS}, message="Say it plainly")
     assert not changed.faults, changed.faults
     for artifact in SAME_MOMENT:
-        made = create(client, "decision", {"title": artifact.split("/")[1].replace("-", " ").capitalize(),
+        made = create(client, "decision", {"title": artifact.rsplit("/", 1)[1].replace("-", " ").capitalize(),
                                            "sections": SECTIONS}, message="Another")
         assert not made.faults, made.faults
     return [FIRST_ARTIFACT, *SAME_MOMENT]

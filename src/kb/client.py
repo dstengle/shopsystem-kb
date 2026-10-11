@@ -1,7 +1,7 @@
 """The client: an object with the stub's method names that, on each call, finds what it reaches and chooses the
 transport for it, the servicer called directly for a store found, the network (kb.network) for the connection to a
-server; and, beside it, the operator's commands that are not rpcs, each a function over the store it finds, never
-through a server."""
+server; `Export` answers with a stream over either; and, beside it, the operator's commands that
+are not rpcs, each a function over the store it finds, never through a server."""
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -11,7 +11,7 @@ from typing import Callable
 from kb import network, refusals, responses, store
 from kb.backups import BackedUp
 from kb.export import Exported
-from kb.importing import Checked
+from kb.examining import Checked
 from kb.contract import kb_pb2
 from kb.operating import Importing, Operator
 from kb.servicer import KbServicer
@@ -61,7 +61,7 @@ class Client:
         if refusal is not None:
             return responses.refused(response, [refusal])
         if found.address is not None:
-            if self._clock is not None and getattr(KbServicer, rpc).writes:
+            if self._clock is not None and getattr(KbServicer, rpc).writes(request):
                 return responses.refused(response, [refusals.clock_with_a_server()])
             return network.called(found.address, rpc, request, response)
         return getattr(KbServicer(found.root, self._clock), rpc)(request, None)
@@ -90,6 +90,9 @@ class Client:
     def List(self, request, timeout=None):
         return self._call("List", request, kb_pb2.ListResponse)
 
+    def Placeholders(self, request, timeout=None):
+        return self._call("Placeholders", request, kb_pb2.PlaceholdersResponse)
+
     def Snapshot(self, request, timeout=None):
         return self._call("Snapshot", request, kb_pb2.SnapshotResponse)
 
@@ -110,6 +113,19 @@ class Client:
 
     def BatchRemove(self, request, timeout=None):
         return self._call("BatchRemove", request, kb_pb2.BatchRemoveResponse)
+
+    def Export(self, request, timeout=None):
+        """The export's stream from what this call finds, read as it is iterated and let go when it ends or is
+        closed: a store's in this process, a server's over the network; or a stream of one message, the refusal that
+        says nothing was found. A caller that will not read to the end closes the stream: until then the read moment
+        (and, through a server, one of its workers) is held. A close while another thread is inside a read raises
+        `ValueError` and lets nothing go."""
+        found, refusal = _found(self._root)
+        if refusal is not None:
+            return iter([responses.refused(kb_pb2.ExportResponse, [refusal])])
+        if found.address is not None:
+            return network.streamed(found.address, "Export", request, kb_pb2.ExportResponse)
+        return KbServicer(found.root, self._clock).Export(request, None)
 
 
 def connect(root=None, *, clock: Callable[[], datetime] | None = None) -> Client:

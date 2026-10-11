@@ -6,6 +6,9 @@ held with a draft of the store as it stood. The other change then runs to its en
 client lands second. In one program the held client runs on a thread; in two, it is `client_program.py`, run with the
 suite's interpreter, whose clock waits on files in a directory of the test's own.
 
+A change that must land between another's stamping and its landing, which no clock can hold, is run as that other is
+handed to the store (`handed_after`): the port the set is landed through runs it first, the once.
+
 Nothing here sleeps in the hope that the other side has moved on: each side waits for the other's signal.
 """
 import os
@@ -18,6 +21,7 @@ from pathlib import Path
 
 from calls import answer
 from kb import client as kb_client
+from kb import store, values, write
 from kb.contract import kb_pb2
 
 PROGRAM = Path(__file__).with_name("client_program.py")
@@ -32,9 +36,12 @@ class OnAThread:
         self._client = kb_client.connect(root, clock=self._clock)
         self._rpc, self._request = rpc, request
         self._response = None
+        self.drafts = 0
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def _clock(self) -> datetime:
+        """kb reads the clock once after each draft of a change, so its readings count the drafts."""
+        self.drafts += 1
         self._waiting.set()
         if not self._go.wait(PATIENCE):
             raise TimeoutError("the held change was never let go")
@@ -91,3 +98,31 @@ def landed_second(held, first):
     held.hold()
     first()
     return answer(held.release())
+
+
+class _RunsFirst:
+    """The store's port, but that the first set handed to it lands only after `first` has run to its end."""
+
+    def __init__(self, held, first):
+        self._held, self._first = held, first
+
+    def __getattr__(self, name):
+        return getattr(self._held, name)
+
+    def land(self, changes, entries):
+        first, self._first = self._first, None
+        if first is not None:
+            first()
+        self._held.land(changes, entries)
+
+
+def handed_after(root, change, first) -> list:
+    """A change (kb.changes' reading of its request) drafted and stamped, `first` run to its end just as the set is
+    handed to the store, then the set landed. Returns the faults it was refused with, each `(artifact, place,
+    rule)`; none when it landed."""
+    with store.opened(root) as held:
+        try:
+            write.land(_RunsFirst(held, first), *change)
+        except values.Refused as refused:
+            return [(fault.artifact, fault.place, fault.rule) for fault in refused.faults]
+    return []

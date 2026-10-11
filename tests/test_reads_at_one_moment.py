@@ -7,7 +7,7 @@ to land before the reader reads on: the window a read made one statement at a ti
 import threading
 import time
 
-from calls import TAG_TYPE, define, read, remove, request, snapshot, start_a_store
+from calls import TAG_TYPE, define, iri, read, remove, request, snapshot, start_a_store
 from kb import client as kb_client
 from kb import sqlite_reads
 
@@ -37,7 +37,7 @@ def test_a_read_and_a_snapshot_beside_a_create_and_remove_loop_are_never_a_store
         own = kb_client.connect(root)
         while not done.is_set():
             failed.extend(request(own, "tag", "T", {}).faults)
-            failed.extend(remove(own, "tag/t").faults)
+            failed.extend(remove(own, iri("tag", "t")).faults)
 
     _lingering(monkeypatch, threading.current_thread())
     writer = threading.Thread(target=churn, daemon=True)
@@ -45,8 +45,8 @@ def test_a_read_and_a_snapshot_beside_a_create_and_remove_loop_are_never_a_store
     try:
         reader = kb_client.connect(root)
         for _ in range(ROUNDS):
-            faults.extend(fault for fault in read(reader, "tag/t", whole=True).faults if fault.rule != "not-found")
-            faults.extend(fault for fault in snapshot(reader, "x", ["tag/t"]).faults if fault.rule != "not-found")
+            faults.extend(fault for fault in read(reader, iri("tag", "t"), whole=True).faults if fault.rule != "not-found")
+            faults.extend(fault for fault in snapshot(reader, "x", [iri("tag", "t")]).faults if fault.rule != "not-found")
     finally:
         done.set()
         writer.join(30)

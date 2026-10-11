@@ -2,21 +2,30 @@
 Feature: Export and import a store
   Narrator: the operator
 
-  @slice-110
+  @slice-165.3
   Scenario Outline: The operator exports the store to a directory that is empty or does not exist
-    Pins what an export is: one readable file per artifact, kept by kind with types in their own place, saying who the artifact is before what it holds, all taken from a single moment of the store.
-    Given a store holding a type for decisions, a type for work items, two decisions and a work item
+    Pins what an export is: one readable file per artifact placed by its IRI, a type written only as its versions, each version as it stood, saying who the artifact is before what it holds, all taken from a single moment of the store.
+    Given a store holding a type for decisions at two versions, a type for work items at one version, two decisions and a work item
     And a directory for the export that <state>
     When the operator exports the store to that directory
-    Then the directory holds one file for each artifact in the store, under a folder named for its kind
-    And the types' files are under the folder for types
-    And each file gives the artifact's identity first, its name, kind, type version, revision and title, and then its content
+    Then the directory holds one file for each decision and for the work item, at a place that follows the path of its IRI
+    And for each type the directory holds one file for each version the store holds and no other, at the type's place followed by @ and the version's number
+    And each version's file gives that version's own revision and title
+    And each file gives the artifact's identity first, its IRI, the IRI of the version of its type it conforms to, its revision and its title, and then its content
     And every file shows the store as it stood at one moment
 
     Examples:
-      | state           |
-      | is empty        |
-      | does not exist  |
+      | state          |
+      | is empty       |
+      | does not exist |
+
+  @slice-165.3
+  Scenario: An artifact that conforms to an earlier version of its type is exported in the order that version declares
+    Pins that an export shows each artifact as the version it conforms to declares it, so its file does not change shape when its type moves on.
+    Given a store holding a note type whose first version declares a summary then a body and whose second declares the body then the summary
+    And a note that conforms to the first version, with a summary and a body
+    When the operator exports the store to a directory that is empty
+    Then the note's file gives its summary before its body
 
   @slice-110
   Scenario: The operator opens an exported artifact's file
@@ -71,7 +80,7 @@ Feature: Export and import a store
     Then the import is rejected because files for import are read from a directory
     And nothing is written
 
-  @slice-111
+  @slice-183
   Scenario Outline: The operator checks a directory for import and each error is reported by file and reason
     Pins that the check reads every file rather than stopping at the first fault, and that each fault names the file it is in and the reason it is one.
     Given a store
@@ -80,27 +89,54 @@ Feature: Export and import a store
     Then each of the two files is reported as an error, naming the file, with the reason that <reason>
 
     Examples:
-      | fault                                                               | reason                                                                |
-      | cannot be read as YAML 1.2                                          | it cannot be read as YAML 1.2                                         |
-      | is not in canonical form                                            | it is not in canonical form                                           |
-      | claims a kind neither the directory nor the store holds a type for  | it claims a kind neither the directory nor the store holds a type for |
-      | has content that does not fit its type                              | its content does not fit its type                                     |
-      | carries a link that lands on nothing in the directory or the store  | it carries a link that lands on nothing in the directory or the store |
+      | fault                                                                            | reason                                                                              |
+      | cannot be read as YAML 1.2                                                       | it cannot be read as YAML 1.2                                                       |
+      | is not in canonical form                                                         | it is not in canonical form                                                         |
+      | claims a type neither the directory nor the store holds                          | it claims a type neither the directory nor the store holds                          |
+      | conforms to a version of its type neither the directory nor the store holds      | it conforms to a version of its type neither the directory nor the store holds      |
+      | has content that does not fit its type                                           | its content does not fit its type                                                   |
+      | carries a link to an IRI under a type neither the directory nor the store holds  | it carries a link to an IRI under a type neither the directory nor the store holds  |
 
-  @slice-111
-  Scenario Outline: The operator checks a directory for import that holds a file with an error, and files link to it
-    Pins that a broken file's reach is shown: every file that leads to it by links, however indirectly, an artifact's link to its own type counting as one, is named as one that would be skipped, with the way it leads there.
-    Given a store
-    And a directory for import holding <broken>, and <linking>
+  @slice-182
+  Scenario Outline: The operator checks a directory for import holding an artifact the store holds at the same IRI with other content or another type version
+    Pins that the check finds, before anything lands, every file that would bring a different artifact under an IRI the store already holds.
+    Given a store holding a type for decisions at version 2 and two decisions written against version 2
+    And a directory for import holding both decisions at the same IRIs, each <difference>
     When the operator checks the directory for import
-    Then <skipped> reported as a file that would be skipped, each with the chain of links that leads from it to the broken file
+    Then each of the two decisions is reported as an error, naming its IRI
 
     Examples:
-      | broken                                                                         | linking                                                                                   | skipped                                |
-      | a file with an error                                                           | a file that links to the broken file directly                                             | the file that links to it is           |
-      | a file with an error                                                           | a file that links to a second file, which links to the broken file                        | the second file and the first file are |
-      | a type for decisions whose content does not fit the type that describes types  | a decision, whose link to its own type leads to the broken file                           | the decision is                        |
-      | a type for decisions whose content does not fit the type that describes types  | a work item that links to a decision, whose link to its own type leads to the broken file | the decision and the work item are     |
+      | difference                                                                 |
+      | with other content, written against version 2 of the type for decisions    |
+      | with the same content, written against version 1 of the type for decisions |
+
+  @slice-182.1
+  Scenario Outline: The operator checks a directory for import holding a file whose IRI does not sit under its type
+    Pins that an import holds a file to the place its type gives it, as a create is held: a file filed under another type's IRI is an error of the check.
+    Given a store holding a type for decisions and a type for work items
+    And a directory for import holding a work item whose IRI <sits>
+    When the operator checks the directory for import
+    Then that file is reported as an error, naming the file
+
+    Examples:
+      | sits                                                    |
+      | sits under the type for decisions                       |
+      | sits under no type the directory or the store holds     |
+
+  @slice-184
+  Scenario Outline: The operator checks a directory for import that holds a type version's file with an error
+    Pins a broken type version's reach: the type versions built on it, however indirectly, the artifacts written against it or against any of them, and the artifacts whose link would wait under a type no version of which would land, are named as ones that would be skipped, with the way each leads there.
+    Given a store
+    And a directory for import holding version 2 of a type for decisions, whose content does not fit the type that describes types, and <leading>
+    When the operator checks the directory for import
+    Then <skipped> reported as a file that would be skipped, each with the chain that leads from it to the broken file
+
+    Examples:
+      | leading                                                                                                                                                                                                                                  | skipped                                                                                |
+      | a decision conforming to version 2 of the type for decisions                                                                                                                                                                             | the decision is                                                                        |
+      | a type for work items whose link field allows decisions, and a work item whose link names an IRI under the type for decisions                                                                                                           | the work item is                                                                       |
+      | version 1 of a type for notes, which refers to version 2 of the type for decisions by a kb: reference, and a note conforming to version 1 of the type for notes                                                                          | version 1 of the type for notes and the note are                                       |
+      | version 1 of a type for notes, which refers to version 2 of the type for decisions by a kb: reference, version 1 of a type for tasks, which refers to version 1 of the type for notes by a kb: reference, and a task conforming to version 1 of the type for tasks | version 1 of the type for notes, version 1 of the type for tasks and the task are      |
 
   @slice-111
   Scenario: The operator checks a directory for import that holds no error
@@ -118,24 +154,97 @@ Feature: Export and import a store
     When the operator checks the directory for import
     Then the check reports failure
 
-  @slice-112
-  Scenario: The operator imports a directory that checks clean into a freshly started store, saying which role they are
-    Pins that an import lands whole as one signed change, saying where it came from, and that each artifact arrives as it was rather than as something new.
-    Given a freshly started store
-    And a directory for import that checks clean, holding a type for decisions and a decision at revision 3 written against version 2 of the decision type
+  @slice-181
+  Scenario: The operator imports a directory that checks clean into a store, saying which role they are
+    Pins that an import goes into a store already holding artifacts, lands whole as one signed change saying where it came from, and that each artifact arrives as it was rather than as something new.
+    Given a store holding a type for work items and a work item
+    And a directory for import that checks clean, holding both versions of a type for decisions and a decision at revision 3 written against version 2 of the type for decisions
     When the operator imports the directory, saying which role they are
     Then everything in the directory lands as one set, signed by that role, with a message naming the directory
-    And the decision lands under the same name and title, at revision 3, written against version 2 of the decision type
-    And the type for decisions lands under the same name and title, at the revision and type version the directory gives it
+    And the decision lands at the same IRI and with the same title, at revision 3, written against version 2 of the type for decisions
+    And the type for decisions lands at the same IRI and with the same title, at the revision and type version the directory gives it
 
-  @slice-112
+  @slice-181
   Scenario: The operator imports a directory that checks clean, and the history shows each type landing before its artifacts
-    Pins the order an import lands in and what it leaves in the history: the store's start, then one import entry per artifact, a type always ahead of the artifacts of its kind.
-    Given a freshly started store
-    And a directory for import that checks clean, holding a type for decisions, a type for work items, two decisions and a work item
+    Pins the order an import lands in and what it adds to the history: one import entry per file, each version of a type counted, a type always ahead of the artifacts of its kind.
+    Given a store holding a type for notes and a note
+    And a directory for import that checks clean, holding a type for decisions at two versions, a type for work items at one version, two decisions and a work item
     When the operator imports the directory, saying which role they are
-    Then the store's history holds its starting entry followed by one import entry for each of the five artifacts, and nothing else
-    And in the history each type's import entry comes before the import entries of the artifacts of its kind
+    Then the store's history gains one import entry for each of the six files
+    And in the history every import entry of a type comes before the import entries of the artifacts of its kind
+
+  @slice-165.6
+  Scenario: A store holding an artifact behind its type comes back from its export as it was
+    Pins that an export carries everything a store needs to read its artifacts again: every version of a type travels, and an artifact left at an earlier version is still held to that version after the import.
+    Given a store holding a note type at two versions, the second requiring an owner the first does not, and a note that conforms to the first version, with no owner
+    And that store exported to a directory
+    When the operator imports that directory into a freshly started store, saying which role they are
+    Then the new store holds both versions of the note type as their files give them
+    And the note still conforms to the first version of the note type
+    And the note can be read, listed and replaced there, and checking that store lists it as behind its type, not as a violation
+
+  @slice-181
+  Scenario: The operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version
+    Pins that bringing in again what the store already holds identically is no obstacle: that artifact is left alone and everything else comes in.
+    Given a store holding a type for decisions and a decision
+    And a directory for import that checks clean, holding that decision at the same IRI with the same content and the same type version, and a second decision
+    When the operator imports the directory, saying which role they are
+    Then the decision the store held is passed over, left as the store held it
+    And the second decision lands
+
+  @slice-182
+  Scenario Outline: Importing a directory holding an artifact the store already holds at the same IRI with other content or another type version is refused
+    Pins that an import never replaces what the store holds: any differing artifact stops the whole import, with errors skipped or not, and the operator is told every IRI that differs.
+    Given a store holding a type for decisions at version 2 and two decisions written against version 2
+    And a directory for import holding both decisions at the same IRIs, each <difference>, and a third decision the store does not hold
+    When the operator <imports>, saying which role they are
+    Then the import is rejected, naming the IRI of each of the two decisions
+    And nothing lands, the third decision included
+
+    Examples:
+      | difference                                                                 | imports                                    |
+      | with other content, written against version 2 of the type for decisions    | imports the directory                      |
+      | with the same content, written against version 1 of the type for decisions | imports the directory                      |
+      | with other content, written against version 2 of the type for decisions    | imports the directory with errors skipped  |
+
+  @slice-183
+  Scenario Outline: The operator imports a directory holding a link to an IRI neither the directory nor the store holds, under a type one of them holds that the link field allows
+    Pins that a link to something not yet anywhere does not stop an import: it lands and waits on a placeholder, whether the directory or the store holds the type it names.
+    Given a store holding a type for work items whose link field allows decisions
+    And a type for decisions held by <holder>
+    And a directory for import that checks clean, holding a work item whose link names an IRI under the type for decisions that neither the directory nor the store holds
+    When the operator imports the directory, saying which role they are
+    Then the import lands
+    And the work item's link lands on a placeholder at that IRI
+
+    Examples:
+      | holder        |
+      | the store     |
+      | the directory |
+
+  @slice-183
+  Scenario Outline: The operator imports a directory holding a link into a part that the artifact at its IRI lacks
+    Pins that a link into a part its target lacks does not stop an import: it lands and waits for the part, as the store exported held it, whether the directory or the store holds the target.
+    Given a store holding a type for decisions whose decisions carry options and may link to an option of another
+    And a decision with no option held by <holder>
+    And a directory for import that checks clean, holding a second decision whose link names an option of the first
+    When the operator imports the directory, saying which role they are
+    Then the import lands
+    And the second decision's link waits on a placeholder for that option of the first decision
+
+    Examples:
+      | holder        |
+      | the store     |
+      | the directory |
+
+  @slice-180.2
+  Scenario: The operator imports a file holding an item that carries no name
+    Pins that every item an import lands has a name, as every item a write makes has, and that a name a file gives is kept.
+    Given a store holding a type for decisions whose decisions carry options
+    And a directory for import that checks clean, holding a decision with one option that carries a name and one that carries none
+    When the operator imports the directory, saying which role they are
+    Then the option that carried a name lands with that name
+    And the option that carried none lands with a name the store gives it
 
   @slice-112
   Scenario: Importing a directory that holds an error is refused
@@ -147,29 +256,24 @@ Feature: Export and import a store
     And the operator is shown the check's report
     And nothing is written
 
-  @slice-112
+  @slice-184
   Scenario Outline: The operator imports with errors skipped
-    Pins that skipping errors leaves out exactly the broken files and everything that leads to them, a broken type taking the artifacts of its kind with it, lands the rest, and says what was left out and why.
+    Pins that skipping errors leaves out exactly the broken files, the type versions built on a broken type version, the artifacts written against any of them and the artifacts whose link would wait under a type no version of which lands, lands everything else, lets a link to what was left out wait on a placeholder, and says what was left out and why.
     Given a freshly started store
-    And a directory for import holding a type for work items and a work item that leads to no broken file, together with <broken>
+    And a directory for import holding a type for work items whose link field allows decisions, and a work item, together with <broken>
     When the operator imports the directory with errors skipped, saying which role they are
     Then the type for work items and the work item land
     And <left out> do not land
+    And <rest>
     And the operator is told what was skipped and why
 
     Examples:
-      | broken                                                                                                             | left out                                                     |
-      | a type for decisions, a decision with an error and a decision that links to it                                     | the decision with an error and the decision that links to it |
-      | a type for decisions, a decision with an error, a decision that links to it, and a decision that links to that one | the three decisions                                          |
-      | a type for decisions whose content does not fit the type that describes types, and a decision                      | the type for decisions and the decision                      |
-
-  @slice-112
-  Scenario: Importing into a store that holds an artifact besides the type that describes types is refused
-    Pins that import never merges: it only fills a store that holds nothing yet.
-    Given a store that has been given a type for decisions since it was started
-    And a directory for import that checks clean
-    When the operator imports the directory, saying which role they are
-    Then the import is rejected because import goes only into a freshly started store
+      | broken                                                                                                                                                                                                                                                                                  | left out                                                    | rest                                                                                                  |
+      | a type for decisions, a decision with an error, and a second decision that links to it                                                                                                                                                                                                  | the decision with an error                                  | the second decision lands, its link landing on a placeholder at the IRI of the decision with an error |
+      | version 1 of a type for decisions, version 2 of it whose content does not fit the type that describes types, and a decision conforming to version 2 that the work item links to                                                                                                        | version 2 of the type for decisions and the decision        | the work item's link to the decision lands on a placeholder at the decision's IRI                     |
+      | version 1 of a type for decisions whose content does not fit the type that describes types, and a second work item whose link names an IRI under the type for decisions                                                                                                                | the type version and the second work item                   | every other file in the directory lands                                                               |
+      | version 1 of a type for decisions whose content does not fit the type that describes types, version 1 of a type for notes, which refers to it by a kb: reference, and a note conforming to version 1 of the type for notes                                                             | the two type versions and the note                          | every other file in the directory lands                                                               |
+      | version 1 of a type for decisions whose content does not fit the type that describes types, version 1 of a type for notes, which refers to it by a kb: reference, version 1 of a type for tasks, which refers to that one by a kb: reference, and a task conforming to version 1 of the type for tasks | the three type versions and the task                        | every other file in the directory lands                                                               |
 
   @slice-112
   Scenario: The operator imports the kb directory of an existing store
@@ -179,6 +283,16 @@ Feature: Export and import a store
     When the operator imports that kb directory, saying which role they are
     Then its types and artifacts land as they would from an export
     And its history and its store marker are passed over, neither landing in the store
+
+  @slice-181.1
+  Scenario: Importing into a store a server serves is refused
+    Pins that an import is a change like any other to a served store: asked of the store's files directly, it is refused and the operator is told where the server is.
+    Given a store holding a type for decisions and a decision
+    And a server serves that store
+    And a directory for import that checks clean, holding a second decision
+    When the operator imports the directory, saying which role they are
+    Then the import is rejected because the store is served, naming the server's address
+    And nothing is written
 
   @slice-112
   Scenario: Importing when nothing names the operator's role is refused

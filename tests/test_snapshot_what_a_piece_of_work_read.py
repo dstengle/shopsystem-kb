@@ -2,14 +2,14 @@ import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, PROCESS_TYPE, create, define, journal, snapshot, replace, start_a_store
+from calls import DECISION_TYPE, PROCESS_TYPE, create, define, iri, journal, replace, snapshot, start_a_store
 import held
 from kb import client as kb_client
 
 scenarios("snapshot-what-work-read.feature")
 
-DECISION = "decision/price-reviews-happen-weekly"
-PROCESS = "process/open-the-shop"
+DECISION = iri("decision", "price-reviews-happen-weekly")
+PROCESS = iri("process", "open-the-shop")
 EXECUTION = "restock-run-12"
 
 
@@ -59,7 +59,7 @@ BLANK = " \t "
 WRONGLY = {
     "the decision and the process without naming the piece of work": ("", [DECISION, PROCESS], "agent", SAID),
     "the decision and an artifact the store holds nothing under": (
-        EXECUTION, [DECISION, "decision/never-made"], "agent", SAID),
+        EXECUTION, [DECISION, iri("decision", "never-made")], "agent", SAID),
     "the decision and the process without saying which role it is": (EXECUTION, [DECISION, PROCESS], "", SAID),
     "the decision and the process without saying why": (EXECUTION, [DECISION, PROCESS], "agent", ""),
     "the decision and the process giving a role that is only blank space": (EXECUTION, [DECISION, PROCESS], BLANK, SAID),
@@ -78,7 +78,7 @@ def _snapshot_wrongly(client, request):
 REASONS = {
     "a snapshot records what a named piece of work read": [("", "", "actor")],
     "the store holds nothing by that name, and the name asked for is given back": [
-        ("decision/never-made", "", "not-found"),
+        (iri("decision", "never-made"), "", "not-found"),
     ],
     "every entry in the history names the role that made it": [("", "", "actor")],
     "every entry in the history says why it was made": [("", "", "message")],

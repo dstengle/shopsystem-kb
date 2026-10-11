@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 from typing import Callable, Iterator
 
-from kb import backups, importing, operating, starting, store
+from kb import backups, examining, operating, starting, store
 from kb.values import Refused
 
 
@@ -51,7 +51,7 @@ def serving(root, role: str | None) -> Iterator[Callable[[], None]]:
             _taken_back(root)
 
 
-def seeded(root, role: str, seed: str) -> importing.Checked:
+def seeded(root, role: str, seed: str) -> examining.Checked:
     """A store started inside root under the role, holding the seed directory's files as the operator's import lands
     them into a freshly started store, or none: the import's answer, its report and the faults that refused it. Raises
     NotStarted, leaving root as it found it, when no store can be started there."""

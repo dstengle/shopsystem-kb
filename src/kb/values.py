@@ -1,15 +1,11 @@
 """The boundary: every value a request carries is turned here into a checked value, or refused with a fault.
-
-Storage takes only these values, never a string that came from a request.
-"""
-import os
+Storage takes only these values, never a string that came from a request."""
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 
-from kb import canonical, names, rules, settled
-from kb.content import loads
+from kb import names, rules
 from kb.contract import kb_pb2
+
 
 class Refused(ValueError):
     """A request value that does not convert. Carries every fault found."""
@@ -21,24 +17,41 @@ class Refused(ValueError):
 
 @dataclass(frozen=True)
 class Kind:
+    """A kind, named by its type's IRI."""
     name: str
 
 
 @dataclass(frozen=True)
 class ArtifactId:
-    kind: Kind
-    slug: str
+    """An artifact, named by its IRI."""
+    iri: str
 
     def __str__(self) -> str:
-        return names.written(self.kind.name, self.slug)
+        return self.iri
+
+
+@dataclass(frozen=True)
+class Version:
+    """A version of a type: the kind it is of, and its number."""
+    kind: Kind
+    number: int
+
+    def __str__(self) -> str:
+        return names.versioned(self.kind.name, self.number)
+
+
+@dataclass(frozen=True)
+class Below:
+    """A path below a type: the segments an artifact's IRI holds after its type's, or the first of them."""
+    segments: tuple[str, ...]
 
 
 TYPE_KIND = Kind(names.TYPES)
 
 
 def type_of(kind: Kind) -> ArtifactId:
-    """The name of the type the artifacts of a kind are of."""
-    return ArtifactId(TYPE_KIND, kind.name)
+    """The type the artifacts of a kind are of, held at the kind's IRI."""
+    return ArtifactId(kind.name)
 
 
 @dataclass(frozen=True)
@@ -48,24 +61,70 @@ class Locator:
 
 
 def kind(text: str) -> Kind:
-    if not names.plain(text):
+    """A kind as a request names it: its type's IRI, of kb's grammar."""
+    if not names.iri(text):
         raise Refused([kb_pb2.Fault(
-            rule=rules.KIND,
-            message=f"a kind is a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not",
+            rule=rules.LOCATOR, message=f"a kind is named by its type's IRI, an IRI of kb's grammar; {text!r} is not",
         )])
     return Kind(text)
 
 
+def below(text: str) -> Below:
+    """A path below a type as a request names it: segments of kb's grammar joined by single slashes."""
+    segments = names.path(text)
+    if segments is None:
+        raise Refused([kb_pb2.Fault(rule=rules.LOCATOR, message=(
+            f"a path below a type is plain segments joined by single slashes, as pricing or pricing/discounts; {text!r} is not"
+        ))])
+    return Below(segments)
+
+
 def artifact_id(text: str) -> ArtifactId:
-    kind_name, slug = names.parted(text)
-    if not (names.plain(kind_name) and names.plain(slug)):
-        raise Refused([_not_a_plain_name(text)])
-    return ArtifactId(Kind(kind_name), slug)
+    """An artifact's IRI as a request names it, of kb's grammar, which holds neither a version nor a place."""
+    if not names.iri(text):
+        raise Refused([kb_pb2.Fault(artifact=text, rule=rules.LOCATOR, message=(
+            f"a name is an IRI, never a path: a name is an IRI of kb's grammar, https://, a host and plain segments; {text!r} is not"
+        ))])
+    return ArtifactId(text)
+
+
+def version(text: str) -> Version:
+    """A type version's IRI as a request names it: a type's IRI, `@` and the version's number."""
+    found = names.version(text)
+    if found is None:
+        raise Refused([kb_pb2.Fault(artifact=text, rule=rules.LOCATOR,
+            message=f'a version of a type is named by the type\'s IRI, "@" and its number; {text!r} is not')])
+    return Version(Kind(found[0]), found[1])
+
+
+def named(text: str) -> Version | None:
+    """The version of its type a change names; None when it names none, as an empty name says."""
+    return version(text) if text else None
+
+
+def read(request: kb_pb2.Locator) -> tuple[Locator, Version | None]:
+    """What a read names: an artifact and a place in it, or, when its name is a type version's IRI, the type's
+    locator and that version."""
+    found = names.version(request.id)
+    if found is None:
+        return locator(request), None
+    return _located(found[0], request.place), Version(Kind(found[0]), found[1])
 
 
 def locator(request: kb_pb2.Locator) -> Locator:
-    """A locator's name and its place, each checked; both faults when both fail."""
-    return _located(request.id, request.place)
+    """A locator's name and its place, each checked; both faults when both fail. Its name may be a part's IRI, the
+    artifact's with the place after it as a link writes one, which names what the artifact's IRI with that place
+    beside it names; a locator giving a place both ways is refused, whether or not the two agree. A name that reads
+    as neither an artifact's IRI nor a part's is refused whole, as a name."""
+    name, part = names.linked(request.id)
+    if not (part and names.iri(name) and all(names.plain(step) for step in names.steps(part))):
+        return _located(request.id, request.place)
+    if request.place:
+        raise Refused([kb_pb2.Fault(artifact=request.id, place=request.place, rule=rules.LOCATOR, message=(
+            "a part is named by its artifact's IRI, # and its place, or by the IRI with the place beside it, never "
+            f"both; {request.id!r} was given with the place {request.place!r}"
+        ))])
+    return _located(name, part)
 
 
 def target(text: str) -> Locator:
@@ -107,141 +166,14 @@ def in_utc(moment: datetime) -> datetime:
     return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
 
 
-def named(kind: Kind, title: str) -> tuple[ArtifactId | None, str, tuple]:
-    """The name kb gives an artifact of this kind from its title, and the name its faults are said of; None, with the
-    title's faults, when it gives none. A title is required and must leave a name."""
-    slug = names.slug(title)
-    at = names.written(kind.name, slug)
-    if not title:
-        message = "an artifact cannot be created without a title"
-    elif not slug:
-        message = _leaves_nothing(title)
-    else:
-        return ArtifactId(kind, slug), at, ()
-    return None, at, (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE, message=message),)
-
-
-def key(text: str) -> str:
-    """The key a create in a set carries, a plain name; none when it carries none."""
-    if text and not names.plain(text):
-        raise Refused([kb_pb2.Fault(
-            rule=rules.REF,
-            message=f"a key is a plain name of lower-case letters, digits and single hyphens; {text!r} is not",
-        )])
-    return text
+def titled(title: str, at: str) -> tuple:
+    """The faults of an artifact's title, said of the IRI given: a title is required."""
+    if title:
+        return ()
+    return (kb_pb2.Fault(artifact=at, place="title", rule=rules.TITLE,
+                         message="an artifact cannot be created without a title"),)
 
 
 def expected(revision: int) -> int | None:
     """The revision a change says the client read its artifact at; None when it says none, as 0 says."""
     return revision or None
-
-
-def _leaves_nothing(title: str) -> str:
-    return f"a title must leave something to make a name from; {title!r} leaves nothing"
-
-
-@dataclass(frozen=True)
-class Content:
-    """Content as a request carries it: the tree read from it, and, when it cannot be taken, what is wrong with it,
-    each as a place, a rule and a message, to be said of whichever artifact the content turns out to be for."""
-    tree: object
-    problems: tuple[tuple[str, str, str], ...] = ()
-
-    def refusal(self, artifact: str) -> list[kb_pb2.Fault]:
-        return [kb_pb2.Fault(artifact=artifact, place=path, rule=rule, message=message)
-                for path, rule, message in self.problems]
-
-
-def content(text: str, at_root: bool = True) -> Content:
-    """Content read plainly, and, for a whole artifact, holding only what a type declares. The identity keys belong
-    to an artifact's root, so a node inside it, a section with its title, is not held to them. Every problem found."""
-    try:
-        tree = canonical.entries(text) if at_root else loads(text)
-    except canonical.NotCanonical as fault:
-        return Content(None, ((fault.path, rules.CONTENT, str(fault)),))
-    if not at_root:
-        return Content(tree)
-    problems = []
-    for key in settled.IDENTITY:
-        if key not in tree:
-            continue
-        if key == "title":
-            message = f"a title is given alongside the content, never inside it; the content carried the title {tree[key]!r}"
-        else:
-            message = f"content holds only what the type declares; {key} is settled by the store, and the content carried {key}: {tree[key]!r}"
-        problems.append((key, rules.IDENTITY, message))
-    return Content(tree, tuple(problems))
-
-
-def item(text: str) -> Content:
-    """An item read plainly, never carrying its own name, which kb gives, and with its title, which its name is made
-    from, as text. Only a set of named entries can carry a name or a title; an item of any other shape is left for
-    its type to refuse."""
-    read = content(text, at_root=False)
-    if read.problems or not isinstance(read.tree, dict):
-        return read
-    if "id" in read.tree:
-        return Content(read.tree, (("id", rules.IDENTITY,
-            f"content holds only what the type declares; an item's id is settled by the store, and the content carried id: {read.tree['id']!r}"),))
-    return _titled(read.tree)
-
-
-def _titled(tree: dict) -> Content:
-    """An item whose title, when it has one, is text whatever it was written as, as an artifact's is, and leaves a
-    name to be made from it."""
-    title = names.title(tree.get("title"))
-    if title is None:
-        return Content(tree)
-    if not names.slug(title):
-        return Content(tree, (("title", rules.TITLE, _leaves_nothing(title)),))
-    return Content({**tree, "title": title})
-
-
-@dataclass(frozen=True)
-class Root:
-    """The directory a store is started in, and the name the request gave it, which a refusal quotes."""
-    path: Path
-    named: str
-
-
-def root(named: "str | os.PathLike") -> Root:
-    """The directory a store is started in, as it is named, as text or as a path; relative names stay relative.
-    What stands there is the store's to check. Anything else, and no name, is refused."""
-    text = os.fspath(named) if isinstance(named, os.PathLike) else named
-    if not isinstance(text, str):
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT,
-            message=f"a store is started in a directory named as text or as a path; it was named {named!r}",
-        )])
-    if not text:
-        raise Refused([kb_pb2.Fault(
-            rule=rules.ROOT,
-            message="a store is started in a directory that was named and that exists; no directory was named",
-        )])
-    return Root(Path(text), text)
-
-
-@dataclass(frozen=True)
-class Named:
-    """A directory or a file the operator names for the store's files, and the name given, which a refusal quotes."""
-    path: Path
-    named: str
-
-
-def directory(text: str) -> Named:
-    """The directory the operator names, as named; relative names stay relative. What stands there is the export's
-    to check."""
-    return Named(Path(text), text)
-
-
-def file(text: str) -> Named:
-    """The file the operator names for a backup, as named; relative names stay relative. What stands there is the
-    backup's to check."""
-    return Named(Path(text), text)
-
-
-def _not_a_plain_name(text: str) -> kb_pb2.Fault:
-    return kb_pb2.Fault(
-        artifact=text, rule=rules.LOCATOR,
-        message=f"a name is a kind and a plain name of lower-case letters, digits and single hyphens, never a path; {text!r} is not",
-    )

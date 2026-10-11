@@ -1,18 +1,21 @@
 """Every change in a set is checked, not only the last a set makes to an artifact: its content against its type as the
-set leaves it, a type's version moved on from the version it acted on; and a change acting on what an earlier one left
-unfit is refused with a typed fault; a key two creates carry refused beside every other fault of the set. Through
-the contract, and, for a set of more than one kind of change, which the contract does not take, through kb.write's
-own `land`; each store under its own tmp_path."""
+set leaves it, a type given its next version by each change to it; and a change acting on what an earlier one left
+unfit is refused with a typed fault; an IRI two creates carry refused beside every other fault of the set, and a
+create that links to its own IRI landing. Through the contract, and, for a set of more than one kind of change, which
+the contract does not take, through kb.write's own `land`; each store under its own tmp_path."""
 import copy
 
 import pytest
 
-from calls import DECISION_TYPE, create, create_many, created, define, read, replace_many, replaced, start_a_store
-from kb import changes, client as kb_client, signatures, store, values, write
-from kb.content import dumps
+from calls import (
+    DECISION_TYPE, check, create, create_many, created, define, iri, kb_ref, read, replace_many, replaced,
+    start_a_store, type_iri,
+)
+from kb import changes, client as kb_client, content_values, signatures, store, values, write
+from kb.content import dumps, loads
 from kb.signatures import Signed
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -72,8 +75,8 @@ def test_adding_to_a_collection_an_earlier_change_wrote_as_a_single_value_is_ref
     _with_the_decision(client)
     decision = values.artifact_id(DECISION)
     faults = _landed(root, [
-        changes.Replace(values.Locator(decision, ()), values.content(dumps({"sections": SECTIONS, "options": written}))),
-        changes.Add(values.Locator(decision, ("options",)), values.item(dumps({"title": "Go monthly"}))),
+        changes.Replace(values.Locator(decision, ()), content_values.content(dumps({"sections": SECTIONS, "options": written}))),
+        changes.Add(values.Locator(decision, ("options",)), content_values.item(dumps({"title": "Go monthly"}))),
     ])
     assert faults == [(DECISION, "options", "type"), (DECISION, "options", "collection")]
 
@@ -87,20 +90,26 @@ def test_changing_what_an_earlier_change_wrote_as_a_single_value_comes_back_type
     assert _faults(response) == [(DECISION, "options", "type"), (DECISION, "options", "type")]
 
 
-def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(client):
+def test_a_type_changed_twice_in_a_set_moves_its_version_on_each_time(root, client):
     first, second = copy.deepcopy(DECISION_TYPE), copy.deepcopy(DECISION_TYPE)
     first["version"] = second["version"] = 2
     first["schema"]["properties"]["owner"] = {"type": "string"}
     second["schema"]["properties"]["outcome"] = {"type": "string"}
     content = [{key: value for key, value in each.items() if key != "title"} for each in (first, second)]
-    response = replace_many(client, [replaced("schema/decision", each) for each in content])
-    assert _faults(response) == [("schema/decision", "version", "version")]
-    assert read(client, "schema/decision").revision == 1
+    response = replace_many(client, [replaced(type_iri("decision"), each) for each in content])
+    assert not response.refused, response.faults
+    stands = read(client, type_iri("decision"), whole=True)
+    assert (stands.revision, loads(stands.content)) == (3, {"version": 3, "schema": second["schema"]})
+    schemas = [DECISION_TYPE["schema"], first["schema"], second["schema"]]
+    with store.opened(root) as held:
+        for number, schema in enumerate(schemas, start=1):
+            version = held.type_version(values.Version(values.Kind(type_iri("decision")), number))
+            assert (version.revision, version.content["version"], version.content["schema"]) == (number, number, schema)
 
 
 @pytest.mark.parametrize("earlier, faults", [
-    ({"version": "two"}, [("schema/decision", "version", "type")]),
-    ({"schema": None}, [("schema/decision", "", "required"), ("schema/decision", "version", "version")]),
+    ({"version": "two"}, [(type_iri("decision"), "version", "type")]),
+    ({"schema": None}, [(type_iri("decision"), "", "required")]),
 ])
 def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(client, earlier, faults):
     content = {key: value for key, value in DECISION_TYPE.items() if key != "title"}
@@ -108,24 +117,153 @@ def test_a_type_changed_after_an_earlier_change_left_it_unfit_comes_back_typed(c
     changed["version"] = 2
     changed["schema"]["properties"]["owner"] = {"type": "string"}
     first = {key: value for key, value in {**content, **earlier}.items() if value is not None}
-    response = replace_many(client, [replaced("schema/decision", first), replaced("schema/decision", changed)])
+    response = replace_many(client, [replaced(type_iri("decision"), first), replaced(type_iri("decision"), changed)])
     assert _faults(response) == faults
-    assert read(client, "schema/decision").revision == 1
+    assert read(client, type_iri("decision")).revision == 1
 
 
-def test_a_key_carried_twice_is_refused_beside_every_other_fault_of_the_set(client):
-    refused = create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
-        created("decision", "Price reviews happen daily", {"sections": SECTIONS[:1]}, key="pricing"),
+def _a_decision_type(version, change):
+    """The type for decisions as a replacement writes it, at the version given, its schema changed as said."""
+    content = {"version": version, "schema": copy.deepcopy(DECISION_TYPE["schema"])}
+    change(content["schema"])
+    return content
+
+
+def _a_shape_not_held(schema):
+    schema["properties"]["binding"] = {"$ref": kb_ref("nothing", 1, "/$defs/binding")}
+
+
+def _built_on_itself(schema):
+    schema["allOf"] = [{"$ref": kb_ref("decision")}]
+
+
+def _a_link_field_without_targets(schema):
+    del schema["properties"]["supersedes"]["ref"]["targets"]
+
+
+def _an_owner(schema):
+    schema["properties"]["owner"] = {"type": "string"}
+
+
+def _an_outcome(schema):
+    schema["properties"]["outcome"] = {"type": "string"}
+
+
+UNSOUND = [
+    (_a_shape_not_held, "schema/properties/binding/$ref", "shape"),
+    (_built_on_itself, "schema/allOf/0/$ref", "built-on"),
+    (_a_link_field_without_targets, "schema/properties/supersedes", "targets"),
+]
+
+
+@pytest.mark.parametrize("unsound, place, rule", UNSOUND)
+def test_a_type_an_earlier_change_of_a_set_leaves_unsound_is_refused_whatever_a_later_one_leaves(
+    root, client, unsound, place, rule,
+):
+    response = replace_many(client, [
+        replaced(type_iri("decision"), _a_decision_type(2, unsound)),
+        replaced(type_iri("decision"), _a_decision_type(2, _an_owner)),
     ])
-    assert _faults(refused) == [("decision/price-reviews-happen-daily", "sections", "sections"), ("", "", "ref")]
-    assert "'pricing'" in refused.faults[1].message
+    assert _faults(response) == [(type_iri("decision"), place, rule)]
+    assert read(client, type_iri("decision")).revision == 1
+    with store.opened(root) as held:
+        assert held.versions(values.artifact_id(type_iri("decision"))) == [1]
 
 
-def test_a_key_carried_twice_is_refused_when_one_of_its_creates_does_not_convert(client):
-    refused = create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
-        created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing"),
+def test_a_type_a_first_change_leaves_unsound_is_refused_beside_every_other_fault_of_the_set(client):
+    _with_the_decision(client)
+    response = replace_many(client, [
+        replaced(type_iri("decision"), _a_decision_type(2, _a_shape_not_held)),
+        replaced(type_iri("decision"), _a_decision_type(2, _an_outcome)),
+        replaced(DECISION, {"sections": SECTIONS[:1]}),
     ])
-    assert [fault.rule for fault in refused.faults] == ["kind", "ref"]
-    assert "'pricing'" in refused.faults[1].message
+    assert _faults(response) == [
+        (type_iri("decision"), "schema/properties/binding/$ref", "shape"), (DECISION, "sections", "sections"),
+    ]
+    assert read(client, type_iri("decision")).revision == 1
+
+
+WEEKLY, MONTHLY = iri("decision", "weekly-price-reviews"), iri("decision", "monthly-price-reviews")
+
+
+def test_an_iri_carried_twice_is_refused_beside_every_other_fault_of_the_set(client):
+    refused = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Prices are reviewed monthly", {"sections": SECTIONS[:1]}, at=MONTHLY),
+    ])
+    assert _faults(refused) == [(WEEKLY, "", "identity"), (MONTHLY, "sections", "sections")]
+    assert repr(WEEKLY) in refused.faults[0].message
+    assert read(client, WEEKLY).faults
+
+
+def test_an_iri_carried_twice_is_refused_when_another_create_of_the_set_does_not_convert(client):
+    refused = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY),
+        created("Not A Kind", "Prices are reviewed monthly", {"sections": SECTIONS}, at=MONTHLY),
+    ])
+    assert [(fault.artifact, fault.rule) for fault in refused.faults][0] == (WEEKLY, "identity")
+    assert [fault.rule for fault in refused.faults] == ["identity", "locator"]
+    assert repr(WEEKLY) in refused.faults[0].message
+
+
+def test_a_create_in_a_set_that_links_to_its_own_iri_lands_the_link_resolving_within_the_set(client):
+    landed = create_many(client, [
+        created("decision", "Price reviews happen weekly", {"supersedes": WEEKLY, "sections": SECTIONS}, at=WEEKLY),
+    ])
+    assert not landed.refused, landed.faults
+    assert [(result.id, result.revision) for result in landed.results] == [(WEEKLY, 1)]
+    assert loads(read(client, WEEKLY, whole=True).content)["supersedes"] == WEEKLY
+    assert not check(client).violations
+
+
+def _sound(title, at=WEEKLY):
+    return created("decision", title, {"sections": SECTIONS}, at=at)
+
+
+def _carried_twice(refused, at=WEEKLY):
+    """The faults saying the set carries an IRI more than once, each of them naming it and not the store."""
+    found = [fault for fault in refused.faults if fault.rule == "identity"]
+    assert all(fault.artifact == at and repr(at) in fault.message for fault in found)
+    assert all("set" in fault.message and "store" not in fault.message for fault in found)
+    return found
+
+
+def test_two_sound_creates_at_one_iri_are_refused_for_it_once_on_the_second(client):
+    refused = create_many(client, [_sound("Price reviews happen weekly"), _sound("Price reviews happen daily")])
+    assert _faults(refused) == [(WEEKLY, "", "identity")]
+    assert len(_carried_twice(refused)) == 1
+    assert read(client, WEEKLY).faults
+
+
+def test_an_iri_carried_twice_is_refused_when_the_first_create_at_it_is_refused_for_a_fault_of_its_own(client):
+    refused = create_many(client, [_sound(""), _sound("Price reviews happen daily")])
+    assert _faults(refused) == [(WEEKLY, "title", "title"), (WEEKLY, "", "identity")]
+    assert len(_carried_twice(refused)) == 1
+
+
+@pytest.mark.parametrize("wrong, rule", [
+    (created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY), "locator"),
+    (created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY, version=7), "version"),
+])
+def test_an_iri_carried_twice_is_refused_on_a_later_create_that_names_a_wrong_type_version(client, wrong, rule):
+    refused = create_many(client, [_sound("Price reviews happen weekly"), wrong])
+    assert [fault.rule for fault in refused.faults] == ["identity", rule]
+    assert len(_carried_twice(refused)) == 1
+
+
+@pytest.mark.parametrize("wrong, rule", [
+    (created("Not A Kind", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY), "locator"),
+    (created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=WEEKLY, version=7), "version"),
+])
+def test_an_iri_carried_twice_is_refused_after_a_create_that_names_a_wrong_type_version(client, wrong, rule):
+    refused = create_many(client, [wrong, _sound("Price reviews happen weekly")])
+    assert [fault.rule for fault in refused.faults] == [rule, "identity"]
+    assert len(_carried_twice(refused)) == 1
+
+
+def test_an_iri_carried_three_times_is_refused_once_on_each_create_after_the_first(client):
+    refused = create_many(client, [_sound("Weekly"), _sound("Daily"), _sound("Monthly")])
+    assert _faults(refused) == [(WEEKLY, "", "identity"), (WEEKLY, "", "identity")]
+    assert len(_carried_twice(refused)) == 2

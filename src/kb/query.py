@@ -1,27 +1,39 @@
 """Questions asked of the store through the port: the artifacts of a kind, what links reach out of or into an artifact,
-where words occur, what the history holds, and what a piece of work read. Nothing here writes."""
+where words occur, what the history holds, what a piece of work read, and the placeholders, what links point at that
+the store does not hold. Nothing here writes."""
+import itertools
+
 from kb import composition, journal, links, names, places, read, refusals, search, values
 from kb.contract import kb_pb2
 from kb.port import Port
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
-from kb.values import ArtifactId, Locator, Refused
+from kb.values import ArtifactId, Below, Kind, Locator, Refused
 
 
 def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
-    """Every artifact of a kind whose fields hold the values asked for, in path order, as stubs or names. Raises
-    Refused for a kind the store holds no type for."""
-    composition.kind_type(asked.kind, store)
-    matched = store.ids(asked.kind, asked.fields)
+    """Every artifact of a kind whose fields hold the values asked for, in the order of their names, as stubs or
+    names; with a path below the type, only those it selects, and, with no kind, of every kind but the kind of
+    types (`left_out`). Raises Refused for a kind the store holds no type for."""
+    if asked.kind is not None:
+        composition.kind_type(asked.kind, store)
+    matched = store.ids(asked.kind, asked.fields, asked.path, left_out(asked.kind, asked.path))
     if asked.ids:
         return kb_pb2.Listed(ids=[str(artifact_id) for artifact_id in matched])
-    return kb_pb2.Listed(stubs=read.stubs(store, asked.kind, matched))
+    return kb_pb2.Listed(stubs=read.stubs(store, matched))
+
+
+def left_out(kind: Kind | None, path: Below | None) -> tuple[Kind, ...]:
+    """The kinds a selection of artifacts leaves out, handed to the port's `ids`: the kind of types when it selects
+    by a path below the type and names no kind, so that a path alone never gives a type; none otherwise."""
+    return (values.TYPE_KIND,) if kind is None and path is not None else ()
 
 
 def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
-    """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
-    a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via or a
-    kind narrows every step. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
-    out, a place it holds nothing at."""
+    """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step
+    at a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via, a
+    kind or a path below the type narrows every step, never the artifact asked about. An IRI a link points at that
+    the store does not hold is reached as the IRI alone, of no kind, and not walked on from. Raises Refused for a
+    kind the store holds no type for, a name the store lacks, or, going out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
     start = asked.locator.id
@@ -35,14 +47,28 @@ def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
             for field, other_id in step(store, locator):
                 if str(other_id) in seen or (asked.via and field != asked.via):
                     continue
-                if asked.kind is not None and other_id.kind != asked.kind:
+                held = store.holds(other_id)
+                if not _narrowed_to(store, asked, other_id, held):
                     continue
                 seen.add(str(other_id))
                 taken = [*route, kb_pb2.Hop(field=field, id=str(other_id))]
                 reached.append(kb_pb2.Reached(stub=read.stub(store, field, other_id), route=taken))
-                following.append((Locator(other_id, ()), taken))
+                if held:
+                    following.append((Locator(other_id, ()), taken))
         frontier = following
     return kb_pb2.Followed(reached=reached)
+
+
+def _narrowed_to(store: Port, asked: Walk, other_id: ArtifactId, held: bool) -> bool:
+    """Whether what a step reaches is what the walk is narrowed to: of the kind asked for, which nothing not held
+    is, and selected by the path asked for, read below its own type's IRI, or, for an IRI not held, below the
+    nearest held type it sits under, and never selected when it sits under none."""
+    if asked.kind is not None and not (held and composition.kind_of(other_id, store) == asked.kind):
+        return False
+    if asked.path is None:
+        return True
+    type_id = composition.kind_of(other_id, store).name if held else composition.nearest_type(other_id, store)
+    return type_id is not None and names.selects(asked.path.segments, other_id, type_id)
 
 
 def found(store: Port, asked: Searching) -> kb_pb2.Found:
@@ -61,6 +87,24 @@ def found(store: Port, asked: Searching) -> kb_pb2.Found:
             snippet=hit.snippet,
         )
         for hit in hits
+    ])
+
+
+def placeholders(store: Port) -> kb_pb2.Placeholders:
+    """Every placeholder, each IRI a link lands on nothing at (the store does not hold it, or what it holds there
+    lacks the part the link names), once, in the order of their names, with every such link: the artifact holding
+    it, the field, the link's place there and the part of the IRI it names, in the port's order."""
+    return placeholders_of(store.waiting())
+
+
+def placeholders_of(waiting: list) -> kb_pb2.Placeholders:
+    """The placeholders the links that land on nothing make, those links as the port gives them, in its order."""
+    return kb_pb2.Placeholders(placeholders=[
+        kb_pb2.Placeholder(id=target, links=[
+            kb_pb2.Linking(artifact=str(each.source), field=each.field, place=each.place, part=each.part)
+            for each in into
+        ])
+        for target, into in itertools.groupby(waiting, key=lambda each: str(each.target))
     ])
 
 
@@ -91,11 +135,11 @@ def _snapshotted(artifact_id: ArtifactId, artifact: dict) -> dict:
 
 def _outward(store: Port, locator: Locator) -> list[tuple[str, ArtifactId]]:
     """Each link out of an artifact, or out of the place inside it the locator names, as the field and the name it
-    points at."""
+    points at, which for a link into a part of an artifact is that artifact's."""
     artifact = store.artifact(locator.id)
-    schema = composition.kind_schema(locator.id.kind, store)["schema"]
+    schema = composition.artifact_schema(artifact, store)["schema"]
     found = links.inside(artifact, schema, store, places.node(artifact, locator))
-    return [(link.field, values.artifact_id(link.target)) for link in found]
+    return [(link.field, values.target(link.target).id) for link in found]
 
 
 def _inward(store: Port, locator: Locator) -> list[tuple[str, ArtifactId]]:
@@ -110,6 +154,6 @@ def _entry(entry: dict) -> kb_pb2.Entry:
     return kb_pb2.Entry(
         id=entry["id"], at=entry["at"], actor=kb_pb2.Actor(**entry["actor"]), op=entry["op"],
         artifact=entry.get("artifact", ""), place=entry.get("path", ""), revision=entry.get("revision", 0),
-        schema_version=entry.get("schema_version", 0), digest=entry.get("digest", ""), message=entry["message"],
+        type=entry.get("type", ""), digest=entry.get("digest", ""), message=entry["message"],
         batch=entry["batch"], read=[kb_pb2.Snapshotted(**each) for each in entry.get("read", [])],
     )

@@ -1,3 +1,4 @@
+import copy
 import shutil
 import signal
 import socket
@@ -5,7 +6,10 @@ import socket
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from calls import DECISION_TYPE, a_decision_type_and_a_decision, define, start_a_store
+from calls import (
+    DECISION_TYPE, a_decision_type_and_a_decision, check, create, define, filed, iri, replace, start_a_store, targets,
+    type_iri,
+)
 from conftest import OPERATOR, _kb, _store_needing_attention, _store_with_content, exported
 import held
 from backing_up import *  # noqa: F403 (the backup and restore steps, bound by this module's scenarios)
@@ -51,7 +55,7 @@ def _a_store_inside(ran, root):
 @then("a client can begin defining its own types in it straight away")
 def _client_defines_a_type(root):
     defined = define(kb_client.connect(root), DECISION_TYPE)
-    assert (defined.id, defined.revision) == ("schema/decision", 1)
+    assert (defined.id, defined.revision) == (type_iri("decision"), 1)
 
 
 @then("setting the store up is rejected because the role must be named through KB_ACTOR")
@@ -82,9 +86,9 @@ def _init_rejected_as_inside_a_store(ran, root, before):
 
 
 REPORT = (
-    "violation\tdecision/prices-are-reviewed-monthly\tsections/0\trequired\t<the validator's message>\n"
-    "stale\tdecision/price-reviews-happen-weekly\tchecked against version 1 of its type, which is at 2\n"
-    "stale\tdecision/prices-are-reviewed-monthly\tchecked against version 1 of its type, which is at 2\n"
+    f"violation\t{iri('decision', 'prices-are-reviewed-monthly')}\tsections/0\trequired\t<the validator's message>\n"
+    f"stale\t{iri('decision', 'price-reviews-happen-weekly')}\tchecked against version 1 of its type, which is at 2\n"
+    f"stale\t{iri('decision', 'prices-are-reviewed-monthly')}\tchecked against version 1 of its type, which is at 2\n"
 )
 
 
@@ -107,16 +111,126 @@ def _kb_validate(where):
     return _kb("validate", cwd=where["cwd"], env=where["env"])
 
 
-@then("the operator is told of everything in the store that does not fit its type, and where")
-def _told_of_every_violation(ran):
+def _to_a_work_item():
+    return {"type": "string", "ref": {"targets": targets("work-item"), "cardinality": "one", "parts": False,
+                                      "on_delete": "refuse"}}
+
+
+# A decision that a work item may carry out, and each of whose options a work item may try; a work item of a title.
+LINKING_SCHEMA = copy.deepcopy(DECISION_TYPE["schema"])
+LINKING_SCHEMA["properties"]["carried_out_by"] = _to_a_work_item()
+LINKING_SCHEMA["parts"]["options"]["items"]["properties"]["tried_by"] = _to_a_work_item()
+PLAIN_WORK_ITEM_TYPE = {"title": "Work item", "version": 1, "schema": {
+    "type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"],
+}}
+SECTIONS = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs move weekly.\n"},
+]
+MONTHLY, WEEKLY = iri("decision", "prices-are-reviewed-monthly"), iri("decision", "price-reviews-happen-weekly")
+DAILY, NOT_HELD = iri("decision", "prices-are-reviewed-daily"), iri("work-item", "move-the-review-to-mondays")
+VIOLATIONS = [f"violation\t{MONTHLY}\tsections/0\trequired"]
+STALE = [
+    f"stale\t{WEEKLY}\tchecked against version 1 of its type, which is at 3",
+    f"stale\t{MONTHLY}\tchecked against version 1 of its type, which is at 3",
+]
+PLACEHOLDERS = [
+    f"placeholder\t{NOT_HELD}\t{DAILY}\tcarried_out_by",
+    f"placeholder\t{NOT_HELD}\t{DAILY}\toptions/0/tried_by",
+]
+
+
+@given("it holds a decision that does not fit its type")
+def _it_holds_a_decision_that_does_not_fit(root):
+    """The store whose content the operator did not write holds one, the decision edited by hand, and no other."""
+    assert [fault.artifact for fault in check(kb_client.connect(root)).violations] == [MONTHLY]
+
+
+@given("it holds a decision that conforms to a version of its type a later version has followed")
+def _it_holds_a_decision_behind_its_type(root):
+    """The store whose content the operator did not write holds them: its decisions conform to the first version."""
+    assert [(stale.artifact, stale.schema_version) for stale in check(kb_client.connect(root)).stale] == [
+        (WEEKLY, 1), (MONTHLY, 1),
+    ]
+
+
+@given(
+    "it holds a decision linking twice to a work item the store does not hold, under a type for work items it holds, "
+    "from two different places in that decision"
+)
+def _it_holds_a_decision_linking_twice_to_a_work_item_not_held(root):
+    """The decision type's third version lets a decision and each of its options link to a work item; the decision
+    made under it links to the one work item from its own field and from its first option."""
+    client = kb_client.connect(root)
+    define(client, PLAIN_WORK_ITEM_TYPE)
+    followed = replace(client, type_iri("decision"), {"version": 3, "schema": LINKING_SCHEMA})
+    assert not followed.faults, followed.faults
+    create(client, "decision", {
+        "title": "Prices are reviewed daily", "sections": SECTIONS, "carried_out_by": NOT_HELD,
+        "options": [{"title": "Go daily", "tried_by": NOT_HELD}],
+    })
+
+
+def _listed(ran, word):
+    """The lines of a check's report that one of its lists gives, each violation's message left out."""
+    return [line for line in _unworded(ran.stdout).splitlines() if line.split("\t")[0] == word]
+
+
+@then("the operator is told of the decision that does not fit its type, and where")
+def _told_of_the_decision_that_does_not_fit(ran):
     assert (ran.returncode, ran.stderr) == (1, "")
-    violations = [line for line in _unworded(ran.stdout).splitlines() if line.startswith("violation")]
-    assert violations == _unworded(REPORT).splitlines()[:1]
+    assert _listed(ran, "violation") == VIOLATIONS
 
 
-@then("of everything that is behind the type it was last checked against")
-def _told_of_everything_stale(ran):
-    assert _unworded(ran.stdout) == _unworded(REPORT)
+@then("of the decision behind the type it conforms to")
+def _told_of_the_decision_behind_its_type(ran):
+    assert _listed(ran, "stale") == STALE
+
+
+@then(
+    "of the work item linked to and not held, a placeholder, with each of the two links into it: the decision holding "
+    "the link and the place in that decision the link sits at"
+)
+def _told_of_the_placeholder_with_each_link(ran):
+    assert _listed(ran, "placeholder") == PLACEHOLDERS
+
+
+@then("each of the three is listed apart from the others")
+def _each_listed_apart(ran):
+    """Each list's lines stand together, and nothing is said but them."""
+    assert _unworded(ran.stdout).splitlines() == VIOLATIONS + STALE + PLACEHOLDERS
+
+
+@given(
+    "a store holding a type for decisions, a type for work items, and a decision that fits its type",
+    target_fixture="where",
+)
+def _store_with_two_types_and_a_decision_that_fits(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, PLAIN_WORK_ITEM_TYPE)
+    define(client, {**DECISION_TYPE, "schema": LINKING_SCHEMA})
+    create(client, "decision", {"title": "Prices are reviewed daily", "sections": SECTIONS})
+    return {"cwd": root, "env": {}}
+
+
+@given("that decision links to a work item the store does not hold")
+def _that_decision_links_to_a_work_item_not_held(root):
+    linked = replace(kb_client.connect(root), DAILY, {"sections": SECTIONS, "carried_out_by": NOT_HELD})
+    assert not linked.faults, linked.faults
+
+
+@given("nothing else in the store does not fit its type or is behind it")
+def _nothing_else_to_find(root):
+    checked = check(kb_client.connect(root))
+    assert (list(checked.violations), list(checked.stale)) == ([], [])
+
+
+@then("the store checks clean")
+def _the_store_checks_clean(ran):
+    """The check does not fail, and says nothing but the one link into the placeholder."""
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert ran.stdout.splitlines() == PLACEHOLDERS[:1]
 
 
 @when("the operator asks what the command line offers", target_fixture="ran")
@@ -125,7 +239,7 @@ def _kb_help(root):
 
 
 @then("it offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing "
-      "into a freshly started store")
+      "into a store")
 def _offers_six_commands(ran):
     assert (ran.returncode, ran.stderr) == (0, "")
     listed = ran.stdout.split("positional arguments:")[1].split("options:")[0]
@@ -136,7 +250,7 @@ def _offers_six_commands(ran):
     assert "export write the store" in lines
     assert "backup back the store found here, or the one KB_ROOT names, up whole" in lines
     assert "restore restore a backup as a store in a directory" in lines
-    assert "import bring a directory of files into a freshly started store" in lines
+    assert "import bring a directory of files into a store" in lines
 
 
 @then("nothing else that changes what the store holds")
@@ -500,7 +614,7 @@ def _a_seed_that_checks_clean(tmp_path):
 @given("a seed directory holding one file whose content does not fit its type", target_fixture="seed")
 def _a_seed_with_one_unfit_file(tmp_path):
     seed = exported(tmp_path, a_decision_type_and_a_decision)
-    unfit = seed / "decision" / "price-reviews-happen-weekly.yaml"
+    unfit = seed / filed(iri("decision", "price-reviews-happen-weekly"))
     decision = canonical.entries(unfit.read_text(encoding="utf-8"))
     decision["sections"] = decision["sections"][:1]
     unfit.write_text(canonical.dump(decision), encoding="utf-8")

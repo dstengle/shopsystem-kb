@@ -574,3 +574,252 @@ The operator backs up a running store whole, its history and journal included, w
 date: 2026-10-10
 supersedes: decision/files-are-an-export (its clause that files on disk enter a store only through `kb import`)
 source: adrs/0028-backup-and-restore-beside-export.md
+
+## decision/0022-ids-are-chosen-by-the-client-in-a-namespace
+An artifact's id is chosen by the client as a namespaced name, kb checking its grammar and that it is unique and never minting one, so that an artifact keeps its id, and every link to it holds, across export, import into another store and migration; parts are still named by kb from title or position.
+date: 2026-10-09
+supersedes: decision/0002-ids-minted-from-titles (for artifacts)
+source: adrs/0022-ids-are-chosen-by-the-client-in-a-namespace.md
+
+## decision/0023-an-artifacts-iri-sits-under-its-types
+An artifact's id is an https IRI made of its type's IRI, a `/`, and a path of plain names the client chooses; a part is the artifact's IRI and a fragment; a type's own IRI is any https IRI its client chooses, and the type that describes types has one under a domain kb owns; kb checks the grammar, the place under the type and uniqueness, selects artifacts by the path below their type, and holds no prefixes, a shortened form being a client's; RDF's naming taken and none of its model.
+date: 2026-10-09
+source: adrs/0023-an-artifacts-iri-sits-under-its-types.md
+
+## decision/0024-a-link-may-land-on-a-placeholder
+A link to an IRI the store does not hold, under a type it does hold, lands on a placeholder: the IRI, typed by its place under its type, checked against the link's targets, and filled by creating an artifact at that IRI; the same over the contract and in import; a placeholder is nothing stored; reads mark a link's target as not held and one query lists the placeholders with what links to each; an IRI under a type the store does not hold is still refused; so that artifacts linking to each other can arrive in any order.
+date: 2026-10-10
+source: adrs/0024-a-link-may-land-on-a-placeholder.md
+
+## decision/0025-placeholders-are-reported-never-a-fault
+`kb validate` and kb's check answer list every placeholder with what links to it, apart from the faults, and a store holding placeholders and no fault checks clean, because whether a missing target is a defect is the domain's to say.
+date: 2026-10-10
+source: adrs/0025-placeholders-are-reported-never-a-fault.md
+
+## decision/0026-import-passes-over-identical-refuses-differing
+Import goes into any store: an artifact the store already holds at the same IRI, with the same content and type version, is passed over; one that differs refuses the whole import, naming each IRI, and nothing lands; replacing content stays a change through the contract.
+date: 2026-10-10
+supersedes: decision/files-are-an-export (its clause that import lands only in a freshly started store)
+source: adrs/0026-import-passes-over-identical-refuses-differing.md
+
+## decision/0027-each-type-version-is-its-own-iri
+A type has a stable IRI, the root its artifacts' IRIs sit under, and each version an IRI of its own, the type's with `@` and the version; a version is fixed once made and a change to a type is a new version; several versions are held while artifacts conform to them; an artifact names the version it conforms to by its IRI, in place of `schema_version`, and moves to a later version by a write checked against it, keeping its own IRI; a link's targets name the type, any version; moving content between versions is not part of this.
+date: 2026-10-10
+source: adrs/0027-each-type-version-is-its-own-iri.md
+
+## decision/0029-export-over-the-contract
+A client exports through the contract: the store's canonical files, whole or selected by the path below each type, as the store stood at one moment, the same against a store in process or a server, a read never refused as busy.
+date: 2026-10-10
+source: adrs/0029-export-over-the-contract.md
+
+## decision/0030-export-streams-and-carries-its-position
+The contract's export answers as a stream, one file to a message, selected by the path below each type and by type, and says the journal position it reflects, so that a store larger than one message exports and an export of what changed since a position can be added later as an optional field without breaking the contract.
+date: 2026-10-10
+revisit_when: a store needs an export of only what changed since a position
+source: adrs/0030-export-streams-and-carries-its-position.md
+
+## decision/0031-a-create-may-name-its-parts
+A create, alone or in a set, may give any part it carries a name of the client's choosing, unique in its collection and of the plain-name grammar; a part given none is named by kb as before; so a client can link to a part of an artifact it creates in the same set.
+date: 2026-10-10
+source: adrs/0031-a-create-may-name-its-parts.md
+
+## decision/contract-v2
+Requests 2 to 10 of the portable-knowledge note (portable identity, K2, and export and import between stores, K3) and a check-only mode on `BatchCreate` and `BatchReplace` ship as one breaking release whose package is `kb.v2`, so clients break once.
+date: 2026-10-10
+source: docs/superpowers/requests/2026-10-10-requests-to-kb-portable-knowledge.md
+
+## decision/iri-grammar
+An IRI kb accepts has scheme `https` only; a lowercase host of plain names joined by single dots; path segments each a plain name or plain names joined by single dots (a plain name being lowercase letters and digits in hyphen-separated runs); no query, no trailing slash, no percent-encoding and no empty segment; at most 512 characters. A part is the artifact's IRI, `#` and the part's place in it as places are written today (a collection and a name, such as `#steps/draft`), a part's name being unique in its collection; a type version is the type's IRI, `@` and the version number, and `@` appears nowhere else. kb's IRI grammar is published.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/type-of-types-iri
+The type that describes types is `https://missingmass.io/kb/type`, its versions `https://missingmass.io/kb/type@1` and on, an IRI under a domain kb owns, published in place of `schema/schema`.
+date: 2026-10-10
+supersedes: decision/type-of-types-id-published
+source: the person's delegation of 2026-10-10
+
+## decision/unused-type-versions-kept
+A version of a type no artifact conforms to is not removed; removing one stays deferred.
+date: 2026-10-10
+revisit_when: a client asks to remove a version no artifact conforms to
+source: the person's delegation of 2026-10-10
+
+## decision/keys-in-a-set-dropped
+`@key` in a set is dropped: creates in a set name each other by the IRIs they carry, which the client chooses, so a key adds nothing.
+date: 2026-10-10
+supersedes: decision/references-inside-a-set
+source: the person's delegation of 2026-10-10
+
+## decision/check-only-sets
+`BatchCreate` and `BatchReplace` may be asked to check only, in the same release as `kb.v2`: the answer is each change's result or the faults as the set would land, with no name for the set, since none lands; it is a read, never refused as busy; an expected revision in it is compared with the revision the artifact stands at.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/pre-v2-stores-not-migrated
+A store made by kb before `kb.v2` is refused as an earlier kb's store; no migration is planned or built.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/v1-store-cannot-be-moved
+A store made by a kb before contract `kb.v2`, a store of contract `kb.v1` or an earlier one, is refused as an earlier kb's store that this kb cannot read or move, its refusal saying so rather than advising an import of its files, which carry no IRIs; an earlier kb's store is no longer an import's source.
+date: 2026-10-10
+supersedes: decision/earlier-store-told-apart (its advice to start a new store and import the old one's files, and its clause that an earlier kb's store is only ever an import's source)
+source: the person's delegation of 2026-10-10
+
+## decision/contract-style-in-behaviour
+Behaviour lines for an rpc's request and response keep the contract's style of today (a kind called a kind, a place a place, a name a name); field names are Implementation.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/published-contract-v2
+What a client may depend on is still versioned together by the release tag, as decision/published-contract-v1-in-0-7-0 lists it, except that `kb.proto` is in package `kb.v2`, the type that describes types is published as `https://missingmass.io/kb/type` in place of `schema/schema`, and kb's IRI grammar is published as the rule a client names artifacts, parts and types by.
+date: 2026-10-10
+supersedes: decision/published-contract-v1-in-0-7-0
+source: docs/superpowers/requests/2026-10-10-requests-to-kb-portable-knowledge.md; the person's delegation of 2026-10-10
+
+## decision/an-artifact-keeps-its-version
+A write naming no version keeps the version its artifact conforms to and is checked against it; an artifact moves only to a later version of its own type that a write names, and a write naming an earlier version or another type's is refused; the store's check reads each artifact against the version it conforms to, so one behind its type is a violation only if it does not fit that version.
+date: 2026-10-10
+supersedes: decision/0006-validation-from-composed-schema (its clause that stale artifacts are checked against the current type)
+source: the person's delegation of 2026-10-10
+
+## decision/kb-numbers-type-versions
+When a type is changed, kb gives the new version the next number; the client no longer moves a type's version on, so a change that does not is no longer refused.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/type-iris-are-free
+A type's IRI need not sit under the IRI of the type that describes types: it is any https IRI of kb's grammar its client chooses.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/references-name-a-version
+A `kb:` reference to another type's shape names by its IRI the version it reads, and artifacts are checked against that version's shape, so a later version of the referred type changes nothing until a type names it.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/removed-iris-may-be-reused
+When an artifact has been removed, the client may create a new artifact at its IRI, at its first revision.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/create-echoes-its-iri
+A create's result, alone or in a set, gives the artifact's IRI and its first revision.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/removal-still-refused-under-placeholders
+Removing an artifact something points at is still refused; its links do not fall back to a placeholder.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/links-into-parts-of-placeholders
+A link into a part of an IRI the store does not hold lands on a placeholder; a link into a part a held artifact lacks is refused as before; creating the artifact without that part leaves the link on a placeholder, reported as any placeholder.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/placeholders-seen-in-stubs-not-read
+A summary's stub of a link to an IRI not held is marked as not held; reading a placeholder's IRI is refused as not found.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/path-selection-is-a-segment-prefix
+Selecting by the path below the type, in a list, a follow or an export, matches every artifact whose path below its type begins with the segments given, whole segments only.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/export-selections-combine
+An export may select a path and a type together, giving only that type's artifacts with that path; selecting a type the store does not hold is refused as a list refuses it.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/journal-position-is-an-entry
+A journal position is the id of a history entry: each history entry gives its position, and an export's position is that of the last entry landed when the store stood at its moment.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/each-type-version-a-file
+An export writes one file for each version of a type the store holds, at the type's place, `@` and the version's number.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/import-skips-only-by-type
+In an import, a link to a file that does not land falls to a placeholder, so only a broken file and the files of a broken type, directly or through other types or their `kb:` references, are skipped.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/import-check-reports-differing
+The import check reports an artifact the store holds at the same IRI with other content or another type version as an error, naming the IRI, so the import that always checks first is refused for it.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/rules-for-iri-refusals
+An IRI not of kb's grammar carries rule `locator`; an IRI not under its type's, and an IRI already held, carry `identity`; a version not held, or not later than the one an artifact conforms to, carries `version`; an import's artifact differing from the one the store holds carries a new rule, `differs`, which joins kb's published rule names.
+date: 2026-10-10
+source: the person's delegation of 2026-10-10
+
+## decision/what-links-to-a-placeholder
+"What links to" a placeholder, wherever a placeholder is listed (the check, kb validate, the query of placeholders), is each link into it: the artifact holding the link and the place in it the link sits at. Chosen over the linking artifacts alone, so a client can find and fill each link.
+date: 2026-10-10
+source: formulation question (check-the-store), answered under the person's delegation of 2026-10-10
+
+## decision/formulation-answers-k2
+Answers to formulation questions on K2 and K3, each tightening a line's wording: an item's title, never an artifact's, gives its name; a type version the store does not hold is refused whether or not it holds the type; a link to an IRI not held is marked and never filled in, at every read level; in a set, a placeholder's type may be one a create in the set makes; an export holds only a type's version files, each with that version's own revision and title; a broken type version takes with it only the artifacts conforming to it and the type versions referring to it by `kb:` reference.
+date: 2026-10-10
+source: formulation questions (name-artifacts-and-items, define-a-type, name-what-is-asked-for, read-an-artifact, make-several-changes-in-one-go, export-and-import-a-store), answered under the person's delegation of 2026-10-10
+
+## decision/an-iri-belongs-to-its-nearest-type
+When one type's IRI sits under another's, an IRI under both belongs to the nearest type: the longest type IRI that is a whole-segment prefix of it. A create naming a version of any other type is refused with rule `identity`, and a placeholder at such an IRI takes the nearest type.
+date: 2026-10-10
+source: slicing question (K2, slices 158 and 167), answered under the person's delegation of 2026-10-10
+
+## decision/an-artifact-is-read-through-its-version
+Everything kb reads of an artifact it reads through the version of its type the artifact conforms to, its links included: a read gives it as that version declares, at every level, and a change to its type restates none of its links, which stay as its version declares them until a write moves the artifact to a later version.
+date: 2026-10-10
+source: review questions (slice 162: reads of an artifact behind its type, and links restated when a type changes), answered under the person's delegation of 2026-10-10
+
+## decision/a-referred-type-is-not-removed
+A type is not removed while a held version of another type reads one of its versions, by a `kb:` reference to a shape or by being built on it: the removal is refused as one is while artifacts of its kind exist, naming each referring type, since every version of a type is kept as made and would otherwise read through a version no longer held. A removed type's own versions go with it.
+date: 2026-10-10
+source: review question (slice 165: a removal left `kb:<T>@1` dangling, and writes through it and the store's check refused as the store's own fault), answered under the person's delegation of 2026-10-10
+
+## decision/a-link-to-a-removed-artifact-waits-on-a-placeholder
+A removed artifact's IRI is an IRI the store does not hold: a link made to it after the removal lands on a placeholder like a link to any IRI not held under a held type that the link field allows, so a removal and a new link made at once may both land when the removal lands first; the removal landing second is still refused.
+date: 2026-10-10
+source: slicing question (K2, slice 166: the scenario of a removal and a new link made at once against decision/0024-a-link-may-land-on-a-placeholder), answered under the person's delegation of 2026-10-10
+
+## decision/a-types-place-is-settled-by-what-sits-under-it
+An IRI belongs to the nearest held type it sits under, and what already sits under a type fixes that: a type is not removed while a link waits on an IRI under it that the store does not hold, as it is not while artifacts of its kind exist; and a type is not defined at an IRI under another type's while an artifact of that other type is held under the new type's IRI or a link waits on an IRI there, since the define would move what is held or waited on to a type it was not checked against. Each refusal names what stands in the way.
+date: 2026-10-11
+source: review questions (slice 165.7: a type removed while links wait under it leaves links the store would refuse; a nearer type defined between a link and the create it waits on lets any kind land there; and the batch 32 review's type defined above held artifacts), answered under the person's delegation of 2026-10-10
+
+## decision/a-link-that-waits-keeps-waiting
+A link that already waits on a part its held target lacks does not stand in the way of later changes to the artifact that holds it: a change that leaves the link as it is lands and the link still waits, since another client's create is what made it wait and the store's check already lists it as a placeholder, not a violation. A link a change adds or alters into a part a held artifact lacks is still refused. An import lets such a link wait as the exporting store held it.
+date: 2026-10-11
+source: review question (batch 35: an artifact holding a link into a part its filled target lacks could not be changed at all, and its store's export could not be imported), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-never-skips-a-difference
+A file that differs from what the store holds at its IRI is not a broken file: with errors skipped the import is still refused naming each such IRI, and nothing lands, since skipping it would hide that the directory and the store disagree.
+date: 2026-10-11
+source: slicing question (K3, slice 182: a differing file under `--skip-errors`), answered under the person's delegation of 2026-10-10
+
+## decision/a-skipped-types-links-are-left-out
+A link waits on a placeholder only under a held type (decision/0024-a-link-may-land-on-a-placeholder), so with errors skipped a file carrying a link to an IRI under a type no version of which lands is left out with that type and reported as skipped by it; a link to a file left out under a type that does land waits on a placeholder.
+date: 2026-10-11
+source: slicing question (K3, slices 183 and 184: a link under a type whose only version is broken), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-names-items-as-a-write-does
+An item a file gives with no name lands named as a write names it, and one given with a name keeps it, so everything that tells an item by its name holds for what an import lands; an export of a store kb wrote carries every name and comes back byte for byte.
+date: 2026-10-11
+source: review question (batch 35, slice 170.1: a link waiting inside an unnamed imported item made every change to its artifact refused), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-counts-files
+An import's history gains one entry for each file that lands, each version of a type counted; a file conforming to a version of its type that neither the directory nor the store holds is an error of the check.
+date: 2026-10-11
+source: slicing questions (K3, slices 165.6 and 181: version files in the history's count; a version nobody holds), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-is-held-as-a-change-is
+An import that goes into a store already holding artifacts is a change to that store like any other: asked while a server serves the store it is refused because the store is served, and each file is held to the place its type gives it as a create is, a file whose IRI does not sit under its type, or sits under a nearer held type, being an error of the check.
+date: 2026-10-11
+source: research findings (K3, slice 181: an import landed under a running server, and a file filed under another type's IRI landed), answered under the person's delegation of 2026-10-10

@@ -4,8 +4,8 @@ import re
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
 from calls import (
-    CLIENT, DECISION_TYPE, NOTE_TYPE, add, define, create, create_many, created, journal, listing, read, refs, remove,
-    replacing, request, replace, answer, start_a_store, check,
+    CLIENT, DECISION_TYPE, NOTE_TYPE, TAG_TYPE, add, answer, check, create, create_many, created, define, iri, journal,
+    listing, next_version, read, refs, remove, replace, replacing, request, start_a_store, type_iri, version_iri,
 )
 import at_once
 import held
@@ -16,8 +16,43 @@ from kb.contract import kb_pb2
 scenarios("sign-a-change.feature")
 
 
-@scenario("change-the-store.feature", "The client changes an artifact")
-def test_the_client_changes_an_artifact():
+@scenario("change-the-store.feature", "A change naming no version of its type keeps the artifact at the version it conforms to")
+def test_a_change_naming_no_version_of_its_type_keeps_the_artifact_at_the_version_it_conf():
+    pass
+
+
+@scenario('change-the-store.feature', "A replacement naming a later version of the artifact's type moves the artifact to it")
+def test_a_replacement_naming_a_later_version_of_the_artifact_s_type_moves_the_artifact_t():
+    pass
+
+
+@scenario('change-the-store.feature', "A replacement naming an earlier version of the artifact's type, or a version of another type, is refused")
+def test_a_replacement_naming_an_earlier_version_of_the_artifact_s_type_or_a_version_of_a():
+    pass
+
+
+@scenario("change-the-store.feature", "The client replaces an artifact")
+def test_the_client_replaces_an_artifact():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type naming a later version, with content that does not fit it, is refused")
+def test_changing_an_artifact_that_is_behind_its_type_naming_a_later_version_with_content():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type naming no version keeps it at the version it conforms to")
+def test_changing_an_artifact_that_is_behind_its_type_naming_no_version_keeps_it_at_the_v():
+    pass
+
+
+@scenario("check-a-change.feature", "Changing an artifact that is behind its type naming the latest version, with content that fits it, brings it up to date")
+def test_changing_an_artifact_that_is_behind_its_type_naming_the_latest_version_with_cont():
+    pass
+
+
+@scenario('name-what-is-asked-for.feature', "A change by a name that is not an IRI of kb's grammar writes nothing")
+def test_a_change_by_a_name_that_is_not_an_iri_of_kb_s_grammar_writes_nothing():
     pass
 
 
@@ -46,16 +81,6 @@ def test_two_clients_replace_one_artifact_at_the_same_time_neither_saying_the_ve
     pass
 
 
-@scenario("check-a-change.feature", "Changing an artifact that is behind its type brings it up to date")
-def test_changing_an_artifact_that_is_behind_its_type_brings_it_up_to_date():
-    pass
-
-
-@scenario("check-a-change.feature", "Changing an artifact that is behind its type with content the current version will not have is refused")
-def test_changing_an_artifact_that_is_behind_its_type_with_content_the_current_version_will_not_have_is_refused():
-    pass
-
-
 @scenario("check-a-change.feature", "A change that would break the type leaves the artifact as it was")
 def test_a_change_that_would_break_the_type_leaves_the_artifact_as_it_was():
     pass
@@ -76,11 +101,6 @@ def test_every_way_an_item_s_name_can_be_wrong_on_a_change_is_refused():
     pass
 
 
-@scenario("name-what-is-asked-for.feature", "A change aimed at a name that is not a plain name writes nothing")
-def test_a_change_aimed_at_a_name_that_is_not_a_plain_name_writes_nothing():
-    pass
-
-
 @scenario("name-what-is-asked-for.feature", "Changing something the store does not hold is refused")
 def test_changing_something_the_store_does_not_hold_is_refused():
     pass
@@ -91,7 +111,7 @@ def test_every_way_the_place_a_change_is_aimed_at_can_be_wrong_is_refused():
     pass
 
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -99,6 +119,7 @@ SECTIONS = [
 
 
 @given("a store holding a decision with a purpose and a rationale, at its first version", target_fixture="client")
+@given("a store holding a decision with a purpose and a rationale, at its first revision", target_fixture="client")
 def _store_with_a_decision(root):
     client = kb_client.connect(root)
     start_a_store(root)
@@ -154,8 +175,8 @@ def _the_rest_as_before(changed):
     assert {key: value for key, value in after.items() if key != "sections"} == {
         key: value for key, value in before.items() if key != "sections"
     }
-    assert [(seen.id, seen.kind, seen.title, seen.schema_version) for seen in (changed["before"], changed["after"])] == [
-        (DECISION, "decision", "Price reviews happen weekly", 1),
+    assert [(seen.id, seen.type, seen.title) for seen in (changed["before"], changed["after"])] == [
+        (DECISION, version_iri("decision"), "Price reviews happen weekly"),
     ] * 2
 
 
@@ -165,6 +186,13 @@ def _replace_the_decision(client):
         SECTIONS[0], {"title": "Rationale", "body": "Suppliers change their prices every week.\n"},
     ]}, message="Say why weekly")
     return response
+
+
+@then("the decision's revision goes up by one")
+def _revision_up_by_one(client, changed):
+    assert not changed.faults, changed.faults
+    assert changed.revision == 2
+    assert read(client, DECISION).revision == 2
 
 
 @given("the client was readied with a clock that fails when it is asked the time", target_fixture="client")
@@ -189,18 +217,6 @@ def _holds_what_it_held(root, before):
     assert held.holds(root) == before["held"]
 
 
-@then("the version goes up by one")
-def _version_up_by_one(client, changed):
-    assert changed.revision == 2
-    assert read(client, DECISION).revision == 2
-
-
-@then("the artifact records the current version of its type")
-def _records_the_current_version(root, client):
-    current = held.artifact(root, "schema/decision")["version"]
-    assert read(client, DECISION).schema_version == current
-
-
 def _stale(client):
     """The names the store's check lists as behind their type."""
     return [stale.artifact for stale in check(client).stale]
@@ -208,15 +224,10 @@ def _stale(client):
 
 def _decision_type_at_version_2(client, schema):
     """The decision type changed to its second version, so the decision, checked against the first, is behind it."""
-    changed = replace(client, "schema/decision", {"version": 2, "schema": schema}, message="Decision type, version 2")
+    changed = replace(client, type_iri("decision"), {"version": 2, "schema": schema}, message="Decision type, version 2")
     assert not changed.faults, changed.faults
-    assert read(client, DECISION).schema_version == 1
+    assert read(client, DECISION).type == version_iri("decision", 1)
     assert _stale(client) == [DECISION]
-
-
-@given("a decision last checked against an older version of the decision type, which still fits the current version")
-def _behind_a_type_it_still_fits(client):
-    _decision_type_at_version_2(client, DECISION_TYPE["schema"])
 
 
 @given("a decision last checked against an older version of the decision type")
@@ -227,44 +238,73 @@ def _behind_a_type_that_now_wants_an_owner(client):
     _decision_type_at_version_2(client, schema)
 
 
+@given(
+    "a decision last checked against an older version of the decision type, where the current version requires a "
+    "section the older one does not"
+)
+def _behind_a_type_that_now_wants_a_consequence(client):
+    schema = copy.deepcopy(DECISION_TYPE["schema"])
+    schema["sections"] = [*schema["sections"], {"title": "Consequences"}]
+    _decision_type_at_version_2(client, schema)
+
+
 @when(
-    "the client replaces the decision with content that fits the current version of its type, saying which role and why",
+    "the client replaces the decision naming no version, with content that fits the older version and lacks the "
+    "section the current one requires, saying which role and why",
     target_fixture="changed",
 )
-def _replace_with_content_that_fits(client):
-    response = replace(client, DECISION, {"sections": SECTIONS}, message="Bring it up to date")
-    assert not response.faults, response.faults
-    return response
+def _replace_naming_no_version(client):
+    return replace(client, DECISION, {"sections": [SECTIONS[0], ONE_RATIONALE]}, message="Say why weekly")
 
 
-@then("the decision records the current version of its type")
-def _records_version_2(client):
-    assert read(client, DECISION).schema_version == 2
+@then("the decision is replaced")
+def _the_decision_is_replaced(client, changed):
+    assert not changed.faults, changed.faults
+    assert changed.revision == read(client, DECISION).revision == 2
+    assert loads(read(client, DECISION, whole=True).content)["sections"] == [SECTIONS[0], ONE_RATIONALE]
+
+
+@when(
+    "the client replaces the decision naming the latest version of the decision type, with content that fits that "
+    "version, saying which role and why",
+    target_fixture="changed",
+)
+def _replace_naming_the_latest_version(client):
+    content = {"owner": "The buyer", "sections": SECTIONS}
+    return replace(client, DECISION, content, message="Say who owns it", version=version_iri("decision", 2))
+
+
+@then("the decision records the latest version of its type")
+def _at_the_latest_version(client, changed):
+    assert not changed.faults, changed.faults
+    assert read(client, DECISION).type == version_iri("decision", 2)
+
+
+@when(
+    "the client replaces the decision naming the latest version of the decision type, with content that does not fit "
+    "that version, saying which role and why",
+    target_fixture="attempt",
+)
+def _replace_naming_the_latest_version_without_an_owner(root, client):
+    before = held.text(root, DECISION)
+    response = replace(
+        client, DECISION, {"sections": [SECTIONS[0], ONE_RATIONALE]}, message="Say why weekly",
+        version=version_iri("decision", 2),
+    )
+    return {"response": response, "before": before}
+
+
+@then("the change is rejected because the content does not fit the version it names, like any change that does not fit")
+def _rejected_for_the_version_named(attempt):
+    refused = attempt["response"]
+    assert refused.revision == 0
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "", "required")]
+    assert "'owner'" in refused.faults[0].message
 
 
 @then("it is no longer listed as behind its type")
 def _no_longer_stale(client):
     assert DECISION not in _stale(client)
-
-
-@when(
-    "the client replaces the decision with content that does not fit the current version of its type, "
-    "saying which role and why",
-    target_fixture="attempt",
-)
-def _replace_with_content_that_does_not_fit(root, client):
-    before = held.text(root, DECISION)
-    return {"response": replace(client, DECISION, {"sections": SECTIONS}, message="No owner"), "before": before}
-
-
-@then(
-    "the change is rejected because the content does not fit the current version of its type, "
-    "like any change that does not fit"
-)
-def _rejected_by_the_current_version(attempt):
-    refused = attempt["response"]
-    assert refused.revision == 0
-    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "", "required")]
 
 
 @then("it is still listed as behind its type")
@@ -299,7 +339,7 @@ def _rejected_for_a_version_inside(attempt):
 )
 def _replace_a_name_the_store_lacks(root, client):
     before = held.holds(root)
-    response = replace(client, "decision/nothing-of-the-sort", {"sections": SECTIONS}, message="Change it")
+    response = replace(client, iri("decision", "nothing-of-the-sort"), {"sections": SECTIONS}, message="Change it")
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
@@ -307,28 +347,33 @@ def _replace_a_name_the_store_lacks(root, client):
 def _rejected_as_not_held(attempt):
     refused = attempt["response"]
     assert refused.revision == 0
-    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [("decision/nothing-of-the-sort", "not-found")]
-    assert "decision/nothing-of-the-sort" in refused.faults[0].message
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [(iri("decision", "nothing-of-the-sort"), "not-found")]
+    assert iri("decision", "nothing-of-the-sort") in refused.faults[0].message
+
+
+@when(
+    'the client replaces an artifact by a name whose path holds "..", saying which role and why',
+    target_fixture="attempt",
+)
+def _replace_a_name_with_dots(root, client, tmp_path):
+    name = DECISION.replace("/price-reviews", "/../price-reviews")
+    before = held.everything_in(tmp_path)
+    response = replace(client, name, {"sections": SECTIONS}, message="Change it")
+    return {"response": response, "name": name, "before": before, "after": held.everything_in(tmp_path)}
+
+
+@then("the change is rejected because a name is an IRI of kb's grammar, and the name asked for is given back")
+def _rejected_as_not_an_iri(attempt):
+    refused = attempt["response"]
+    assert refused.revision == 0
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [(attempt["name"], "locator")]
+    assert "a name is an IRI of kb's grammar" in refused.faults[0].message
+    assert repr(attempt["name"]) in refused.faults[0].message
 
 
 @then("nothing is written anywhere in the store")
 def _nothing_written_in_the_store(attempt):
     assert attempt["after"] == attempt["before"]
-
-
-@when(parsers.parse('the client replaces an artifact named "{name}", saying which role and why'), target_fixture="attempt")
-def _replace_by_a_name(client, tmp_path, name):
-    before = held.everything_in(tmp_path)
-    response = replace(client, name, {"sections": SECTIONS}, message="Change it")
-    return {"response": response, "before": before, "after": held.everything_in(tmp_path)}
-
-
-@then("the change is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
-def _rejected_as_not_a_plain_name(attempt):
-    refused = attempt["response"]
-    assert refused.revision == 0
-    assert [fault.rule for fault in refused.faults] == ["locator"]
-    assert "plain name" in refused.faults[0].message
 
 
 @then("nothing is written anywhere, inside the store or outside it")
@@ -463,7 +508,7 @@ def _keeps_its_name(changed):
 def _still_lands(client):
     assert list(check(client).violations) == []
     inward = refs(client, DECISION, 1, inward=True)
-    assert [(reached.stub.id, reached.route[0].field) for reached in inward.reached] == [("note/why-monthly", "about")]
+    assert [(reached.stub.id, reached.route[0].field) for reached in inward.reached] == [(iri("note", "why-monthly"), "about")]
 
 
 @when(
@@ -513,7 +558,7 @@ SAYING = {
 
 
 def _names(client):
-    return [stub.id for stub in listing(client, "decision", ids_only=True).stubs]
+    return list(listing(client, "decision", ids_only=True).ids)
 
 
 @when(
@@ -581,7 +626,7 @@ def _rejected_while_pointed_at(root, attempt):
 @then("the client is given each link into that option")
 def _each_link_into_the_option(attempt):
     faults = attempt["response"].faults
-    assert [(fault.artifact, fault.place) for fault in faults] == [("note/why-weekly", "about")]
+    assert [(fault.artifact, fault.place) for fault in faults] == [(iri("note", "why-weekly"), "about")]
     assert f"'{LINKED_OPTION}'" in faults[0].message
 
 
@@ -798,3 +843,127 @@ def _no_longer_holds_the_decision(root, client, changed, before):
     assert changed.revision == before["stands_at"] + 1
     assert DECISION not in _names(client)
     assert not held.holds_artifact(root, DECISION)
+
+
+EARLIER, LATER = version_iri("decision", 1), version_iri("decision", 2)
+NAMING_NO_VERSION = {
+    "replaces the decision": lambda client: replace(
+        client, DECISION, {"sections": [SECTIONS[0], ONE_RATIONALE], "options": OPTIONS}, message="Say why weekly"),
+    "adds an option to the decision": lambda client: add(
+        client, DECISION, "options", GO_FORTNIGHTLY, message="Weigh going fortnightly"),
+}
+
+
+@given(
+    "a store holding two versions of a decision type, the later one also requiring a consequence the earlier does "
+    "not have",
+    target_fixture="client",
+)
+def _two_versions_of_the_decision_type(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    assert not next_version(client, "decision", DECISION_TYPE, ["Purpose", "Rationale", "Consequences"]).faults
+    return client
+
+
+def _a_decision_conforming_to(client, version, content):
+    """The decision made naming a version of its type; gives the revision it stands at."""
+    made = request(client, "decision", "Price reviews happen weekly", content, version=version)
+    assert not made.faults, made.faults
+    return made.revision
+
+
+@given("a decision conforming to the earlier version, with a purpose, a rationale and two options", target_fixture="seen")
+def _a_decision_at_the_earlier_version_with_options(client):
+    return _a_decision_conforming_to(client, 1, {"sections": SECTIONS, "options": OPTIONS})
+
+
+@given("a decision conforming to the earlier version, with a purpose and a rationale", target_fixture="seen")
+def _a_decision_at_the_earlier_version(client):
+    return _a_decision_conforming_to(client, 1, {"sections": SECTIONS})
+
+
+@when(
+    parsers.re(
+        f"the client (?P<call>{'|'.join(map(re.escape, NAMING_NO_VERSION))}) with no consequence, naming no version "
+        "of the decision type, saying which role and why"
+    ),
+    target_fixture="changed",
+)
+def _change_naming_no_version(client, call):
+    return NAMING_NO_VERSION[call](client)
+
+
+@then("the decision still records the earlier version of the decision type")
+def _still_at_the_earlier_version(client):
+    assert read(client, DECISION).type == EARLIER
+
+
+CONSEQUENCES = {"title": "Consequences", "body": "Prices change on Mondays.\n"}
+
+
+@when(
+    "the client replaces the decision with content carrying a consequence, naming the later version of the decision "
+    "type, saying which role and why",
+    target_fixture="changed",
+)
+def _replace_naming_the_later_version(client):
+    return replace(client, DECISION, {"sections": [*SECTIONS, CONSEQUENCES]}, message="Say what follows", version=LATER)
+
+
+@then("the decision records the later version of the decision type")
+def _at_the_later_version(client):
+    assert read(client, DECISION).type == LATER
+
+
+@then("the store holds the decision at the IRI it had before")
+def _held_where_it_was(root, client):
+    assert [name for name in held.names(root) if name.startswith(type_iri("decision") + "/")] == [DECISION]
+    assert read(client, DECISION).id == DECISION
+
+
+NOT_LATER = {
+    "the earlier version of the decision type": EARLIER,
+    "the version of the tag type": version_iri("tag", 1),
+}
+
+
+@given("a store holding two versions of a decision type and a tag type", target_fixture="client")
+def _two_versions_of_the_decision_type_and_a_tag_type(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    for type_content in [DECISION_TYPE, TAG_TYPE]:
+        define(client, type_content)
+    assert not next_version(client, "decision", DECISION_TYPE).faults
+    return client
+
+
+@given("a decision conforming to the later version of the decision type")
+def _a_decision_at_the_later_version(client):
+    _a_decision_conforming_to(client, 2, {"sections": SECTIONS})
+    assert read(client, DECISION).type == LATER
+
+
+@when(
+    parsers.re(f"the client replaces the decision, naming (?P<version>{'|'.join(map(re.escape, NOT_LATER))}), saying which role and why"),
+    target_fixture="attempt",
+)
+def _replace_naming_a_version_not_later(root, client, version):
+    before = held.text(root, DECISION)
+    response = replace(
+        client, DECISION, {"sections": [SECTIONS[0], ONE_RATIONALE]}, message="Say why weekly", version=NOT_LATER[version])
+    return {"response": response, "before": before}
+
+
+@then("the change is rejected because an artifact moves only to a later version of its own type")
+def _rejected_as_not_later(attempt):
+    refused = attempt["response"]
+    assert refused.revision == 0
+    assert [(fault.artifact, fault.place, fault.rule) for fault in refused.faults] == [(DECISION, "", "version")]
+    assert refused.faults[0].message.startswith("an artifact moves only to a later version of its own type")
+
+
+@then("the decision reads as before")
+def _the_decision_as_before(root, attempt):
+    assert held.text(root, DECISION) == attempt["before"]

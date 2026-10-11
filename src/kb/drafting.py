@@ -1,12 +1,20 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
-the operations before it left it, then every artifact the set touched checked once, its content, its links and a type
-as a type, against the store as the whole set leaves it; each change then as the port takes it, with the revisions of
-the types it was read through. A fault anywhere refuses the whole set with every fault found."""
+the operations before it left it, then every change checked, its content, its links and a type as a type, against the
+store as the whole set leaves it, and a set with no other fault refused for every link from outside it into a part one
+of its changes drops; each change then as the port takes it, with the revisions of
+the types it was read through and the IRIs where a type could be defined nearer, as holding nothing (kb.standing);
+and whether the set lands only as drafted while the write lock is held. The imports a set makes of one type's versions are handed one after another, in the order of
+their numbers whatever order the set gave them in, each the version its file names at the revision its file gives, read
+at the revision the one before it left the type at, the first at the revision the store's type stands at when
+it is a version above the one that type stands at; an imported artifact is checked, and its links read, through the
+version of its type its file names. Only
+what the set changes is handed: a type's change restates the links of no artifact, which stay as the version it
+conforms to declares them. A fault anywhere refuses the whole set with every fault found."""
 from typing import NamedTuple
 
 from kb import (
-    canonical, composition, definitions, edits, fault_order, keys, links, places, port, refusals, requests, search, settled,
-    validation, values,
+    composition, definitions, edits, fault_order, handing, names, port, port_values, refusals, requests, settled,
+    standing, validation, values,
 )
 from kb.draft import Draft
 from kb.edits import Change
@@ -14,48 +22,85 @@ from kb.values import Refused
 
 
 class Drafted(NamedTuple):
-    """A set drafted against the store as it stood: the draft, its changes, their texts, the changes as the port takes
-    them, the links read again of what the set leaves as it is, and the kinds whose links it reads anew."""
+    """A set drafted against the store as it stood: the draft, its changes, their texts, the changes as the port
+    takes them, and whether it lands only as drafted while the write lock is held, the port comparing nothing that
+    would show what landed since: a set that removes a type (a type made that reads it, a link landed that waits
+    under it), one that defines a type (an artifact or a link landed under its IRI), and one that makes or links
+    to something below an artifact where a type could be defined in that artifact's place (kb.standing)."""
     draft: Draft
     changes: list[Change]
     texts: list[str | None]
-    handed: list[port.Change]
-    relinks: list[port.Relink]
-    kinds: tuple[values.Kind, ...]
+    handed: list[port_values.Change]
+    locked: bool
 
 
 def drafted(held: port.Port, operations: list) -> Drafted:
-    """The set drafted and serialised against the store as it stands, each change as the port takes it, and the
-    links of what it leaves as it is read again."""
+    """The set drafted and serialised against the store as it stands, each change as the port takes it."""
     draft = Draft(held)
-    changes = _drafted(draft, operations)
-    texts = _serialised(changes)
+    changes = _drafted(draft, _by_number(operations))
+    texts = handing.serialised(changes)
+    _kept_whole(draft, changes)
     last = {change.artifact_id: index for index, change in enumerate(changes)}
-    handed = [_handed(draft, change, last[change.artifact_id] == index) for index, change in enumerate(changes)]
-    relinks = [_relinked(draft, each) for each in draft.stale()]
-    return Drafted(draft, changes, texts, handed, relinks, tuple(draft.reread()))
+    handed = [
+        handing.handed(draft, change, read, last[change.artifact_id] == index)
+        for index, (change, read) in enumerate(zip(changes, _read_at(held, changes), strict=True))
+    ]
+    handed, below = standing.guarded(handed, draft)
+    locked = below or any(standing.removes_a_type(change) or standing.defines_a_type(change) for change in changes)
+    return Drafted(draft, changes, texts, handed, locked)
 
 
-def _relinked(draft: Draft, artifact_id: values.ArtifactId) -> port.Relink:
-    """The links of an artifact the set leaves as it is, read again through the types as the set leaves them, with the
-    revision it was read at and those of the types it was read through that the set leaves as they are."""
-    artifact = draft.artifact(artifact_id)
-    return port.Relink(
-        artifact_id, tuple(links.handed(artifact_id, artifact, draft)), artifact["revision"],
-        draft.as_read(composition.read_through(artifact_id.kind, draft)),
-    )
+def _by_number(operations: list) -> list:
+    """The set's operations, the imports it makes of one type's versions put in the order of their numbers, in the
+    places the set gave those imports, whatever order it gave them in: so the type stands at the highest."""
+    places: dict = {}
+    for index, operation in enumerate(operations):
+        if isinstance(operation, edits.Import) and type(operation.artifact.get("version")) is int:
+            places.setdefault(operation.artifact_id, []).append(index)
+    ordered = list(operations)
+    for indices in places.values():
+        by_number = sorted((operations[index] for index in indices), key=lambda each: each.artifact["version"])
+        for index, operation in zip(indices, by_number):
+            ordered[index] = operation
+    return ordered
+
+
+def _read_at(held: port.Port, changes: list[Change]) -> list[int]:
+    """The revision each change read its artifact at: the one before the one it leaves; or, for an import, which
+    keeps the revision its file gives, the one the set's change before it left that artifact at, and for the first
+    the one the store's type stands at when it brings a version above the one that type stands at, else 0, as not
+    held. So the versions of one type a set imports land one after another, the type standing at the last."""
+    left, read = {}, []
+    for change in changes:
+        before = left.get(change.artifact_id)
+        if change.op != "import":
+            read.append(change.revision - 1)
+        else:
+            read.append(_gained_at(held, change) if before is None else before)
+        left[change.artifact_id] = change.revision
+    return read
+
+
+def _gained_at(held: port.Port, change: Change) -> int:
+    """The revision a type the store holds stands at, for an import of a version of it above the one it stands at;
+    0 for any other import, which lands only where nothing is held."""
+    if not (settled.typed(change.left) and held.holds(change.artifact_id)):
+        return 0
+    stands = held.artifact(change.artifact_id)
+    above = settled.typed(stands) and stands["version"] < change.left["version"]
+    return stands["revision"] if above else 0
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:
     """Every operation applied in order to a draft, then what the set leaves checked once; refused with every fault,
     in the order of the operations they belong to."""
-    outcomes = keys.resolved(draft, operations, [_acted(draft, operation) for operation in operations])
+    outcomes = [_acted(draft, operation) for operation in operations]
     changes = [each for each in outcomes if isinstance(each, Change)]
     last = {change.artifact_id: change for change in changes}
-    faults = [fault for outcome in outcomes for fault in _faults(draft, outcome, last)]
+    faults = [fault for outcome in outcomes for fault in _faults(draft, outcome)]
     if faults:
         raise Refused(faults)
-    return [_versioned(draft, change, last[change.artifact_id] is change) for change in changes]
+    return [handing.versioned(draft, change, last[change.artifact_id] is change) for change in changes]
 
 
 def _acted(draft: Draft, operation) -> Change | list:
@@ -68,21 +113,38 @@ def _acted(draft: Draft, operation) -> Change | list:
         return list(refused.faults)
 
 
-def _faults(draft: Draft, outcome: Change | list, last: dict) -> list:
+def _faults(draft: Draft, outcome: Change | list) -> list:
     """An operation's faults: those it was refused with as it acted; for a removal, every link the set leaves pointing
-    at what it removed; for a change, those it found as it acted, then what it left against its type as the set leaves
-    it, and, for the last the set makes to a type, that type checked as a type."""
+    at what it removed, then what stands in the way of a type's removal; for a change, those it found as it acted,
+    then what it left against its type as the set leaves it, and, for every change the set makes to a type, each
+    making a version that is kept, what it left checked as a type."""
     if not isinstance(outcome, Change):
         return outcome
     if outcome.left is None:
         return [
             refusals.still_linked(str(outcome.artifact_id), each.source, each.place)
             for each in draft.links_in(outcome.artifact_id) if each.source != outcome.artifact_id
-        ]
+        ] + standing.in_the_way(draft, outcome)
     faults = [*outcome.faults, *_fits(draft, outcome)]
-    if not faults and last[outcome.artifact_id] is outcome and outcome.artifact_id.kind == values.TYPE_KIND:
+    typed = composition.artifact_kind(outcome.left) == values.TYPE_KIND
+    if not faults and typed:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return _in_order(draft, outcome, faults)
+
+
+def _kept_whole(draft: Draft, changes: list[Change]) -> None:
+    """Refused, when the set has no other fault, with every link into a part the store held in an artifact and the
+    set leaves it without, from an artifact the set leaves as it is (one the set changes is checked as it leaves it):
+    the artifacts in the order the set first changes them, the links into each in the order of the names of the
+    artifacts holding them, the part named as a link writes it."""
+    dropped = {change.artifact_id: draft.dropped(change.artifact_id) for change in changes}
+    linked = [
+        refusals.still_linked(names.pointing(artifact_id, each.part), each.source, each.place)
+        for artifact_id, gone in dropped.items() if gone
+        for each in draft.links_in(artifact_id) if each.part in gone and not draft.changed(each.source)
+    ]
+    if linked:
+        raise Refused(linked)
 
 
 def _in_order(draft: Draft, change: Change, faults: list) -> list:
@@ -90,72 +152,21 @@ def _in_order(draft: Draft, change: Change, faults: list) -> list:
     if len(faults) < 2:
         return faults
     try:
-        declared = composition.declared(_typed(draft, change)["schema"], draft)
+        declared = composition.declared(handing.typed(draft, change)["schema"], draft)
     except Refused:
         return faults
     return fault_order.ordered(faults, settled.checked(change.left), declared)
 
 
 def _fits(draft: Draft, change: Change) -> list:
-    """Every fault of what a change left against its type, its links landing, both as the set leaves them."""
+    """Every fault of what a change left against its type, its links landing, both as the set leaves them, but
+    that a link the store already held waiting still waits, and so does each an import brings into a part its held
+    target lacks."""
     try:
-        schema = _typed(draft, change)
+        schema = handing.typed(draft, change)
     except Refused as refused:
         return list(refused.faults)
-    return validation.validate(str(change.artifact_id), settled.checked(change.left), schema["schema"], draft)
-
-
-def _typed(draft: Draft, change: Change) -> dict:
-    """The type a change is checked against: its kind's as the set leaves it, or, for an artifact the set later removes
-    when it leaves no such type, as the change acted on it. Raises Refused when an artifact the set leaves has no
-    type."""
-    if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(change.artifact_id.kind)):
-        return change.acted
-    return composition.kind_schema(change.artifact_id.kind, draft)
-
-
-def _versioned(draft: Draft, change: Change, last: bool) -> Change:
-    """A change recording the version of the type it was checked against, its entries in the order that type
-    declares; the last the set makes to an artifact put in the draft so. An import keeps the version it was written
-    against."""
-    if change.left is None or change.op == "import":
-        return change
-    schema = _typed(draft, change)
-    left = settled.order(
-        {**change.left, "schema_version": schema["version"]}, composition.declared(schema["schema"], draft),
-    )
-    if last:
-        draft.put(change.artifact_id, left)
-    return change._replace(schema_version=schema["version"], left=left)
-
-
-def _serialised(changes: list[Change]) -> list[str | None]:
-    """Each change's canonical text as the change left its artifact, None for a removal; refused if any cannot be
-    written."""
-    texts, found = [], []
-    for change in changes:
-        try:
-            texts.append(None if change.left is None else canonical.dump(change.left))
-        except canonical.NotCanonical as fault:
-            found.append(refusals.unwritable(change.artifact_id, str(fault), fault.path))
-    if found:
-        raise Refused(found)
-    return texts
-
-
-def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
-    """A change as the port takes it, read at the revision before the one it leaves, or, for an import, as not held:
-    its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
-    artifact, its links and the places of its parts as the set leaves them, read through the types as the set leaves
-    them, with the revisions of those types the set leaves as they are."""
-    read = 0 if change.op == "import" else change.revision - 1
-    if change.left is None:
-        return port.Change(change.artifact_id, None, read=read, revision=change.revision)
-    searched = tuple(search.searchable(change.left))
-    if not last:
-        return port.Change(change.artifact_id, change.left, read=read, revision=change.revision, searched=searched)
-    return port.Change(
-        change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft)),
-        tuple(places.parts(change.left)), read, change.revision,
-        draft.as_read(composition.read_through(change.artifact_id.kind, draft)), searched,
+    waited = draft.waited(change.artifact_id)
+    return validation.validate(
+        str(change.artifact_id), settled.checked(change.left), schema["schema"], draft, waited, change.op == "import",
     )

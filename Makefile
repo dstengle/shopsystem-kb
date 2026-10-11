@@ -1,4 +1,4 @@
-.PHONY: dev test bench contract image image-check
+.PHONY: dev test coverage-map coverage-ask bench contract image image-check
 
 # One virtualenv per checkout. kb is installed editable here; a client pins a tag.
 dev:
@@ -7,6 +7,16 @@ dev:
 
 test:
 	.venv/bin/python -m pytest -q -n auto
+
+# The map of which test executes which line of src/kb (a per-test context in .coverage-map, git-ignored), made by a
+# run of the whole suite under coverage; not part of test. Ask it with `make coverage-ask ARGS="tests-for src/kb/examining.py"`
+# or `ARGS="unexecuted"` (tools/coverage_map.py).
+coverage-map:
+	rm -f .coverage-map*
+	PYTHONPATH=tools .venv/bin/python -m pytest -q -n auto -p passed_record --cov --cov-context=test --cov-report=
+
+coverage-ask:
+	.venv/bin/python tools/coverage_map.py $(ARGS)
 
 # The performance bounds at 30,000 artifacts (spec/index.md); not part of test. `bench/bounds.py 3000` for a quick look.
 bench:

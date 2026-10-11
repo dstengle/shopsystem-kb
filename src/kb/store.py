@@ -3,7 +3,7 @@ adapter keeps the store in; or the connection to a server serving one, kb/server
 the callers and naming the server's `address`. Finding either, the way git finds a repository: upward from the
 working directory, or named by KB_ROOT. STORE_FORM is the store marker's value alone, written to store.yaml when the
 store is started; the store's own, not part of the published contract (adrs/0018). An earlier kb's marker held
-`contract`, and a store it made is told apart by that."""
+`contract`, or the form before this one, and a store it made is told apart by either."""
 import contextlib
 import os
 import shutil
@@ -16,12 +16,14 @@ from kb import canonical, refusals, rules, sqlite_store
 from kb.addresses import Address, address
 from kb.contract import kb_pb2
 from kb.port import Port, Unreadable
-from kb.values import Refused, Root
+from kb.roots import Root
+from kb.values import Refused
 
 MARKER = Path("kb") / "store.yaml"
 DATABASE = MARKER.parent / "store.sqlite3"
 CONNECTION = MARKER.parent / "server.yaml"
-STORE_FORM = 1
+STORE_FORM = 2
+EARLIER_FORM = 1
 STAGING = ".kb-starting"
 
 
@@ -70,13 +72,12 @@ def _marks(directory: Path) -> bool:
 
 
 class EarlierKb(Exception):
-    """The store was made by an earlier version of kb, in a form this kb cannot read: where it is, and the directory
-    holding its files, which are imported into a new store to move it."""
+    """The store was made by an earlier version of kb, in a form this kb can neither read nor move. It carries where
+    the store is."""
 
     def __init__(self, root: Path):
         super().__init__(str(root))
         self.root = root
-        self.files = root / MARKER.parent
 
 
 class LaterKb(Exception):
@@ -88,26 +89,32 @@ class LaterKb(Exception):
         self.root = root
 
 
-def opened(root) -> contextlib.AbstractContextManager[Port]:
-    """The store at root, open until the block ends: the database beside its marker, handed to the adapter. Raises,
-    opening nothing, EarlierKb when the marker is the one an earlier kb wrote, and LaterKb when it is any other but
-    this kb's own or cannot be read at all."""
+def opened(root, any_thread: bool = False) -> contextlib.AbstractContextManager[Port]:
+    """The store at root, open until the block ends: the database beside its marker, handed to the adapter, to be
+    used on whatever thread when asked so. Raises, opening nothing, EarlierKb when the marker is the one an earlier
+    kb wrote, and LaterKb when it is any other but this kb's own or cannot be read at all."""
     _told_apart(Path(root))
-    return sqlite_store.opened(Path(root) / DATABASE)
+    return sqlite_store.opened(Path(root) / DATABASE, any_thread)
 
 
 def _told_apart(root: Path) -> None:
-    """Refuse a store whose marker is not exactly this kb's: one holding `contract`, which an earlier kb wrote, as an
-    earlier kb's; any other, and one that cannot be read at all, whatever its bytes, as a later kb's."""
+    """Refuse a store whose marker is not exactly this kb's: one holding `contract`, or naming exactly the form before
+    this one, which an earlier kb wrote, as an earlier kb's; any other, and one that cannot be read at all, whatever
+    its bytes, as a later kb's."""
     try:
         marker = canonical.load((root / MARKER).read_text(encoding="utf-8"))
     except (canonical.NotCanonical, UnicodeDecodeError, OSError):
         raise LaterKb(root) from None
-    if isinstance(marker, dict) and canonical.dump(marker) == canonical.dump({"store": STORE_FORM}):
+    if isinstance(marker, dict) and _names(marker, STORE_FORM):
         return
-    if isinstance(marker, dict) and "contract" in marker:
+    if isinstance(marker, dict) and ("contract" in marker or _names(marker, EARLIER_FORM)):
         raise EarlierKb(root)
     raise LaterKb(root)
+
+
+def _names(marker: dict, form: int) -> bool:
+    """Whether the marker is exactly the one a kb keeping stores in that form writes."""
+    return canonical.dump(marker) == canonical.dump({"store": form})
 
 
 def start(root: Root, fill: Callable[[Port], None], made: Callable[[Path], None] | None = None) -> None:

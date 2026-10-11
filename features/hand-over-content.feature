@@ -2,12 +2,13 @@
 Feature: Hand over content
   Narrator: the client
 
-  @slice-1.6
-  Scenario: Content that settles what only the store settles is refused
-    Pins the boundary around identity: name and version belong to the store alone, and content reaching for either is refused with each such entry named back.
+  @slice-159
+  Scenario: Content given to a create that carries what travels beside it is refused
+    Pins that the artifact's IRI, the version of its type and its revision travel beside the content and never inside it, and that each one the content carried is named back.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision whose content carries a name and a version for the artifact itself, saying which role and why
-    Then the artifact is rejected because content holds only what the type declares, and each thing it carried that only the store settles is named back
+    When the client creates a decision whose content carries the artifact's IRI, the version of its type and a revision for the artifact itself, saying which role and why
+    Then the artifact is rejected because content holds only what the type declares
+    And the artifact's IRI, the version of its type and the revision the content carried are each named back
 
   @slice-1.2
   Scenario: Content carrying a title of its own is refused

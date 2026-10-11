@@ -11,14 +11,14 @@ from pytest_bdd import given, parsers, then, when
 
 import at_once
 import serving
-from calls import (DECISION_TYPE, a_decision_type_and_a_decision, answer, create, created, creating, define,
-                   journal, listing, read, replace, signature, snapshot, start_a_store)
+from calls import (DECISION_TYPE, a_decision_type_and_a_decision, answer, create, created, creating, define, iri,
+                   journal, listing, read, replace, signature, snapshot, start_a_store, type_iri, TYPE_OF_TYPES)
 from conftest import _kb
 from kb import client as kb_client
 from kb import sqlite_search, store
 from kb.contract import kb_pb2
 
-DECISIONS = ("decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly")
+DECISIONS = (iri("decision", "price-reviews-happen-weekly"), iri("decision", "prices-are-reviewed-monthly"))
 
 
 def _sections(rationale):
@@ -90,7 +90,7 @@ def _restores(backup, root, tmp_path, restored):
 def everything(root):
     """Every artifact the store holds, by name, read whole as the contract gives it."""
     client = kb_client.connect(root)
-    kinds = {"schema", *(name.split("/", 1)[1] for name in listing(client, "schema", ids_only=True).ids)}
+    kinds = {TYPE_OF_TYPES, *listing(client, TYPE_OF_TYPES, ids_only=True).ids}
     return {name: read(client, name, whole=True).response
             for kind in sorted(kinds) for name in listing(client, kind, ids_only=True).ids}
 
@@ -120,7 +120,7 @@ def _backup_holds_everything(backup, root, tmp_path_factory, restored):
 @then("it holds everything the store backed up held")
 def _holds_everything(restored):
     held = everything(restored["from"])
-    assert set(held) >= {"schema/decision", *DECISIONS}
+    assert set(held) >= {type_iri("decision"), *DECISIONS}
     assert everything(restored["place"]) == held
 
 
@@ -154,7 +154,7 @@ def _history_ends_with_the_replace(restored):
 
 # A backup made while the store is written to.
 
-LANDING = ("decision/stock-is-counted-weekly", "decision/stock-is-counted-monthly", "decision/stock-is-counted-yearly")
+LANDING = (iri("decision", "stock-is-counted-weekly"), iri("decision", "stock-is-counted-monthly"), iri("decision", "stock-is-counted-yearly"))
 
 
 @given("a store holding a type for decisions")
@@ -420,7 +420,7 @@ def _a_backup_of_a_decision(tmp_path):
 @then("it holds everything the store backed up held, its history and its journal included")
 def _holds_everything_with_history_and_journal(restored):
     held = everything(restored["from"])
-    assert {"schema/decision", "decision/price-reviews-happen-weekly"} <= set(held)
+    assert {type_iri("decision"), iri("decision", "price-reviews-happen-weekly")} <= set(held)
     assert everything(restored["place"]) == held
     assert the_journal(restored["place"]) == the_journal(restored["from"])
 

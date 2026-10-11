@@ -10,12 +10,17 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-from kb import names
+from kb import names, sqlite_types
 from kb.content import text
-from kb.port import Candidate, Linking
-from kb.values import ArtifactId, Kind, artifact_id
+from kb.port_values import Candidate, Linking, TypeVersion
+from kb.values import ArtifactId, Below, Kind, Version
 
 PAIRS = "~pairs"
+WAITING = (
+    "SELECT source, field, place, target, part, ordinal, holder FROM links WHERE implicit = 0 AND ("
+    "NOT EXISTS (SELECT 1 FROM artifacts WHERE id = target) OR (part != '' AND NOT EXISTS"
+    " (SELECT 1 FROM parts WHERE artifact = target AND parts.place = part)))"
+)
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
@@ -51,7 +56,7 @@ def moment(at: datetime) -> int:
 
 
 def ordered(written: list[str]) -> list[ArtifactId]:
-    return [artifact_id(name) for name in sorted(written, key=names.order)]
+    return [ArtifactId(name) for name in sorted(written, key=names.order)]
 
 
 class Reads:
@@ -86,10 +91,27 @@ class Reads:
             raise KeyError(str(artifact_id))
         return decoded(rows[0][0])
 
-    def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
+    def type_version(self, version: Version) -> TypeVersion:
+        found = sqlite_types.read(self._db, str(version))
+        if found is None:
+            raise KeyError(str(version))
+        stored, revision, title = found
+        return TypeVersion(version, decoded(stored), revision, title)
+
+    def versions(self, type_id: ArtifactId) -> list[int]:
+        return sqlite_types.numbers(self._db, str(type_id))
+
+    def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None,
+            path: Below | None = None, leaving: tuple[Kind, ...] = ()) -> list[ArtifactId]:
         narrowed = "" if kind is None else " WHERE kind = ?"
-        rows = self._rows(f"SELECT id, content FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
-        return ordered([name for name, stored in rows if not fields or _holds(decoded(stored), fields)])
+        rows = self._rows(f"SELECT id, content, kind FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
+        left_out = {each.name for each in leaving}
+        return ordered([
+            name for name, stored, of_kind in rows
+            if of_kind not in left_out
+            and (path is None or names.selects(path.segments, name, of_kind))
+            and (not fields or _holds(decoded(stored), fields))
+        ])
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
         return self._links_into(artifact_id, field, kind, implicit=False)
@@ -97,25 +119,36 @@ class Reads:
     def _links_into(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None,
                     implicit: bool = True) -> list[Linking]:
         """The links landing on an artifact or a part inside it; the implicit ones too, unless left out."""
+        return [each for each, _ in self._kinded(artifact_id, field, kind, implicit)]
+
+    def _kinded(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None,
+                implicit: bool = True) -> list[tuple[Linking, str]]:
+        """The links landing on an artifact or a part inside it, each with the kind of the artifact holding it."""
         rows = self._rows(
-            "SELECT source, field, place, target, part, ordinal FROM links WHERE target = ?"
+            "SELECT links.source, field, place, target, part, ordinal, artifacts.kind, holder FROM links"
+            " LEFT JOIN artifacts ON artifacts.id = links.source WHERE target = ?"
             + ("" if implicit else " AND implicit = 0"), str(artifact_id),
         )
         rows.sort(key=lambda row: (names.order(row[0]), row[5]))
-        found = [_linking(*row[:5]) for row in rows]
         return [
-            each for each in found
-            if (not field or each.field == field) and (kind is None or each.source.kind == kind)
+            (_linking(*row[:5], row[7]), row[6]) for row in rows
+            if (not field or row[1] == field) and (kind is None or row[6] == kind.name)
         ]
 
     def inbound(self, artifact_id: ArtifactId) -> dict[tuple[str, str], int]:
         counts, counted = {}, set()
-        for each in self.links_in(artifact_id):
-            key = (each.source.kind.name, each.field)
+        for each, of_kind in self._kinded(artifact_id, implicit=False):
+            key = (of_kind, each.field)
             if (key, each.source) not in counted:
                 counted.add((key, each.source))
                 counts[key] = counts.get(key, 0) + 1
         return counts
+
+    def waiting(self, source: ArtifactId | None = None) -> list[Linking]:
+        """One artifact's are found by the links' key, which begins with their source, never by reading them all."""
+        rows = self._rows(WAITING) if source is None else self._rows(WAITING + " AND source = ?", str(source))
+        rows.sort(key=lambda row: (names.order(row[3]), names.order(row[0]), row[5]))
+        return [_linking(*row[:5], row[6]) for row in rows]
 
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:
@@ -126,7 +159,7 @@ class Reads:
         rows.sort(key=lambda row: (names.order(row[0]), row[4]))
         wanted = {what for what, asked in (("section", sections), ("field", fields)) if asked}
         return [
-            Candidate(artifact_id(name), label if what == "section" else "", label if what == "field" else "")
+            Candidate(ArtifactId(name), label if what == "section" else "", label if what == "field" else "")
             for name, of_kind, what, label, _ in rows
             if what in wanted and (kind is None or of_kind == kind.name)
         ]
@@ -149,9 +182,13 @@ class Reads:
     def entry_ids(self, at: datetime) -> list[str]:
         return [entry_id for (entry_id,) in self._rows("SELECT id FROM entries WHERE moment = ?", moment(at))]
 
+    def landed_last(self) -> str:
+        last = self._rows("SELECT id FROM entries ORDER BY landing DESC LIMIT 1")
+        return last[0][0] if last else ""
 
-def _linking(source: str, field: str, place: str, target: str, part: str) -> Linking:
-    return Linking(artifact_id(source), field, place, artifact_id(target), part)
+
+def _linking(source: str, field: str, place: str, target: str, part: str, holder: str | None) -> Linking:
+    return Linking(ArtifactId(source), field, place, ArtifactId(target), part, holder)
 
 
 def _holds(artifact: dict, fields: dict[str, str]) -> bool:

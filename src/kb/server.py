@@ -17,11 +17,12 @@ from typing import Callable
 
 import grpc
 
-from kb import names, served, store
+from kb import served, store
 from kb.addresses import Address
 from kb.contract import kb_pb2, kb_pb2_grpc
-from kb.servicer import KbServicer, boundary
-from kb.values import artifact_id
+from kb.boundary import boundary
+from kb.servicer import KbServicer
+from kb.values import TYPE_KIND, type_of
 
 WORKERS = 8  # calls answered at once
 GRACE = 3  # seconds the calls in flight are given to finish when the server stops
@@ -42,7 +43,7 @@ class _Opening:
     @boundary(Opened)
     def opened(self, request, held):
         """The store opened and read, which a damaged database is found by only once it is."""
-        held.holds(artifact_id(names.written(names.TYPES, names.TYPES)))
+        held.holds(type_of(TYPE_KIND))
         return Opened()
 
 
@@ -83,19 +84,20 @@ class InOrder:
 
 
 class _OneAtATime:
-    """The servicer a server hosts, each rpc that writes taken under the server's lock (`Server.taking`), so changes
-    are taken one at a time in the order they come to it; every other rpc as the servicer answers it."""
+    """The servicer a server hosts, each call that writes taken under the server's lock (`Server.taking`), so changes
+    are taken one at a time in the order they come to it; every other call as the servicer answers it. Whether a
+    call writes is asked of its request, as the servicer marks its rpc (`writes`)."""
 
     def __init__(self, servicer: KbServicer, server: "Server"):
         self._servicer, self._server = servicer, server
 
     def __getattr__(self, name):
         rpc = getattr(self._servicer, name)
-        if not getattr(rpc, "writes", False):
-            return rpc
 
         @functools.wraps(rpc)
         def taken(request, context=None):
+            if not rpc.writes(request):
+                return rpc(request, context)
             with self._server.taking:
                 return rpc(request, context)
         return taken

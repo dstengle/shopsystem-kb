@@ -1,25 +1,39 @@
-"""The check of the whole store, read through the port: every artifact against the current version of its type, the
-stale listed beside the violations."""
-from kb import composition, fault_order, settled, validation
+"""The check of the whole store, read through the port: every artifact against the version of its type it
+conforms to, the stale listed beside the violations, and the placeholders apart from both."""
+from kb import composition, fault_order, port_values, query, settled, validation
 from kb.contract import kb_pb2
 from kb.port import Port
 
 
 def everything(store: Port) -> kb_pb2.Checked:
-    """Every artifact checked against the current version of its type, and listed as stale when it was last
-    checked against an older one; each kind's type composed once."""
-    violations, stale, schemas = [], [], {}
+    """Every artifact checked against the version of its type it conforms to, and listed as stale when its type
+    stands at a later one; each version of a type read once. The placeholders are those the client is given when it
+    asks for them, made of the waiting links read once, and a link among them that waits on a part its held
+    target lacks is no violation, by the judgement a change to its artifact is checked with (kb.validation)."""
+    violations, stale, schemas, standing = [], [], {}, {}
+    waiting = store.waiting()
+    held = _by_holder(waiting)
     for artifact_id in store.ids():
         artifact = store.artifact(artifact_id)
-        if artifact_id.kind not in schemas:
-            schemas[artifact_id.kind] = composition.kind_schema(artifact_id.kind, store)
-        schema = schemas[artifact_id.kind]
-        if artifact["schema_version"] < schema["version"]:
+        conforming = composition.conforming(artifact)
+        if conforming not in schemas:
+            schemas[conforming] = composition.artifact_schema(artifact, store)
+        if conforming.kind not in standing:
+            standing[conforming.kind] = composition.kind_schema(conforming.kind, store)["version"]
+        if conforming.number < standing[conforming.kind]:
             stale.append(kb_pb2.Stale(
-                artifact=str(artifact_id), schema_version=artifact["schema_version"], current=schema["version"],
+                artifact=str(artifact_id), schema_version=conforming.number, current=standing[conforming.kind],
             ))
-        found = validation.validate(str(artifact_id), settled.checked(artifact), schema["schema"], store)
-        violations += fault_order.ordered(
-            found, settled.checked(artifact), composition.declared(schema["schema"], store),
-        )
-    return kb_pb2.Checked(violations=violations, stale=stale)
+        schema = schemas[conforming]["schema"]
+        waited = port_values.held_waiting(held.get(artifact_id, ()))
+        found = validation.validate(str(artifact_id), settled.checked(artifact), schema, store, waited)
+        violations += fault_order.ordered(found, settled.checked(artifact), composition.declared(schema, store))
+    return kb_pb2.Checked(violations=violations, stale=stale, placeholders=query.placeholders_of(waiting).placeholders)
+
+
+def _by_holder(waiting: list) -> dict:
+    """The waiting links by the artifact holding each, each artifact's in the order given."""
+    found = {}
+    for each in waiting:
+        found.setdefault(each.source, []).append(each)
+    return found

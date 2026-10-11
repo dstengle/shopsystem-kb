@@ -2,6 +2,13 @@
 Feature: Check a change
   Narrator: the client
 
+  @slice-162
+  Scenario: An artifact created naming a version of its type is checked against that version
+    Pins that a create is held to the version it names, not to the latest one, so a client can write to the version it knows.
+    Given a store holding two versions of the decision type, where the later one requires a section the earlier one does not
+    When the client creates a decision naming the earlier version of the decision type, with content that fits the earlier version and lacks the section the later one requires, saying which role and why
+    Then the client is given the IRI the artifact keeps for life and its first version
+
   @slice-25
   Scenario: An artifact missing a required section is refused
     Pins that the sections a type requires are checked at creation, in order, so nothing incomplete gets into the store to be fixed later.
@@ -9,18 +16,77 @@ Feature: Check a change
     When the client creates a decision with a rationale and no purpose, saying which role and why
     Then the artifact is rejected because the sections the type requires must all be present, in order
 
-  @slice-25
-  Scenario: An artifact pointing at something that is not there is refused
-    Pins that links are checked against the store as it stands, so the graph never contains a link that lands nowhere.
+  @slice-167
+  Scenario: An artifact pointing at an IRI under a type the store does not hold is refused
+    Pins that a link may only reach toward a type the store knows, so nothing in the graph points into a kind nobody has defined.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision that supersedes a decision the store does not hold, saying which role and why
+    When the client creates a decision that supersedes an IRI under a type the store does not hold, saying which role and why
     Then the artifact is rejected because a link must land on a node of a kind the type allows
 
-  @slice-7
+  @slice-166.1
+  Scenario: An artifact pointing at an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder
+    Pins that a link may run ahead of what it points at, so a client can write what it knows before the rest is written.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    When the client creates a decision that supersedes a decision the store does not hold, at an IRI under the decision type, saying which role and why
+    Then the client is given the IRI the artifact keeps for life and its first version
+    And asked for the placeholders, the client is given that IRI, with the new decision linking to it
+
+  @slice-168
+  Scenario: An artifact pointing into a part of an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder
+    Pins that a link into a part may run ahead of the artifact that will hold the part, as a link to a whole artifact may.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede or into one of its options, and may carry a collection of options
+    When the client creates a decision that supersedes an option of a decision the store does not hold, at an IRI under the decision type, saying which role and why
+    Then the client is given the IRI the artifact keeps for life and its first version
+    And asked for the placeholders, the client is given the IRI the link points at, with the new decision linking to it
+
+  @slice-168
+  Scenario: An artifact pointing into a part a held artifact does not have is refused
+    Pins that a placeholder stands only for what is not held, so a link into a held artifact must find the part it names.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede or into one of its options, and may carry a collection of options
+    And a decision the store holds, with no option named "rollback"
+    When the client creates a decision that supersedes the option "rollback" of that decision, saying which role and why
+    Then the artifact is rejected because a link must land on a node of a kind the type allows
+
+  @slice-167
+  Scenario: An artifact pointing at an IRI the store does not hold, under a type the link does not allow, is refused
+    Pins that a placeholder is typed by the IRI it sits under, so a link to something not yet written is held to the link's kinds as a link to something held is.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    And a process type
+    When the client creates a decision that supersedes an IRI the store does not hold, under the process type, saying which role and why
+    Then the artifact is rejected because a link must land on a node of a kind the type allows
+
+  @slice-168
+  Scenario: Creating an artifact at an IRI links already point at fills the placeholder
+    Pins that a placeholder is filled by creating what it names, with no relinking by the client.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
+    And a decision that supersedes a decision the store does not hold, at an IRI under the decision type
+    When the client creates a decision at that IRI, saying which role and why
+    Then following the link from the first decision reaches the new decision
+    And asked for the placeholders, the client is not given that IRI
+
+  @slice-168
+  Scenario: Creating an artifact without the part a link points into leaves that link on a placeholder
+    Pins that creating the artifact fills only what it holds, so a link into a part it lacks is reported, not refused and not lost.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede or into one of its options, and may carry a collection of options
+    And a decision that supersedes the option "rollback" of a decision the store does not hold, at an IRI under the decision type
+    When the client creates a decision at that IRI with no option named "rollback", saying which role and why
+    Then the client is given the IRI the artifact keeps for life and its first version
+    And asked for the placeholders, the client is given the IRI the link points at, with the first decision linking to it
+
+  @slice-170.1
+  Scenario: Changing an artifact that holds a link waiting on a part its target lacks leaves the link waiting
+    Pins that a link left waiting by someone else's create does not lock the artifact that holds it: its other content can still change, and only a link the change itself makes is judged anew.
+    Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede or into one of its options, and may carry a collection of options
+    And a decision that supersedes the option "rollback" of a second decision, the second created afterwards with no option named "rollback"
+    When the client replaces the first decision's rationale, leaving what it supersedes as it is, saying which role and why
+    Then the change is accepted
+    And asked for the placeholders, the client is still given the IRI the link points at, with the first decision linking to it
+
+  @slice-167
   Scenario: An artifact with several faults reports them all
     Pins that a refusal is a full account rather than the first complaint, so a client can fix everything in one more attempt and the store is untouched meanwhile.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
-    When the client creates a decision that is missing its purpose and supersedes a decision the store does not hold, saying which role and why
+    When the client creates a decision that is missing its purpose and supersedes an IRI under a type the store does not hold, saying which role and why
     Then the artifact is rejected with both faults, each naming the artifact, the place in it and the rule broken
     And the store is unchanged
 
@@ -72,22 +138,31 @@ Feature: Check a change
     Then the client is given the name the artifact keeps for life and its first version
     And the rationale reads back with an empty body
 
-  @slice-23
-  Scenario: Changing an artifact that is behind its type brings it up to date
-    Pins that being behind the type is not a state to migrate out of separately: a write that fits the current version clears it as a side effect.
+  @slice-163
+  Scenario: Changing an artifact that is behind its type naming no version keeps it at the version it conforms to
+    Pins that a change naming no version never moves an artifact to a later version of its type, so being behind is cleared only by asking for it.
     Given a store holding a decision with a purpose and a rationale, at its first version
-    Given a decision last checked against an older version of the decision type, which still fits the current version
-    When the client replaces the decision with content that fits the current version of its type, saying which role and why
-    Then the decision records the current version of its type
-    And it is no longer listed as behind its type
+    Given a decision last checked against an older version of the decision type, where the current version requires a section the older one does not
+    When the client replaces the decision naming no version, with content that fits the older version and lacks the section the current one requires, saying which role and why
+    Then the decision is replaced
+    And it is still listed as behind its type
 
-  @slice-23
-  Scenario: Changing an artifact that is behind its type with content the current version will not have is refused
-    Pins that being behind buys no leniency: the write is checked against the current version like any other, and a failing one changes nothing, staleness included.
+  @slice-163
+  Scenario: Changing an artifact that is behind its type naming the latest version, with content that fits it, brings it up to date
+    Pins that an artifact moves to the latest version of its type when a change names it and fits it, and that this clears being behind.
     Given a store holding a decision with a purpose and a rationale, at its first version
     Given a decision last checked against an older version of the decision type
-    When the client replaces the decision with content that does not fit the current version of its type, saying which role and why
-    Then the change is rejected because the content does not fit the current version of its type, like any change that does not fit
+    When the client replaces the decision naming the latest version of the decision type, with content that fits that version, saying which role and why
+    Then the decision records the latest version of its type
+    And it is no longer listed as behind its type
+
+  @slice-163
+  Scenario: Changing an artifact that is behind its type naming a later version, with content that does not fit it, is refused
+    Pins that naming a later version buys no leniency: the change is checked against the version it names, and a refused one changes nothing, being behind included.
+    Given a store holding a decision with a purpose and a rationale, at its first version
+    Given a decision last checked against an older version of the decision type
+    When the client replaces the decision naming the latest version of the decision type, with content that does not fit that version, saying which role and why
+    Then the change is rejected because the content does not fit the version it names, like any change that does not fit
     And reading the decision gives what it held before, at the version it held before
     And it is still listed as behind its type
 
@@ -99,11 +174,11 @@ Feature: Check a change
     Then the change is rejected because the sections the type requires must all be present, in order
     And reading the decision gives what it held before, at the version it held before
 
-  @slice-64
-  Scenario: An item pointing at something that is not there is refused
-    Pins that a link inside an item is a link like any other, so nothing enters the graph pointing nowhere by sitting inside a collection.
+  @slice-167
+  Scenario: An item pointing at an IRI under a type the store does not hold is refused
+    Pins that a link inside an item is held to the types the store knows like any other link, so nothing reaches into an undefined kind by sitting inside a collection.
     Given a store holding a process with two steps and a shared step other processes use
-    When the client adds a step that points at a shared step the store does not hold, saying which role and why
+    When the client adds a step that points at an IRI under a type the store does not hold, saying which role and why
     Then the item is rejected because a link must land on a node of a kind the type allows
     And the process holds the steps it held before, at the version it held before
 

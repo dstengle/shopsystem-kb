@@ -1,18 +1,20 @@
 """While `kb serve` owns a store, every rpc that writes, asked of the store directly, is refused with `served`, naming
-the server's address, and writes nothing, while every read is answered; a server killed without warning leaves the
-store taking changes again; and a second server on a served store is refused before it listens, the first serving on
-(the plan's decisions 1 to 4)."""
+the server's address, and writes nothing, while every read is answered, a set asked to be checked only among them; a
+server killed without warning leaves the store taking changes again; and a second server on a served store is refused
+before it listens, the first serving on (the plan's decisions 1 to 4)."""
 import pytest
 
-from calls import (CLIENT, TAG_TYPE, answer, create, creating, define, replacing, removing, signature,
-                   start_a_store)
+from calls import (
+    CLIENT, TAG_TYPE, answer, create, created, creating, define, iri, replacing, removing, signature, start_a_store,
+    type_iri,
+)
 from conftest import _kb
 import held
 import serving
 from kb import client as kb_client
 from kb.contract import kb_pb2
 
-KEPT = "tag/kept"
+KEPT = iri("tag", "kept")
 
 
 def _started(root):
@@ -34,7 +36,7 @@ WRITING = {
                                      signature=_signed()),
     "Remove": lambda: removing(KEPT),
     "BatchCreate": lambda: kb_pb2.BatchCreateRequest(
-        items=[kb_pb2.CreateItem(kind="tag", title="New", content="{}\n")], signature=_signed()),
+        items=[created("tag", "New", {})], signature=_signed()),
     "BatchReplace": lambda: kb_pb2.BatchReplaceRequest(
         items=[kb_pb2.ReplaceItem(locator=kb_pb2.Locator(id=KEPT), content="summary: Still kept.\n")],
         signature=_signed()),
@@ -52,8 +54,26 @@ READING = {
     "History": lambda: kb_pb2.HistoryRequest(),
     "Search": lambda: kb_pb2.SearchRequest(text="kept"),
     "Follow": lambda: kb_pb2.FollowRequest(locator=kb_pb2.Locator(id=KEPT)),
-    "List": lambda: kb_pb2.ListRequest(kind="tag"),
+    "List": lambda: kb_pb2.ListRequest(kind=type_iri("tag")),
+    "Placeholders": lambda: kb_pb2.PlaceholdersRequest(),
+    "Export": lambda: kb_pb2.ExportRequest(),
 }
+
+
+CHECKING = {rpc: WRITING[rpc] for rpc in ("BatchCreate", "BatchReplace")}
+
+
+@pytest.mark.parametrize("rpc", CHECKING)
+def test_a_set_asked_of_a_served_store_directly_to_be_checked_only_is_answered_and_writes_nothing(root, request, rpc):
+    client = _started(root)
+    serving.serving(root, request)
+    before = held.holds(root), held.history(client)
+    asked = CHECKING[rpc]()
+    asked.check_only = True
+    answered = answer(getattr(client, rpc)(asked))
+    assert not answered.refused, answered.faults
+    assert (answered.batch, len(answered.results)) == ("", 1)
+    assert (held.holds(root), held.history(client)) == before
 
 
 @pytest.mark.parametrize("rpc", WRITING)

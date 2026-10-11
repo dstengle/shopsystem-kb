@@ -4,10 +4,14 @@ import grpc
 import pytest
 from pytest_bdd import given, parsers, scenario, scenarios, then, when
 
-from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, create, define, read, tagged_decision_type, replace, start_a_store, answer
+from calls import (
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, answer, change_type, create, define, iri, read, replace,
+    start_a_store, tagged_decision_type, targets, type_iri, version_iri,
+)
 import held
 import serving
 from kb import client as kb_client
+from kb import names
 from kb import store as kb_store
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -16,13 +20,28 @@ scenarios("find-the-store.feature")
 scenarios("read-an-artifact.feature")
 
 
-@scenario("name-what-is-asked-for.feature", "A name that is not a plain name is refused")
-def test_a_name_that_is_not_a_plain_name_is_refused():
+@scenario("name-what-is-asked-for.feature", "A read by a name that is a path on the disk is refused")
+def test_a_read_by_a_name_that_is_a_path_on_the_disk_is_refused():
     pass
 
 
-@scenario("name-what-is-asked-for.feature", "A name that begins at the root of the disk is refused")
-def test_a_name_that_begins_at_the_root_of_the_disk_is_refused():
+@scenario('name-what-is-asked-for.feature', "A read by a name that is not an IRI of kb's grammar is refused")
+def test_a_read_by_a_name_that_is_not_an_iri_of_kb_s_grammar_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A read by an IRI links point at that the store does not hold is refused")
+def test_a_read_by_an_iri_links_point_at_that_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A read by an IRI under no type the store holds is refused")
+def test_a_read_by_an_iri_under_no_type_the_store_holds_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A name a call carries is an IRI of kb's grammar")
+def test_a_name_a_call_carries_is_an_iri_of_kb_s_grammar():
     pass
 
 
@@ -41,9 +60,9 @@ def test_a_read_that_names_a_place_the_artifact_does_not_hold_is_refused():
     pass
 
 
-OLDER = "decision/prices-are-reviewed-monthly"
-DECISION = "decision/price-reviews-happen-weekly"
-PROCESS = "process/open-the-shop"
+OLDER = iri("decision", "prices-are-reviewed-monthly")
+DECISION = iri("decision", "price-reviews-happen-weekly")
+PROCESS = iri("process", "open-the-shop")
 OLDER_SECTIONS = [
     {"title": "Purpose", "body": "Keep prices current.\n"},
     {"title": "Rationale", "body": "Monthly was enough once.\n"},
@@ -90,14 +109,14 @@ def _read_at_a_glance(client):
 
 @then("the client is given its name, its kind, its title and the few fields the type shows at a glance")
 def _identity_and_summary_fields(summary):
-    assert (summary.id, summary.kind, summary.title) == (DECISION, "decision", "Price reviews happen weekly")
+    assert (summary.id, summary.type, summary.title) == (DECISION, version_iri("decision"), "Price reviews happen weekly")
     assert loads(summary.content) == {"supersedes": OLDER}
 
 
 @then("a stub of each thing it points at and of each of its parts")
 def _stubs(summary):
-    assert {(stub.field, stub.id, stub.kind, stub.title) for stub in summary.references} == {
-        ("supersedes", OLDER, "decision", "Prices are reviewed monthly"),
+    assert {(stub.field, stub.id, stub.type, stub.title) for stub in summary.references} == {
+        ("supersedes", OLDER, version_iri("decision"), "Prices are reviewed monthly"),
     }
     assert [(stub.collection, stub.id, stub.title) for stub in summary.parts] == [
         ("options", "keep-weekly", "Keep weekly"),
@@ -108,7 +127,7 @@ def _stubs(summary):
 @then("how many things point at it, counted by their kind and by the link they use")
 def _inbound_counts(summary):
     assert [(count.kind, count.field, count.count) for count in summary.inbound] == [
-        ("work-item", "decisions", 2),
+        (type_iri("work-item"), "decisions", 2),
     ]
 
 
@@ -237,15 +256,45 @@ def _given_the_decision_answered(shown, channels, served, how):
     assert channels == ANSWERED[how](served)
 
 
+@pytest.fixture
+def asked_by_name():
+    """The name a read asked for, filled in by the When that made it."""
+    return {}
+
+
 @when("the client reads an artifact by a name the store holds nothing under", target_fixture="shown")
-def _read_a_name_the_store_lacks(client):
-    return read(client, "decision/nothing-of-the-sort")
+def _read_a_name_the_store_lacks(client, asked_by_name):
+    asked_by_name["name"] = iri("decision", "nothing-of-the-sort")
+    return read(client, asked_by_name["name"])
 
 
 @then("the read is rejected because the store holds nothing by that name, and the name asked for is given back")
-def _rejected_as_not_held(shown):
-    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [("decision/nothing-of-the-sort", "not-found")]
-    assert "decision/nothing-of-the-sort" in shown.faults[0].message
+def _rejected_as_not_held(shown, asked_by_name):
+    name = asked_by_name["name"]
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(name, "not-found")]
+    assert name in shown.faults[0].message
+
+
+@given("a store holding a decision that links to an IRI the store does not hold", target_fixture="client")
+def _store_with_a_link_to_an_iri_not_held(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    create(client, "decision", {
+        "title": "Price reviews happen weekly",
+        "supersedes": iri("decision", "nothing-of-the-sort"),
+        "sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+            {"title": "Rationale", "body": "Costs move weekly.\n"},
+        ],
+    })
+    return client
+
+
+@when("the client reads an artifact by that IRI", target_fixture="shown")
+def _read_the_iri_a_link_points_at(client, asked_by_name):
+    asked_by_name["name"] = iri("decision", "nothing-of-the-sort")
+    return read(client, asked_by_name["name"])
 
 
 @when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="shown")
@@ -253,30 +302,87 @@ def _read_by_the_name(client, name):
     return read(client, name)
 
 
-@then("the read is rejected because a name is a kind and a plain name of lower-case letters, digits and single hyphens")
-def _rejected_as_not_a_plain_name(shown):
-    assert [fault.rule for fault in shown.faults] == ["locator"]
-    assert "plain name" in shown.faults[0].message
+@then('the read is rejected because a name is an IRI, never a path')
+def _rejected_as_a_path(shown):
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [("/etc/passwd", "locator")]
+    assert "a name is an IRI, never a path" in shown.faults[0].message
+
+
+@given("a store holding three decisions, one of them superseded", target_fixture="client")
+def _store_with_three_decisions(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    sections = [{"title": "Purpose", "body": "Keep prices current.\n"}, {"title": "Rationale", "body": "It was agreed.\n"}]
+    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": sections})
+    create(client, "decision", {"title": "Price reviews happen weekly", "supersedes": OLDER, "sections": sections})
+    create(client, "decision", {"title": "Restock on Thursdays", "sections": sections})
+    return client
+
+
+@when("the client reads an artifact by an IRI under no type the store holds", target_fixture="shown")
+def _read_an_iri_under_no_type_held(client, asked_by_name):
+    asked_by_name["name"] = iri("invoice", "march")
+    return read(client, asked_by_name["name"])
+
+
+WITH_DOTS = DECISION.replace("/price-reviews", "/../price-reviews")
+HOST, _, PATH = DECISION.removeprefix("https://").partition("/")
+_PADDED = DECISION.rpartition("/")[0] + "/"
+NAMES = {
+    'the decision\'s IRI with the scheme "http"': DECISION.replace("https://", "http://", 1),
+    "the decision's IRI with its host in upper case": f"https://{HOST.upper()}/{PATH}",
+    "the decision's IRI with two dots together in its host": f"https://{HOST.replace('.', '..', 1)}/{PATH}",
+    "the decision's IRI with a segment holding an upper-case letter": DECISION.replace("price", "Price", 1),
+    "the decision's IRI with a segment holding two hyphens together": DECISION.replace("price-reviews", "price--reviews"),
+    "the decision's IRI with an empty segment in its path": DECISION.replace("/decision/", "/decision//", 1),
+    "the decision's IRI followed by a query": DECISION + "?as=of",
+    "the decision's IRI followed by a slash": DECISION + "/",
+    "the decision's IRI with a segment percent-encoded": DECISION.replace("price-reviews", "price%2dreviews"),
+    "a name of 513 characters, otherwise of kb's grammar": _PADDED + "a" * (names.LONGEST + 1 - len(_PADDED)),
+    "a name of 512 characters, of kb's grammar, that the store holds nothing under":
+        _PADDED + "a" * (names.LONGEST - len(_PADDED)),
+    'the decision\'s IRI with "@" in its host': DECISION.replace("https://", "https://someone@", 1),
+    'the decision\'s IRI holding "#" twice': DECISION + "#sections#purpose",
+}
+assert len(NAMES["a name of 512 characters, of kb's grammar, that the store holds nothing under"]) == names.LONGEST
+REASONS = {
+    "a name is an IRI of kb's grammar": "locator",
+    "the store holds nothing by that name": "not-found",
+}
+
+
+@when(parsers.re(f"the client reads an artifact by (?P<which>{'|'.join(map(re.escape, NAMES))})$"), target_fixture="shown")
+def _read_by_a_name_of_the_grammar(client, asked_by_name, which):
+    asked_by_name["name"] = NAMES[which]
+    return read(client, NAMES[which])
+
+
+@then(parsers.re(f"the read is rejected because (?P<why>{'|'.join(map(re.escape, REASONS))})$"))
+def _rejected_for_its_reason(shown, asked_by_name, why):
+    name = asked_by_name["name"]
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(name, REASONS[why])]
+    assert (shown.id, shown.content) == ("", "")
+
+
+@when('the client reads an artifact by a name whose path holds ".."', target_fixture="shown")
+def _read_a_name_with_dots(client, asked_by_name):
+    asked_by_name["name"] = WITH_DOTS
+    return read(client, WITH_DOTS)
+
+
+@then("the read is rejected because a name is an IRI of kb's grammar, and the name asked for is given back")
+def _rejected_as_not_an_iri(shown, asked_by_name):
+    name = asked_by_name["name"]
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(name, "locator")]
+    assert "a name is an IRI of kb's grammar" in shown.faults[0].message
+    assert repr(name) in shown.faults[0].message
 
 
 @then("no content comes back, from inside the store or outside it")
 def _no_content_at_all(shown):
     assert (shown.id, shown.title, shown.content) == ("", "", "")
     assert not shown.references and not shown.parts and not shown.inbound
-
-
-@when("the client reads an artifact by a name that begins at the root of the disk", target_fixture="shown")
-def _read_by_an_absolute_name(client, tmp_path):
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "secret.yaml").write_text("title: Not for the store\n")
-    return read(client, str(outside / "secret"))
-
-
-@then("the read is rejected because a name is a kind and a plain name, never a path")
-def _rejected_as_a_path(shown):
-    assert [fault.rule for fault in shown.faults] == ["locator"]
-    assert "never a path" in shown.faults[0].message
 
 
 PLACES = {
@@ -478,8 +584,8 @@ def _never_readied_again(readied):
     assert readied["used"] is readied["client"]
 
 
-DAILY = "decision/stock-is-counted-daily"
-NIGHTLY = "decision/stock-is-counted-nightly"
+DAILY = iri("decision", "stock-is-counted-daily")
+NIGHTLY = iri("decision", "stock-is-counted-nightly")
 COUNTING = [
     {"title": "Purpose", "body": "Know what is on the shelves.\n"},
     {"title": "Rationale", "body": "Counting catches shrinkage early.\n"},
@@ -514,6 +620,60 @@ def _points_back_as_a_name(whole):
     assert loads(whole.content)["supersedes"]["supersedes"] == DAILY
 
 
+NOT_HELD = iri("decision", "price-reviews-happen-daily")
+
+
+@given("the decision also points at a decision under an IRI the store does not hold")
+def _the_decision_also_points_at_an_iri_not_held(client):
+    """The decision type gains a second link field, and the decision a link in it to an IRI nothing is held at."""
+    schema = tagged_decision_type()["schema"]
+    schema["properties"]["revisits"] = schema["properties"]["supersedes"]
+    assert not change_type(client, "decision", schema).faults
+    content = loads(read(client, DECISION, whole=True).content)
+    changed = replace(client, DECISION, {**content, "revisits": NOT_HELD}, version=version_iri("decision", 2))
+    assert not changed.faults, changed.faults
+
+
+_WAITED = kb_pb2.Placeholder(id=NOT_HELD, links=[kb_pb2.Linking(artifact=DECISION, field="revisits", place="revisits")])
+"""The one link of the decision that lands on nothing held, as a read gives it: the whole of what a read marks, so
+a link that lands is shown unmarked by the list holding this alone."""
+
+
+@pytest.fixture
+def came_back(request):
+    """What the scenario's read gave, and whether it was read at a glance rather than whole."""
+    try:
+        return request.getfixturevalue("summary"), True
+    except pytest.FixtureLookupError:
+        return request.getfixturevalue("whole"), False
+
+
+@then("the stub of the link to that IRI is marked as not held")
+def _the_stub_is_marked_as_not_held(summary):
+    assert [stub for stub in summary.references if stub.id == NOT_HELD] == [
+        kb_pb2.Stub(field="revisits", id=NOT_HELD, not_held=True),
+    ]
+
+
+@then("the link to that IRI comes back marked as landing on nothing held, and is not filled in")
+def _the_link_is_marked_and_not_filled_in(came_back):
+    given, at_a_glance = came_back
+    if at_a_glance:
+        _the_stub_is_marked_as_not_held(given)
+        return
+    assert list(given.placeholders) == [_WAITED]
+    assert loads(given.content)["revisits"] == NOT_HELD
+
+
+@then("the link to the older decision carries no such mark")
+def _the_link_that_lands_carries_no_mark(came_back):
+    given, at_a_glance = came_back
+    if at_a_glance:
+        assert [stub.not_held for stub in given.references if stub.id == OLDER] == [False]
+    else:
+        assert list(given.placeholders) == [_WAITED]
+
+
 @when("the client reads the rationale of the decision", target_fixture="shown")
 def _read_the_rationale(client):
     return read(client, DECISION, section="Rationale")
@@ -536,14 +696,25 @@ def _read_the_whole_decision(client):
 
 @then("the client is given every field, every section and every part, in the order the type declares")
 def _everything_in_declared_order(whole):
-    assert (whole.id, whole.kind, whole.schema_version, whole.revision, whole.title) == (
-        DECISION, "decision", 1, 1, "Price reviews happen weekly",
+    assert (whole.id, whole.type, whole.revision, whole.title) == (
+        DECISION, version_iri("decision"), 1, "Price reviews happen weekly",
     )
     content = loads(whole.content)
     assert list(content) == ["supersedes", "sections", "options"]
     assert [section["title"] for section in content["sections"]] == ["Purpose", "Rationale"]
     assert [list(option) for option in content["options"]] == [["id", "title", "body"]] * 2
     assert [option["id"] for option in content["options"]] == ["keep-weekly", "go-monthly"]
+
+
+@then(
+    "beside its content the client is given its IRI, the IRI of the version of the decision type it conforms to, "
+    "its revision and its title"
+)
+def _identity_beside_content(whole):
+    assert (whole.id, whole.type, whole.revision, whole.title) == (
+        DECISION, version_iri("decision"), 1, "Price reviews happen weekly",
+    )
+    assert not {"id", "type", "revision", "title"} & set(loads(whole.content))
 
 
 @then("the older decision is given as the name it is known by, and nothing more")
@@ -590,7 +761,7 @@ def _older_filled_in(whole):
 @then("the tag is given in place of the link inside the older decision")
 def _tag_filled_in(whole):
     assert loads(whole.content)["supersedes"]["tags"] == [
-        {"id": "tag/pricing", "type": "tag", "schema_version": 1, "revision": 1, "title": "pricing"},
+        {"id": iri("tag", "pricing"), "type": version_iri("tag"), "revision": 1, "title": "pricing"},
     ]
 
 
@@ -611,12 +782,15 @@ def _branches_as_written(whole):
     assert set(steps[0]["branches"]) <= {step["id"] for step in steps}
 
 
-@then("the older decision comes with its name, its kind, its title and the version it is at, ahead of its content")
+@then(
+    "the older decision comes with its IRI, the IRI of the version of the decision type it conforms to, its title "
+    "and its revision, ahead of its content"
+)
 def _older_says_what_it_is(whole):
     older = loads(whole.content)["supersedes"]
-    assert list(older)[:5] == ["id", "type", "schema_version", "revision", "title"]
+    assert list(older) == ["id", "type", "revision", "title", "sections"]
     assert (older["id"], older["type"], older["title"], older["revision"]) == (
-        OLDER, "decision", "Prices are reviewed monthly", 1,
+        OLDER, version_iri("decision"), "Prices are reviewed monthly", 1,
     )
 
 
@@ -816,3 +990,69 @@ def opened_roots(monkeypatch):
         return opening(root)
     monkeypatch.setattr(kb_store, "opened", recorded)
     return roots
+
+
+NOTE_TEXT = {"summary": "Pricing notes", "reference": "see the pricing notes"}
+MOVED_ON = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "owner": {"type": "string"},
+        "reference": {
+            "type": "string",
+            "ref": {"targets": targets("decision"), "cardinality": "one", "parts": False, "on_delete": "refuse"},
+        },
+    },
+    "required": ["title"],
+    "summary": ["owner"],
+}
+NOTE = iri("note", "a-note")
+NOTE_READS = {
+    "the note at a glance": lambda client: read(client, NOTE),
+    "the whole note": lambda client: read(client, NOTE, whole=True),
+    "the whole note following its links one step": lambda client: read(client, NOTE, whole=True, depth=1),
+}
+
+
+@given(
+    "a note type whose first version shows a summary at a glance and holds a reference as plain text, and whose second "
+    "version shows an owner at a glance and makes the reference a link"
+)
+def _a_note_type_that_moved_on(client):
+    first = {
+        "title": "Note",
+        "version": 1,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"}, "summary": {"type": "string"}, "reference": {"type": "string"},
+            },
+            "required": ["title"],
+            "summary": ["summary"],
+        },
+    }
+    define(client, first)
+
+
+@given("a note that conforms to the first version, with a summary and a reference")
+def _a_note_at_the_first_version(client):
+    create(client, "note", {"title": "A note", **NOTE_TEXT})
+    response = change_type(client, "note", MOVED_ON)
+    assert not response.faults, response.faults
+
+
+@when(parsers.re(f"the client reads (?P<what>{'|'.join(map(re.escape, NOTE_READS))})$"), target_fixture="shown")
+def _read_the_note(client, what):
+    return NOTE_READS[what](client)
+
+
+@then(parsers.re("the note is given as the first version declares, (?P<as_declared>.*)"))
+def _the_note_as_its_version_declares(shown, as_declared):
+    assert not shown.faults, shown.faults
+    assert (shown.id, shown.type) == (NOTE, version_iri("note", 1))
+    if as_declared.startswith("its summary"):
+        assert loads(shown.content) == {"summary": NOTE_TEXT["summary"]}
+        assert not shown.references
+    else:
+        assert loads(shown.content)["reference"] == NOTE_TEXT["reference"]

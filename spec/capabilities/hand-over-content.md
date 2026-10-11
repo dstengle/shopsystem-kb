@@ -2,7 +2,7 @@
 id: capability/hand-over-content
 title: Hand over content
 narrator: the client
-rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action, decision/paired-escapes-are-one-character, decision/not-canonical-names-its-place]
+rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action, decision/paired-escapes-are-one-character, decision/not-canonical-names-its-place, decision/0027-each-type-version-is-its-own-iri]
 formulated_as: features/hand-over-content.feature
 ---
 
@@ -10,11 +10,11 @@ formulated_as: features/hand-over-content.feature
 
 ## Purpose
 
-When the client creates, changes or adds, it hands the store content as text. The store reads that text one plain way and refuses anything it cannot take, naming the place. Content holds only what the type declares; what only the store settles (name, kind, revisions, title) travels beside it. This capability covers reading the text. Whether the content fits its type is check-a-change.
+When the client creates, changes or adds, it hands the store content as text. The store reads that text one plain way and refuses anything it cannot take, naming the place. Content holds only what the type declares; what travels beside it is the artifact's IRI, the IRI of the version of its type it conforms to, its revision and its title. This capability covers reading the text. Whether the content fits its type is check-a-change.
 
 ## Behaviour
 
-- If content given to a create carries what only the store settles, such as a name or a revision for the artifact itself, the artifact is refused because content holds only what the type declares, naming each such entry.
+- If content given to a create carries what travels beside it, such as the artifact's IRI, the version of its type or a revision for the artifact itself, the artifact is refused because content holds only what the type declares, naming each such entry.
 - If content given to a create carries a title of its own as well as the title given alongside it, the artifact is refused because a title is given alongside the content, never inside it, naming the title the content carried.
 - If content given to a change carries a revision of its own, the change is refused because content holds only what the type declares, naming that entry, and the artifact reads as before, at the revision it held.
 - If an added item's content carries a name of its own, the item is refused because content holds only what the type declares, naming that entry, and the artifact holds the items it held before, at the revision it held.
@@ -33,7 +33,7 @@ When the client creates, changes or adds, it hands the store content as text. Th
 
 ## Implementation, may change
 
-- `content` is canonical YAML 1.2 text holding only fields, sections and parts; the identity keys (the id, the kind, `schema_version`, `revision` and `title`) are typed fields of the messages that carry an artifact, the kind's field named `kind`, never `type`. Clients parse content with any YAML parser.
+- `content` is canonical YAML 1.2 text holding only fields, sections and parts; the identity keys (the artifact's IRI, the IRI of the type version it conforms to, `revision` and `title`) are typed fields of the messages that carry an artifact. Clients parse content with any YAML parser.
 - Content is parsed with a safe YAML 1.2 loader using the core schema: only `true`, `false`, `null`, integers and floats are typed. Tags, anchors, aliases, `%YAML` and `%TAG` directives, documents beyond the first, and duplicate keys are each a fault naming the place.
 - One canonical checker runs on content after parsing and on the canonical text about to be stored or exported.
 - `kb.content` publishes `loads`, `dumps`, `text` and `NotCanonical`, the refusal of text kb cannot keep.

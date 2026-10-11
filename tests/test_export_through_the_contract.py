@@ -1,0 +1,241 @@
+"""Export through the contract, bound to its feature: the steps of the scenarios built so far, each export asked of
+the client as any rpc is and its stream read through `calls`."""
+import re
+
+import pytest
+from pytest_bdd import given, parsers, scenarios, then, when
+
+import held
+from calls import (DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, answer, create, define, export, exporting, filed, iri,
+                   journal, next_version, replace, slug, start_a_store, type_iri)
+from kb import client as kb_client
+from kb.content import dumps, loads
+from kb.contract import kb_pb2
+
+scenarios("export-through-the-contract.feature")
+
+SECTIONS = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs move weekly.\n"},
+]
+DECISION = iri("decision", "price-reviews-happen-weekly")
+REPLACED = [SECTIONS[0], {"title": "Rationale", "body": "Suppliers reprice weekly.\n"}]
+
+
+@pytest.fixture
+def client(root):
+    return kb_client.connect(root)
+
+
+@given("a store holding a type for decisions, a type for work items, two decisions and a work item",
+       target_fixture="made")
+def _decisions_and_a_work_item(root, client):
+    """The store, and the IRI of each artifact made in it that is not a type."""
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    define(client, WORK_ITEM_TYPE)
+    decisions = [create(client, "decision", {"title": title, "sections": SECTIONS}).id
+                 for title in ("Price reviews happen weekly", "Prices are reviewed monthly")]
+    work_item = create(client, "work-item", {"title": "Move the review to Mondays", "decisions": decisions[:1]})
+    return [*decisions, work_item.id]
+
+
+@given("a store holding a decision, whose replacement is the last entry landed in its history",
+       target_fixture="replaced")
+def _a_decision_replaced_last(root, client):
+    """The decision's IRI, and the entry its replacement landed, the last change made to the store."""
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    decision = create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS}).id
+    assert not replace(client, decision, {"sections": REPLACED}).faults
+    made, replacement = journal(client, artifact=decision).entries
+    return decision, replacement
+
+
+@given("a store holding a type for decisions and two decisions")
+def _two_decisions(root, client):
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
+        create(client, "decision", {"title": title, "sections": SECTIONS})
+
+
+@when("the client exports the store through the server", target_fixture="stream")
+def _exports_through_the_server():
+    """The stream as a client working where the connection is found is given it, not yet read."""
+    return kb_client.connect().Export(kb_pb2.ExportRequest())
+
+
+@when("the client exports the store", target_fixture="stream")
+def _exports(client):
+    """The stream as the client is given it, not yet read."""
+    return client.Export(kb_pb2.ExportRequest())
+
+
+@pytest.fixture
+def exported(stream):
+    """The stream read to its end, once, for every step that reads what it gave."""
+    return answer(stream)
+
+
+@then("the client is given the store's canonical files one at a time")
+def _given_the_files_one_at_a_time(exported, made):
+    """Each message of the stream gives one file, until the one that ends it; each file's text is canonical, and the
+    files are those of the three types' versions and of every artifact made."""
+    assert not exported.refused, exported.faults
+    assert [message.result.WhichOneof("part") for message in exported.messages] == ["file"] * 6 + ["end"]
+    for _, text in exported.files:
+        assert dumps(loads(text)) == text
+    assert sorted(place for place, _ in exported.files) == sorted(
+        [filed(TYPE_OF_TYPES, 1), filed(type_iri("decision"), 1), filed(type_iri("work-item"), 1), *map(filed, made)])
+
+
+@then("each file comes with the place that follows its artifact's IRI")
+def _each_place_follows_its_iri(exported):
+    """A type's version is at its type's IRI and its number, any other artifact at its own."""
+    for place, text in exported.files:
+        artifact = loads(text)
+        assert place == filed(artifact["id"], artifact.get("version"))
+
+
+@then("every file shows the store as it stood at one moment")
+def _every_file_shows_the_store(root, exported, made):
+    """Nothing has changed since: each artifact's file gives what the store holds of it now."""
+    files = {loads(text)["id"]: loads(text) for _, text in exported.files}
+    for name in made:
+        assert files[name] == held.artifact(root, name)
+
+
+@then("the client is told the position in the history those files reflect")
+def _told_the_position(client, exported, made):
+    """The work item was made last: the entry that made it is the last landed."""
+    assert exported.complete
+    assert exported.position == journal(client, artifact=made[-1]).entries[-1].id
+
+
+@then("the position the client is told is the position of the history entry the decision's replacement landed")
+def _the_position_is_the_replacements(exported, replaced):
+    _, replacement = replaced
+    assert exported.position == replacement.id
+
+
+@then("the decision's file shows the decision as that replacement left it")
+def _the_file_shows_the_replacement(exported, replaced):
+    decision, _ = replaced
+    [shown] = [loads(text) for place, text in exported.files if place == filed(decision)]
+    assert (shown["revision"], shown["sections"]) == (2, REPLACED)
+
+
+@pytest.fixture
+def in_process(root):
+    """The same export as a client that reaches the store in process is given it."""
+    return export(kb_client.connect(root))
+
+
+@then("the client is given the same files, at the same places, as a client that reaches that store in process is "
+      "given")
+def _the_same_files_at_the_same_places(exported, in_process):
+    """The two decisions and both types' versions, each file's place and text as in process."""
+    assert not exported.refused, exported.faults
+    assert len(in_process.files) == 4
+    assert exported.files == in_process.files
+
+
+@then("the client is told the same position as a client that reaches that store in process is told")
+def _the_same_position(exported, in_process):
+    assert exported.position == in_process.position
+
+
+@then("the client is given the export")
+def _given_the_export(exported, holding):
+    """The whole of it, the decision's file in it, while the other change still holds the store."""
+    assert exported.complete, exported.faults
+    assert filed(DECISION) in [place for place, _ in exported.files]
+    assert holding.held  # the other change took the store before the export, and is let go only when the test ends
+
+
+@then("the export is not refused because the store was busy with another change")
+def _not_refused_as_busy(exported):
+    assert not exported.refused, exported.faults
+    assert "busy" not in [fault.rule for fault in exported.faults]
+
+
+@given("a store holding a type for decisions at its third version")
+def _a_type_at_its_third_version(root, client):
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    for version in (1, 2):
+        assert not next_version(client, "decision", {**DECISION_TYPE, "version": version}).faults
+
+
+@then("the client is given one file for each of the three versions of the type for decisions")
+def _one_file_for_each_version(exported):
+    """Three files for the type, one for each number, each giving the version its number says."""
+    assert not exported.refused, exported.faults
+    versions = {place: loads(text) for place, text in exported.files if loads(text)["id"] == type_iri("decision")}
+    assert sorted(versions) == sorted(filed(type_iri("decision"), number) for number in (1, 2, 3))
+    assert sorted(file["version"] for file in versions.values()) == [1, 2, 3]
+
+
+@then("each of those files is at the type's place, followed by `@` and that version's number")
+def _each_at_the_type_place_and_number(exported):
+    placed = {place: loads(text)["version"] for place, text in exported.files if loads(text)["id"] == type_iri("decision")}
+    assert placed == {filed(type_iri("decision"), number): number for number in (1, 2, 3)}
+
+
+BELOW = r'(decision|work item) whose path below its type is "([^"]+)"'
+
+
+@given(parsers.re(rf"a store holding (?P<named>an? {BELOW}.*)"))
+def _artifacts_below_their_types(root, client, named):
+    """Each decision and work item the step names, at the path below its type the step gives it."""
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    define(client, WORK_ITEM_TYPE)
+    for kind, path in re.findall(BELOW, named):
+        content = {"sections": SECTIONS} if kind == "decision" else {}
+        create(client, slug(kind), {"title": path, **content}, at=iri(slug(kind), path))
+
+
+@when(parsers.parse('the client exports selecting the path "{path}"'), target_fixture="stream")
+def _exports_selecting_a_path(client, path):
+    return client.Export(exporting(path=path))
+
+
+@then(parsers.re(r"the client is given the files? of (?P<these>the (?:decision|work item) at .*)"),
+      target_fixture="selected")
+def _given_the_files_of_these(root, exported, these):
+    """The whole export, and in it the file of each artifact the step names, showing what the store holds of it;
+    the places of those files are what the next step holds every file given against."""
+    assert exported.complete, exported.faults
+    files = dict(exported.files)
+    named = [iri(slug(kind), path) for kind, path in re.findall(r'(decision|work item) at "([^"]+)"', these)]
+    for name in named:
+        assert loads(files[filed(name)]) == held.artifact(root, name)
+    return [filed(name) for name in named]
+
+
+@then("the client is given no other file")
+def _given_no_other_file(exported, selected):
+    assert sorted(place for place, _ in exported.files) == sorted(selected)
+
+
+@when("the client exports selecting the type for decisions", target_fixture="stream")
+def _exports_selecting_a_type(client):
+    return client.Export(exporting("decision"))
+
+
+@then("the client is given the files of the two decisions", target_fixture="selected")
+def _given_the_files_of_the_two_decisions(root, exported, made):
+    """The whole export, and in it each decision's file, showing what the store holds of it."""
+    assert exported.complete, exported.faults
+    files = dict(exported.files)
+    for name in made[:2]:
+        assert loads(files[filed(name)]) == held.artifact(root, name)
+    return [filed(name) for name in made[:2]]
+
+
+@when(parsers.parse('the client exports selecting the path "{path}" and the type for decisions together'),
+      target_fixture="stream")
+def _exports_selecting_a_path_and_a_type(client, path):
+    return client.Export(exporting("decision", path))

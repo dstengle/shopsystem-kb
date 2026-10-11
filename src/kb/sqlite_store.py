@@ -12,10 +12,10 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from kb import sqlite_backup, sqlite_search
-from kb.port import Busy, Change, Entry, Relink, Unreadable
+from kb import sqlite_backup, sqlite_search, sqlite_types
+from kb.port import Busy, Unreadable
+from kb.port_values import Change, Entry
 from kb.sqlite_checks import Checks
-from kb.values import Kind
 from kb.sqlite_reads import encoded, moment
 
 FLOOR = (3, 9, 0)  # FTS5 and its ascii tokenizer; the suite has run on the SQLite Python 3.11 ships
@@ -27,7 +27,7 @@ CREATE INDEX artifacts_by_kind ON artifacts (kind);
 CREATE TABLE parts (artifact TEXT NOT NULL, place TEXT NOT NULL, PRIMARY KEY (artifact, place));
 CREATE TABLE links (
     source TEXT NOT NULL, ordinal INTEGER NOT NULL, field TEXT NOT NULL, place TEXT NOT NULL, target TEXT NOT NULL,
-    part TEXT NOT NULL, implicit INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (source, ordinal)
+    part TEXT NOT NULL, implicit INTEGER NOT NULL DEFAULT 0, holder TEXT, PRIMARY KEY (source, ordinal)
 );
 CREATE INDEX links_in ON links (target, part);
 CREATE TABLE sets (seq INTEGER PRIMARY KEY AUTOINCREMENT, batch TEXT UNIQUE);
@@ -46,32 +46,36 @@ CREATE VIRTUAL TABLE search USING fts5 (
 );
 CREATE TABLE searched (row INTEGER PRIMARY KEY, artifact TEXT NOT NULL);
 CREATE INDEX searched_by_artifact ON searched (artifact);
-"""
+""" + sqlite_types.SCHEMA
 
 
 def make(path: Path) -> None:
-    """A new database at path, its tables made and WAL mode set, once. Raises FileExistsError when anything is
-    there, sqlite3.Error when it cannot be made, and Unreadable as `supported` does."""
+    """A new database at path, its whole schema made in one transaction, so committed once, and then WAL mode set,
+    which SQLite sets only outside one. Raises FileExistsError when anything is there, sqlite3.Error when it cannot
+    be made, and Unreadable as `supported` does."""
     supported()
     if path.exists() or path.is_symlink():
         raise FileExistsError(f"a database is made only where nothing is: {path}")
     db = sqlite3.connect(_uri(path, "rwc"), uri=True)
     try:
-        db.executescript(SCHEMA)
+        db.executescript(f"BEGIN;{SCHEMA}COMMIT;")
         db.execute("PRAGMA journal_mode = WAL")
     finally:
         db.close()
 
 
 @contextlib.contextmanager
-def opened(path: Path) -> Iterator["SqliteStore"]:
-    """The database at path, open read-write until the block ends. Raises Unreadable, naming it, when it cannot be
-    opened, which creates nothing, or when any statement finds it damaged, which shows only once one is made; Busy
-    when a writer waited BUSY seconds for the write lock and another connection still held it."""
+def opened(path: Path, any_thread: bool = False) -> Iterator["SqliteStore"]:
+    """The database at path, open read-write until the block ends, its connection held to the thread that opened it
+    unless `any_thread`, which whoever asks for must then use on one thread at a time. Raises Unreadable, naming it,
+    when it cannot be opened, which creates nothing, or when any statement finds it damaged, which shows only once
+    one is made; Busy when a writer waited BUSY seconds for the write lock and another connection still held it."""
     supported()
     _writable(path)
     try:
-        db = sqlite3.connect(_uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None)
+        db = sqlite3.connect(
+            _uri(path, "rw"), uri=True, timeout=BUSY, isolation_level=None, check_same_thread=not any_thread,
+        )
     except sqlite3.OperationalError as error:
         raise Unreadable(f"{path}: {error}") from None
     try:
@@ -153,24 +157,19 @@ class SqliteStore(Checks):
     def copied(self, path: Path, form: int) -> None:
         sqlite_backup.copied(self._db, path, form, self._path)
 
-    def land(self, changes: list[Change], entries: list[Entry], relinks: list[Relink] = (),
-             kinds: tuple[Kind, ...] = ()) -> None:
+    def land(self, changes: list[Change], entries: list[Entry]) -> None:
         with self.exclusive(), self._saved():
             self._unheld(entries)
             landed = self._db.execute(
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
             ).lastrowid
-            self._unmoved(changes, relinks)
-            self._restated(kinds, changes, relinks)
-            before = {}
+            self._unmoved(changes)
+            before, waited = {}, self._waited(changes)
             for step, change in enumerate(changes):
                 held = self._compared(change.artifact, change.read)
                 before.setdefault(change.artifact, (held, set(self._parts(change.artifact))))
                 self._written(change, landed, step)
-            for relink in relinks:
-                self._compared(relink.artifact, relink.read)
-                self._linked(relink.artifact, relink.links)
-            self._integral(changes, before)
+            self._integral(changes, before, waited)
             self._recorded(entries)
 
     @contextlib.contextmanager
@@ -199,19 +198,24 @@ class SqliteStore(Checks):
             (name, landed, step, change.revision, stored),
         )
         if stored is None:
+            sqlite_types.removed(self._db, name)
             return
-        kind = change.artifact.kind.name
+        kind = change.kind.name
         self._db.execute(
             "INSERT INTO artifacts (id, kind, revision, content) VALUES (?, ?, ?, ?)", (name, kind, change.revision, stored),
         )
         self._db.executemany("INSERT INTO parts VALUES (?, ?)", [(name, place) for place in set(change.parts)])
         sqlite_search.searchable(self._db, name, kind, change.searched)
+        if change.version is not None:
+            version, title = change.version.version, change.version.title
+            sqlite_types.made(self._db, name, str(version), version.number, change.revision, title, stored)
 
     def _linked(self, artifact, links) -> None:
         """The links an artifact holds, in place of those it held."""
         self._db.execute("DELETE FROM links WHERE source = ?", (str(artifact),))
-        self._db.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?, ?)", [
-            (str(artifact), ordinal, link.field, link.place, str(link.target), link.part, int(link.implicit))
+        self._db.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
+            (str(artifact), ordinal, link.field, link.place, str(link.target), link.part, int(link.implicit),
+             link.holder)
             for ordinal, link in enumerate(links)
         ])
 

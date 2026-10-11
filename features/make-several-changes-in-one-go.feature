@@ -83,68 +83,79 @@ Feature: Make several changes in one go
     And each entry records the version that change left behind
     And the work item's version has gone up by two
 
-  @slice-121
+  @slice-160
   Scenario Outline: A create in a set points at what another create in it makes, earlier or later
     Pins that a link may point at what any create in the set makes, before or after it, because links are judged against the store as the whole set leaves it.
     When the client asks, in one go, for <creates>, in that order, saying which role and why
     Then the set lands, and the new work item points at the new decision
 
     Examples:
-      | creates                                                                                                                 |
-      | a decision to be created carrying a key and a work item to be created pointing at it by that key                        |
-      | a work item to be created pointing at a decision by the key its create carries and that decision to be created with it |
+      | creates                                                                                                                  |
+      | a decision to be created carrying an IRI and a work item to be created pointing at it by that IRI                        |
+      | a work item to be created pointing at a decision by the IRI its create carries and that decision to be created with it   |
 
-  @slice-121
-  Scenario Outline: A link in a set that refers to the key a create carries points at what that create makes
-    Pins that a key is only the client's handle inside the set: the link lands on the artifact the create makes, and what the store keeps is the name it gave that artifact, wherever in the set the link is written.
+  @slice-160
+  Scenario Outline: A link in a set to the IRI another create in it carries lands on what that create makes
+    Pins that new artifacts in one set name each other by the IRIs their creates carry, wherever in an artifact the link is written.
     Given work items may carry a collection of tasks, each of which may point at a decision
-    When the client asks, in one go, for a decision to be created carrying a key of the client's choosing and a work item to be created with a link to that key <where>, saying which role and why
-    Then the new work item points, <where>, at the decision that create made
-    And the link holds the name the store gave the decision, not the key
+    When the client asks, in one go, for a decision to be created carrying an IRI of the client's choosing and a work item to be created with a link to that IRI <where>, saying which role and why
+    Then the set lands
+    And the new work item points, <where>, at the decision that create made
 
     Examples:
-      | where                    |
-      | in its content           |
-      | inside one of its tasks  |
+      | where                   |
+      | in its content          |
+      | inside one of its tasks |
 
-  @slice-121
-  Scenario: Two new artifacts in one set that point at each other by their keys land
+  @slice-160
+  Scenario: Two new artifacts in one set that point at each other by their IRIs land
     Pins that a set is checked as a whole, so two artifacts that each need the other to exist can be made together, which no order of single changes allows.
     Given the decision type lets a decision point at another decision
-    When the client asks, in one go, for two decisions to be created, each carrying a key and pointing at the other by the key the other's create carries, saying which role and why
+    When the client asks, in one go, for two decisions to be created, each carrying an IRI and pointing at the other by the IRI the other's create carries, saying which role and why
     Then the set lands
     And the store holds both decisions, each pointing at the other
 
-  @slice-121
-  Scenario: Each create in a set gives back the name it was given, in the order of the set
-    Pins that a client which made several artifacts at once can tell which name went to which, without reading the store again.
-    When the client asks, in one go, for three decisions with titles of their own to be created, saying which role and why
+  @slice-180
+  Scenario Outline: A link in a set into a part a create in it names lands on that part
+    Pins that a client can link into a part of an artifact it creates in the same set, by the name it gave that part.
+    Given the decision type gives a decision a collection of options
+    And work items may carry a collection of tasks, each of which may point into a decision's option
+    When the client asks, in one go, for a decision to be created carrying an IRI and giving one of its options a name of the client's choosing, and a work item to be created with a link <where> to the decision's IRI and that option's place, saying which role and why
+    Then the set lands
+    And the new work item points, <where>, at that option of the decision
+
+    Examples:
+      | where                   |
+      | in its content          |
+      | inside one of its tasks |
+
+  @slice-180
+  Scenario Outline: A link in a set to an IRI nothing holds, under <type>, lands on a placeholder
+    Pins that a link to an artifact not yet held is kept, not refused, so long as its IRI sits under a type the store or the set provides and the link field allows.
+    Given work items may point at an artifact of <type>
+    When the client asks, in one go, for <creates>, the work item pointing at an IRI under <type> that neither the store nor any create in the set holds, saying which role and why
+    Then the set lands
+    And the work item's link lands on a placeholder at that IRI
+
+    Examples:
+      | type                                     | creates                                                       |
+      | the decision type, which the store holds | a work item to be created                                     |
+      | a note type a create in the set makes    | a note type to be created and a work item to be created       |
+
+  @slice-160
+  Scenario: Two creates in one set that carry the same IRI are refused
+    Pins that an IRI names one artifact only, so a set can never make two artifacts under it.
+    When the client asks, in one go, for two decisions to be created, both carrying the same IRI, saying which role and why
+    Then the set is rejected because an IRI names one artifact
+    And the IRI is given back
+    And the store holds none of the changes in the set
+
+  @slice-160
+  Scenario: Each create in a set gives back its artifact's IRI and first revision, in the order of the set
+    Pins that a client which made several artifacts at once can tell which result belongs to which create, and where each artifact starts, without reading the store again.
+    When the client asks, in one go, for three decisions to be created, each carrying an IRI of its own, saying which role and why
     Then the client is given a result for each create, in the order of the set
-    And each result gives the name the store gave the decision made by the create in that place
-
-  @slice-121
-  Scenario: A link in a set that refers to a key no create in it carries is refused
-    Pins that a key is never looked for outside its set, so a link whose key no create carries points at nothing and the whole set is stopped.
-    When the client asks, in one go, for a decision and a work item to be created, the work item pointing at a key no create in the set carries, saying which role and why
-    Then the set is rejected because the link lands on nothing
-    And the key is given back
-    And the store holds none of the changes in the set
-
-  @slice-121
-  Scenario: Two creates in one set that carry the same key are refused
-    Pins that a key names one create only, so a link to it can never be taken to mean either of two artifacts.
-    When the client asks, in one go, for two decisions to be created, both carrying the same key, saying which role and why
-    Then the set is rejected because a key names one create in the set
-    And the key is given back
-    And the store holds none of the changes in the set
-
-  @slice-121
-  Scenario: A link in a set that refers to a key together with a place inside what that create makes is refused
-    Pins that a key stands for a whole new artifact and nothing inside it, so a link that reaches past it into a place lands on nothing.
-    When the client asks, in one go, for a decision to be created carrying a key and a work item to be created pointing at that key together with a place inside the decision, saying which role and why
-    Then the set is rejected because the link lands on nothing
-    And the reference is given back
-    And the store holds none of the changes in the set
+    And each result gives the IRI of the decision made by the create in that place and its first revision
 
   @slice-122
   Scenario Outline: A change in a set that says a version its artifact no longer stands at is refused
@@ -181,3 +192,45 @@ Feature: Make several changes in one go
     Then the set is rejected because the store was busy with another change
     And nothing is written
     And the same set may be asked for again
+
+  @slice-177
+  Scenario Outline: A set of <changes> asked to be checked only answers as it would land and lands nothing
+    Pins that a client can learn what a set would give before committing to it, and that asking leaves no trace.
+    Given the store also holds a second work item
+    When the client asks, in one go, for <set> to be checked only, saying which role and why
+    Then the client is given each change's result as the set would give it if it landed
+    And the client is given no name for the set
+    And the store holds nothing of the set
+    And the store's history holds nothing of it
+
+    Examples:
+      | changes      | set                                                    |
+      | creates      | a decision and a work item to be created               |
+      | replacements | the work item and the second work item to be replaced  |
+
+  @slice-177
+  Scenario: A set asked to be checked only that would be refused is refused with every fault
+    Pins that checking only answers a bad set as landing it would, every fault included, and still leaves no trace.
+    Given a set whose first and second changes are each missing a section its type requires
+    When the client asks for the set to be checked only, saying which role and why
+    Then the set is rejected because a change in it does not fit its type
+    And every fault the set would be refused with comes back
+    And the store holds nothing of the set
+    And the store's history holds nothing of it
+
+  @slice-177
+  Scenario: A replacement in a set asked to be checked only that says a revision its artifact no longer stands at is refused
+    Pins that checking only holds a replacement to the revision the client read, just as landing would.
+    Given the store also holds a second work item
+    And the client read the work item at its first revision, and another client has since replaced it
+    When the client asks, in one go, for the work item and the second work item to be replaced, checked only, the replacement of the work item saying the revision the client read it at, saying which role and why
+    Then the set is rejected because the artifact moved since it was read
+    And the revision the work item stands at is given back
+
+  @slice-177
+  Scenario: A set asked to be checked only while another change is being written is answered, not refused as busy
+    Pins that checking only does not wait on a change being written, so it is never refused as busy.
+    Given another change is being written and holds the store longer than the store waits
+    When the client asks, in one go, for a decision and a work item to be created, checked only, saying which role and why
+    Then the client is answered
+    And the set is not rejected because the store was busy with another change

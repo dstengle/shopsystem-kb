@@ -2,7 +2,11 @@
 connection names, over a channel made for that call alone, and its response as the server gave it; a server that
 cannot be reached, never there, gone since, or something at the address that never answers as one, the rpc's own
 response refused with `unreachable`, naming the address. The channel gives up connecting after CONNECTING; a call
-sets no deadline of its own. A message may be of any size, either way."""
+sets no deadline of its own. A message may be of any size, either way. An rpc that answers with a stream is called
+the same way (`streamed`), its channel kept for as long as the stream is read."""
+import sys
+from contextlib import contextmanager
+
 import grpc
 
 from kb import refusals, responses
@@ -27,3 +31,28 @@ def called(address: Address, rpc: str, request, response):
             return getattr(kb_pb2_grpc.KbStub(channel), rpc)(request)
         except grpc.RpcError:
             return responses.refused(response, [refusals.unreachable(str(address))])
+
+
+def streamed(address: Address, rpc: str, request, response):
+    """The server's stream for the rpc, each message as the server sends it, over a channel of its own that is kept
+    until the stream ends or its reader closes it or lets it go, which tells the server to stop; no deadline is set
+    on its length. A server that cannot be reached, or is lost partway, ends the stream with one more message of the
+    rpc's type, refused: the stream's only message when none had come, its last otherwise."""
+    with _kept(address) as channel:
+        try:
+            yield from getattr(kb_pb2_grpc.KbStub(channel), rpc)(request)
+        except grpc.RpcError:
+            yield responses.refused(response, [refusals.unreachable(str(address))])
+
+
+@contextmanager
+def _kept(address: Address):
+    """A channel to the address, closed when the block ends, unless it ends because the program is ending: closing a
+    channel with a call still open waits on a thread of grpc's, which runs no longer by then, so the program would
+    never end; the channel is left to go with the process."""
+    channel = grpc.insecure_channel(str(address), options=_OPTIONS)
+    try:
+        yield channel
+    finally:
+        if not sys.is_finalizing():
+            channel.close()

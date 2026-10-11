@@ -1,13 +1,19 @@
-// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (decision/published-contract-v1).
+// kb contract. Regenerate with `make contract`. Versioned by kb's release tag (decision/published-contract-v2).
 //
 // Artifact content crosses as canonical YAML text beside the fixed
 // identity fields, since content shape is schema-defined at runtime.
+// Every artifact, part and type is named by an https IRI of kb's grammar:
+// an artifact's chosen by its client under its type's IRI, a part's its
+// artifact's IRI, `#` and its place, a type version's its type's IRI, `@`
+// and its number. A kind is named by its type's IRI. The type that
+// describes types is https://missingmass.io/kb/type.
 // Every response is its result or a refusal holding every fault, never
-// both; a refusal means nothing was written. A store is started off the
+// both; a refusal means nothing was written. `Export` alone answers with
+// a stream, and each message of the stream is such a response. A store is started off the
 // wire, by `kb.init` in the client's own process; no rpc starts one.
 syntax = "proto3";
 
-package kb.v1;
+package kb.v2;
 
 
 service Kb {
@@ -26,6 +32,8 @@ service Kb {
   rpc BatchReplace(BatchReplaceRequest) returns (BatchReplaceResponse);
   rpc BatchAdd(BatchAddRequest) returns (BatchAddResponse);
   rpc BatchRemove(BatchRemoveRequest) returns (BatchRemoveResponse);
+  rpc Placeholders(PlaceholdersRequest) returns (PlaceholdersResponse);
+  rpc Export(ExportRequest) returns (stream ExportResponse);
 }
 
 // Who made an entry in the history: the role, and the piece of work. The
@@ -42,7 +50,10 @@ message Signature {
   string message = 3;
 }
 
-// An artifact root when place is empty; a node inside it otherwise.
+// An artifact root when place is empty; otherwise a place inside the artifact,
+// which gives a part when it names one. A place naming a section, a field or a
+// collection gives no node. id may itself be a part's IRI, <IRI>#<place>;
+// giving both a part's IRI and a place is refused.
 message Locator {
   string id = 1;
   string place = 2;
@@ -60,16 +71,20 @@ message Refusal {
   repeated Fault faults = 1;
 }
 
-// A new artifact of a kind. The title travels here, never inside the
-// content.
+// A new artifact at the IRI its client chose, conforming to the version
+// of its type named by that version's IRI. The title travels here, never
+// inside the content.
 message CreateRequest {
-  string kind = 1;
+  reserved 1;
+  reserved "kind";
+  string id = 5;  // the artifact's IRI
+  string type = 6;  // the IRI of the type version it conforms to
   string title = 2;
   string content = 3;  // canonical YAML: fields, sections, parts
   Signature signature = 4;
 }
 
-// The name kb gave the artifact, and its version.
+// The artifact's IRI, and its revision.
 message Created {
   string id = 1;
   int32 revision = 2;
@@ -107,17 +122,26 @@ message ReadRequest {
 // An artifact at the level read: its identity and its content at that
 // level; a summary's content is the fields the type shows at a glance,
 // with a stub of each reference target and of each part, and inbound
-// counts.
+// counts. A part read gives the part alone as its content; its id, type,
+// revision and title are its artifact's. Read at a glance or whole, each link the read shows that lands
+// on nothing held, on an IRI the store does not hold or on a part the
+// artifact held there lacks, is given beside the content, where the link
+// stays as written: the links of the artifact read and, read whole
+// following links, of each artifact filled in, at every step followed,
+// each saying whose it is. A link that lands is not among them. A
+// section shows no link, and its read gives none.
 message Artifact {
+  reserved 2, 3;
+  reserved "kind", "schema_version";
   string id = 1;
-  string kind = 2;
-  int32 schema_version = 3;
+  string type = 10;  // the IRI of the type version it conforms to
   int32 revision = 4;
   string title = 5;
   string content = 6;  // canonical YAML
   repeated Stub references = 7;
   repeated PartStub parts = 8;
   repeated InboundCount inbound = 9;
+  repeated Placeholder placeholders = 11;  // each IRI a link shown, of it or of an artifact filled in, lands on nothing at, with those links
 }
 
 // A refusal: a bad locator, a name the store lacks, a place or a section
@@ -129,12 +153,22 @@ message ReadResponse {
   }
 }
 
+// An artifact in brief: one a list or a search gives, one a walk
+// reaches, or one a link of an artifact read at a glance points at.
+// When it is the stub of a link, it is of the artifact the link points
+// at or into a part of; when the store does not hold that artifact the
+// stub is its IRI alone, marked as not held. A link into a part its held
+// artifact lacks has that artifact's stub, not so marked: the read's
+// placeholders say that it lands on nothing held.
 message Stub {
+  reserved 3;
+  reserved "kind";
   string field = 1;
   string id = 2;
-  string kind = 3;
+  string type = 6;  // the IRI of the type version it conforms to
   string title = 4;
   string fields = 5;   // canonical YAML
+  bool not_held = 7;  // the stub of a link, at a glance or walked to: the store holds nothing at its IRI; never said of a part
 }
 
 message PartStub {
@@ -144,7 +178,7 @@ message PartStub {
 }
 
 message InboundCount {
-  string kind = 1;
+  string kind = 1;  // the type's IRI
   string field = 2;
   int32 count = 3;
 }
@@ -155,10 +189,14 @@ message CheckRequest {
 // Every violation the store holds, each a fault naming the artifact, the
 // place and the rule; they are what the store holds, not a refusal. Every
 // artifact last checked against an older version of its type is listed as
-// stale, whether or not it still fits.
+// stale, whether or not it still fits. Every placeholder is listed apart,
+// with the links into it, as `Placeholders` gives them at that moment; a
+// placeholder is never a violation, nor is a link into a part that the
+// artifact held at its IRI lacks, which is listed there.
 message Checked {
   repeated Fault violations = 1;
   repeated Stale stale = 2;
+  repeated Placeholder placeholders = 3;
 }
 
 // A refusal: no store found, or one that cannot be read.
@@ -188,6 +226,7 @@ message ReplaceRequest {
   string content = 2;  // canonical YAML: fields, sections, parts
   Signature signature = 3;
   int32 revision = 4;  // the revision the client read the artifact at; 0 says none
+  string type = 5;  // the IRI of the type version it is replaced to conform to; empty says it keeps its own
 }
 
 // The artifact replaced, and its version now.
@@ -220,6 +259,8 @@ message HistoryRequest {
 // change made alone names itself as its batch. A snapshot's entry has op
 // `snapshot`, lists what was read, and names no artifact of its own.
 message Entry {
+  reserved 8;
+  reserved "schema_version";
   string id = 1;
   string at = 2;
   Actor actor = 3;
@@ -227,7 +268,7 @@ message Entry {
   string artifact = 5;
   string place = 6;
   int32 revision = 7;
-  int32 schema_version = 8;
+  string type = 13;  // the IRI of the type version the artifact conforms to
   string digest = 9;
   string message = 10;
   string batch = 11;
@@ -247,7 +288,7 @@ message Entries {
   repeated Entry entries = 1;
 }
 
-// A refusal: a name that is not a plain name, a time that cannot be read,
+// A refusal: a name that is not an IRI, a time that cannot be read,
 // or no store found.
 message HistoryResponse {
   oneof outcome {
@@ -284,7 +325,7 @@ message Found {
   repeated Match matches = 1;
 }
 
-// A refusal: a kind that is not a plain name, a kind the store holds no
+// A refusal: a kind that is not a type's IRI, a kind the store holds no
 // type for, or no store found.
 message SearchResponse {
   oneof outcome {
@@ -295,7 +336,9 @@ message SearchResponse {
 
 // The links out of an artifact, or into it, followed as many steps as
 // depth says. A via names the one field a link may be; a kind, the one
-// kind an artifact reached may be. Either narrows every step.
+// kind an artifact reached may be. Either narrows every step, as does a
+// path: a step is kept when its artifact's path below its own type
+// begins with the path's segments, whole segments only.
 message FollowRequest {
   enum Direction {
     OUT = 0;
@@ -306,6 +349,7 @@ message FollowRequest {
   Direction direction = 3;
   string via = 4;
   string kind = 5;
+  string path = 6;  // the path below the type that every artifact reached is narrowed to
 }
 
 // One step of a route: the link taken and the name it landed on. Going
@@ -327,8 +371,8 @@ message Followed {
   repeated Reached reached = 1;
 }
 
-// A refusal: a bad locator, a name the store lacks, a kind that is not a
-// plain name, or no store found.
+// A refusal: a bad locator, a name the store lacks, a kind that is not
+// a type's IRI, or no store found.
 message FollowResponse {
   oneof outcome {
     Followed result = 1;
@@ -338,7 +382,10 @@ message FollowResponse {
 
 // The artifacts of one kind, narrowed to those whose fields hold the
 // values given, each value compared as the text it is written as. As
-// stubs by default, or as names only.
+// stubs by default, or as names only. With a path the kind may be left
+// out: the list then spans every kind but the type that describes types.
+// A path matches whole segments only. With neither a kind nor a path, the
+// list is refused.
 message ListRequest {
   enum Form {
     STUBS = 0;
@@ -347,6 +394,7 @@ message ListRequest {
   string kind = 1;
   map<string, string> fields = 2;
   Form form = 3;
+  string path = 4;  // the path below the type that the artifacts listed are narrowed to
 }
 
 // The matches in the order the store holds them, as stubs or as names.
@@ -355,8 +403,9 @@ message Listed {
   repeated string ids = 2;
 }
 
-// A refusal: a kind that is not a plain name, a kind the store holds no
-// type for, or no store found.
+// A refusal: a kind that is not a type's IRI, a path that is not one, a
+// kind the store holds no type for, neither a kind nor a path, or no store
+// found.
 message ListResponse {
   oneof outcome {
     Listed result = 1;
@@ -378,7 +427,7 @@ message Recorded {
 }
 
 // A refusal: an unsigned snapshot, or one naming no piece of work, a name
-// that is not a plain name, a name the store lacks, or no store found;
+// that is not an IRI, a name the store lacks, or no store found;
 // nothing was written.
 message SnapshotResponse {
   oneof outcome {
@@ -437,25 +486,29 @@ message RemoveResponse {
 }
 
 // A set of creates, landing in order as one change, or none does. A
-// create may carry a key of the client's choosing, unique in the set; a
-// link written `@` and the key, anywhere in the set, names the artifact
-// that create makes, and kb puts the name it gives that artifact in its
-// place before anything is checked. A key names a whole artifact, never
-// a place inside one.
+// link anywhere in the set names what another create of it makes by the
+// IRI that create carries, earlier in the set or later.
 message CreateItem {
-  string kind = 1;
+  reserved 1, 4;
+  reserved "kind", "key";
+  string id = 5;  // the artifact's IRI
+  string type = 6;  // the IRI of the type version it conforms to
   string title = 2;
   string content = 3;  // canonical YAML: fields, sections, parts
-  string key = 4;
 }
 
 message BatchCreateRequest {
   repeated CreateItem items = 1;
   Signature signature = 2;
+  // Asks that the set be checked only: answered as it would land, each
+  // change's result in order and no name for the set, or refused with every
+  // fault it would be refused with; nothing is written, and it is never
+  // refused as busy.
+  bool check_only = 3;
 }
 
-// The set's name, minted by kb, and each create's result in the order of
-// the set.
+// The set's name, minted by kb, empty for a set checked only, and each
+// create's result in the order of the set.
 message BatchCreated {
   string batch = 1;
   repeated Created results = 2;
@@ -473,15 +526,22 @@ message ReplaceItem {
   Locator locator = 1;
   string content = 2;  // canonical YAML: fields, sections, parts
   int32 revision = 3;  // the revision the client read the artifact at; 0 says none
+  string type = 4;  // the IRI of the type version it is replaced to conform to; empty says it keeps its own
 }
 
 message BatchReplaceRequest {
   repeated ReplaceItem items = 1;
   Signature signature = 2;
+  // Asks that the set be checked only: answered as it would land, each
+  // change's result in order and no name for the set, or refused with every
+  // fault it would be refused with; nothing is written, and it is never
+  // refused as busy.
+  bool check_only = 3;
 }
 
-// The set's name, minted by kb, and each replacement's result, naming the
-// artifact it replaced, in the order of the set.
+// The set's name, minted by kb, empty for a set checked only, and each
+// replacement's result, naming the artifact it replaced, in the order of
+// the set.
 message BatchReplaced {
   string batch = 1;
   repeated Replaced results = 2;
@@ -541,6 +601,107 @@ message BatchRemoved {
 message BatchRemoveResponse {
   oneof outcome {
     BatchRemoved result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// Asks for every placeholder: each IRI a link lands on nothing at, because
+// the store does not hold it or because what it holds there lacks the part
+// the link names.
+message PlaceholdersRequest {
+}
+
+// A link into a placeholder: the artifact holding it, the field, the
+// link's place in that artifact, and the part of the placeholder's IRI it
+// names.
+message Linking {
+  string artifact = 1;
+  string field = 2;
+  string place = 3;
+  string part = 4;  // the place of the part the link points into; empty when it names the whole IRI
+}
+
+// An IRI with every link that lands on nothing there, once however many
+// links name it or parts of it. Either the store does not hold the IRI,
+// and every link to it or into a part of it is given; or it holds an
+// artifact there that lacks a part some links name, and only those links
+// are given, each carrying its part. The links come in the order of the
+// names of the artifacts holding them, each artifact's in the order they
+// sit in it.
+// Nothing is stored for a placeholder: it is there while a link names it.
+message Placeholder {
+  string id = 1;
+  repeated Linking links = 2;
+}
+
+// The placeholders, in the order of their names. A link that lands on an
+// artifact the store holds, or on a part that artifact has, is left out.
+message Placeholders {
+  repeated Placeholder placeholders = 1;
+}
+
+// A refusal: no store found, or one that cannot be read.
+message PlaceholdersResponse {
+  oneof outcome {
+    Placeholders result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// Asks for the store as its canonical files: the whole store, or, with a
+// path, a kind or both, only the files of the artifacts they select. A
+// path selects the artifacts whose path below their own type begins with
+// its segments, whole segments only, whatever their type; a kind, named
+// by its type's IRI as a list's is, those of that type; both, those of
+// that type the path selects. A kind or a path brings the files of the
+// artifacts selected and no file of a version of their types; both apply
+// together. A selection that matches nothing is a whole export of no
+// file, ending with the position. A kind the store holds no type for is
+// refused as a list by it is.
+message ExportRequest {
+  string path = 1;
+  string kind = 2;
+}
+
+// One file of an export: its place below the directory an export is
+// written to, the host and the segments of its artifact's IRI joined by
+// `/`, the last followed by `.yaml`, a type version's by `@`, its number
+// and `.yaml`; and its canonical YAML text, the artifact whole.
+message ExportedFile {
+  string place = 1;
+  string text = 2;
+}
+
+// The end of an export: every file has been given. The position is the
+// position in the history the files reflect, the `id` of the last history
+// entry landed when the store stood at the export's moment; it names
+// that entry and promises no order between two positions. It is empty
+// when no entry has landed.
+message ExportEnd {
+  string position = 1;
+}
+
+// One message of an export's stream: a file, or, once and last, the end.
+message Exported {
+  oneof part {
+    ExportedFile file = 1;
+    ExportEnd end = 2;
+  }
+}
+
+// An export answers with a stream of these: one for each file, every file
+// showing the store as it stood at one moment, then one carrying the end.
+// An export refused gives a refusal as its only message: a kind that is
+// not a type's IRI, a kind the store holds no type for, a path that is
+// not one, no store found, or one that cannot be read. A server that
+// cannot be reached, or is lost partway, ends the stream with a refusal
+// in the end's place, the stream's only message when no file had come.
+// One that fails after files were given ends with a refusal in the end's
+// place. Only a stream whose last message carries the end is the whole
+// export.
+message ExportResponse {
+  oneof outcome {
+    Exported result = 1;
     Refusal refusal = 2;
   }
 }

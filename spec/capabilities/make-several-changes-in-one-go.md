@@ -2,7 +2,7 @@
 id: capability/make-several-changes-in-one-go
 title: Make several changes in one go
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-and-expected-revision, decision/busy-rule, decision/sets-one-kind-at-a-time, decision/references-inside-a-set, decision/expected-revision, decision/faults-ordered-by-reading-order-then-rule-name]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/0013-empty-set-refused, decision/0016-empty-set-fault, decision/a-refused-write-changes-nothing, decision/a-set-is-checked-whole-links-and-types, decision/a-set-lands-in-one-transaction, decision/write-lock-and-expected-revision, decision/busy-rule, decision/sets-one-kind-at-a-time, decision/keys-in-a-set-dropped, decision/expected-revision, decision/faults-ordered-by-reading-order-then-rule-name, decision/0024-a-link-may-land-on-a-placeholder, decision/0031-a-create-may-name-its-parts, decision/check-only-sets, decision/create-echoes-its-iri, decision/iri-grammar]
 formulated_as: features/make-several-changes-in-one-go.feature
 ---
 
@@ -10,7 +10,7 @@ formulated_as: features/make-several-changes-in-one-go.feature
 
 ## Purpose
 
-The client asks for an ordered set of changes of one kind (creates, replacements, additions or removals) as one act. The store names the set, and each change still reports its own result and leaves its own history entry. Each change acts on the store as the changes before it in the set left it. What a change points at, and the type it is checked against, are judged against the store as the whole set leaves it. New artifacts in one set point at each other by keys the client gives their creates. The set lands whole or not at all. This capability is not the individual changes themselves (change-the-store).
+The client asks for an ordered set of changes of one kind (creates, replacements, additions or removals) as one act. The store names the set, and each change still reports its own result and leaves its own history entry. Each change acts on the store as the changes before it in the set left it. What a change points at, and the type it is checked against, are judged against the store as the whole set leaves it. New artifacts in one set point at each other, and into each other's parts, by the IRIs their creates carry; a link to an IRI neither the store nor the set holds, under a type the store holds, lands on a placeholder. The set lands whole or not at all. A set of creates or of replacements may be asked to be checked only, answering as it would land and landing nothing. This capability is not the individual changes themselves (change-the-store).
 
 ## Behaviour
 
@@ -26,21 +26,25 @@ The client asks for an ordered set of changes of one kind (creates, replacements
 - If a set holds no changes, the client is given no name for the set and no results.
 - If a set holding no changes also lacks a role or a message, only the faults of the role and the message come back.
 - When a create in a set points at what another create in it makes, earlier or later, its links are checked against the store as the whole set leaves it; each change still acts on the store as the changes before it in the set left it.
-- When the client creates several artifacts in one go, giving a create a key of its own choosing, a link anywhere in the set that refers to that key points at the artifact that create makes, and holds the name the store gave that artifact.
-- When two new artifacts in one set point at each other, each by the key the other's create carries, the set lands.
-- When the client creates several artifacts in one go, each create's result gives the name it was given, in the order of the set.
-- If a link in a set refers to a key no create in the set carries, the set is refused because the link lands on nothing, naming the key, and the store holds none of its changes.
-- If two creates in one set carry the same key, the set is refused because a key names one create in the set, naming the key, and the store holds none of its changes.
-- If a link in a set refers to a key together with a place inside the artifact that create makes, the set is refused because the link lands on nothing, naming the reference, and the store holds none of its changes.
+- When the client creates several artifacts in one go, a link anywhere in the set to the IRI another create in it carries lands on the artifact that create makes.
+- When two new artifacts in one set point at each other, each by the IRI the other's create carries, the set lands.
+- When a create in a set gives a part a name of its own choosing, a link anywhere in the set to that artifact's IRI, `#` and that part's place lands on that part.
+- When a link in a set points at an IRI neither the store nor any create in the set holds, under a type the store holds, or one a create in the set makes, that the link field allows, the set lands and the link lands on a placeholder at that IRI.
+- If two creates in one set carry the same IRI, the set is refused because an IRI names one artifact, naming the IRI, and the store holds none of its changes.
+- When the client creates several artifacts in one go, each create's result gives the artifact's IRI and its first revision, in the order of the set.
 - If a replacement, an addition or a removal in a set says the revision the client read its artifact at, and the artifact stands at another revision when the set lands, the set is refused because the artifact moved since it was read, naming the revision it stands at, and nothing of the set is written.
 - When a set changes one artifact twice and the second change says the revision the client read the artifact at, that revision is compared with the one the change before it in the set left.
 - If a set waits longer than the store waits while another change is being written, the set is refused because the store was busy with another change, nothing is written, and the same set may be asked for again.
+- When the client asks for a set of creates or of replacements to be checked only, it is given each change's result as the set would give it if it landed, and no name for the set, and the store and its history hold nothing of it.
+- If a set asked to be checked only would be refused, it is refused with every fault it would be refused with, and the store and its history hold nothing of it.
+- If a replacement in a set asked to be checked only says the revision the client read its artifact at, and the artifact stands at another revision, the set is refused because the artifact moved since it was read, naming the revision it stands at.
+- While another change is being written to the store, when the client asks for a set to be checked only, it is answered and is not refused because the store was busy with another change.
 
 ## Implementation, may change
 
 - `Apply` and its four operation messages are gone. `BatchCreate`, `BatchReplace`, `BatchAdd` and `BatchRemove` each take an ordered list of one kind of change and one `Signature`, each with a request and a response message of its own, and return the set's name, minted by kb, and each change's own result in the order of the set; the set lands in one database transaction.
-- A create in `BatchCreate` may carry a key, unique in the set. A link written as `@` followed by a key names the artifact that create makes; kb puts the name it mints in its place before anything is checked. A reference names a whole artifact, never a part.
-- A key no create carries, a key carried twice and a key with a place are faults with rule `ref`.
+- `@key` references are gone: a create in `BatchCreate` carries its artifact's IRI, and a link anywhere in the set names it by that IRI. A create may give any part a name of its own, so a link into it is written `<IRI>#<place>`.
+- `BatchCreate` and `BatchReplace` take a flag asking that the set be checked only: the set is drafted and checked against the store as it stands, read in one read transaction without the write lock, each expected revision compared with the revision its artifact stands at; the response is each change's result or the faults, with no set name, and nothing is handed to the port. `BatchAdd` and `BatchRemove` take no such flag.
 - A replacement, an addition or a removal in a set may carry an expected revision; a mismatch is the fault with rule `revision` (change-the-store).
 - The set's name is carried by every entry the set writes.
 - An empty set is the fault with rule `operations`, no artifact and no place.

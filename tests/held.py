@@ -13,7 +13,7 @@ from pathlib import Path
 from kb import canonical, sqlite_store, store
 from kb.contract import kb_pb2
 from kb.sqlite_reads import encoded
-from kb.values import artifact_id
+from kb.values import Kind, Version, artifact_id
 
 _PLACE = "kb"
 _MARKER = "store.yaml"
@@ -53,6 +53,22 @@ def names(root):
     """The name of every artifact the store holds, sorted."""
     with store.opened(root) as opened:
         return sorted(str(each) for each in opened.ids())
+
+
+def versions(root):
+    """Every version the store holds of every type, by the type's name: the numbers held, lowest first. An artifact
+    that is no type, and a type with no version held, is not in it."""
+    with store.opened(root) as opened:
+        found = {str(each): opened.versions(each) for each in opened.ids()}
+    return {name: numbers for name, numbers in sorted(found.items()) if numbers}
+
+
+def version(root, name, number):
+    """A version the store holds of a type, as a mapping: the content, the revision and the title it was made with,
+    under the type's name."""
+    with store.opened(root) as opened:
+        found = opened.type_version(Version(Kind(name), number))
+    return {**found.content, "id": name, "revision": found.revision, "title": found.title}
 
 
 def history(client):
@@ -179,7 +195,7 @@ def make_read_only(root, what):
 
 def made_by_an_earlier_kb(root):
     """Make the store in `root` the way kb 0.3.0 kept one: its marker holding the contract, every artifact a canonical
-    file at kb/<kind>/<slug>.yaml, the history in kb/journal/, a git repository in kb/.git/, and no database. A
+    file below kb/ at the host and path of its name, the history in kb/journal/, a git repository in kb/.git/, and no database. A
     store this kb started there is taken apart into it; where none was started, it is a store of nothing."""
     place = _place(root)
     files = {name: text(root, name) for name in names(root)} if (place / _DATABASE).exists() else {}
@@ -187,12 +203,19 @@ def made_by_an_earlier_kb(root):
     for leftover in place.glob(f"{_DATABASE}*"):
         leftover.unlink()
     for name, canonical_text in files.items():
-        (place / f"{name}.yaml").parent.mkdir(exist_ok=True)
-        (place / f"{name}.yaml").write_text(canonical_text, encoding="utf-8")
+        filed = place / f"{name.removeprefix('https://')}.yaml"
+        filed.parent.mkdir(parents=True, exist_ok=True)
+        filed.write_text(canonical_text, encoding="utf-8")
     for directory, name, data in (("journal", "0001.yaml", "entry: first\n"), (".git", "HEAD", "ref: refs/heads/main\n")):
         (place / directory).mkdir(exist_ok=True)
         (place / directory / name).write_text(data, encoding="utf-8")
     (place / _MARKER).write_text(canonical.dump({"contract": "0.1"}), encoding="utf-8")
+
+
+def made_before_contract_v2(root):
+    """Make the store in `root` look as a kb of contract v1 kept it: its marker naming the form of store that kb wrote,
+    the database beside it left as it is, so that opening it would succeed."""
+    (_place(root) / _MARKER).write_text(canonical.dump({"store": 1}), encoding="utf-8")
 
 
 def made_by_a_later_kb(root):
@@ -267,3 +290,15 @@ def in_process(main, argv, cwd, env):
         os.environ.clear()
         os.environ.update(was_env)
     return types.SimpleNamespace(returncode=code or 0, stdout=out.getvalue(), stderr=err.getvalue())
+
+
+def database_open(root):
+    """The files of the store's database this process holds open, none when nothing in it has the store open: a
+    server hosted in this process holds them only while a call reads or writes."""
+    database, found = str(_place(Path(root).resolve()) / _DATABASE), []
+    for descriptor in os.listdir("/proc/self/fd"):
+        try:
+            found.append(os.readlink(f"/proc/self/fd/{descriptor}"))
+        except OSError:  # a descriptor closed since the listing, the listing's own among them
+            continue
+    return sorted(name for name in found if name.startswith(database))

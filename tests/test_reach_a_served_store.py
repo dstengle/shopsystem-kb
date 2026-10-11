@@ -10,7 +10,7 @@ import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, TAG_TYPE, answer, create, creating, define, journal, next_version, read, removing, replace,
+    DECISION_TYPE, TAG_TYPE, answer, create, creating, define, iri, journal, next_version, read, removing, replace,
     start_a_store, tagged_decision_type,
 )
 import serving
@@ -19,13 +19,13 @@ from kb.contract import kb_pb2
 
 scenarios("reach-a-served-store.feature")
 
-DECISION = "decision/price-reviews-happen-weekly"
+DECISION = iri("decision", "price-reviews-happen-weekly")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
 ]
-TAG = "tag/clearance"
-TAGGED = "decision/clearance-runs-monthly"
+TAG = iri("tag", "clearance")
+TAGGED = iri("decision", "clearance-runs-monthly")
 READ = kb_pb2.ReadRequest(locator=kb_pb2.Locator(id=DECISION))
 
 
@@ -36,17 +36,6 @@ def _store_with_a_decision(root):
     define(client, DECISION_TYPE)
     create(client, "decision", {"title": "Price reviews happen weekly", "sections": SECTIONS})
     return client
-
-
-@given("a server serves that store, and the client works where the connection to that server is found",
-       target_fixture="arranged")
-@given("a server the operator runs with kb serve serves that store, and the client works where the connection to "
-       "that server is found", target_fixture="arranged")
-def _served_and_working_where_the_connection_is(root, tmp_path, request, monkeypatch):
-    arranged = tmp_path / "arranged"
-    connection = serving.connection(arranged, serving.serving(root, request))
-    monkeypatch.chdir(arranged)
-    return {"connection": connection, "bytes": connection.read_bytes()}
 
 
 @pytest.fixture
@@ -76,7 +65,7 @@ def _removing_while_linking_through_the_server(tmp_path, address, monkeypatch):
     monkeypatch.chdir(arranged)
     return {
         "removing": removing(TAG, message="Nothing is on clearance"),
-        "creating": creating("decision", "Clearance runs monthly", message="Say how often", content={
+        "creating": creating("decision", "Clearance runs monthly", message="Say how often", version=2, content={
             "tags": [TAG],
             "sections": [
                 {"title": "Purpose", "body": "Clear old stock.\n"},

@@ -1,12 +1,13 @@
 """The operator's commands that are not rpcs, export, the import check, the import, the backup and the restore, over
-one store, each run inside the servicer's one boundary: the store opened first (but for a restore, which makes it),
-the command's values made, one call into the domain, and any refusal or escaping exception its faults."""
+one store, each run inside kb.boundary's one boundary: the store opened first (but for a restore, which makes it),
+the command's values made, one call into the domain, and any refusal or escaping exception its faults. The import
+writes, so it is refused while a server owns the store, as a change asked of the store directly is."""
 from pathlib import Path
 from typing import NamedTuple
 
-from kb import backups, export, importing, signatures, values
+from kb import backups, examining, export, importing, roots, signatures
 from kb.contract import kb_pb2
-from kb.servicer import boundary
+from kb.boundary import boundary
 
 
 class Importing(NamedTuple):
@@ -23,39 +24,41 @@ class Operator:
     def __init__(self, root):
         """Over the store at root."""
         self._root = root
+        self._hosted = False  # no server hosts an operator: a command that writes is refused while one owns the store
 
     @boundary(export.Exported)
     def export(self, directory: str, held):
         """The store written out as files into the directory named."""
-        export.written(held, values.directory(directory))
+        export.written(held, roots.directory(directory))
         return export.Exported()
 
-    @boundary(importing.Checked, at_one_moment=True)
+    @boundary(examining.Checked, at_one_moment=True)
     def import_check(self, directory: str, held):
-        """A directory read as a set for import into the store, its errors and what would be skipped; nothing written."""
-        return importing.checked(held, values.directory(directory))
+        """A directory read as a set for import into the store, its errors and what would be skipped; nothing
+        written."""
+        return examining.checked(held, roots.directory(directory))
 
-    @boundary(importing.Checked)
+    @boundary(examining.Checked, writes=lambda request: True)
     def import_(self, request: Importing, held):
         """A directory checked, then landed in the store as one set signed by the role, with a message naming it."""
         signed = signatures.signed(kb_pb2.Signature(role=request.role, message=f"import {request.directory}"))
-        return importing.imported(held, values.directory(request.directory), signed, request.skip_errors,
+        return importing.imported(held, roots.directory(request.directory), signed, request.skip_errors,
                                 request.passed_over)
 
     @boundary(backups.BackedUp)
     def backup(self, file: str, held):
         """The store copied whole, as it stood at one moment, into a new file at the place named."""
-        backups.made(held, values.file(file))
+        backups.made(held, roots.file(file))
         return backups.BackedUp()
 
     @boundary(backups.Restored, opens=False)
     def readable(self, file: str):
         """The file named read as a backup this kb made; nothing made."""
-        backups.read(values.file(file))
+        backups.read(roots.file(file))
         return backups.Restored()
 
     @boundary(backups.Restored, opens=False)
     def restore(self, file: str):
         """The store restored from the backup named, where no store is; nothing signed and nothing landed."""
-        backups.restored(values.root(self._root), values.file(file))
+        backups.restored(roots.root(self._root), roots.file(file))
         return backups.Restored()

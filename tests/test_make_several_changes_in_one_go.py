@@ -4,8 +4,9 @@ import re
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, add_many, added,
-    create, create_many, created, define, journal, listing, next_version, read, refs, remove_many, removed, replace, replace_many, replaced, start_a_store,
+    DECISION_TYPE, MISORDERED_DECISION, NOTE_TYPE, ORDERED_DECISION_TYPE, READING_ORDER, TYPES, WORK_ITEM_TYPE,
+    add_many, added, create, create_many, created, define, held_version, iri, journal, listing, next_version,
+    placeholders, read, refs, remove, remove_many, removed, replace, replace_many, replaced, start_a_store, type_iri,
 )
 import held
 from kb import client as kb_client
@@ -14,8 +15,8 @@ from kb.contract import kb_pb2
 
 scenarios("make-several-changes-in-one-go.feature")
 
-DECISION = "decision/price-reviews-happen-weekly"
-WORK_ITEM = "work-item/move-the-review-to-mondays"
+DECISION = iri("decision", "price-reviews-happen-weekly")
+WORK_ITEM = iri("work-item", "move-the-review-to-mondays")
 SECTIONS = [
     {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
     {"title": "Rationale", "body": "Costs move weekly.\n"},
@@ -32,7 +33,7 @@ def _store_with_a_decision_type_and_a_work_item(root):
     return client
 
 
-NEW_WORK_ITEM = "work-item/review-prices-on-mondays"
+NEW_WORK_ITEM = iri("work-item", "review-prices-on-mondays")
 
 
 @when(
@@ -107,7 +108,7 @@ def _a_set_with_a_bad_second_change():
     return Set([
         created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
         created("decision", "Prices are reviewed monthly", {"sections": []}),
-    ], {("decision/prices-are-reviewed-monthly", "sections")})
+    ], {(iri("decision", "prices-are-reviewed-monthly"), "sections")})
 
 
 @when("the client asks for the set, saying which role and why", target_fixture="attempt")
@@ -136,10 +137,11 @@ def _decision_type_in_reading_order(client):
     target_fixture="bad_set",
 )
 def _a_set_with_a_misordered_second_change():
+    """Of the decision type's second version, which declares the fields first."""
     return Set([
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
-        created("decision", "Prices are reviewed monthly", MISORDERED_DECISION),
-    ], {("decision/prices-are-reviewed-monthly", rule) for _, rule in READING_ORDER})
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, version=2),
+        created("decision", "Prices are reviewed monthly", MISORDERED_DECISION, version=2),
+    ], {(iri("decision", "prices-are-reviewed-monthly"), rule) for _, rule in READING_ORDER})
 
 
 @then(
@@ -161,14 +163,14 @@ def _a_set_with_two_bad_changes():
     return Set([
         created("decision", "Price reviews happen weekly", {"sections": []}),
         created("decision", "Prices are reviewed monthly", {"sections": []}),
-    ], {("decision/price-reviews-happen-weekly", "sections"), ("decision/prices-are-reviewed-monthly", "sections")})
+    ], {(iri("decision", "price-reviews-happen-weekly"), "sections"), (iri("decision", "prices-are-reviewed-monthly"), "sections")})
 
 
 @then("the first change's fault comes back before the second change's fault")
 def _the_first_changes_fault_first(attempt):
     refused = attempt["response"]
     assert list(dict.fromkeys(fault.artifact for fault in refused.faults)) == [
-        "decision/price-reviews-happen-weekly", "decision/prices-are-reviewed-monthly",
+        iri("decision", "price-reviews-happen-weekly"), iri("decision", "prices-are-reviewed-monthly"),
     ]
     assert [fault.artifact for fault in refused.faults] == sorted(fault.artifact for fault in refused.faults)
 
@@ -176,7 +178,7 @@ def _the_first_changes_fault_first(attempt):
 @then("the store holds neither change")
 def _neither_change_held(client, attempt):
     assert attempt["after"] == attempt["before"]
-    for name in (DECISION, "decision/prices-are-reviewed-monthly"):
+    for name in (DECISION, iri("decision", "prices-are-reviewed-monthly")):
         assert [fault.rule for fault in read(client, name).faults] == ["not-found"]
 
 
@@ -223,7 +225,7 @@ def _two_versions_on(client):
     assert read(client, WORK_ITEM).revision == 3
 
 
-MONTHLY = "decision/prices-are-reviewed-monthly"
+MONTHLY = iri("decision", "prices-are-reviewed-monthly")
 
 
 def _nothing_by_that_name(client):
@@ -287,7 +289,7 @@ def _no_entry_for_the_set(client, attempt):
 @when("the client asks, in one go, for a set holding no changes at all, saying which role and why", target_fixture="attempt")
 def _ask_for_an_empty_set(root, client):
     before = {
-        "names": [stub.id for stub in listing(client, "decision", ids_only=True).stubs],
+        "names": list(listing(client, "decision", ids_only=True).ids),
         "files": held.holds(root),
         "entries": len(journal(client).entries),
     }
@@ -299,63 +301,64 @@ def _rejected_for_being_empty(attempt):
     assert _refused_with(attempt, [("", "", "operations")]).startswith("a set must hold at least one change")
 
 
-KEYED_CREATES = {
-    "a decision to be created carrying a key and a work item to be created pointing at it by that key": lambda: [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
-        created("work-item", "Review prices on Mondays", {"decisions": ["@weekly"]}),
+CREATES_BY_IRI = {
+    "a decision to be created carrying an IRI and a work item to be created pointing at it by that IRI": lambda: [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=DECISION),
+        created("work-item", "Review prices on Mondays", {"decisions": [DECISION]}),
     ],
-    "a work item to be created pointing at a decision by the key its create carries and that decision to be created "
+    "a work item to be created pointing at a decision by the IRI its create carries and that decision to be created "
     "with it": lambda: [
-        created("work-item", "Review prices on Mondays", {"decisions": ["@weekly"]}),
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
+        created("work-item", "Review prices on Mondays", {"decisions": [DECISION]}),
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=DECISION),
     ],
 }
 
 
 @when(
-    parsers.re(f"the client asks, in one go, for (?P<creates>{'|'.join(map(re.escape, KEYED_CREATES))}), in that "
+    parsers.re(f"the client asks, in one go, for (?P<creates>{'|'.join(map(re.escape, CREATES_BY_IRI))}), in that "
                "order, saying which role and why"),
     target_fixture="applied",
 )
-def _create_pointing_by_key(client, creates):
-    return create_many(client, KEYED_CREATES[creates](), message="Move price reviews to weekly")
+def _create_pointing_by_iri(client, creates):
+    return create_many(client, CREATES_BY_IRI[creates](), message="Move price reviews to weekly")
 
 
 @then("the set lands, and the new work item points at the new decision")
-def _lands_pointing_by_key(client, applied):
+def _lands_pointing_at_the_new_decision(client, applied):
     assert not applied.refused, applied.faults
     assert loads(read(client, NEW_WORK_ITEM, whole=True).content)["decisions"] == [DECISION]
     assert not read(client, DECISION).faults
 
 
-WEEKLY, DAILY = DECISION, "decision/price-reviews-happen-daily"
+WEEKLY, DAILY = DECISION, iri("decision", "price-reviews-happen-daily")
 
 
 @given("the decision type lets a decision point at another decision")
 def _decisions_may_point_at_decisions():
-    assert DECISION_TYPE["schema"]["properties"]["supersedes"]["ref"]["targets"] == ["decision"]
+    assert DECISION_TYPE["schema"]["properties"]["supersedes"]["ref"]["targets"] == [type_iri("decision")]
 
 
 @when(
-    "the client asks, in one go, for two decisions to be created, each carrying a key and pointing at the other by "
-    "the key the other's create carries, saying which role and why",
+    "the client asks, in one go, for two decisions to be created, each carrying an IRI and pointing at the other by "
+    "the IRI the other's create carries, saying which role and why",
     target_fixture="applied",
 )
 def _create_two_pointing_at_each_other(client):
     return create_many(client, [
-        created("decision", "Price reviews happen weekly", {"supersedes": "@daily", "sections": SECTIONS}, key="weekly"),
-        created("decision", "Price reviews happen daily", {"supersedes": "@weekly", "sections": SECTIONS}, key="daily"),
+        created("decision", "Price reviews happen weekly", {"supersedes": DAILY, "sections": SECTIONS}, at=WEEKLY),
+        created("decision", "Price reviews happen daily", {"supersedes": WEEKLY, "sections": SECTIONS}, at=DAILY),
     ], message="Record two decisions that point at each other")
 
 
 @then("the set lands")
 def _the_set_lands(applied):
     assert not applied.refused, applied.faults
-    assert [(result.id, result.revision) for result in applied.results] == [(WEEKLY, 1), (DAILY, 1)]
+    assert applied.batch
 
 
 @then("the store holds both decisions, each pointing at the other")
-def _both_held_pointing_at_each_other(client):
+def _both_held_pointing_at_each_other(client, applied):
+    assert [(result.id, result.revision) for result in applied.results] == [(WEEKLY, 1), (DAILY, 1)]
     assert loads(read(client, WEEKLY, whole=True).content)["supersedes"] == DAILY
     assert loads(read(client, DAILY, whole=True).content)["supersedes"] == WEEKLY
 
@@ -383,72 +386,202 @@ def _work_items_carry_tasks(client):
         "properties": {"title": {"type": "string"}, "decision": DECISION_TYPE["schema"]["properties"]["supersedes"]},
         "required": ["title"],
     }}}
-    assert not replace(client, "schema/work-item", {"version": 2, "schema": schema}).faults
+    assert not replace(client, type_iri("work-item"), {"version": 2, "schema": schema}).faults
 
 
-LINKED_TO_THE_KEY = {
-    "in its content": ({"decisions": ["@weekly"]}, lambda content: content["decisions"][0]),
+CHOSEN = iri("decision", "weekly-price-reviews")
+LINKED_TO_THE_IRI = {
+    "in its content": ({"decisions": [CHOSEN]}, lambda content: content["decisions"][0]),
     "inside one of its tasks": (
-        {"tasks": [{"title": "Move the meeting", "decision": "@weekly"}]}, lambda content: content["tasks"][0]["decision"],
+        {"tasks": [{"title": "Move the meeting", "decision": CHOSEN}]}, lambda content: content["tasks"][0]["decision"],
     ),
 }
 
 
 @when(
     parsers.re(
-        "the client asks, in one go, for a decision to be created carrying a key of the client's choosing and a work "
-        f"item to be created with a link to that key (?P<where>{'|'.join(map(re.escape, LINKED_TO_THE_KEY))}), saying "
+        "the client asks, in one go, for a decision to be created carrying an IRI of the client's choosing and a work "
+        f"item to be created with a link to that IRI (?P<where>{'|'.join(map(re.escape, LINKED_TO_THE_IRI))}), saying "
         "which role and why"
     ),
     target_fixture="applied",
 )
-def _create_linking_to_a_key(client, where):
+def _create_linking_to_an_iri(client, where):
     return create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
-        created("work-item", "Review prices on Mondays", LINKED_TO_THE_KEY[where][0]),
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=CHOSEN),
+        created("work-item", "Review prices on Mondays", LINKED_TO_THE_IRI[where][0],
+                version=held_version(client, "work-item")),
     ], message="Move price reviews to weekly")
 
 
 @then(parsers.re(
-    f"the new work item points, (?P<where>{'|'.join(map(re.escape, LINKED_TO_THE_KEY))}), at the decision that create "
+    f"the new work item points, (?P<where>{'|'.join(map(re.escape, LINKED_TO_THE_IRI))}), at the decision that create "
     "made"
 ))
 def _points_at_the_decision_made(client, applied, where):
-    assert not applied.refused, applied.faults
     made = applied.results[0].id
+    assert made == CHOSEN
+    assert read(client, made).title == "Price reviews happen weekly"
     assert [found.stub.id for found in refs(client, made, 1, inward=True).reached] == [NEW_WORK_ITEM]
-    assert LINKED_TO_THE_KEY[where][1](loads(read(client, NEW_WORK_ITEM, whole=True).content)) == made
+    assert LINKED_TO_THE_IRI[where][1](loads(read(client, NEW_WORK_ITEM, whole=True).content)) == made
 
 
-@then("the link holds the name the store gave the decision, not the key")
-def _holds_the_name_not_the_key(root, applied):
-    assert applied.results[0].id == DECISION
-    assert "@weekly" not in held.text(root, NEW_WORK_ITEM)
-    assert DECISION in held.text(root, NEW_WORK_ITEM)
+@given("the decision type gives a decision a collection of options")
+def _decisions_carry_options():
+    assert "options" in DECISION_TYPE["schema"]["parts"]
 
 
-THREE_TITLES = ["Price reviews happen weekly", "Prices are rounded to the cent", "Discounts end on Sundays"]
+INTO_AN_OPTION = {"targets": [type_iri("decision")], "cardinality": "one", "parts": True, "on_delete": "refuse"}
 
 
-@when("the client asks, in one go, for three decisions with titles of their own to be created, saying which role and why",
+@given("work items may carry a collection of tasks, each of which may point into a decision's option")
+def _work_items_carry_tasks_pointing_into_options(client):
+    """A work item's own link may point into an option too, as the link in its content does."""
+    schema = copy.deepcopy(WORK_ITEM_TYPE["schema"])
+    schema["properties"]["decisions"]["ref"] = {**INTO_AN_OPTION, "cardinality": "many"}
+    schema["parts"] = {"tasks": {"items": {
+        "type": "object",
+        "properties": {"title": {"type": "string"}, "decision": {"type": "string", "ref": INTO_AN_OPTION}},
+        "required": ["title"],
+    }}}
+    assert not replace(client, type_iri("work-item"), {"version": 2, "schema": schema}).faults
+
+
+OPTION = {"id": "go-weekly", "title": "Review every week"}
+THE_OPTION = f"{CHOSEN}#options/{OPTION['id']}"
+LINKED_INTO_THE_OPTION = {
+    "in its content": ({"decisions": [THE_OPTION]}, lambda content: content["decisions"][0], "decisions/0"),
+    "inside one of its tasks": (
+        {"tasks": [{"title": "Move the meeting", "decision": THE_OPTION}]},
+        lambda content: content["tasks"][0]["decision"], "tasks/0/decision",
+    ),
+}
+
+
+@when(
+    parsers.re(
+        "the client asks, in one go, for a decision to be created carrying an IRI and giving one of its options a name "
+        "of the client's choosing, and a work item to be created with a link "
+        f"(?P<where>{'|'.join(map(re.escape, LINKED_INTO_THE_OPTION))}) to the decision's IRI and that option's place, "
+        "saying which role and why"
+    ),
+    target_fixture="applied",
+)
+def _create_linking_into_an_option(client, where):
+    return create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS, "options": [OPTION]}, at=CHOSEN),
+        created("work-item", "Review prices on Mondays", LINKED_INTO_THE_OPTION[where][0],
+                version=held_version(client, "work-item")),
+    ], message="Move price reviews to weekly")
+
+
+@then(parsers.re(
+    f"the new work item points, (?P<where>{'|'.join(map(re.escape, LINKED_INTO_THE_OPTION))}), at that option of the "
+    "decision"
+))
+def _points_at_that_option(client, where):
+    _, linked, place = LINKED_INTO_THE_OPTION[where]
+    assert loads(read(client, THE_OPTION, whole=True).content) == OPTION
+    work_item = read(client, NEW_WORK_ITEM, whole=True)
+    assert linked(loads(work_item.content)) == THE_OPTION
+    assert not work_item.placeholders and not placeholders(client).placeholders
+    into = refs(client, CHOSEN, 1, inward=True, place=f"options/{OPTION['id']}")
+    assert [found.stub.id for found in into.reached] == [NEW_WORK_ITEM]
+    kept = remove(client, CHOSEN)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in kept.faults] == [(NEW_WORK_ITEM, place, "on_delete")]
+
+
+def _may_point_at_decisions(client):
+    assert WORK_ITEM_TYPE["schema"]["properties"]["decisions"]["ref"]["targets"] == [type_iri("decision")]
+    assert not read(client, type_iri("decision")).faults
+
+
+def _may_point_at_notes(client):
+    """The work item type moved on to a version whose `notes` point at notes, a type the store does not hold."""
+    schema = copy.deepcopy(WORK_ITEM_TYPE["schema"])
+    schema["properties"]["notes"] = {
+        "type": "array", "items": {"type": "string"},
+        "ref": {"targets": [type_iri("note")], "cardinality": "many", "parts": False, "on_delete": "refuse"},
+    }
+    assert not replace(client, type_iri("work-item"), {"version": 2, "schema": schema}).faults
+    assert read(client, type_iri("note")).refused
+
+
+# For each type a work item may point at: its kind, the work item's field that points at it, and how the store is
+# made to allow it.
+POINTED_AT = {
+    "the decision type, which the store holds": ("decision", "decisions", _may_point_at_decisions),
+    "a note type a create in the set makes": ("note", "notes", _may_point_at_notes),
+}
+OF_A_TYPE = "|".join(map(re.escape, POINTED_AT))
+# What the set creates before its work item.
+CREATED_FIRST = {
+    "a work item to be created": lambda: [],
+    "a note type to be created and a work item to be created": lambda: [
+        created(TYPES, NOTE_TYPE["title"], {key: NOTE_TYPE[key] for key in ("version", "schema")}),
+    ],
+}
+
+
+@given(parsers.re(f"work items may point at an artifact of (?P<of>{OF_A_TYPE})"), target_fixture="pointing")
+def _work_items_may_point_at(client, of):
+    """The field of a work item that points at an artifact of that type, and an IRI under the type nothing holds."""
+    kind, field, allow = POINTED_AT[of]
+    allow(client)
+    return field, iri(kind, "what-the-supplier-said")
+
+
+@when(
+    parsers.re(
+        f"the client asks, in one go, for (?P<creates>{'|'.join(map(re.escape, CREATED_FIRST))}), the work item "
+        f"pointing at an IRI under (?P<of>{OF_A_TYPE}) that neither the store nor any create in the set holds, saying "
+        "which role and why"
+    ),
+    target_fixture="applied",
+)
+def _create_pointing_at_an_iri_nothing_holds(client, creates, of, pointing):
+    field, nothing_held = pointing
+    assert read(client, nothing_held).refused
+    return create_many(client, [
+        *CREATED_FIRST[creates](),
+        created("work-item", "Review prices on Mondays", {field: [nothing_held]},
+                version=held_version(client, "work-item")),
+    ], message="Move price reviews to weekly")
+
+
+@then("the work item's link lands on a placeholder at that IRI")
+def _lands_on_a_placeholder(client, pointing):
+    field, nothing_held = pointing
+    assert read(client, nothing_held).refused
+    assert [
+        (waiting.id, [(link.artifact, link.field, link.place, link.part) for link in waiting.links])
+        for waiting in placeholders(client).placeholders
+    ] == [(nothing_held, [(NEW_WORK_ITEM, field, f"{field}/0", "")])]
+
+
+THREE = {
+    iri("decision", "weekly-price-reviews"): "Price reviews happen weekly",
+    iri("decision", "rounding-to-the-cent"): "Prices are rounded to the cent",
+    iri("decision", "sunday-discounts"): "Discounts end on Sundays",
+}
+
+
+@when("the client asks, in one go, for three decisions to be created, each carrying an IRI of its own, saying which role and why",
       target_fixture="applied")
 def _create_three_decisions(client):
-    return create_many(client, [created("decision", title, {"sections": SECTIONS}) for title in THREE_TITLES],
+    return create_many(client, [created("decision", title, {"sections": SECTIONS}, at=at) for at, title in THREE.items()],
                        message="Record three decisions")
 
 
 @then("the client is given a result for each create, in the order of the set")
-def _a_result_for_each_create(applied):
+def _a_result_for_each_create(client, applied):
     assert not applied.refused, applied.faults
-    assert [result.revision for result in applied.results] == [1, 1, 1]
+    assert [read(client, result.id).title for result in applied.results] == list(THREE.values())
 
 
-@then("each result gives the name the store gave the decision made by the create in that place")
-def _each_result_names_its_decision(client, applied):
-    assert [read(client, result.id).title for result in applied.results] == THREE_TITLES
-    assert [result.id for result in applied.results] == [
-        "decision/price-reviews-happen-weekly", "decision/prices-are-rounded-to-the-cent", "decision/discounts-end-on-sundays",
-    ]
+@then("each result gives the IRI of the decision made by the create in that place and its first revision")
+def _each_result_gives_its_iri_and_first_revision(applied):
+    assert [(result.id, result.revision) for result in applied.results] == [(at, 1) for at in THREE]
 
 
 def _attempted(root, client, ask):
@@ -458,66 +591,29 @@ def _attempted(root, client, ask):
     return {"response": response, "before": before, "after": held.holds(root), "history": history}
 
 
-@when(
-    "the client asks, in one go, for a decision and a work item to be created, the work item pointing at a key no "
-    "create in the set carries, saying which role and why",
-    target_fixture="attempt",
-)
-def _create_pointing_at_a_key_nothing_carries(root, client):
-    return _attempted(root, client, lambda: create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
-        created("work-item", "Review prices on Mondays", {"decisions": ["@monthly"]}),
-    ], message="Move price reviews to weekly")) | {"key": "'@monthly'"}
+CARRIED_TWICE = iri("decision", "price-reviews")
 
 
-@then("the set is rejected because the link lands on nothing")
-def _rejected_landing_on_nothing(attempt):
-    assert attempt["response"].refused
-    assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
-        (NEW_WORK_ITEM, "decisions/0", "ref"),
-    ]
-
-
-@then("the key is given back")
-def _the_key_given_back(attempt):
-    assert attempt["key"] in attempt["response"].faults[0].message
-
-
-@when("the client asks, in one go, for two decisions to be created, both carrying the same key, saying which role and why",
+@when("the client asks, in one go, for two decisions to be created, both carrying the same IRI, saying which role and why",
       target_fixture="attempt")
-def _create_two_with_one_key(root, client):
-    return {**_attempted(root, client, lambda: create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="pricing"),
-        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, key="pricing"),
-    ], message="Record two decisions")), "key": "'pricing'"}
+def _create_two_at_one_iri(root, client):
+    return _attempted(root, client, lambda: create_many(client, [
+        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, at=CARRIED_TWICE),
+        created("decision", "Price reviews happen daily", {"sections": SECTIONS}, at=CARRIED_TWICE),
+    ], message="Record two decisions"))
 
 
-@then("the set is rejected because a key names one create in the set")
-def _rejected_for_a_key_carried_twice(attempt):
-    assert attempt["response"].refused
-    faults = attempt["response"].faults
-    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [("", "", "ref")]
-    assert faults[0].message.startswith("a key names one create in the set")
+@then("the set is rejected because an IRI names one artifact")
+def _rejected_for_an_iri_carried_twice(attempt):
+    assert _refused_with(attempt, [(CARRIED_TWICE, "", "identity")]).startswith("an IRI names one artifact")
 
 
-@when(
-    "the client asks, in one go, for a decision to be created carrying a key and a work item to be created pointing "
-    "at that key together with a place inside the decision, saying which role and why",
-    target_fixture="attempt",
-)
-def _create_pointing_at_a_place_by_key(root, client):
-    return {**_attempted(root, client, lambda: create_many(client, [
-        created("decision", "Price reviews happen weekly", {"sections": SECTIONS}, key="weekly"),
-        created("work-item", "Review prices on Mondays", {"decisions": ["@weekly#purpose"]}),
-    ], message="Move price reviews to weekly")), "reference": "'@weekly#purpose'"}
+@then("the IRI is given back")
+def _the_iri_given_back(attempt):
+    assert repr(CARRIED_TWICE) in attempt["response"].faults[0].message
 
 
-@then("the reference is given back")
-def _the_reference_given_back(attempt):
-    assert attempt["reference"] in attempt["response"].faults[0].message
-
-
-SECOND_WORK_ITEM = "work-item/print-the-new-price-labels"
+SECOND_WORK_ITEM = iri("work-item", "print-the-new-price-labels")
 
 
 @given("the store also holds a second work item, and work items carry a collection of tasks")
@@ -528,6 +624,10 @@ def _a_second_work_item_and_tasks(client):
 
 @given(
     "the client read the work item at its first version, and another client has since replaced it",
+    target_fixture="moved",
+)
+@given(
+    "the client read the work item at its first revision, and another client has since replaced it",
     target_fixture="moved",
 )
 def _read_then_replaced_by_another(root, client):
@@ -571,6 +671,7 @@ def _set_rejected_as_moved(applied):
 
 
 @then("the version the work item stands at is given back")
+@then("the revision the work item stands at is given back")
 def _given_where_the_work_item_stands(applied, moved):
     assert f"stands at revision {moved['stands_at']}" in applied.faults[0].message
 
@@ -602,3 +703,104 @@ def _lands_two_versions_on(client, applied):
     assert not applied.refused, applied.faults
     assert [(result.id, result.revision) for result in applied.results] == [(WORK_ITEM, 2), (WORK_ITEM, 3)]
     assert read(client, WORK_ITEM).revision == 3
+
+
+@given("the store also holds a second work item")
+def _a_second_work_item(client):
+    create(client, "work-item", {"title": "Print the new price labels"})
+
+
+# Each set asked to be checked only: how it is asked for, and each change's result as landing it would give.
+CHECKED_ONLY = {
+    "a decision and a work item to be created": (
+        lambda client: create_many(client, [
+            created("decision", "Price reviews happen weekly", {"sections": SECTIONS}),
+            created("work-item", "Review prices on Mondays", {}),
+        ], message="Move price reviews to weekly", check_only=True),
+        [(DECISION, 1), (NEW_WORK_ITEM, 1)],
+    ),
+    "the work item and the second work item to be replaced": (
+        lambda client: replace_many(client, [
+            replaced(WORK_ITEM, {"decisions": []}), replaced(SECOND_WORK_ITEM, {}),
+        ], message="Replace both work items", check_only=True),
+        [(WORK_ITEM, 2), (SECOND_WORK_ITEM, 2)],
+    ),
+}
+
+
+@when(
+    parsers.re(f"the client asks, in one go, for (?P<asked>{'|'.join(map(re.escape, CHECKED_ONLY))}) to be checked "
+               "only, saying which role and why"),
+    target_fixture="attempt",
+)
+def _ask_for_a_set_to_be_checked_only(root, client, asked):
+    ask, would_give = CHECKED_ONLY[asked]
+    return {**_attempted(root, client, lambda: ask(client)), "would give": would_give}
+
+
+@then("the client is given each change's result as the set would give it if it landed")
+def _each_result_as_it_would_land(attempt):
+    checked = attempt["response"]
+    assert not checked.refused, checked.faults
+    assert [(result.id, result.revision) for result in checked.results] == attempt["would give"]
+
+
+@then("the client is given no name for the set")
+def _no_name_for_the_set(attempt):
+    assert attempt["response"].batch == ""
+
+
+@then("the store holds nothing of the set")
+def _nothing_of_the_set_held(attempt):
+    assert attempt["after"] == attempt["before"]
+
+
+@then("the store's history holds nothing of it")
+def _nothing_of_the_set_in_the_history(client, attempt):
+    assert held.history(client) == attempt["history"]
+
+
+@when("the client asks for the set to be checked only, saying which role and why", target_fixture="attempt")
+def _ask_for_the_set_to_be_checked_only(root, client, bad_set):
+    return _attempted(
+        root, client, lambda: create_many(client, bad_set, message="Record two decisions", check_only=True),
+    )
+
+
+@then("every fault the set would be refused with comes back")
+def _every_fault_it_would_be_refused_with(attempt):
+    missing = "the sections the type requires must all be present, in order; {!r} is missing"
+    assert [(fault.artifact, fault.place, fault.message) for fault in attempt["response"].faults] == [
+        (name, "sections", missing.format(section))
+        for name in (DECISION, MONTHLY) for section in ("Purpose", "Rationale")
+    ]
+
+
+@when(
+    "the client asks, in one go, for the work item and the second work item to be replaced, checked only, the "
+    "replacement of the work item saying the revision the client read it at, saying which role and why",
+    target_fixture="applied",
+)
+def _ask_for_replacements_checked_only_saying_what_was_read(client, moved):
+    return replace_many(client, [
+        replaced(WORK_ITEM, {}, revision=moved["seen"]), replaced(SECOND_WORK_ITEM, {}),
+    ], message="Replace both work items", check_only=True)
+
+
+@when(
+    "the client asks, in one go, for a decision and a work item to be created, checked only, saying which role and why",
+    target_fixture="applied",
+)
+def _ask_for_creates_checked_only(client):
+    return CHECKED_ONLY["a decision and a work item to be created"][0](client)
+
+
+@then("the client is answered")
+def _the_client_is_answered(applied):
+    assert not applied.refused, applied.faults
+    assert [(result.id, result.revision) for result in applied.results] == [(DECISION, 1), (NEW_WORK_ITEM, 1)]
+
+
+@then("the set is not rejected because the store was busy with another change")
+def _set_not_rejected_as_busy(applied):
+    assert "busy" not in [fault.rule for fault in applied.faults]

@@ -3,12 +3,40 @@ import re
 
 from pytest_bdd import given, parsers, scenario, then, when
 
-from calls import PROCESS_TYPE, add, adding, answer, create, define, journal, read, replace, start_a_store, check
+from calls import (
+    DECISION_TYPE, PROCESS_TYPE, add, adding, answer, check, create, define, iri, journal, read, replace, request,
+    start_a_store, targets, type_iri, version_iri,
+)
 import at_once
 import held
 from kb import client as kb_client
 from kb.content import loads
 from kb.contract import kb_pb2
+
+
+@scenario("check-a-change.feature", "An item pointing at an IRI under a type the store does not hold is refused")
+def test_an_item_pointing_at_an_iri_under_a_type_the_store_does_not_hold_is_refused():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "An added item's title becomes its name, read as text, refused if it leaves nothing")
+def test_an_added_item_s_title_becomes_its_name_read_as_text_refused_if_it_leaves_nothing():
+    pass
+
+
+@scenario('name-artifacts-and-items.feature', "An item's title with capitals and punctuation gives a plain name")
+def test_an_item_s_title_with_capitals_and_punctuation_gives_a_plain_name():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "Two items created with the same title in one collection, neither given a name, are given names of their own")
+def test_two_items_created_with_the_same_title_in_one_collection_neither_given_a_name_are():
+    pass
+
+
+@scenario("name-artifacts-and-items.feature", "An artifact created giving two parts of one collection the same name is refused")
+def test_an_artifact_created_giving_two_parts_of_one_collection_the_same_name_is_refused():
+    pass
 
 
 @scenario("change-the-store.feature", "The client adds an item to a collection")
@@ -31,11 +59,6 @@ def test_the_client_adds_an_item_to_a_collection_inside_an_item():
     "Several clients on one machine change one store at the same time, none saying the version it read",
 )
 def test_several_clients_on_one_machine_change_one_store_at_the_same_time_none_saying_the_version_it_read():
-    pass
-
-
-@scenario("check-a-change.feature", "An item pointing at something that is not there is refused")
-def test_an_item_pointing_at_something_that_is_not_there_is_refused():
     pass
 
 
@@ -71,11 +94,6 @@ def test_taking_an_item_out_does_not_rename_the_items_left():
 
 @scenario("name-artifacts-and-items.feature", "Putting items in a different order does not rename them")
 def test_putting_items_in_a_different_order_does_not_rename_them():
-    pass
-
-
-@scenario("name-artifacts-and-items.feature", "An item's title becomes its name by the same rules as an artifact's title")
-def test_an_item_s_title_becomes_its_name_by_the_same_rules_as_an_artifact_s_title():
     pass
 
 
@@ -116,17 +134,17 @@ FINDING_TYPE = {
             "title": {"type": "string"},
             "check": {
                 "type": "string",
-                "ref": {"targets": ["checklist"], "cardinality": "one", "parts": True, "on_delete": "refuse"},
+                "ref": {"targets": targets("checklist"), "cardinality": "one", "parts": True, "on_delete": "refuse"},
             },
         },
         "required": ["title"],
     },
 }
-CHECKLIST = "checklist/closing-checks"
-FINDING = "finding/the-till-was-short"
+CHECKLIST = iri("checklist", "closing-checks")
+FINDING = iri("finding", "the-till-was-short")
 CHECKS = [{"says": "Lights off"}, {"says": "Till counted"}, {"says": "Door locked"}]
-PROCESS = "process/open-the-shop"
-SHARED = "step/count-the-till"
+PROCESS = iri("process", "open-the-shop")
+SHARED = iri("step", "count-the-till")
 STEPS = [
     {"id": "unlock-the-door", "title": "Unlock the door", "body": "Front door first."},
     {"id": "turn-on-the-lights", "title": "Turn on the lights", "body": "Shop floor, then the stockroom."},
@@ -336,14 +354,14 @@ def _process_as_it_was(client, attempt):
 @when("the client adds a step to a process by a name the store holds nothing under, saying which role and why", target_fixture="attempt")
 def _add_to_nothing(root, client):
     before = held.holds(root)
-    response = add(client, "process/close-the-shop", "steps", {"title": "Lock the door"})
+    response = add(client, iri("process", "close-the-shop"), "steps", {"title": "Lock the door"})
     return {"response": response, "before": before, "after": held.holds(root)}
 
 
 @then("the item is rejected because the store holds nothing by that name, and the name asked for is given back")
 def _rejected_for_nothing(attempt):
-    assert [(fault.artifact, fault.rule) for fault in attempt["response"].faults] == [("process/close-the-shop", "not-found")]
-    assert "'process/close-the-shop'" in attempt["response"].faults[0].message
+    assert [(fault.artifact, fault.rule) for fault in attempt["response"].faults] == [(iri("process", "close-the-shop"), "not-found")]
+    assert repr(iri("process", "close-the-shop")) in attempt["response"].faults[0].message
 
 
 @then("nothing is written anywhere in the store")
@@ -351,10 +369,16 @@ def _nothing_written(attempt):
     assert attempt["after"] == attempt["before"]
 
 
-@when("the client adds a step that points at a shared step the store does not hold, saying which role and why", target_fixture="attempt")
-def _add_a_step_pointing_nowhere(client):
+UNHELD_TYPE_IRI = "https://shop.example/kb/gadget/count-the-change"
+
+
+@when(
+    "the client adds a step that points at an IRI under a type the store does not hold, saying which role and why",
+    target_fixture="attempt",
+)
+def _add_a_step_pointing_under_a_type_not_held(client):
     before = read(client, PROCESS, whole=True)
-    response = add(client, PROCESS, "steps", {"title": "Count the change", "uses": "step/count-the-change"})
+    response = add(client, PROCESS, "steps", {"title": "Count the change", "uses": UNHELD_TYPE_IRI})
     return {"response": response, "before": before}
 
 
@@ -363,7 +387,7 @@ def _rejected_for_its_link(attempt):
     assert [(fault.artifact, fault.place, fault.rule) for fault in attempt["response"].faults] == [
         (PROCESS, "steps/2/uses", "ref"),
     ]
-    assert "'step/count-the-change'" in attempt["response"].faults[0].message
+    assert repr(UNHELD_TYPE_IRI) in attempt["response"].faults[0].message
 
 
 def _steps_must_name_a_role(client):
@@ -373,9 +397,11 @@ def _steps_must_name_a_role(client):
     step = staffed["parts"]["steps"]["items"]
     step["properties"]["role"] = {"type": "string"}
     step["required"] = ["title", "role"]
-    assert not replace(client, "schema/process", {"version": 2, "schema": staffed}, message="Steps name a role").faults
+    assert not replace(client, type_iri("process"), {"version": 2, "schema": staffed}, message="Steps name a role").faults
     staffed_steps = [{**STEPS[0], "role": "opener"}, {**STEPS[1], "role": "opener"}]
-    assert not replace(client, PROCESS, {"steps": staffed_steps}, message="Say who does each step").faults
+    assert not replace(
+        client, PROCESS, {"steps": staffed_steps}, message="Say who does each step", version=version_iri("process", 2),
+    ).faults
 
 
 @when("the client adds a step with no role named, where a step must name a role, saying which role and why", target_fixture="attempt")
@@ -399,9 +425,11 @@ def _steps_carry_checks(client):
     checked["parts"]["steps"]["items"]["parts"] = {
         "checks": {"items": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}},
     }
-    assert not replace(client, "schema/process", {"version": 2, "schema": checked}, message="Steps carry checks").faults
+    assert not replace(client, type_iri("process"), {"version": 2, "schema": checked}, message="Steps carry checks").faults
     steps = [{**STEPS[0], "checks": [{"title": "Key turns"}]}, {**STEPS[1], "checks": [{"title": "Every bulb lit"}]}]
-    assert not replace(client, PROCESS, {"steps": steps}, message="Give each step its checks").faults
+    assert not replace(
+        client, PROCESS, {"steps": steps}, message="Give each step its checks", version=version_iri("process", 2),
+    ).faults
     return loads(read(client, PROCESS, whole=True).content)
 
 
@@ -486,3 +514,76 @@ def _in_the_order_they_landed(client, landed):
     assert _steps(client) == [
         *STEPS, {"id": "count-the-float", **OTHER_STEP}, {"id": "check-the-card-reader", **DIFFERENT_STEP},
     ]
+
+
+@then(
+    "the name the client is given for the new item is that title in lower case, with each run of anything that is "
+    "not a letter or a digit turned into a single hyphen, and no hyphen at either end"
+)
+def _named_plainly_from_its_title(client, added):
+    assert added["sent"] == {"title": "Count stock: shelf, then back room!"}
+    assert added["response"].id == "count-stock-shelf-then-back-room"
+    assert _steps(client)[-1] == {"id": "count-stock-shelf-then-back-room", **added["sent"]}
+
+
+DECISION = iri("decision", "price-reviews-happen-weekly")
+DECISION_SECTIONS = [
+    {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
+    {"title": "Rationale", "body": "Costs move weekly.\n"},
+]
+
+
+@given(
+    parsers.parse('a store holding a decision type at "{type_iri}" whose decisions may carry a collection of options'),
+    target_fixture="client",
+)
+def _store_with_a_decision_type(root, before, type_iri):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE, at=type_iri)
+    before.update(held=held.holds(root))
+    return client
+
+
+def _create_a_decision(client, options):
+    content = {"sections": DECISION_SECTIONS, "options": options}
+    return request(client, "decision", "Price reviews happen weekly", content, message="Record it", at=DECISION)
+
+
+@when(
+    "the client creates a decision carrying two options with the same title, neither given a name, saying which role "
+    "and why",
+    target_fixture="created",
+)
+def _create_with_two_options_titled_alike(client):
+    return _create_a_decision(client, [{"title": "Keep weekly"}, {"title": "Keep weekly", "body": "As it is now."}])
+
+
+@then("each option is given a name of its own, the second the name of the first with a number added")
+def _each_named_the_second_numbered(client, created):
+    assert not created.faults, created.faults
+    assert loads(read(client, DECISION, whole=True).content)["options"] == [
+        {"id": "keep-weekly", "title": "Keep weekly"},
+        {"id": "keep-weekly-2", "title": "Keep weekly", "body": "As it is now."},
+    ]
+
+
+@when(
+    parsers.parse('the client creates a decision carrying two options it names both "{name}", saying which role and why'),
+    target_fixture="created",
+)
+def _create_naming_two_options_alike(client, name):
+    return _create_a_decision(client, [{"id": name, "title": "Keep weekly"}, {"id": name, "title": "Go monthly"}])
+
+
+@then("the artifact is rejected because a part's name is unique in its collection")
+def _rejected_as_named_twice(created):
+    assert (created.id, created.revision) == ("", 0)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in created.faults] == [(DECISION, "options/1/id", "item-name")]
+    assert created.faults[0].message.startswith("a part's name is unique in its collection")
+
+
+@then(parsers.parse('the refusal names "{name}"'))
+def _the_refusal_names_the_name_given_twice(created, name):
+    [fault] = created.faults
+    assert repr(name) in fault.message

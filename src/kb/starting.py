@@ -1,14 +1,14 @@
 """A store started in the client's own process, off the wire: `init`, which `kb` publishes, and the operator's
 `kb init` calls, and `NotStarted`, what it raises when it refuses; `refused`, where `init` would refuse to start one,
 asked before anything is made; and `prepared`, a step a start takes on the filesystem first. Each runs inside the
-servicer's one boundary: its values made first, then one call into the domain, and any refusal or escaping exception
+kb.boundary's one boundary: its values made first, then one call into the domain, and any refusal or escaping exception
 its faults."""
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
 
-from kb import signatures, store, values, write
-from kb.servicer import boundary, guarded
+from kb import roots, signatures, store, write
+from kb.boundary import boundary, guarded
 
 
 class NotStarted(Exception):
@@ -41,7 +41,7 @@ class _Starter:
     def start(self, request: Starting):
         """Who starts the store, then where, the first refusal only; then the store started there."""
         actor = signatures.starter(request.role, request.execution)
-        write.start(values.root(request.root), actor, self._clock)
+        write.start(roots.root(request.root), actor, self._clock)
         return Started()
 
     @boundary(Started, opens=False)
@@ -54,7 +54,7 @@ class _Starter:
     def vacant(self, request: tuple):
         """Where a store would be put, given as (root, verb), refused as `start` refuses it; nothing made."""
         root, verb = request
-        store.vacant(values.root(root), verb)
+        store.vacant(roots.root(root), verb)
         return Started()
 
 

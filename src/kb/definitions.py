@@ -1,7 +1,7 @@
-"""A type checked as it is written, as the whole set leaves the types: every shape it refers to belongs to a type the
-store holds, it is not built on itself, kb's own keywords stand only where kb reads them, and every link field kb
-reads states its whole shape; and, for each change to it, that its version moves on from the version it changed. What
-a type could never check an artifact against is refused here, once, rather than by every create that uses it."""
+"""A type checked as it is written, as the whole set leaves the types: every shape it refers to belongs to a version of
+a type the store holds, whichever version that type stands at, it is not built on itself, kb's own keywords stand only where kb reads them, and every link field kb
+reads states its whole shape. What a type could never check an artifact against is refused here, once, rather than by
+every create that uses it."""
 from kb import composition, keywords, type_refusals
 from kb.contract import kb_pb2
 from kb.values import ArtifactId
@@ -16,7 +16,7 @@ def faults(type_id: ArtifactId, content: dict, draft) -> list[kb_pb2.Fault]:
 
 
 def _shapes(type_id: ArtifactId, schema, draft) -> list[kb_pb2.Fault]:
-    """Every kb: reference that names no type the draft holds, or names the type itself as its base."""
+    """Every kb: reference that names no type version the draft holds, or names the type itself as its base."""
     found = []
     for place, ref in _refs(schema, "schema"):
         named = composition.reference(ref)
@@ -24,7 +24,7 @@ def _shapes(type_id: ArtifactId, schema, draft) -> list[kb_pb2.Fault]:
             continue
         if named.type_id == type_id and named.whole:
             found.append(type_refusals.built_on_itself(type_id, place, ref))
-        elif named.type_id is None or not draft.holds(named.type_id):
+        elif not composition.held(named, draft):
             found.append(type_refusals.no_such_shape(type_id, place, ref))
     return found
 
@@ -63,21 +63,6 @@ def _left_out(ref: dict) -> list[str]:
         key for key in ("cardinality", "parts", "on_delete")
         if key not in ref or (key == "parts" and not isinstance(ref[key], bool))
     ]
-
-
-def version_kept(type_id: ArtifactId, content: dict, held: dict) -> list[kb_pb2.Fault]:
-    """The fault of a type whose schema changed from the one held while its version did not go up from the held
-    version; nothing when either version is not a number, which the type of types refuses."""
-    version, before = content.get("version"), held.get("version")
-    if not _number(version) or not _number(before):
-        return []
-    if content.get("schema") == held.get("schema") or version > before:
-        return []
-    return [type_refusals.version_kept(type_id, before)]
-
-
-def _number(version) -> bool:
-    return isinstance(version, int) and not isinstance(version, bool)
 
 
 def _refs(node, place: str):

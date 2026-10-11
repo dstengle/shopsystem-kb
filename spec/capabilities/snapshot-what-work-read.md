@@ -2,7 +2,7 @@
 id: capability/snapshot-what-work-read
 title: Snapshot what work read
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/one-current-corpus, decision/0014-signature-refused-before-operations, decision/busy-rule, decision/one-signature]
+rests_on: [decision/0004-journal-batch-and-snapshots, decision/one-current-corpus, decision/0014-signature-refused-before-operations, decision/busy-rule, decision/one-signature, decision/0022-ids-are-chosen-by-the-client-in-a-namespace]
 formulated_as: features/snapshot-what-work-read.feature
 ---
 
@@ -20,7 +20,7 @@ A named piece of work records which revisions of which artifacts it read, in one
 
 ## Implementation, may change
 
-- `Snapshot` takes a `Signature` and artifact ids, and returns the journal entry id; the snapshot's piece of work is its signature's. A snapshot entry carries `op: snapshot` and a list of `{ artifact, revision, digest }`.
+- `Snapshot` takes a `Signature` and artifact IRIs, and returns the journal entry id; the snapshot's piece of work is its signature's. A snapshot entry carries `op: snapshot` and a list of `{ artifact, revision, digest }`, each `artifact` an IRI.
 - A snapshot refused as busy is the fault with rule `busy` (change-the-store).
 
 ## Not yet

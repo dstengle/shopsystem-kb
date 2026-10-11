@@ -1,9 +1,10 @@
 """Pins what kb publishes to a client through the contract alone (adrs/0018): `kb.content`'s `loads`, `dumps`,
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
-None; `kb.contract.kb_pb2`'s being importable, as package `kb.v1`; the changes `Create`, `Replace`, `Add` and `Remove`,
+None; `kb.contract.kb_pb2`'s being importable, as package `kb.v2`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
-`place`; the reads `Read`, `List`, `Follow`, `Search` and `History`, the signed `Snapshot` and the `Check`, each
-answering its result or a refusal; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
+`place`; the reads `Read`, `List`, `Follow`, `Search`, `History` and `Placeholders`, the signed `Snapshot` and the
+`Check`, each answering its result or a refusal; `Export`, which alone answers with a stream, each message of it its
+result, a file or the end with the position, or a refusal; that a placeholder is given by its IRI and the links into it, each with the part it names; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
 faults; that each item an `BatchAdd` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
 import dataclasses
@@ -14,7 +15,7 @@ from pathlib import Path
 import pytest
 
 import kb
-from calls import DECISION_TYPE, add_many, added, create, define, request
+from calls import DECISION_TYPE, add_many, added, create, define, iri, request
 from kb import client as kb_client, rules
 from kb import content as kb_content
 from kb import testing as kb_testing
@@ -130,8 +131,8 @@ def test_a_json_schema_keyword_passes_through_as_a_rule_outside_the_pinned_set(t
 
 
 CHANGES = {
-    "Create": ("CreateRequest", {"kind", "title", "content", "signature"}, "Created", {"id", "revision"}),
-    "Replace": ("ReplaceRequest", {"locator", "content", "signature", "revision"}, "Replaced", {"id", "revision"}),
+    "Create": ("CreateRequest", {"id", "type", "title", "content", "signature"}, "Created", {"id", "revision"}),
+    "Replace": ("ReplaceRequest", {"locator", "content", "signature", "revision", "type"}, "Replaced", {"id", "revision"}),
     "Add": ("AddRequest", {"locator", "content", "signature", "revision"}, "Added", {"artifact", "id", "revision"}),
     "Remove": ("RemoveRequest", {"locator", "signature", "revision"}, "Removed", {"id", "revision"}),
 }
@@ -141,8 +142,8 @@ def _fields(name):
     return set(kb_pb2.DESCRIPTOR.message_types_by_name[name].fields_by_name)
 
 
-def test_the_contract_is_version_one():
-    assert kb_pb2.DESCRIPTOR.package == "kb.v1"
+def test_the_contract_is_version_two():
+    assert kb_pb2.DESCRIPTOR.package == "kb.v2"
 
 
 @pytest.mark.parametrize("rpc", sorted(CHANGES))
@@ -157,26 +158,50 @@ def test_each_change_takes_one_signature_and_answers_its_result_or_a_refusal(rpc
     assert _fields(f"{rpc}Response") == {"result", "refusal"}
 
 
+SETS = {
+    "BatchCreateRequest": {"items", "signature", "check_only"},
+    "BatchReplaceRequest": {"items", "signature", "check_only"},
+    "BatchAddRequest": {"items", "signature"},
+    "BatchRemoveRequest": {"items", "signature"},
+}
+
+
+@pytest.mark.parametrize("asked", sorted(SETS))
+def test_only_a_set_of_creates_or_of_replacements_may_be_asked_to_be_checked_only(asked):
+    assert _fields(asked) == SETS[asked]
+    for single in CHANGES.values():
+        assert "check_only" not in _fields(single[0])
+
+
+def test_a_set_is_asked_to_be_checked_only_with_a_flag_that_is_off_unless_set():
+    for asked in ("BatchCreateRequest", "BatchReplaceRequest"):
+        flag = kb_pb2.DESCRIPTOR.message_types_by_name[asked].fields_by_name["check_only"]
+        assert (flag.type, flag.is_repeated) == (flag.TYPE_BOOL, False)
+        assert getattr(kb_pb2, asked)().check_only is False
+
+
 def test_the_small_values_name_kinds_and_places_in_the_specs_words():
     assert _fields("Signature") == {"role", "execution", "message"}
     assert _fields("Refusal") == {"faults"}
     assert _fields("Locator") == {"id", "place"}
     assert _fields("Fault") == {"artifact", "place", "rule", "message"}
-    assert _fields("Stub") == {"field", "id", "kind", "title", "fields"}
+    assert _fields("Stub") == {"field", "id", "type", "title", "fields", "not_held"}
     assert _fields("InboundCount") == {"kind", "field", "count"}
     assert "place" in _fields("Entry") and "path" not in _fields("Entry")
 
 
 READS = {
     "Read": ("ReadRequest", {"locator", "summary", "whole", "section"}, "Artifact", {
-        "id", "kind", "schema_version", "revision", "title", "content", "references", "parts", "inbound",
+        "id", "type", "revision", "title", "content", "references", "parts", "inbound", "placeholders",
     }),
-    "List": ("ListRequest", {"kind", "fields", "form"}, "Listed", {"stubs", "ids"}),
-    "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind"}, "Followed", {"reached"}),
+    "List": ("ListRequest", {"kind", "fields", "form", "path"}, "Listed", {"stubs", "ids"}),
+    "Follow": ("FollowRequest", {"locator", "depth", "direction", "via", "kind", "path"}, "Followed", {"reached"}),
     "Search": ("SearchRequest", {"text", "kind", "scope"}, "Found", {"matches"}),
     "History": ("HistoryRequest", {"artifact", "role", "execution", "since", "batch"}, "Entries", {"entries"}),
     "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
-    "Check": ("CheckRequest", set(), "Checked", {"violations", "stale"}),
+    "Check": ("CheckRequest", set(), "Checked", {"violations", "stale", "placeholders"}),
+    "Placeholders": ("PlaceholdersRequest", set(), "Placeholders", {"placeholders"}),
+    "Export": ("ExportRequest", {"path", "kind"}, "Exported", {"file", "end"}),
 }
 
 
@@ -190,6 +215,29 @@ def test_each_read_the_snapshot_and_the_check_answer_their_result_or_a_refusal(r
     outcome = method.output_type.oneofs_by_name["outcome"]
     assert [(field.name, field.message_type.name) for field in outcome.fields] == [("result", result), ("refusal", "Refusal")]
     assert _fields(f"{rpc}Response") == {"result", "refusal"}
+
+
+def test_an_export_alone_answers_with_a_stream_each_message_a_file_or_the_end_with_the_position():
+    """Each message of the stream is a response as every other is, its result or a refusal: the result is one file,
+    its place and its text, or the end, carrying the position."""
+    methods = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods
+    assert [method.name for method in methods if method.server_streaming] == ["Export"]
+    assert not any(method.client_streaming for method in methods)
+    part = kb_pb2.DESCRIPTOR.message_types_by_name["Exported"].oneofs_by_name["part"]
+    assert [(field.name, field.message_type.name) for field in part.fields] == [
+        ("file", "ExportedFile"), ("end", "ExportEnd"),
+    ]
+    assert _fields("ExportedFile") == {"place", "text"}
+    assert _fields("ExportEnd") == {"position"}
+
+
+def test_a_placeholder_is_given_by_its_iri_and_the_links_into_it_each_with_the_part_it_names():
+    assert _fields("Placeholder") == {"id", "links"}
+    assert _fields("Linking") == {"artifact", "field", "place", "part"}
+    assert _field_type("Placeholders", "placeholders") == "Placeholder"
+    assert _field_type("Placeholder", "links") == "Linking"
+    for message, field in (("Placeholders", "placeholders"), ("Placeholder", "links")):
+        assert kb_pb2.DESCRIPTOR.message_types_by_name[message].fields_by_name[field].is_repeated
 
 
 def test_a_read_asks_for_one_level():
@@ -227,11 +275,11 @@ def test_each_item_an_add_many_adds_names_the_artifact_it_went_to(tmp_path):
         sections = [{"title": "Purpose", "body": "Why.\n"}, {"title": "Rationale", "body": "Because.\n"}]
         create(client, "decision", {"title": title, "sections": sections})
     landed = add_many(client, [
-        added("decision/weekly", "options", {"title": "Go monthly"}),
-        added("decision/daily", "options", {"title": "Go hourly"}),
+        added(iri("decision", "weekly"), "options", {"title": "Go monthly"}),
+        added(iri("decision", "daily"), "options", {"title": "Go hourly"}),
     ])
     assert [(each.artifact, each.id, each.revision) for each in landed.results] == [
-        ("decision/weekly", "go-monthly", 2), ("decision/daily", "go-hourly", 2),
+        (iri("decision", "weekly"), "go-monthly", 2), (iri("decision", "daily"), "go-hourly", 2),
     ]
 
 

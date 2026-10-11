@@ -1,6 +1,6 @@
 """A seed directory read for a seeded start: the place the start made is passed over wherever it lies below the seed,
 and nothing else of the root, nor any other place of that name, is."""
-from kb import offers, store, values
+from kb import offers, roots, store
 
 
 def _written(base, *places):
@@ -11,7 +11,7 @@ def _written(base, *places):
 
 
 def _read(seed, passed_over):
-    return [each.file for each in offers.offered(values.directory(str(seed)), passed_over)]
+    return [each.file for each in offers.offered(roots.directory(str(seed)), passed_over)]
 
 
 def test_a_root_two_levels_down_has_only_the_place_it_made_passed_over(tmp_path):
