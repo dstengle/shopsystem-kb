@@ -8,9 +8,10 @@ from kb.port import Port
 def everything(store: Port) -> kb_pb2.Checked:
     """Every artifact checked against the version of its type it conforms to, and listed as stale when its type
     stands at a later one; each version of a type read once. The placeholders are those the client is given when it
-    asks for them, and a link among them is no violation."""
+    asks for them, made of the waiting links read once, and a link among them is no violation."""
     violations, stale, schemas, standing = [], [], {}, {}
-    lacking = _lacking(store)
+    waiting = store.waiting()
+    lacking = _lacking(waiting, store)
     for artifact_id in store.ids():
         artifact = store.artifact(artifact_id)
         conforming = composition.conforming(artifact)
@@ -26,11 +27,11 @@ def everything(store: Port) -> kb_pb2.Checked:
         found = validation.validate(str(artifact_id), settled.checked(artifact), schema, store)
         found = [fault for fault in found if (fault.rule, fault.artifact, fault.place) not in lacking]
         violations += fault_order.ordered(found, settled.checked(artifact), composition.declared(schema, store))
-    return kb_pb2.Checked(violations=violations, stale=stale, placeholders=query.placeholders(store).placeholders)
+    return kb_pb2.Checked(violations=violations, stale=stale, placeholders=query.placeholders_of(waiting).placeholders)
 
 
-def _lacking(store: Port) -> set[tuple[str, str, str]]:
-    """The fault a write would refuse each link for that points into a part the artifact held at its IRI lacks, as
-    its rule, the artifact holding the link and the link's place there. Such a link was written while nothing was
-    held at that IRI, waits as a placeholder does, and is listed with them."""
-    return {(rules.REF, str(each.source), each.place) for each in store.waiting() if store.holds(each.target)}
+def _lacking(waiting: list, store: Port) -> set[tuple[str, str, str]]:
+    """The fault a write would refuse each waiting link for that points into a part the artifact held at its IRI
+    lacks, as its rule, the artifact holding the link and the link's place there. Such a link was written while
+    nothing was held at that IRI, waits as a placeholder does, and is listed with them."""
+    return {(rules.REF, str(each.source), each.place) for each in waiting if store.holds(each.target)}

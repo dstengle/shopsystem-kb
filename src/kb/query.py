@@ -74,13 +74,17 @@ def placeholders(store: Port) -> kb_pb2.Placeholders:
     """Every placeholder, each IRI a link lands on nothing at (the store does not hold it, or what it holds there
     lacks the part the link names), once, in the order of their names, with every such link: the artifact holding
     it, the field, the link's place there and the part of the IRI it names, in the port's order."""
-    waited = itertools.groupby(store.waiting(), key=lambda each: str(each.target))
+    return placeholders_of(store.waiting())
+
+
+def placeholders_of(waiting: list) -> kb_pb2.Placeholders:
+    """The placeholders the links that land on nothing make, those links as the port gives them, in its order."""
     return kb_pb2.Placeholders(placeholders=[
         kb_pb2.Placeholder(id=target, links=[
             kb_pb2.Linking(artifact=str(each.source), field=each.field, place=each.place, part=each.part)
             for each in into
         ])
-        for target, into in waited
+        for target, into in itertools.groupby(waiting, key=lambda each: str(each.target))
     ])
 
 
