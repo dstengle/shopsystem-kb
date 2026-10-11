@@ -4,27 +4,19 @@ the export layout (kb.offers) is put in one draft over the store, so files are c
 directory brings and the store's together, as a set is. A file read through a type file that has an error, or that
 leads to one, is not checked but left to be skipped. The type that describes types is the store's own: a copy of it is
 compared, never drafted. The examination writes nothing."""
-from collections import deque
 from dataclasses import dataclass, field
 
 from kb import (
-    canonical, composition, definitions, file_refusals, links, naming, names, offers, rules, settled, validation,
-    values,
+    canonical, composition, definitions, file_refusals, links, naming, names, offers, rules, settled, skipping,
+    validation, values,
 )
 from kb.draft import Draft
 from kb.offers import Offered
 from kb.port import Port
 from kb.roots import Named
-from kb.values import TYPE_KIND, ArtifactId, Refused
+from kb.values import ArtifactId, Refused
 
-METASCHEMA_ID = values.type_of(TYPE_KIND)
-
-
-@dataclass(frozen=True)
-class Skipped:
-    """A file that would be skipped, and the files from it to the broken one it leads to, itself first."""
-    file: str
-    chain: tuple[str, ...]
+METASCHEMA_ID = skipping.METASCHEMA_ID
 
 
 @dataclass(frozen=True)
@@ -57,7 +49,7 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
         each = by_name[name]
         each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, unread, drafted)]
     return Checked(
-        errors=[fault for each in offered for fault in each.errors], skipped=_skipped(store, draft, offered, by_name),
+        errors=[fault for each in offered for fault in each.errors], skipped=skipping.skipped(store, draft, offered, by_name),
     )
 
 
@@ -72,7 +64,7 @@ def in_order(by_name: dict[ArtifactId, Offered]) -> list[ArtifactId]:
     def visit(name: ArtifactId, seen: frozenset) -> None:
         if name in ordered or name in seen:
             return
-        for under in sorted(_beneath(by_name[name], by_name), key=key):
+        for under in sorted(skipping.beneath(by_name[name], by_name), key=key):
             visit(under, seen | {name})
         ordered.append(name)
     for name in sorted((name for name in by_name if by_name[name].typed), key=key):
@@ -87,7 +79,7 @@ def _drafted(draft: Draft, by_name: dict) -> dict[ArtifactId, tuple]:
     drafted = {}
     for name in in_order(by_name):
         each = by_name[name]
-        if each.artifact is None or each.id == METASCHEMA_ID or _held_back(each, by_name):
+        if each.artifact is None or each.id == METASCHEMA_ID or skipping.held_back(each, by_name):
             continue
         try:
             drafted[name] = naming.imported(draft, each.id, each.artifact)
@@ -109,7 +101,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
         return [] if each.text == canonical.dump(store.artifact(METASCHEMA_ID)) else [file_refusals.not_canonical(
             each.file, "the type that describes types is the store's own, and this copy differs from it",
         )]
-    if _held_back(each, by_name):
+    if skipping.held_back(each, by_name):
         return []
     kind = composition.artifact_kind(each.artifact)
     if not draft.holds(values.type_of(kind)):
@@ -155,82 +147,6 @@ def _named(target) -> ArtifactId | None:
         return values.target(target).id if isinstance(target, str) else None
     except Refused:
         return None
-
-
-def _skipped(store: Port, draft: Draft, offered: list[Offered], by_name: dict) -> list[Skipped]:
-    """Each file without an error that leads to a broken one, with the shortest chain of files that leads there: by
-    its implicit link to its type version's file, for a type by a version it is built on or refers to, or by a link to
-    an IRI under a type no version of which would land. A link to an artifact's file is not followed: a file that
-    does not land leaves its IRI a placeholder. The type that describes types is the store's own, led to by none."""
-    files = {name: each.file for name, each in by_name.items() if each.id != METASCHEMA_ID}
-    broken = {each.file for each in offered if each.errors}
-    sound = [each for each in offered if each.name in files and each.file not in broken]
-    through = {each.file: [files[name] for name in _beneath(each, by_name)] for each in sound}
-    lost = _lost(store, files, by_name, broken | {file for file in through if _chain(file, through, broken)})
-    leads = {each.file: through[each.file] + _waiting_under(draft, each, by_name, lost) for each in sound}
-    chains = [(file, _chain(file, leads, broken)) for file in leads]
-    return [Skipped(file, chain) for file, chain in chains if chain is not None]
-
-
-def _lost(store: Port, files: dict, by_name: dict, left_out: set) -> dict[ArtifactId, list[str]]:
-    """The types no version of which would land, each with its versions' files in the order of their numbers: those
-    the store does not hold whose every version file is broken or leads to a broken one. Worked out from the files
-    that would land and the store, never from the check's draft, which holds the broken versions too."""
-    versions: dict[ArtifactId, list[str]] = {}
-    for name in sorted((name for name in files if by_name[name].typed), key=lambda name: by_name[name].number or 0):
-        versions.setdefault(by_name[name].id, []).append(files[name])
-    return {
-        type_id: held for type_id, held in versions.items()
-        if not store.holds(type_id) and all(file in left_out for file in held)
-    }
-
-
-def _waiting_under(draft: Draft, each: Offered, by_name: dict, lost: dict) -> list[str]:
-    """The files a file leads to by its links: for each link to an IRI under a type no version of which would land,
-    where no placeholder can wait, that type's version files. The links are read through the version of its type the
-    file names, so not at all when that version's file is broken or leads to a broken one."""
-    if _held_back(each, by_name):
-        return []
-    handed = links.handed(each.id, each.artifact, draft, composition.conformed(each.artifact, draft))
-    return [file for link in handed if not link.implicit for file in lost.get(link.under, [])]
-
-
-def _beneath(each: Offered, by_name: dict) -> list[ArtifactId]:
-    """The names of the type version files the directory brings that a file is read through: that of the version of
-    its type it conforms to, other than the store's own type of types, and, for a type, of each version its schema is
-    built on or refers to by a kb: reference, at the number the reference names. No other version of those types."""
-    if each.artifact is None:
-        return []
-    found = [str(composition.conforming(each.artifact))]
-    if each.typed:
-        referred = composition.references(each.artifact.get("schema"))
-        found += [names.versioned(str(to.type_id), to.number) for to in referred]
-    read_through = dict.fromkeys(ArtifactId(name) for name in found)
-    return [name for name in read_through if name in by_name and by_name[name].id != METASCHEMA_ID]
-
-
-def _held_back(each: Offered, by_name: dict, seen: frozenset = frozenset()) -> bool:
-    """Whether a type file a file is read through has an error, or is itself read through one that leads to one."""
-    seen = seen | {each.name}
-    return any(
-        by_name[under].errors or _held_back(by_name[under], by_name, seen)
-        for under in _beneath(each, by_name) if under not in seen
-    )
-
-
-def _chain(start: str, leads: dict, broken: set) -> tuple[str, ...] | None:
-    """The shortest chain of files from one to a broken file, or None when it leads to none."""
-    chains, waiting = {start: (start,)}, deque([start])
-    while waiting:
-        at = waiting.popleft()
-        for to in leads.get(at, []):
-            if to in chains:
-                continue
-            chains[to] = (*chains[at], to)
-            if to in broken:
-                return chains[to]
-            waiting.append(to)
-    return None
 
 
 def _of(file: str, fault):
