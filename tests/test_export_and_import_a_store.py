@@ -10,7 +10,7 @@ from ruamel.yaml import YAML
 
 from calls import (
     DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
-    filed, iri, journal, listing, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
+    filed, iri, journal, kb_ref, listing, read, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
@@ -1005,6 +1005,8 @@ STANDALONE = iri("work-item", "stands-alone")
 DECISIONS = type_iri("decision")
 AT_TWO = iri("decision", "review-prices-on-fridays")
 LINKING_UNDER = iri("work-item", "find-the-decision")
+NOTES, NOTE = _file(type_iri("note"), 1), _file(iri("note", "stock-is-low"))  # files, as the report names them
+TASKS, TASK = _file(type_iri("task"), 1), _file(iri("task", "count-the-stock"))
 
 
 def _decisions_at(client, number):
@@ -1038,10 +1040,40 @@ def _a_work_item_linking_under_the_type(client):
     create(client, "work-item", {"title": "Find the decision", "decisions": [iri("decision", "not-anywhere")]})
 
 
+def _referring_to(title, kind, number):
+    """A type whose label is the title a version of another kind's type declares, named by a `kb:` reference."""
+    properties = {"title": {"type": "string"}, "label": {"$ref": kb_ref(kind, number, "#/properties/title")}}
+    return {"title": title, "version": 1, "schema": {"type": "object", "properties": properties, "required": ["title"]}}
+
+
+def _notes_of(number):
+    """What gives a store version 1 of a type for notes, which refers to that version of the type for decisions, and
+    a note conforming to it."""
+    def fill(client):
+        define(client, _referring_to("Note", "decision", number))
+        create(client, "note", {"title": "Stock is low", "label": "stock"})
+    return fill
+
+
+def _tasks_of(number):
+    """What gives a store version 1 of a type for notes, which refers to that version of the type for decisions,
+    version 1 of a type for tasks, which refers to it, and a task conforming to that."""
+    def fill(client):
+        define(client, _referring_to("Note", "decision", number))
+        define(client, _referring_to("Task", "note", 1))
+        create(client, "task", {"title": "Count the stock", "label": "count"})
+    return fill
+
+
 LEADING = {  # what each row's source store is given beside the type for decisions, standing at version 2
     "a decision conforming to version 2 of the type for decisions": _a_decision_of_the_type,
     "a type for work items whose link field allows decisions, and a work item whose link names an IRI under the type "
     "for decisions": _a_work_item_linking_under_the_type,
+    "version 1 of a type for notes, which refers to version 2 of the type for decisions by a kb: reference, and a "
+    "note conforming to version 1 of the type for notes": _notes_of(2),
+    "version 1 of a type for notes, which refers to version 2 of the type for decisions by a kb: reference, version "
+    "1 of a type for tasks, which refers to version 1 of the type for notes by a kb: reference, and a task "
+    "conforming to version 1 of the type for tasks": _tasks_of(2),
 }
 
 
@@ -1066,6 +1098,10 @@ def _for_import_with_a_broken_version_and_what_leads_to_it(tmp_path, leading, fi
 SKIPPED = {  # each file a row says would be skipped, with the files its chain passes before the broken one
     "the decision is": [(_file(AT_TWO),)],
     "the work item is": [(_file(LINKING_UNDER),)],
+    "version 1 of the type for notes and the note are": [(NOTES,), (NOTE, NOTES)],
+    "version 1 of the type for notes, version 1 of the type for tasks and the task are": [
+        (NOTES,), (TASKS, NOTES), (TASK, TASKS, NOTES),
+    ],
 }
 
 
