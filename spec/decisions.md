@@ -793,3 +793,8 @@ source: slicing question (K2, slice 166: the scenario of a removal and a new lin
 An IRI belongs to the nearest held type it sits under, and what already sits under a type fixes that: a type is not removed while a link waits on an IRI under it that the store does not hold, as it is not while artifacts of its kind exist; and a type is not defined at an IRI under another type's while an artifact of that other type is held under the new type's IRI or a link waits on an IRI there, since the define would move what is held or waited on to a type it was not checked against. Each refusal names what stands in the way.
 date: 2026-10-11
 source: review questions (slice 165.7: a type removed while links wait under it leaves links the store would refuse; a nearer type defined between a link and the create it waits on lets any kind land there; and the batch 32 review's type defined above held artifacts), answered under the person's delegation of 2026-10-10
+
+## decision/a-link-that-waits-keeps-waiting
+A link that already waits on a part its held target lacks does not stand in the way of later changes to the artifact that holds it: a change that leaves the link as it is lands and the link still waits, since another client's create is what made it wait and the store's check already lists it as a placeholder, not a violation. A link a change adds or alters into a part a held artifact lacks is still refused. An import lets such a link wait as the exporting store held it.
+date: 2026-10-11
+source: review question (batch 35: an artifact holding a link into a part its filled target lacks could not be changed at all, and its store's export could not be imported), answered under the person's delegation of 2026-10-10
