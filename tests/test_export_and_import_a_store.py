@@ -1953,9 +1953,40 @@ def _checked_row(leading):
     return lambda tmp_path: (_for_import_with_a_broken_version_and_what_leads_to_it(tmp_path, leading, {}), None)
 
 
-@pytest.mark.parametrize("made", [*map(_checked_row, LEADING), *TOGETHER_WITH.values()], ids=[
+def _decisions_linked_to_and_into(client):
+    """The types for decisions, work items and notes, two decisions, a work item linking to both and a note linking
+    into an option of one."""
+    for content in (DECISION_TYPE, WORK_ITEM_TYPE, NOTE_TYPE):
+        define(client, content)
+    for title in ("Price reviews happen weekly", "Prices are reviewed monthly"):
+        create(client, "decision", {
+            "title": title, "sections": _sections("Purpose", "Rationale"), "options": [{"title": "Go monthly"}],
+        })
+    create(client, "work-item", {"title": "Move the review to Mondays", "decisions": [WEEKLY, MONTHLY]})
+    create(client, "note", {"title": "On going monthly", "about": f"{MONTHLY}#options/go-monthly"})
+
+
+def _the_only_version_of_the_type_for_decisions(not_landing):
+    """A row's directory: what links to the decisions and into one, the one file of their type kept from landing."""
+    def made(tmp_path):
+        target = _for_import(tmp_path, _decisions_linked_to_and_into)
+        not_landing(Path(target) / _file(DECISIONS, 1))
+        return target, None
+    return made
+
+
+NOT_LANDING = {  # the type's only version file, in a directory whose other files link to its artifacts and into one
+    "deleted": _the_only_version_of_the_type_for_decisions(Path.unlink),
+    "unreadable": _the_only_version_of_the_type_for_decisions(
+        lambda file: file.write_text(f"id: {DECISIONS}\ntitle: [never closed\n", encoding="utf-8"),
+    ),
+}
+
+
+@pytest.mark.parametrize("made", [*map(_checked_row, LEADING), *TOGETHER_WITH.values(), *NOT_LANDING.values()], ids=[
     *(f"check row {number}" for number in range(1, len(LEADING) + 1)),
     *(f"import row {number}" for number in range(1, len(TOGETHER_WITH) + 1)),
+    *(f"the type's only version {how}" for how in NOT_LANDING),
 ])
 def test_what_the_check_calls_an_error_or_a_skip_is_what_an_import_with_errors_skipped_leaves_out(root, tmp_path, made):
     target, _ = made(tmp_path)

@@ -98,13 +98,20 @@ def validate(artifact_id: str, content: dict, schema: dict, corpus, waited=froze
     if not _misread("sections", errors):
         required = [section for part in composition(schema, corpus) for section in part.get("sections", [])]
         faults += _sections(artifact_id, content.get("sections", []), required, "sections")
+    found = unlanded(content, schema, corpus, waited, imported, errors)
+    return faults + [refusals.unlanded(artifact_id, link.place, link.target) for link in found]
+
+
+def unlanded(content: dict, schema: dict, corpus, waited=frozenset(), imported: bool = False, errors=()) -> list:
+    """The links content carries that neither land in the corpus nor wait, `waited` and `imported` as `validate` takes
+    them, but those JSON Schema's errors leave unread. The links are read through the schema; the corpus is where
+    they would land, which an import's check gives as the store with only the files that would land (kb.examining)."""
     carried = links.carried(content, schema, corpus)
-    for link, told in zip(carried, links.told(carried)):
-        if _misread(link.place, errors) or _lands(link.target, link.ref, corpus):
-            continue
-        if not (imported or told in waited) or not _keeps_waiting(link, told[2], corpus):
-            faults.append(refusals.unlanded(artifact_id, link.place, link.target))
-    return faults
+    return [
+        link for link, told in zip(carried, links.told(carried))
+        if not (_misread(link.place, errors) or _lands(link.target, link.ref, corpus))
+        and not ((imported or told in waited) and _keeps_waiting(link, told[2], corpus))
+    ]
 
 
 def _errors(content: dict, composed: dict, corpus) -> list:

@@ -2,13 +2,14 @@
 they lead to one, each with the chain of files that leads there. Each file that reads as an artifact at its place in
 the export layout (kb.offers) is put in one draft over the store, so files are checked against the types the
 directory brings and the store's together, as a set is. A file read through a type file that has an error, or that
-leads to one, is not checked but left to be skipped. The type that describes types is the store's own: a copy of it is
+leads to one, is not checked but left to be skipped. A file's links are judged last, against the store with only the
+files that would land, as the landing judges them. The type that describes types is the store's own: a copy of it is
 compared, never drafted. The examination writes nothing."""
 from dataclasses import dataclass, field
 
 from kb import (
-    canonical, comparing, composition, definitions, file_refusals, links, naming, names, offers, rules, settled, skipping,
-    validation, values,
+    canonical, comparing, composition, definitions, file_refusals, naming, names, offers, refusals, rules, settled,
+    skipping, validation, values,
 )
 from kb.draft import Draft
 from kb.offers import Offered
@@ -43,16 +44,51 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
         if each.artifact is not None and each.id != METASCHEMA_ID:
             draft.put(each.id, each.artifact)
     by_name = {each.name: each for each in offered if each.name is not None}
-    unread = {each.id for each in by_name.values() if each.artifact is None}
     drafted = _drafted(draft, by_name)
     for name in in_order(by_name):
         each = by_name[name]
-        each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, unread, drafted)]
+        each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, drafted)]
+    waiting = _unlanded(store, offered, by_name, drafted)
     for each in comparing.compared(store, [each for each in offered if each.id != METASCHEMA_ID]).differing:
         each.errors.append(file_refusals.differs(each.file, str(each.id)))
-    return Checked(
-        errors=[fault for each in offered for fault in each.errors], skipped=skipping.skipped(store, draft, offered, by_name),
-    )
+    errors = [fault for each in offered for fault in each.errors]
+    return Checked(errors=errors, skipped=skipping.skipped(offered, by_name, waiting))
+
+
+def _unlanded(store: Port, offered: list[Offered], by_name: dict, drafted: dict) -> dict[str, list[str]]:
+    """Each file's links judged as the landing judges them, against the store with only the files that would land, so
+    a link to a file that does not land is a link to an IRI not held: it waits under a type the store holds or of
+    which a version lands; under a type no version of which lands it leads its file to that type's version files,
+    which are given here for the file; under no type at all it is the file's error."""
+    landing, sound = Draft(store), _sound(by_name, drafted)
+    for each, artifact in sound:
+        landing.put(each.id, artifact)
+    lost, waiting = skipping.lost(store, offered, by_name), {}
+    for each, artifact in sound:
+        schema = composition.conformed(artifact, landing)["schema"]
+        for link in validation.unlanded(settled.checked(artifact), schema, landing, imported=True):
+            under = skipping.under(values.target(link.target).id, lost, landing)
+            if under is None:
+                each.errors.append(refusals.unlanded(each.file, link.place, link.target))
+            else:
+                waiting.setdefault(each.file, []).extend(lost[under])
+    return waiting
+
+
+def _sound(by_name: dict, drafted: dict) -> list[tuple[Offered, dict]]:
+    """The files that would land but for their links, each with its artifact as it would land, in the order files are
+    read in: those checked against their type and found with no error."""
+    found = [by_name[name] for name in in_order(by_name)]
+    return [
+        (each, drafted.get(each.name, (each.artifact,))[0]) for each in found
+        if _checked(each, by_name) and not each.errors
+    ]
+
+
+def _checked(each: Offered, by_name: dict) -> bool:
+    """Whether a file is checked against its type: it reads as an artifact, is not the type that describes types, and
+    is read through no type file that is broken or leads to one."""
+    return each.artifact is not None and each.id != METASCHEMA_ID and not skipping.held_back(each, by_name)
 
 
 def in_order(by_name: dict[ArtifactId, Offered]) -> list[ArtifactId]:
@@ -81,7 +117,7 @@ def _drafted(draft: Draft, by_name: dict) -> dict[ArtifactId, tuple]:
     drafted = {}
     for name in in_order(by_name):
         each = by_name[name]
-        if each.artifact is None or each.id == METASCHEMA_ID or skipping.held_back(each, by_name):
+        if not _checked(each, by_name):
             continue
         try:
             drafted[name] = naming.imported(draft, each.id, each.artifact)
@@ -91,12 +127,12 @@ def _drafted(draft: Draft, by_name: dict) -> dict[ArtifactId, tuple]:
     return drafted
 
 
-def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set, drafted: dict) -> list:
+def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, drafted: dict) -> list:
     """What is wrong with a file that reads as an artifact: a copy of the type that describes types that differs from
     the store's; or, unless it is read through a type file that is broken or leads to one, its kind, the version of
-    its type it names, which the directory or the store must hold, its form, its content and its links against that
-    version, whatever its type stands at, and for a type, the type as a type. A link to a file that could not be read
-    is no error: that file does not land, and its IRI is left a placeholder."""
+    its type it names, which the directory or the store must hold, its form and its content against that version,
+    whatever its type stands at, and for a type, the type as a type. Its links are judged apart, once it is known which
+    files would land (`_unlanded`)."""
     if each.artifact is None:
         return []
     if each.id == METASCHEMA_ID:
@@ -116,7 +152,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     schema, content = version.content["schema"], settled.checked(landing)
     found = [
         *_form(draft, each, schema), *misnamed, *naming.placed(draft, each.id, values.type_of(kind)),
-        *_fit(draft, each, content, schema, unread),
+        *_fit(draft, each, content, schema),
     ]
     if not found and each.typed:
         found = definitions.faults(each.id, content, draft)
@@ -132,23 +168,14 @@ def _form(draft: Draft, each: Offered, schema: dict) -> list:
     return [] if written == each.text else [file_refusals.not_canonical(each.file, "its text is not the text kb writes")]
 
 
-def _fit(draft: Draft, each: Offered, content: dict, schema: dict, unread: set) -> list:
-    """Every fault of the content against its type, as an import's set is checked, a link into a part its held target
-    lacks waiting, but for a link to a file that could not be read."""
+def _fit(draft: Draft, each: Offered, content: dict, schema: dict) -> list:
+    """Every fault of the content against its type but those of its links, which are judged against what would land,
+    never against the draft, which holds the files that would not."""
     try:
         found = validation.validate(each.file, content, schema, draft, imported=True)
     except Refused as refused:
         return list(refused.faults)
-    leading = {link.place for link in links.carried(content, schema, draft) if _named(link.target) in unread}
-    return [fault for fault in found if not (fault.rule == rules.REF and fault.place in leading)]
-
-
-def _named(target) -> ArtifactId | None:
-    """The artifact a link's value names, or None where it names none."""
-    try:
-        return values.target(target).id if isinstance(target, str) else None
-    except Refused:
-        return None
+    return [fault for fault in found if fault.rule != rules.REF]
 
 
 def _of(file: str, fault):
