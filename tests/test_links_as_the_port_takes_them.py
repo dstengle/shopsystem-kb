@@ -1,6 +1,7 @@
 """A link as kb hands it to the port (`links.handed`): one whose target the corpus does not hold carries the held type
 that target's IRI sits under, which the adapter checks again as it lands the link (decision 2 of batch 35); one whose
-target is held, and the link to an artifact's own type, carry none."""
+target is held carries the type that target sits under too, for a target removed before the link lands (decision 10);
+the link to an artifact's own type carries none."""
 import pytest
 
 from calls import DECISION_TYPE, create, define, iri, start_a_store, type_iri
@@ -38,7 +39,7 @@ def handed(corpus, supersedes):
     (iri("decision", "nothing-here"), DECISION),
     (iri("decision", "minor/nothing-here"), DECISION),
     (iri("note", "nothing-here"), None),
-    (str(HELD), None),
+    (str(HELD), DECISION),
 ], ids=["not held, under a held type", "not held, deeper under it", "not held, under no held type", "held"])
 def test_a_link_carries_the_held_type_a_target_not_held_sits_under(corpus, target, under):
     of_its_type, supersedes = handed(corpus, target)

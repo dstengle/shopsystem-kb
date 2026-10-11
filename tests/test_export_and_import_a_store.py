@@ -929,7 +929,7 @@ def test_a_link_in_a_field_only_the_version_a_file_names_reads_as_a_link_lands_a
 
 def test_a_link_to_nothing_in_a_field_only_the_version_a_file_names_reads_as_a_link_is_reported(root, tmp_path):
     target = _for_import(tmp_path, _a_note_behind_its_type)
-    _put(target, {**_read(target, SUMMARISED), "about": iri("decision", "nothing-by-this-name")})
+    _put(target, {**_read(target, SUMMARISED), "about": iri("tag", "nothing-by-this-name")})
 
     ran = _check_for_import(root, target)
     assert (ran.returncode, _errors(ran)) == (1, [(_file(SUMMARISED), "ref")]), ran.stdout

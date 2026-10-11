@@ -138,11 +138,17 @@ def test_a_create_naming_an_earlier_version_carries_the_links_that_version_makes
 def test_a_create_naming_an_earlier_version_is_held_to_the_links_that_version_makes(root):
     client = kb_client.connect(root)
     start_a_store(root)
-    for type_content in [TAG_TYPE, _typed("Note", {"about": LINKED})]:
+    """The earlier version makes `about` a link and `beside` none, the later the other way round; the store holds
+    neither tag, so each link the note makes is one to an IRI not held, under the tag type its field allows."""
+    for type_content in [TAG_TYPE, _typed("Note", {"about": LINKED, "beside": ABOUT})]:
         define(client, type_content)
-    assert not replace(client, type_iri("note"), {"schema": _typed("Note", {"about": ABOUT})["schema"]}).faults
-    refused = request(client, "note", "X", {"about": iri("tag", "a")}, version=1)
-    assert [(fault.place, fault.rule) for fault in refused.faults] == [("about", "ref")]
+    later = _typed("Note", {"about": ABOUT, "beside": LINKED})["schema"]
+    assert not replace(client, type_iri("note"), {"schema": later}).faults
+    made = request(client, "note", "X", {"about": iri("tag", "a"), "beside": iri("tag", "b")}, version=1)
+    assert not made.faults, made.faults
+    assert read(client, iri("note", "x")).type == version_iri("note", 1)
+    linked = refs(client, iri("note", "x"), 1)
+    assert [(each.stub.field, each.stub.id) for each in linked.reached] == [("about", iri("tag", "a"))]
 
 
 def test_a_type_changed_while_a_type_built_on_it_moved_lands_and_restates_no_links(root):
