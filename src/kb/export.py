@@ -8,7 +8,7 @@ both (decision/export-selections-combine); the operator's is always the whole st
 from dataclasses import dataclass, field
 from typing import Iterator, NamedTuple
 
-from kb import canonical, composition, file_refusals, names, settled
+from kb import canonical, composition, file_refusals, names, query, settled
 from kb.port import Port
 from kb.port_values import TypeVersion
 from kb.requests import Selection
@@ -46,11 +46,12 @@ def taken(store: Port, asked: Selection = Selection()) -> Iterator[File | Positi
 def files(store: Port, asked: Selection = Selection()) -> Iterator[File]:
     """Every artifact the store holds and every version it holds of every type, each at its place as canonical
     text, read as it is asked for. Asked for a kind, a path below the type or both, only the artifacts the port
-    gives for them (`Port.ids`): those of that kind, of whatever kind when none is asked for, that the path
-    selects. Raises Refused, before any file is given, for a kind the store holds no type for."""
+    gives for them (`Port.ids`): those of that kind, or, when none is asked for, of every kind a list by that path
+    gives (`query.left_out`), that the path selects. Raises Refused, before any file is given, for a kind the store
+    holds no type for."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
-    for name in store.ids(asked.kind, None, asked.path):
+    for name in store.ids(asked.kind, None, asked.path, query.left_out(asked.kind, asked.path)):
         artifact = store.artifact(name)
         if settled.typed(artifact):
             yield from _versions(store, name)

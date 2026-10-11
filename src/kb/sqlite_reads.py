@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from kb import names, sqlite_types
 from kb.content import text
 from kb.port_values import Candidate, Linking, TypeVersion
-from kb.values import TYPE_KIND, ArtifactId, Below, Kind, Version
+from kb.values import ArtifactId, Below, Kind, Version
 
 PAIRS = "~pairs"
 WAITING = (
@@ -102,12 +102,14 @@ class Reads:
         return sqlite_types.numbers(self._db, str(type_id))
 
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None,
-            path: Below | None = None) -> list[ArtifactId]:
+            path: Below | None = None, leaving: tuple[Kind, ...] = ()) -> list[ArtifactId]:
         narrowed = "" if kind is None else " WHERE kind = ?"
         rows = self._rows(f"SELECT id, content, kind FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
+        left_out = {each.name for each in leaving}
         return ordered([
             name for name, stored, of_kind in rows
-            if (path is None or _selected(path, name, of_kind, kind))
+            if of_kind not in left_out
+            and (path is None or names.selects(path.segments, name, of_kind))
             and (not fields or _holds(decoded(stored), fields))
         ])
 
@@ -187,12 +189,6 @@ class Reads:
 
 def _linking(source: str, field: str, place: str, target: str, part: str, holder: str | None) -> Linking:
     return Linking(ArtifactId(source), field, place, ArtifactId(target), part, holder)
-
-
-def _selected(path: Below, name: str, of_kind: str, asked: Kind | None) -> bool:
-    """Whether a path selects a row: by the row's IRI below its own kind's, and, when no kind is asked for, never a
-    row of the kind of types."""
-    return (asked is not None or of_kind != TYPE_KIND.name) and names.selects(path.segments, name, of_kind)
 
 
 def _holds(artifact: dict, fields: dict[str, str]) -> bool:

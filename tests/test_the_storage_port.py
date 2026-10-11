@@ -490,13 +490,23 @@ def test_a_path_below_the_type_is_read_below_the_kind_each_artifact_was_landed_w
     assert [short(each) for each in store.ids(kind("note/sub"), path=below("plan"))] == ["note/sub/plan"]
 
 
-def test_names_by_a_path_alone_leave_out_what_is_of_the_kind_of_types(store):
-    """A type is of the kind of types, and one may sit under the IRI of the type that describes types."""
+def test_names_leave_out_the_kinds_the_port_is_told_to_leave_out_and_no_other(store):
+    """Which kinds a listing leaves out is kb's to say, above the port: told one, the port leaves out exactly what
+    is of it; told none, it leaves out none, whatever the kind is. Here one of them is the kind of a type, which may
+    sit under the IRI of the type that describes types."""
     a_type = ArtifactId(f"{TYPE_OF_TYPES}/plan")
     land(store, dataclasses.replace(put("schema/plan", {"title": "a type"}), artifact=a_type),
-         put("note/plan", {"title": "a note"}))
-    assert [short(each) for each in store.ids(path=below("plan"))] == ["note/plan"]
+         put("note/plan", {"title": "a note"}), put("work/plan", {"title": "a work"}))
+    by_path = store.ids(path=below("plan"))
+    assert sorted(by_path, key=str) == sorted([a_type, name("note/plan"), name("work/plan")], key=str)
+    assert store.ids(path=below("plan"), leaving=()) == by_path
+    assert [short(each) for each in store.ids(path=below("plan"), leaving=(kind("schema"),))] == [
+        "note/plan", "work/plan",
+    ]
+    assert store.ids(path=below("plan"), leaving=(kind("note"),)) == [each for each in by_path if each != name("note/plan")]
+    assert store.ids(path=below("plan"), leaving=(kind("note"), kind("work"))) == [a_type]
     assert store.ids(kind("schema"), path=below("plan")) == [a_type]
+    assert [short(each) for each in store.ids(leaving=(kind("schema"),))] == ["note/plan", "work/plan"]
     assert a_type in store.ids()
 
 

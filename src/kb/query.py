@@ -7,27 +7,33 @@ from kb import composition, journal, links, names, places, read, refusals, searc
 from kb.contract import kb_pb2
 from kb.port import Port
 from kb.requests import JournalFilter, Listing, Refusal, Searching, Walk
-from kb.values import ArtifactId, Locator, Refused
+from kb.values import ArtifactId, Below, Kind, Locator, Refused
 
 
 def listing(store: Port, asked: Listing) -> kb_pb2.Listed:
     """Every artifact of a kind whose fields hold the values asked for, in the order of their names, as stubs or
     names; with a path below the type, only those it selects, and, with no kind, of every kind but the kind of
-    types. Raises Refused for a kind the store holds no type for."""
+    types (`left_out`). Raises Refused for a kind the store holds no type for."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
-    matched = store.ids(asked.kind, asked.fields, asked.path)
+    matched = store.ids(asked.kind, asked.fields, asked.path, left_out(asked.kind, asked.path))
     if asked.ids:
         return kb_pb2.Listed(ids=[str(artifact_id) for artifact_id in matched])
     return kb_pb2.Listed(stubs=read.stubs(store, matched))
 
 
+def left_out(kind: Kind | None, path: Below | None) -> tuple[Kind, ...]:
+    """The kinds a selection of artifacts leaves out, handed to the port's `ids`: the kind of types when it selects
+    by a path below the type and names no kind, so that a path alone never gives a type; none otherwise."""
+    return (values.TYPE_KIND,) if kind is None and path is not None else ()
+
+
 def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
-    """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
-    a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via, a
+    """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step
+    at a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via, a
     kind or a path below the type narrows every step, never the artifact asked about. An IRI a link points at that
-    the store does not hold is reached as the IRI alone, of no kind, and not walked on from. Raises Refused for a kind the store holds no type for, a name the store lacks,
-    or, going out, a place it holds nothing at."""
+    the store does not hold is reached as the IRI alone, of no kind, and not walked on from. Raises Refused for a
+    kind the store holds no type for, a name the store lacks, or, going out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
     start = asked.locator.id

@@ -72,11 +72,11 @@ class Port(Protocol):
         """The number of every version held of the type at an IRI, lowest first; none where no version is held."""
 
     def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None,
-            path: Below | None = None) -> list[ArtifactId]:
+            path: Below | None = None, leaving: tuple[Kind, ...] = ()) -> list[ArtifactId]:
         """Every artifact held, or those of one kind whose fields each hold the value given, compared as the text
         YAML 1.2 writes the value as. With a path, only those it selects (`names.selects`), each by its IRI's path
-        below its own kind's, the IRI the change that landed it gave as its kind; and with a path and no kind, of
-        every kind but the kind of types (`values.TYPE_KIND`)."""
+        below its own kind's, the IRI the change that landed it gave as its kind. Never one of a kind it is told to
+        leave out (`leaving`), which kb says and an adapter only compares: told none, it leaves out none."""
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
         """The links landing on an artifact or a part inside it, narrowed to a field and a kind of source."""

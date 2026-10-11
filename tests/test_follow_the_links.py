@@ -3,8 +3,9 @@ import copy
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, iri, read, refs, remove, replace, start_a_store,
-    tagged_decision_type, targets, type_iri, version_iri,
+    DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, WORK_ITEM_TYPE, below_their_types, create, define, iri,
+    leading_decision_type, read, refs, remove, replace, start_a_store, tagged_decision_type, targets, type_iri,
+    version_iri,
 )
 from kb import client as kb_client
 
@@ -159,17 +160,6 @@ def _both_work_items(reached):
 
 ROADMAP = iri("decision", "roadmap")
 PLAIN_WORK_ITEM_TYPE = {"title": "Work item", "version": 1, "schema": TAG_TYPE["schema"]}
-
-
-def leading_decision_type():
-    """The decision type, whose artifacts may also lead to decisions and work items."""
-    decision_type = copy.deepcopy(DECISION_TYPE)
-    decision_type["schema"]["properties"]["leads"] = {
-        "type": "array",
-        "items": {"type": "string"},
-        "ref": {"targets": targets("decision", "work-item"), "cardinality": "many", "parts": False, "on_delete": "refuse"},
-    }
-    return decision_type
 
 
 @given(parsers.parse('a store where a decision at "{path}" below its type points at each of these:'), target_fixture="client")

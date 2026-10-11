@@ -177,6 +177,17 @@ def tagged_decision_type():
     return decision_type
 
 
+def leading_decision_type():
+    """The decision type, whose artifacts may also lead to decisions and work items."""
+    decision_type = copy.deepcopy(DECISION_TYPE)
+    decision_type["schema"]["properties"]["leads"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "ref": {"targets": targets("decision", "work-item"), "cardinality": "many", "parts": False, "on_delete": "refuse"},
+    }
+    return decision_type
+
+
 def start_a_store(root, clock=None):
     """A store started at root through `kb.init`, under the client's role, its first entry stamped by the clock when
     one is given."""

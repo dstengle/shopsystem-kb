@@ -9,8 +9,8 @@ import pytest
 
 import kb.testing as kb_testing
 from calls import (
-    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, create, define, iri, listing, refs, start_a_store,
-    targets, type_iri, version_iri,
+    TAG_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, create, define, iri, leading_decision_type, listing, refs,
+    start_a_store, type_iri, version_iri,
 )
 from kb import client as kb_client
 from kb.content import loads
@@ -25,17 +25,6 @@ WORK_ITEMS = ("plan", "plan/a", "plans/a")
 ROADMAP = iri("decision", "roadmap")
 NOT_HELD = (iri("work-item", "plan/ghost"), iri("work-item", "planning/ghost"))
 NO_KIND = "a kind is named by its type's IRI, an IRI of kb's grammar; '' is not"
-
-
-def leading_decision_type():
-    """The decision type, whose artifacts may also lead to decisions and work items."""
-    decision_type = copy.deepcopy(DECISION_TYPE)
-    decision_type["schema"]["properties"]["leads"] = {
-        "type": "array",
-        "items": {"type": "string"},
-        "ref": {"targets": targets("decision", "work-item"), "cardinality": "many", "parts": False, "on_delete": "refuse"},
-    }
-    return decision_type
 
 
 def at(kind, paths):
