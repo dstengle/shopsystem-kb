@@ -110,6 +110,7 @@ Feature: Export and import a store
       | with other content, written against version 2 of the type for decisions    |
       | with the same content, written against version 1 of the type for decisions |
 
+  @slice-182.1
   Scenario Outline: The operator checks a directory for import holding a file whose IRI does not sit under its type
     Pins that an import holds a file to the place its type gives it, as a create is held: a file filed under another type's IRI is an error of the check.
     Given a store holding a type for decisions and a type for work items
@@ -283,6 +284,7 @@ Feature: Export and import a store
     Then its types and artifacts land as they would from an export
     And its history and its store marker are passed over, neither landing in the store
 
+  @slice-181.1
   Scenario: Importing into a store a server serves is refused
     Pins that an import is a change like any other to a served store: asked of the store's files directly, it is refused and the operator is told where the server is.
     Given a store holding a type for decisions and a decision

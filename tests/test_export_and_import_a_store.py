@@ -48,6 +48,16 @@ def test_the_operator_imports_a_directory_holding_a_link_into_a_part_that_the_ar
     pass
 
 
+@scenario("export-and-import-a-store.feature", "The operator checks a directory for import holding a file whose IRI does not sit under its type")
+def test_the_operator_checks_a_directory_for_import_holding_a_file_whose_iri_does_not_sit_under_its_type():
+    pass
+
+
+@scenario("export-and-import-a-store.feature", "Importing into a store a server serves is refused")
+def test_importing_into_a_store_a_server_serves_is_refused():
+    pass
+
+
 @scenario("export-and-import-a-store.feature", "The operator imports a file holding an item that carries no name")
 def test_the_operator_imports_a_file_holding_an_item_that_carries_no_name():
     pass
