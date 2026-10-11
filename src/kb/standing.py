@@ -15,13 +15,19 @@ def under(type_id: values.ArtifactId, draft) -> tuple[values.ArtifactId | None, 
     """The nearest held type an IRI a type would be defined at sits under, None for one under no held type, and
     every IRI under the new type's that belongs to that other type: each artifact of its kind the draft holds there,
     but under the type of types, to which no type belongs by where it sits (decision/type-iris-are-free); and each
-    IRI not held a link waits on there with no nearer held type above it; once each, in the order of their names."""
+    IRI not held a link waits on there with no nearer held type above it, and the new type's own IRI when a link
+    waits on it, whole or on a part of it, but under the type of types, where the type defined is the artifact of
+    that type the link waits on; once each, in the order of their names."""
     other = composition.nearest_type(type_id, draft)
     if other is None:
         return None, []
     kept = [] if other == TYPE_OF_TYPES else draft.ids(values.Kind(str(other)))
     held = [each for each in kept if str(type_id) in names.above(each)]
-    waited = [each.target for each in draft.waiting() if composition.nearest_was(each.target, type_id, draft)]
+    own = [] if other == TYPE_OF_TYPES else [type_id]
+    waited = [
+        each.target for each in draft.waiting()
+        if each.target in own or composition.nearest_was(each.target, type_id, draft)
+    ]
     return other, sorted({*held, *waited}, key=names.order)
 
 
