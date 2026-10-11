@@ -256,12 +256,12 @@ Feature: Define a type
 
   Scenario Outline: Defining a type under another type's IRI, over what already sits there, is refused
     Pins that a new type cannot take over what was written or linked under an older one: an IRI's type is settled by what already sits there.
-    Given a decision type the store holds, and <what sits there> under the decision type's IRI
+    Given a decision type the store holds, and <what sits there>
     When the client defines a type at an IRI between the decision type's and that one
     Then the type is rejected because what sits under it already belongs to the decision type, naming that IRI
     And nothing is written anywhere in the store
 
     Examples:
-      | what sits there                                          |
-      | a decision held at an IRI two segments                   |
-      | a link waiting on a decision not held, two segments      |
+      | what sits there                                                                          |
+      | a decision the store holds at an IRI two segments below the type's                       |
+      | a link waiting on a decision the store does not hold, at an IRI two segments below the type's |
