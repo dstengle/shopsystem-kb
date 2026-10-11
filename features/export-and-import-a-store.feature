@@ -93,6 +93,7 @@ Feature: Export and import a store
       | cannot be read as YAML 1.2                                                       | it cannot be read as YAML 1.2                                                       |
       | is not in canonical form                                                         | it is not in canonical form                                                         |
       | claims a type neither the directory nor the store holds                          | it claims a type neither the directory nor the store holds                          |
+      | conforms to a version of its type neither the directory nor the store holds      | it conforms to a version of its type neither the directory nor the store holds      |
       | has content that does not fit its type                                           | its content does not fit its type                                                   |
       | carries a link to an IRI under a type neither the directory nor the store holds  | it carries a link to an IRI under a type neither the directory nor the store holds  |
 
@@ -111,7 +112,7 @@ Feature: Export and import a store
 
   @slice-184
   Scenario Outline: The operator checks a directory for import that holds a type version's file with an error
-    Pins a broken type version's reach: the type versions built on it, however indirectly, and the artifacts written against it or against any of them, are named as ones that would be skipped, with the way each leads there.
+    Pins a broken type version's reach: the type versions built on it, however indirectly, the artifacts written against it or against any of them, and the artifacts whose link would wait under a type no version of which would land, are named as ones that would be skipped, with the way each leads there.
     Given a store
     And a directory for import holding version 2 of a type for decisions, whose content does not fit the type that describes types, and <leading>
     When the operator checks the directory for import
@@ -120,6 +121,7 @@ Feature: Export and import a store
     Examples:
       | leading                                                                                                                                                                                                                                  | skipped                                                                                |
       | a decision conforming to version 2 of the type for decisions                                                                                                                                                                             | the decision is                                                                        |
+      | a type for work items whose link field allows decisions, and a work item whose link names an IRI under the type for decisions                                                                                                           | the work item is                                                                       |
       | version 1 of a type for notes, which refers to version 2 of the type for decisions by a kb: reference, and a note conforming to version 1 of the type for notes                                                                          | version 1 of the type for notes and the note are                                       |
       | version 1 of a type for notes, which refers to version 2 of the type for decisions by a kb: reference, version 1 of a type for tasks, which refers to version 1 of the type for notes by a kb: reference, and a task conforming to version 1 of the type for tasks | version 1 of the type for notes, version 1 of the type for tasks and the task are      |
 
@@ -151,12 +153,12 @@ Feature: Export and import a store
 
   @slice-181
   Scenario: The operator imports a directory that checks clean, and the history shows each type landing before its artifacts
-    Pins the order an import lands in and what it adds to the history: one import entry per artifact, a type always ahead of the artifacts of its kind.
+    Pins the order an import lands in and what it adds to the history: one import entry per file, each version of a type counted, a type always ahead of the artifacts of its kind.
     Given a store holding a type for notes and a note
-    And a directory for import that checks clean, holding a type for decisions and a type for work items, each at one version, two decisions and a work item
+    And a directory for import that checks clean, holding a type for decisions at two versions, a type for work items at one version, two decisions and a work item
     When the operator imports the directory, saying which role they are
-    Then the store's history gains one import entry for each of the five artifacts
-    And in the history each type's import entry comes before the import entries of the artifacts of its kind
+    Then the store's history gains one import entry for each of the six files
+    And in the history every import entry of a type comes before the import entries of the artifacts of its kind
 
   @slice-165.6
   Scenario: A store holding an artifact behind its type comes back from its export as it was
@@ -179,17 +181,18 @@ Feature: Export and import a store
 
   @slice-182
   Scenario Outline: Importing a directory holding an artifact the store already holds at the same IRI with other content or another type version is refused
-    Pins that an import never replaces what the store holds: any differing artifact stops the whole import, and the operator is told every IRI that differs.
+    Pins that an import never replaces what the store holds: any differing artifact stops the whole import, with errors skipped or not, and the operator is told every IRI that differs.
     Given a store holding a type for decisions at version 2 and two decisions written against version 2
     And a directory for import holding both decisions at the same IRIs, each <difference>, and a third decision the store does not hold
-    When the operator imports the directory, saying which role they are
+    When the operator <imports>, saying which role they are
     Then the import is rejected, naming the IRI of each of the two decisions
     And nothing lands, the third decision included
 
     Examples:
-      | difference                                                                 |
-      | with other content, written against version 2 of the type for decisions    |
-      | with the same content, written against version 1 of the type for decisions |
+      | difference                                                                 | imports                                    |
+      | with other content, written against version 2 of the type for decisions    | imports the directory                      |
+      | with the same content, written against version 1 of the type for decisions | imports the directory                      |
+      | with other content, written against version 2 of the type for decisions    | imports the directory with errors skipped  |
 
   @slice-183
   Scenario Outline: The operator imports a directory holding a link to an IRI neither the directory nor the store holds, under a type one of them holds that the link field allows
@@ -206,6 +209,28 @@ Feature: Export and import a store
       | the store     |
       | the directory |
 
+  Scenario Outline: The operator imports a directory holding a link into a part that the artifact at its IRI lacks
+    Pins that a link into a part its target lacks does not stop an import: it lands and waits for the part, as the store exported held it, whether the directory or the store holds the target.
+    Given a store holding a type for decisions whose decisions carry options and may link to an option of another
+    And a decision with no option held by <holder>
+    And a directory for import that checks clean, holding a second decision whose link names an option of the first
+    When the operator imports the directory, saying which role they are
+    Then the import lands
+    And the second decision's link waits on a placeholder for that option of the first decision
+
+    Examples:
+      | holder        |
+      | the store     |
+      | the directory |
+
+  Scenario: The operator imports a file holding an item that carries no name
+    Pins that every item an import lands has a name, as every item a write makes has, and that a name a file gives is kept.
+    Given a store holding a type for decisions whose decisions carry options
+    And a directory for import that checks clean, holding a decision with one option that carries a name and one that carries none
+    When the operator imports the directory, saying which role they are
+    Then the option that carried a name lands with that name
+    And the option that carried none lands with a name the store gives it
+
   @slice-112
   Scenario: Importing a directory that holds an error is refused
     Pins that import always checks first and takes nothing from a directory whose check fails, showing the operator why.
@@ -218,7 +243,7 @@ Feature: Export and import a store
 
   @slice-184
   Scenario Outline: The operator imports with errors skipped
-    Pins that skipping errors leaves out exactly the broken files, the type versions built on a broken type version and the artifacts written against any of them, lands everything else, lets a link to what was left out wait on a placeholder, and says what was left out and why.
+    Pins that skipping errors leaves out exactly the broken files, the type versions built on a broken type version, the artifacts written against any of them and the artifacts whose link would wait under a type no version of which lands, lands everything else, lets a link to what was left out wait on a placeholder, and says what was left out and why.
     Given a freshly started store
     And a directory for import holding a type for work items whose link field allows decisions, and a work item, together with <broken>
     When the operator imports the directory with errors skipped, saying which role they are
@@ -230,7 +255,8 @@ Feature: Export and import a store
     Examples:
       | broken                                                                                                                                                                                                                                                                                  | left out                                                    | rest                                                                                                  |
       | a type for decisions, a decision with an error, and a second decision that links to it                                                                                                                                                                                                  | the decision with an error                                  | the second decision lands, its link landing on a placeholder at the IRI of the decision with an error |
-      | version 1 of a type for decisions whose content does not fit the type that describes types, and a decision conforming to it that the work item links to                                                                                                                                | the type version and the decision                           | the work item's link to the decision lands on a placeholder at the decision's IRI                     |
+      | version 1 of a type for decisions, version 2 of it whose content does not fit the type that describes types, and a decision conforming to version 2 that the work item links to                                                                                                        | version 2 of the type for decisions and the decision        | the work item's link to the decision lands on a placeholder at the decision's IRI                     |
+      | version 1 of a type for decisions whose content does not fit the type that describes types, and a second work item whose link names an IRI under the type for decisions                                                                                                                | the type version and the second work item                   | every other file in the directory lands                                                               |
       | version 1 of a type for decisions whose content does not fit the type that describes types, version 1 of a type for notes, which refers to it by a kb: reference, and a note conforming to version 1 of the type for notes                                                             | the two type versions and the note                          | every other file in the directory lands                                                               |
       | version 1 of a type for decisions whose content does not fit the type that describes types, version 1 of a type for notes, which refers to it by a kb: reference, version 1 of a type for tasks, which refers to that one by a kb: reference, and a task conforming to version 1 of the type for tasks | the three type versions and the task                        | every other file in the directory lands                                                               |
 
