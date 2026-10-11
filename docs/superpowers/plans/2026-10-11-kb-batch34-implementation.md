@@ -97,6 +97,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
 - [ ] **Tests the decisions break:**
   - `tests/test_export_and_import_a_store.py::test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the_order_its_type_now_declares`: decision 2. Rewritten and renamed: the artifact, left at its version, exports in the order that version declares.
   - Any existing export or seeding test whose store holds a type at two versions now exports two files for it: with Task 1's helper the comparisons hold; a hard-coded single file for such a type is rewritten to the files decision 1 gives. One that breaks otherwise is a `BLOCKED` reply naming it.
+  - Added after the hand-back at 398790a: the rewritten export-order test (`test_an_artifact_left_at_its_version_when_its_type_reordered_its_fields_exports_in_the_order_that_version_declares`) also runs the import check and the import on its export, which now holds two version files of the note type; the import cannot land them until Task 5. The test is split: its export half stays as rewritten; its import half becomes a test of its own, unchanged in what it asserts, skipped with the reason "the import of an export holding two versions of a type: slice 165.6", and Task 5 removes the skip.
   - The import of such an export is Task 5's: an existing test that exports a two-version type and imports it again, if any, is named in the reply as `BLOCKED` rather than changed.
 - [ ] **Steps to reuse:** `calls.define`, `create`, `next_version` or `change_type`, `type_iri`, `version_iri`, `filed`; `tests/test_export_and_import_a_store.py`'s `_file`, `_read`, `_exported_names`; Task 1's helper.
 - [ ] **Verify:** `.venv/bin/python -m pytest -q -m "slice-165.3"` gives 3 passed, and `make test` shows no new failure.
@@ -145,6 +146,7 @@ Scripts: /home/vscode/.claude/plugins/cache/shopsystem-bdd/shopsystem-bdd/0.11.0
   - CLAUDE.md's rows for every module whose ownership changes ("an import keeping the revision and type version its file gives" already stands in `drafting.py`'s).
 - [ ] **Decisions applied:** 4, 5, 6, 7. Review Focus 1, 2 (second half), 3, 4.
 - [ ] **Tests the decisions break:**
+  - The import half of the export-order test, split off and skipped by Task 2 (reason naming slice 165.6): the skip is removed and it passes as it asserts.
   - Any existing import test asserting an artifact's file is checked against its type's latest version where the file names an earlier one the directory holds: decision 5. The scout found none by name; one that breaks is a `BLOCKED` reply naming it.
   - `tests/test_export_and_import_a_store.py`'s history assertions count "one import entry for each of the five artifacts" for directories holding each type at one version: unchanged under decision 6.
 - [ ] **Steps:**
