@@ -13,7 +13,7 @@ from calls import TYPE_OF_TYPES, TYPES, TYPES_AT, iri, type_iri
 from kb import client as kb_client
 from kb import port, port_values, search, sqlite_store
 from kb import store as stores
-from kb.values import ArtifactId, Kind, Version
+from kb.values import ArtifactId, Below, Kind, Version
 
 ADAPTERS = {"sqlite": (sqlite_store.make, sqlite_store.opened)}
 
@@ -448,6 +448,56 @@ def test_names_by_kind_with_field_equality_on_the_text_form(store):
     assert [short(each) for each in store.ids(note, {"count": "3"})] == ["note/a", "note/b"]
     assert [short(each) for each in store.ids(note, {"count": "3", "on": "2026-10-01"})] == ["note/a"]
     assert store.ids(note, {"absent": ""}) == []
+
+
+def below(text):
+    """A path below a type as the port takes it, written as its segments joined by slashes."""
+    return Below(tuple(text.split("/")))
+
+
+def test_names_by_a_path_below_the_type_are_matched_by_whole_segments_across_every_kind(store):
+    """No case escapes a `%` or a `_` in a segment: kb's grammar gives a segment neither, so none can arise."""
+    for text in ("note/plan", "note/plan/a", "note/plan/a/b", "note/planning", "note/plan-b", "note/plan.b",
+                 "note/old/plan", "work/plan", "work/plan/a", "work/plans/a"):
+        land(store, put(text, {"title": text}))
+    assert [short(each) for each in store.ids(path=below("plan"))] == [
+        "note/plan/a/b", "note/plan/a", "note/plan", "work/plan/a", "work/plan",
+    ]
+    assert [short(each) for each in store.ids(path=below("plan/a"))] == ["note/plan/a/b", "note/plan/a", "work/plan/a"]
+    assert [short(each) for each in store.ids(path=below("plan/a/b"))] == ["note/plan/a/b"]
+    assert [short(each) for each in store.ids(path=below("old"))] == ["note/old/plan"]
+    assert store.ids(path=below("pla")) == []
+    assert store.ids(path=below("plan/a/b/c")) == []
+    assert store.ids(path=below("a")) == []
+
+
+def test_names_by_a_path_below_the_type_are_narrowed_by_a_kind_and_by_fields_when_those_are_given(store):
+    land(store,
+         put("note/plan/a", {"count": 3}), put("note/plan/b", {"count": 4}), put("note/other", {"count": 3}),
+         put("work/plan/a", {"count": 3}))
+    assert [short(each) for each in store.ids(kind("note"), path=below("plan"))] == ["note/plan/a", "note/plan/b"]
+    assert [short(each) for each in store.ids(kind("note"), {"count": "3"}, below("plan"))] == ["note/plan/a"]
+    assert [short(each) for each in store.ids(None, {"count": "3"}, below("plan"))] == ["note/plan/a", "work/plan/a"]
+    assert store.ids(kind("tag"), path=below("plan")) == []
+
+
+def test_a_path_below_the_type_is_read_below_the_kind_each_artifact_was_landed_with(store):
+    """A type whose IRI sits under another's: what is of its kind has its path below it, not below the other."""
+    nested = dataclasses.replace(put("note/sub/plan", {"title": "nested"}), kind=kind("note/sub"))
+    land(store, nested, put("note/plan", {"title": "plain"}))
+    assert [short(each) for each in store.ids(path=below("plan"))] == ["note/plan", "note/sub/plan"]
+    assert store.ids(path=below("sub")) == []
+    assert [short(each) for each in store.ids(kind("note/sub"), path=below("plan"))] == ["note/sub/plan"]
+
+
+def test_names_by_a_path_alone_leave_out_what_is_of_the_kind_of_types(store):
+    """A type is of the kind of types, and one may sit under the IRI of the type that describes types."""
+    a_type = ArtifactId(f"{TYPE_OF_TYPES}/plan")
+    land(store, dataclasses.replace(put("schema/plan", {"title": "a type"}), artifact=a_type),
+         put("note/plan", {"title": "a note"}))
+    assert [short(each) for each in store.ids(path=below("plan"))] == ["note/plan"]
+    assert store.ids(kind("schema"), path=below("plan")) == [a_type]
+    assert a_type in store.ids()
 
 
 def test_links_in_narrowed_by_field_and_source_kind_into_parts_too(store):

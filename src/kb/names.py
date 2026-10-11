@@ -38,6 +38,20 @@ def above(iri_text) -> tuple[str, ...]:
     return tuple(SCHEME + "/".join((host, *segments[:count])) for count in range(len(segments) - 1, 0, -1))
 
 
+def below(iri_text, type_iri) -> tuple[str, ...] | None:
+    """An IRI's path below a type's IRI: the segments it holds after the type's. None for an IRI that does not sit
+    under the type's, as the type's own does not."""
+    under = f"{type_iri}/"
+    return tuple(str(iri_text).removeprefix(under).split("/")) if str(iri_text).startswith(under) else None
+
+
+def selects(segments: tuple[str, ...], iri_text, type_iri) -> bool:
+    """Whether a path below the type selects an IRI of a type: the IRI's path below its type's IRI is the segments
+    given or begins with them, whole segments only, so `plan` selects `plan` and `plan/a`, never `planning`."""
+    found = below(iri_text, type_iri)
+    return found is not None and found[:len(segments)] == tuple(segments)
+
+
 def version(text: str) -> tuple[str, int] | None:
     """A type version's IRI read as the type's IRI and the version's number; None for text that is not one."""
     found = VERSION.fullmatch(text)

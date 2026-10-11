@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from kb import names, sqlite_types
 from kb.content import text
 from kb.port_values import Candidate, Linking, TypeVersion
-from kb.values import ArtifactId, Kind, Version
+from kb.values import TYPE_KIND, ArtifactId, Below, Kind, Version
 
 PAIRS = "~pairs"
 WAITING = (
@@ -101,10 +101,15 @@ class Reads:
     def versions(self, type_id: ArtifactId) -> list[int]:
         return sqlite_types.numbers(self._db, str(type_id))
 
-    def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
+    def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None,
+            path: Below | None = None) -> list[ArtifactId]:
         narrowed = "" if kind is None else " WHERE kind = ?"
-        rows = self._rows(f"SELECT id, content FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
-        return ordered([name for name, stored in rows if not fields or _holds(decoded(stored), fields)])
+        rows = self._rows(f"SELECT id, content, kind FROM artifacts{narrowed}", *([] if kind is None else [kind.name]))
+        return ordered([
+            name for name, stored, of_kind in rows
+            if (path is None or _selected(path, name, of_kind, kind))
+            and (not fields or _holds(decoded(stored), fields))
+        ])
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
         return self._links_into(artifact_id, field, kind, implicit=False)
@@ -182,6 +187,12 @@ class Reads:
 
 def _linking(source: str, field: str, place: str, target: str, part: str, holder: str | None) -> Linking:
     return Linking(ArtifactId(source), field, place, ArtifactId(target), part, holder)
+
+
+def _selected(path: Below, name: str, of_kind: str, asked: Kind | None) -> bool:
+    """Whether a path selects a row: by the row's IRI below its own kind's, and, when no kind is asked for, never a
+    row of the kind of types."""
+    return (asked is not None or of_kind != TYPE_KIND.name) and names.selects(path.segments, name, of_kind)
 
 
 def _holds(artifact: dict, fields: dict[str, str]) -> bool:

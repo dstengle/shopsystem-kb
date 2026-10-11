@@ -41,6 +41,12 @@ class Version:
         return names.versioned(self.kind.name, self.number)
 
 
+@dataclass(frozen=True)
+class Below:
+    """A path below a type: the segments an artifact's IRI holds after its type's, or the first of them."""
+    segments: tuple[str, ...]
+
+
 TYPE_KIND = Kind(names.TYPES)
 
 

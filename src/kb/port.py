@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import ContextManager, Protocol
 
 from kb.port_values import Candidate, Change, Entry, Linking, TypeVersion
-from kb.values import ArtifactId, Kind, Version
+from kb.values import ArtifactId, Below, Kind, Version
 
 
 class Refusal(Exception):
@@ -71,9 +71,12 @@ class Port(Protocol):
     def versions(self, type_id: ArtifactId) -> list[int]:
         """The number of every version held of the type at an IRI, lowest first; none where no version is held."""
 
-    def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None) -> list[ArtifactId]:
+    def ids(self, kind: Kind | None = None, fields: dict[str, str] | None = None,
+            path: Below | None = None) -> list[ArtifactId]:
         """Every artifact held, or those of one kind whose fields each hold the value given, compared as the text
-        YAML 1.2 writes the value as."""
+        YAML 1.2 writes the value as. With a path, only those it selects (`names.selects`), each by its IRI's path
+        below its own kind's, the IRI the change that landed it gave as its kind; and with a path and no kind, of
+        every kind but the kind of types (`values.TYPE_KIND`)."""
 
     def links_in(self, artifact_id: ArtifactId, field: str = "", kind: Kind | None = None) -> list[Linking]:
         """The links landing on an artifact or a part inside it, narrowed to a field and a kind of source."""
