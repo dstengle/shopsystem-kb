@@ -13,7 +13,7 @@ from pathlib import Path
 from kb import canonical, sqlite_store, store
 from kb.contract import kb_pb2
 from kb.sqlite_reads import encoded
-from kb.values import artifact_id
+from kb.values import Kind, Version, artifact_id
 
 _PLACE = "kb"
 _MARKER = "store.yaml"
@@ -61,6 +61,14 @@ def versions(root):
     with store.opened(root) as opened:
         found = {str(each): opened.versions(each) for each in opened.ids()}
     return {name: numbers for name, numbers in sorted(found.items()) if numbers}
+
+
+def version(root, name, number):
+    """A version the store holds of a type, as a mapping: the content, the revision and the title it was made with,
+    under the type's name."""
+    with store.opened(root) as opened:
+        found = opened.type_version(Version(Kind(name), number))
+    return {**found.content, "id": name, "revision": found.revision, "title": found.title}
 
 
 def history(client):

@@ -9,8 +9,8 @@ from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
 from calls import (
-    DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, check, create, define, filed, iri, journal, replace, start_a_store,
-    type_iri, version_iri,
+    DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, change_type, check, create, define, filed, iri, journal, replace,
+    request, start_a_store, type_iri, version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
@@ -52,6 +52,13 @@ def test_the_operator_imports_a_directory_that_checks_clean_into_a_store_saying_
 
 @scenario(FEATURE, "The operator exports the store to a directory that is empty or does not exist")
 def test_the_operator_exports_the_store():
+    pass
+
+
+@scenario(
+    FEATURE, "An artifact that conforms to an earlier version of its type is exported in the order that version declares",
+)
+def test_an_artifact_conforming_to_an_earlier_version_is_exported_in_that_version_s_order():
     pass
 
 
@@ -139,32 +146,121 @@ def _files(target):
     return sorted(str(path.relative_to(target)) for path in Path(target).rglob("*") if path.is_file())
 
 
-@then("the directory holds one file for each artifact in the store, under a folder named for its kind")
+REVISED_DECISION_TYPE = {**DECISION_TYPE, "version": 2, "schema": {**DECISION_TYPE["schema"], "sections": [
+    {"title": "Purpose"}, {"title": "Rationale"}, {"title": "Consequences"},
+]}}
+VERSIONS = {  # every version the outline's store holds of each type, with the revision and title it was made with
+    TYPE_OF_TYPES: {1: (1, "Schema")},
+    type_iri("decision"): {1: (1, "Decision"), 2: (2, "Decision")},
+    type_iri("work-item"): {1: (1, "Work item")},
+}
+
+
+@given(
+    "a store holding a type for decisions at two versions, a type for work items at one version, two decisions and "
+    "a work item",
+)
+def _store_with_a_type_at_two_versions(root):
+    client = _started(root)
+    _decisions_and_a_work_item(client)
+    revised = replace(client, type_iri("decision"), {key: REVISED_DECISION_TYPE[key] for key in ("version", "schema")})
+    assert not revised.faults, revised.faults
+    assert held.versions(root) == {name: list(numbers) for name, numbers in VERSIONS.items()}
+
+
+def _version_files(target, name):
+    """The files a directory holds at a type's place followed by `@`, sorted."""
+    return [file for file in _files(target) if file.startswith(f"{_file(name)[:-len('.yaml')]}@")]
+
+
+@then("the directory holds one file for each decision and for the work item, at a place that follows the path of its IRI")
 def _one_file_for_each_artifact(ran, root, target):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    assert [file for file in _files(target) if "@" not in file] == sorted(_file(name) for name in (WEEKLY, MONTHLY, MONDAYS))
+
+
+@then(
+    "for each type the directory holds one file for each version the store holds and no other, at the type's place "
+    "followed by @ and the version's number",
+)
+def _one_file_for_each_version(root, target):
+    for name, numbers in VERSIONS.items():
+        assert _version_files(target, name) == [_file(name, number) for number in numbers], name
     assert _files(target) == _held_files(root)
-    assert {path.parent.name for path in Path(target).rglob("*.yaml")} == {"schema", "decision", "work-item"}
 
 
-@then("the types' files are under the folder for types")
-def _types_under_the_folder_for_types(target):
-    assert sorted(path.name for path in (Path(target) / "schema").iterdir()) == [
-        "decision.yaml", "schema.yaml", "work-item.yaml",
-    ]
+@then("each version's file gives that version's own revision and title")
+def _each_version_its_own_revision_and_title(target):
+    for name, numbers in VERSIONS.items():
+        for number, made_with in numbers.items():
+            written = _read(target, name, number)
+            assert (written["version"], (written["revision"], written["title"])) == (number, made_with), (name, number)
+    schemas = [_read(target, type_iri("decision"), number)["schema"] for number in (1, 2)]
+    assert schemas == [DECISION_TYPE["schema"], REVISED_DECISION_TYPE["schema"]]
 
 
-@then("each file gives the artifact's identity first, its name, kind, type version, revision and title, and then its content")
+def _held_at(root, file):
+    """What the store at root holds of the artifact, or the type's version, an export puts at a file's place."""
+    name, _, number = ("https://" + file.removesuffix(".yaml")).partition("@")
+    return held.version(root, name, int(number)) if number else held.artifact(root, name)
+
+
+@then(
+    "each file gives the artifact's identity first, its IRI, the IRI of the version of its type it conforms to, its "
+    "revision and its title, and then its content",
+)
 def _identity_first(root, target):
-    for name in held.names(root):
-        written = _loaded((Path(target) / _held_file(root, name)).read_text(encoding="utf-8"))
-        assert list(written)[:len(IDENTITY)] == IDENTITY, name
-        assert written == held.artifact(root, name)
+    for file in _files(target):
+        written, kept = _loaded((Path(target) / file).read_text(encoding="utf-8")), _held_at(root, file)
+        assert list(written)[:len(IDENTITY)] == IDENTITY, file
+        assert _file(written["id"]).removesuffix(".yaml") == file.removesuffix(".yaml").partition("@")[0], file
+        assert written == kept and list(written)[len(IDENTITY):] == [key for key in kept if key not in IDENTITY], file
+    assert _read(target, WEEKLY)["type"] == version_iri("decision", 1)
+    assert {_read(target, name, number)["type"] for name, numbers in VERSIONS.items() for number in numbers} == {
+        version_iri(TYPE_OF_TYPES, 1),
+    }
 
 
 @then("every file shows the store as it stood at one moment")
 def _as_the_store_stood(root, target):
     for name in held.names(root):
         assert (Path(target) / _held_file(root, name)).read_text(encoding="utf-8") == held.text(root, name), name
+    for file in _files(target):
+        assert (Path(target) / file).read_text(encoding="utf-8") == canonical.dump(_held_at(root, file)), file
+
+
+def _note_type(*fields):
+    """The schema of a note type declaring the fields named, in that order, after its title."""
+    properties = {name: {"type": "string"} for name in ("title", *fields)}
+    return {"type": "object", "properties": properties, "required": ["title"]}
+
+
+@given(
+    "a store holding a note type whose first version declares a summary then a body and whose second declares the "
+    "body then the summary",
+)
+def _store_with_a_note_type_at_two_versions(root):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    changed = change_type(client, "note", _note_type("body", "summary"))
+    assert not changed.faults, changed.faults
+    assert held.versions(root)[type_iri("note")] == [1, 2]
+
+
+@given("a note that conforms to the first version, with a summary and a body")
+def _a_note_of_the_first_version(root):
+    made = request(
+        kb_client.connect(root), "note", "Stock count", {"body": "Count on Fridays.", "summary": "Weekly"}, version=1,
+    )
+    assert not made.faults, made.faults
+    assert held.artifact(root, iri("note", "stock-count"))["type"] == version_iri("note", 1)
+
+
+@then("the note's file gives its summary before its body")
+def _summary_before_body(ran):
+    assert (ran["ran"].returncode, ran["ran"].stderr) == (0, "")
+    written = _loaded((ran["target"] / _file(iri("note", "stock-count"))).read_text(encoding="utf-8"))
+    assert list(written) == [*IDENTITY, "summary", "body"]
 
 
 LONG = (
@@ -925,7 +1021,7 @@ def _kb_import_there(where, tmp_path):
 @then("the store KB_ROOT names is the one exported")
 def _that_store_exported(ran, root, where):
     assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
-    assert _files(where["target"]) == sorted(_held_file(root, name) for name in held.names(root))
+    assert _files(where["target"]) == _held_files(root)
 
 
 @then("the store found above where they are working is the one imported into")
@@ -1027,7 +1123,18 @@ def _the_type_of_types_kept(root, before):
     assert [(entry.op, entry.message) for entry in entries] == [("create", "initialise store")]
 
 
-def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the_order_its_type_now_declares(
+def test_a_store_holding_a_type_at_two_versions_exports_the_same_files_twice(root, tmp_path):
+    _store_with_a_type_at_two_versions(root)
+    first, second = (tmp_path / each for each in ("first", "second"))
+    for target in (first, second):
+        ran = _kb("export", str(target), cwd=root)
+        assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+    assert _files(first) == _files(second) == _held_files(root)
+    for file in _files(first):
+        assert (first / file).read_bytes() == (second / file).read_bytes(), file
+
+
+def test_an_artifact_left_at_its_version_when_its_type_reordered_its_fields_exports_in_the_order_that_version_declares(
     tmp_path, monkeypatch,
 ):
     def typed(order, version):
@@ -1046,7 +1153,7 @@ def test_an_artifact_written_before_its_type_reordered_its_fields_exports_in_the
     monkeypatch.setenv("KB_ROOT", str(source))
     assert kb_client.export(str(exported)).faults == []
     text = (exported / _file(iri("note", "x"))).read_text(encoding="utf-8")
-    assert list(_loaded(text)) == [*IDENTITY, "b", "a"]
+    assert list(_loaded(text)) == [*IDENTITY, "a", "b"]
     assert (_loaded(text)["type"], _loaded(text)["revision"]) == (version_iri("note", 1), 1)
     monkeypatch.setenv("KB_ROOT", str(target))
     checked = kb_client.import_check(str(exported))
@@ -1113,6 +1220,7 @@ def _import_run_again(root, target, holding):
 
 
 @when("the operator exports the store to an empty directory", target_fixture="ran")
+@when("the operator exports the store to a directory that is empty", target_fixture="ran")
 def _kb_export_to_an_empty_directory(root, tmp_path):
     target = tmp_path / "exported"
     target.mkdir()

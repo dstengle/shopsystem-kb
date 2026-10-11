@@ -157,8 +157,8 @@ def artifact_schema(artifact: dict, corpus) -> dict:
 
 
 def latest_schema(artifact: dict, corpus) -> dict:
-    """The version its kind's type stands at now, whichever version the artifact conforms to: what an export and an
-    import read an artifact through. Raises Refused when the corpus holds no such type."""
+    """The version its kind's type stands at now, whichever version the artifact conforms to: what an import reads an
+    artifact through. Raises Refused when the corpus holds no such type."""
     return kind_schema(artifact_kind(artifact), corpus)
 
 
