@@ -1,8 +1,10 @@
+import copy
+
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
     DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, READING_ORDER, WORK_ITEM_TYPE, create, define, iri,
-    next_version, placeholders, replace, start_a_store, targets,
+    next_version, placeholders, replace, request, start_a_store, targets,
 )
 import held
 from kb import client as kb_client
@@ -124,23 +126,62 @@ def _the_iri_is_listed_as_a_placeholder(checked):
 
 
 DAILY = iri("decision", "prices-are-reviewed-daily")
+YEARLY = iri("decision", "prices-are-reviewed-yearly")
+HOURLY = iri("decision", "prices-are-reviewed-hourly")
+# A decision whose options may each say which decision they would replace, at its first version.
+REPLACING_DECISION_TYPE = copy.deepcopy(DECISION_TYPE)
+REPLACING_DECISION_TYPE["schema"]["parts"]["options"]["items"]["properties"]["replaces"] = (
+    DECISION_TYPE["schema"]["properties"]["supersedes"]
+)
 
 
 @given(
     "a store holding a decision that links to an IRI the store does not hold from one of its fields and again from "
-    "one of its sections",
+    "one of its items",
     target_fixture="client",
 )
-def _store_with_a_decision_linking_from_a_field_and_from_a_section(root):
-    """The decision supersedes the IRI, and its purpose, a section, holds the same link."""
-    client = _store_with_a_decision(root)
-    purpose, rationale = SECTIONS
-    made = create(client, "decision", {
-        "title": "Prices are reviewed daily", "supersedes": MONTHLY,
-        "sections": [{**purpose, "supersedes": MONTHLY}, rationale],
+def _store_with_a_decision_linking_from_a_field_and_from_an_item(root):
+    """The decision supersedes the IRI, and its first option would replace it. The type stands at its second version
+    from the start, which requires what the first does, so only what a step makes under the first is behind it."""
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, REPLACING_DECISION_TYPE)
+    followed = next_version(client, "decision", REPLACING_DECISION_TYPE)
+    assert not followed.faults, followed.faults
+    create(client, "decision", {
+        "title": "Prices are reviewed daily", "sections": SECTIONS, "supersedes": MONTHLY,
+        "options": [{"title": "Go daily", "replaces": MONTHLY}],
     })
-    assert not made.faults, made.faults
     return client
+
+
+@given("the store holds another decision that breaks a rule of its type")
+def _another_decision_breaks_a_rule(root, client):
+    """Made by hand behind the store's back, since the store refuses to write it: the decision loses its rationale."""
+    create(client, "decision", {"title": "Prices are reviewed yearly", "sections": SECTIONS})
+    decision = held.artifact(root, YEARLY)
+    decision["sections"] = decision["sections"][:1]
+    held.plant(root, YEARLY, decision)
+
+
+@given("the store holds a third decision that conforms to a version of the decision type a later version has followed")
+def _a_third_decision_behind_its_type(client):
+    made = request(client, "decision", "Prices are reviewed hourly", {"sections": SECTIONS}, version=1)
+    assert not made.faults, made.faults
+
+
+@then("the IRI is listed as a placeholder with each link into it: the decision and the field, and the decision and the item")
+def _the_iri_with_each_link_into_it(checked):
+    assert not checked.faults, checked.faults
+    assert [
+        (each.id, [(link.artifact, link.field, link.place) for link in each.links]) for each in checked.placeholders
+    ] == [(MONTHLY, [(DAILY, "supersedes", "supersedes"), (DAILY, "replaces", "options/0/replaces")])]
+
+
+@then("the placeholder is listed apart from the violations and from the artifacts behind their type")
+def _the_placeholder_apart(checked):
+    assert [fault.artifact for fault in checked.violations] == [YEARLY]
+    assert [entry.artifact for entry in checked.stale] == [HOURLY]
 
 
 @then("the client is told of no violation")
