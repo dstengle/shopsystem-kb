@@ -1153,7 +1153,31 @@ def _a_broken_second_version_and_a_decision_linked_to(tmp_path):
     return target, {broken: "error", _file(AT_TWO): f"{_file(AT_TWO)} -> {broken}"}
 
 
+def _a_broken_only_version_and(leading, *chains):
+    """What makes a directory holding the type for decisions at its one version, broken, the type for work items, the
+    work item, and what a row says leads to the broken version: the files left out, each chain given without the
+    broken file it ends at."""
+    def made(tmp_path):
+        def fill(client):
+            _decisions_at(client, 1)
+            define(client, WORK_ITEM_TYPE)
+            create(client, "work-item", {"title": "Stands alone"})
+            leading(client)
+
+        target = _for_import(tmp_path, fill)
+        broken = _breaks(target, DECISIONS, 1)
+        return target, {broken: "error", **{chain[0]: " -> ".join((*chain, broken)) for chain in chains}}
+    return made
+
+
+def _a_second_work_item_linking_under_the_type(client):
+    create(client, "work-item", {"title": "Find the decision", "decisions": [iri("decision", "not-anywhere")]})
+
+
 TOGETHER_WITH = {
+    "version 1 of a type for decisions whose content does not fit the type that describes types, and a second work "
+    "item whose link names an IRI under the type for decisions":
+        _a_broken_only_version_and(_a_second_work_item_linking_under_the_type, (_file(LINKING_UNDER),)),
     "version 1 of a type for decisions, version 2 of it whose content does not fit the type that describes types, "
     "and a decision conforming to version 2 that the work item links to":
         _a_broken_second_version_and_a_decision_linked_to,
@@ -1189,6 +1213,7 @@ def _the_work_item_lands(ran, root, target):
 
 LEFT_OUT = {
     "the decision with an error": [_file(BROKEN)],
+    "the type version and the second work item": [_file(DECISIONS, 1), _file(LINKING_UNDER)],
     "version 2 of the type for decisions and the decision": [_file(DECISIONS, 2), _file(AT_TWO)],
 }
 
@@ -1228,6 +1253,16 @@ def _the_second_decision_waits_on_the_broken_one(root, target):
 @then("the work item's link to the decision lands on a placeholder at the decision's IRI")
 def _the_work_item_waits_on_the_decision(root):
     assert _waiting(root) == {AT_TWO: [STANDALONE]}
+
+
+@then("every other file in the directory lands")
+def _every_other_file_lands(root, target, files):
+    landed = [file for file in _directory_files(target) if file not in files]
+    assert landed and _waiting(root) == {}
+    for file in landed:
+        name = _iri_of(file)
+        assert file == _held_file(root, name)
+        assert held.text(root, name) == (Path(target) / file).read_text(encoding="utf-8")
 
 
 @then("the operator is told what was skipped and why")
