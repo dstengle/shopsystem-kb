@@ -2,7 +2,8 @@
 collection, an artifact removed. Each acts on the draft as the operations before it left it, on a copy of what it was
 asked to put there, so the same set can act again on another draft, and is refused there with every fault it finds in
 what it names, the revisions it makes and the names of its items; what its content and links come to is checked once
-the whole set has acted (kb.write). An import puts an artifact in the draft whole, as the file it came from gives it."""
+the whole set has acted (kb.write). An import puts an artifact in the draft whole, as the file it came from gives it,
+conforming to the version of its type that file names, which the draft must hold."""
 import copy
 from typing import NamedTuple
 
@@ -40,7 +41,7 @@ def apply(draft: Draft, operation) -> Change:
         return _delete(draft, operation)
     change = _changed(draft, operation)
     left = draft.artifact(change.artifact_id)
-    acted = composition.latest_schema(left, draft) if change.op == "import" else composition.conformed(left, draft)
+    acted = composition.conformed(left, draft)
     return change._replace(revision=left["revision"], type=left["type"], left=left, acted=acted)
 
 

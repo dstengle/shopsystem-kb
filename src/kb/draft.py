@@ -101,14 +101,17 @@ class Draft:
         """Every link into an artifact or a part inside it from an artifact the draft holds, in the order of their
         names, each artifact's in the order it carries them: the store's, as each artifact's own version of its type
         declares them whatever the draft did to that type, but for what the draft changed, which is read here as the
-        draft leaves it."""
+        draft leaves it, one whose own version of its type the draft does not keep carrying none."""
         read_here = set(self._pending) | self._removed
         held = [each for each in self._store.links_in(target) if each.source not in read_here]
-        sources = [(source, artifact) for source, artifact in self._pending.items() if source not in self._removed]
+        sources = [
+            (source, artifact, self._own(artifact)) for source, artifact in self._pending.items()
+            if source not in self._removed
+        ]
         drafted = [
             Linking(source, link.field, link.place, link.target, link.part)
-            for source, artifact in sources
-            for link in links.handed(source, artifact, self, self._own(artifact))
+            for source, artifact, own in sources if own is not None
+            for link in links.handed(source, artifact, self, own)
             if link.target == target and not link.implicit
         ]
         return sorted(held + drafted, key=lambda each: names.order(each.source))

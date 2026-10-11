@@ -43,9 +43,10 @@ def checked(store: Port, directory: Named) -> Checked:
 def examined(store: Port, offered: list[Offered]) -> Checked:
     """The files offered, the artifacts among them drafted as one set, then each checked: the types first, each after
     the types it is read through, so a file read through a broken type file is left to be skipped rather than
-    checked. Each file's errors are kept on it."""
+    checked. The versions of one type are drafted in the order of their numbers, so the draft leaves the type standing
+    at the highest. Each file's errors are kept on it."""
     draft = Draft(store)
-    for each in offered:
+    for each in sorted(offered, key=lambda each: each.number or 0):
         if each.artifact is not None and each.id != METASCHEMA_ID:
             draft.put(each.id, each.artifact)
     by_name = {each.name: each for each in offered if each.name is not None}
@@ -79,9 +80,10 @@ def in_order(by_name: dict[ArtifactId, Offered]) -> list[ArtifactId]:
 
 def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set) -> list:
     """What is wrong with a file that reads as an artifact: a copy of the type that describes types that differs from
-    the store's; or, unless it is read through a type file that is broken or leads to one, its kind, its form, its
-    content and its links against its type, and for a type, the type as a type. A link to a file that could not be
-    read is left to the skipping."""
+    the store's; or, unless it is read through a type file that is broken or leads to one, its kind, the version of
+    its type it names, which the directory or the store must hold, its form, its content and its links against that
+    version, whatever its type stands at, and for a type, the type as a type. A link to a file that could not be read
+    is left to the skipping."""
     if each.artifact is None:
         return []
     if each.id == METASCHEMA_ID:
@@ -93,8 +95,11 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     kind = composition.artifact_kind(each.artifact)
     if not draft.holds(values.type_of(kind)):
         return [file_refusals.no_type_offered(each.file, kind.name)]
-    schema = composition.kind_schema(kind, draft)["schema"]
-    content = settled.checked(each.artifact)
+    named = composition.conforming(each.artifact)
+    version = composition.kept(values.type_of(kind), named.number, draft)
+    if version is None:
+        return [file_refusals.no_version_offered(each.file, str(named))]
+    schema, content = version.content["schema"], settled.checked(each.artifact)
     found = [*_form(draft, each, schema), *_fit(draft, each, content, schema, unread)]
     if not found and each.typed:
         found = definitions.faults(each.id, content, draft)
@@ -146,11 +151,12 @@ def _skipped(draft: Draft, offered: list[Offered], by_name: dict) -> list[Skippe
 
 def _leads_to(draft: Draft, each: Offered, by_name: dict) -> list[ArtifactId]:
     """Where an artifact leads: the type files it is read through, then, unless one of them is broken or leads to a
-    broken one, every link it carries, read through its type."""
+    broken one, every link it carries, read through the version of its type it names."""
     beneath = _beneath(each, by_name)
     if _held_back(each, by_name):
         return beneath
-    return [*beneath, *(link.target for link in links.handed(each.id, each.artifact, draft))]
+    typed = composition.conformed(each.artifact, draft)
+    return [*beneath, *(link.target for link in links.handed(each.id, each.artifact, draft, typed))]
 
 
 def _beneath(each: Offered, by_name: dict) -> list[ArtifactId]:

@@ -28,21 +28,14 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
     return inside(artifact, schema, corpus, artifact)
 
 
-def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict | None = None) -> list[port.Link]:
+def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
-    the kinds its field allows, read through the type given, the version the artifact conforms to, or, given none,
-    through its kind's type as the corpus holds it, the latest version: the import relies on that, its files read
-    against their kind's type as the set leaves it, and the draft falls back to it for an artifact whose own version
-    it does not keep. None but the implicit one when the corpus holds no such type. Every artifact carries one
-    implicit link, first, to the artifact of its type. A value that could name nothing, which a type changed after it
-    was written can leave in a link field, is not handed."""
+    the kinds its field allows, read through the type given, the version of its type the artifact conforms to,
+    whatever its type stands at. Every artifact carries one implicit link, first, to the artifact of its type. A value
+    that could name nothing, which a type changed after it was written can leave in a link field, is not handed."""
     kind = composition.artifact_kind(artifact)
-    implicit = port.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True)
-    if not corpus.holds(values.type_of(kind)):
-        return [implicit]
-    schema = (typed or composition.kind_schema(kind, corpus))["schema"]
-    found = [implicit]
-    for link in carried(artifact, schema, corpus):
+    found = [port.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True)]
+    for link in carried(artifact, typed["schema"], corpus):
         if not isinstance(link.target, str):
             continue
         try:

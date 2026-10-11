@@ -9,12 +9,14 @@ from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
 from calls import (
-    DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, change_type, check, create, define, filed, iri, journal, replace,
-    request, start_a_store, type_iri, version_iri,
+    DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
+    filed, iri, journal, refs, remove, replace, request, start_a_store, targets, type_iri, version_iri,
 )
 from conftest import OPERATOR, _kb, exported
 import held
-from kb import canonical, client as kb_client
+from kb import canonical, client as kb_client, signatures, store, values, write
+from kb.edits import Import
+from kb.signatures import Signed
 
 FEATURE = "export-and-import-a-store.feature"
 IDENTITY = ["id", "type", "revision", "title"]
@@ -827,6 +829,157 @@ def test_a_type_at_two_versions_lands_beside_a_type_at_one_and_its_artifact(root
     ]
     for file in _files(target):
         assert (target / file).read_text(encoding="utf-8") == canonical.dump(_held_at(root, file)), file
+
+
+# The import reads each artifact through the version its file names (slice 165.6, decision 5). The note type here
+# requires a summary at its first version and an owner, in the summary's place, at its second; its first version
+# alone links a note to a decision.
+
+def _a_note_schema(required, linking):
+    about = {"type": "string"}
+    if linking:
+        about["ref"] = {"targets": targets("decision"), "cardinality": "one", "parts": False, "on_delete": "refuse"}
+    properties = {"title": {"type": "string"}, "summary": {"type": "string"}, "owner": {"type": "string"}, "about": about}
+    return {"type": "object", "properties": properties, "required": ["title", required]}
+
+
+SUMMARISED = iri("note", "stock-count")
+
+
+def _a_note_behind_its_type(client):
+    """The type for decisions and a decision; a note type, a note of its first version, with a summary and no owner,
+    about that decision, and then the note type's second version, which the note is left behind."""
+    a_decision_type_and_a_decision(client)
+    define(client, {"title": "Note", "version": 1, "schema": _a_note_schema("summary", linking=True)})
+    create(client, "note", {"title": "Stock count", "summary": "Weekly", "about": WEEKLY})
+    changed = change_type(client, "note", _a_note_schema("owner", linking=False))
+    assert not changed.faults, changed.faults
+
+
+def _check_for_import(root, target):
+    start_a_store(root)
+    return _kb("import", str(target), "--check", cwd=root)
+
+
+def _errors(ran):
+    return [(line[1], line[2]) for line in _report(ran) if line[0] == "error"]
+
+
+def test_a_note_that_fits_the_version_its_file_names_and_not_the_latest_checks_clean_and_lands(root, tmp_path):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+    assert _read(target, SUMMARISED)["type"] == version_iri("note", 1)
+
+    ran = _check_for_import(root, target)
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, f"clean\t{target} checks clean for import\n", "")
+    landed = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (landed.returncode, landed.stdout, landed.stderr) == (0, "", "")
+
+    assert held.versions(root)[type_iri("note")] == [1, 2]
+    assert held.text(root, SUMMARISED) == (target / _file(SUMMARISED)).read_text(encoding="utf-8")
+    assert held.artifact(root, SUMMARISED)["type"] == version_iri("note", 1)
+
+
+def test_a_note_that_fits_the_latest_version_and_not_the_one_its_file_names_is_reported_and_does_not_land(
+    root, tmp_path,
+):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+    note = _read(target, SUMMARISED)
+    _put(target, {**{key: note[key] for key in IDENTITY}, "owner": "the shopkeeper", "about": WEEKLY})
+
+    ran = _check_for_import(root, target)
+    assert (ran.returncode, ran.stderr) == (1, "")
+    assert _errors(ran) == [(_file(SUMMARISED), "required")], ran.stdout
+    refused = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert refused.returncode == 2 and held.names(root) == [TYPE_OF_TYPES]
+
+
+def test_a_file_naming_a_version_of_its_type_neither_the_directory_nor_the_store_holds_is_an_error_of_the_check(
+    root, tmp_path,
+):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+    _put(target, {**_read(target, SUMMARISED), "type": version_iri("note", 3)})
+
+    ran = _check_for_import(root, target)
+    assert (ran.returncode, ran.stderr) == (1, "")
+    assert [line for line in _report(ran) if line[0] == "error"] == [[
+        "error", _file(SUMMARISED), "version",
+        "an artifact conforms to a version of its type the directory or the store holds; neither holds "
+        f"{version_iri('note', 3)!r}",
+    ]], ran.stdout
+    refused = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert refused.returncode == 2 and held.names(root) == [TYPE_OF_TYPES]
+
+
+def test_a_link_in_a_field_only_the_version_a_file_names_reads_as_a_link_lands_as_one(root, tmp_path):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+
+    _import_into_a_fresh_store(root, target)
+
+    client = kb_client.connect(root)
+    assert [each.stub.id for each in refs(client, WEEKLY, 1, inward=True).reached] == [SUMMARISED]
+    refused = remove(client, WEEKLY)
+    assert [(fault.rule, fault.artifact) for fault in refused.faults] == [("on_delete", SUMMARISED)], refused.faults
+
+
+def test_a_link_to_nothing_in_a_field_only_the_version_a_file_names_reads_as_a_link_is_reported(root, tmp_path):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+    _put(target, {**_read(target, SUMMARISED), "about": iri("decision", "nothing-by-this-name")})
+
+    ran = _check_for_import(root, target)
+    assert (ran.returncode, _errors(ran)) == (1, [(_file(SUMMARISED), "ref")]), ran.stdout
+
+
+def _versions_2_and_10(target):
+    """The note type's two version files renumbered, the first to 2 and the second to 10, so the file of the higher
+    version comes first by name, and the note left at what is now version 2."""
+    note = type_iri("note")
+    for was, number in ((2, 10), (1, 2)):
+        _put(target, {**_read(target, note, was), "version": number, "revision": number}, number)
+    (target / _file(note, 1)).unlink()
+    assert _version_files(target, note) == [_file(note, 10), _file(note, 2)]
+    _put(target, {**_read(target, SUMMARISED), "type": version_iri("note", 2)})
+
+
+def test_each_note_is_checked_through_the_version_its_file_names_whatever_order_the_versions_files_come_in(
+    root, tmp_path,
+):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+    _versions_2_and_10(target)
+    owned = iri("note", "till-float")
+    _put(target, {"id": owned, "type": version_iri("note", 10), "revision": 1, "title": "Till float", "owner": "Ada"})
+
+    ran = _check_for_import(root, target)
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, f"clean\t{target} checks clean for import\n", "")
+    landed = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (landed.returncode, landed.stderr) == (0, "")
+
+    assert held.versions(root)[type_iri("note")] == [2, 10]
+    assert held.artifact(root, type_iri("note"))["version"] == 10
+    assert [held.artifact(root, name)["type"] for name in (SUMMARISED, owned)] == [
+        version_iri("note", 2), version_iri("note", 10),
+    ]
+    assert list(check(kb_client.connect(root)).violations) == []
+
+
+def test_versions_of_a_type_a_set_imports_out_of_the_order_of_their_numbers_leave_it_standing_at_the_highest(
+    root, tmp_path,
+):
+    target = _for_import(tmp_path, _a_note_behind_its_type)
+    _versions_2_and_10(target)
+    note = type_iri("note")
+    start_a_store(root)
+    files = [(note, 10), (type_iri("decision"), 1), (note, 2), (WEEKLY, None), (SUMMARISED, None)]
+    operations = [Import(values.artifact_id(name), _read(target, name, number)) for name, number in files]
+
+    with store.opened(root) as opened:
+        write.land(opened, operations, Signed(signatures.Actor(OPERATOR, ""), "import out of order"))
+
+    assert held.versions(root)[note] == [2, 10]
+    assert held.text(root, note) == (target / _file(note, 10)).read_text("utf-8")
+    assert [(entry.artifact, entry.revision) for entry in _imported(root)][:3] == [
+        (note, 2), (type_iri("decision"), 1), (note, 10),
+    ]
+    assert [each.stub.id for each in refs(kb_client.connect(root), WEEKLY, 1, inward=True).reached] == [SUMMARISED]
 
 
 @scenario(

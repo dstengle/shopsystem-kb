@@ -1,8 +1,10 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
 the operations before it left it, then every change checked, its content, its links and a type as a type, against the
 store as the whole set leaves it; each change then as the port takes it, with the revisions of
-the types it was read through. The imports a set makes of one type's versions are handed one after another, each the
-version its file names at the revision its file gives, read at the revision the one before it left the type at. Only
+the types it was read through. The imports a set makes of one type's versions are handed one after another, in the order of
+their numbers whatever order the set gave them in, each the version its file names at the revision its file gives, read
+at the revision the one before it left the type at; an imported artifact is checked, and its links read, through the
+version of its type its file names. Only
 what the set changes is handed: a type's change restates the links of no artifact, which stay as the version it
 conforms to declares them. A fault anywhere refuses the whole set with every fault found."""
 from typing import NamedTuple
@@ -28,7 +30,7 @@ class Drafted(NamedTuple):
 def drafted(held: port.Port, operations: list) -> Drafted:
     """The set drafted and serialised against the store as it stands, each change as the port takes it."""
     draft = Draft(held)
-    changes = _drafted(draft, operations)
+    changes = _drafted(draft, _by_number(operations))
     texts = _serialised(changes)
     last = {change.artifact_id: index for index, change in enumerate(changes)}
     handed = [
@@ -36,6 +38,21 @@ def drafted(held: port.Port, operations: list) -> Drafted:
         for index, (change, read) in enumerate(zip(changes, _read_at(changes), strict=True))
     ]
     return Drafted(draft, changes, texts, handed)
+
+
+def _by_number(operations: list) -> list:
+    """The set's operations, the imports it makes of one type's versions put in the order of their numbers, in the
+    places the set gave those imports, whatever order it gave them in: so the type stands at the highest."""
+    places: dict = {}
+    for index, operation in enumerate(operations):
+        if isinstance(operation, edits.Import) and type(operation.artifact.get("version")) is int:
+            places.setdefault(operation.artifact_id, []).append(index)
+    ordered = list(operations)
+    for indices in places.values():
+        by_number = sorted((operations[index] for index in indices), key=lambda each: each.artifact["version"])
+        for index, operation in zip(indices, by_number):
+            ordered[index] = operation
+    return ordered
 
 
 def _read_at(changes: list[Change]) -> list[int]:
@@ -129,14 +146,12 @@ def _fits(draft: Draft, change: Change) -> list:
 
 def _typed(draft: Draft, change: Change) -> dict:
     """The type a change is checked against: the version of its type its artifact conforms to as the change left it
-    (the one a create or a replacement names, else the one it conformed to), whatever its type stands at; for an
-    import, its kind's as the set leaves it; or, for an artifact the set later removes when it leaves no such type,
-    as the change acted on it. Raises Refused when an artifact the set leaves has no type."""
+    (the one a create or a replacement names, the one an import's file names, else the one it conformed to), whatever
+    its type stands at; or, for an artifact the set later removes when it leaves no such type, as the change acted on
+    it. Raises Refused when an artifact the set leaves has no type."""
     kind = composition.artifact_kind(change.left)
     if not draft.holds(change.artifact_id) and not draft.holds(values.type_of(kind)):
         return change.acted
-    if change.op == "import":
-        return composition.kind_schema(kind, draft)
     return composition.conformed(change.left, draft)
 
 

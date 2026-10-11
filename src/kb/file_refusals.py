@@ -51,6 +51,15 @@ def no_type_offered(file: str, kind_name: str) -> kb_pb2.Fault:
     )
 
 
+def no_version_offered(file: str, version: str) -> kb_pb2.Fault:
+    """A file offered for import conforming to a version of its type neither the directory nor the store holds."""
+    return kb_pb2.Fault(
+        artifact=file, rule=rules.VERSION,
+        message=f"an artifact conforms to a version of its type the directory or the store holds; neither holds "
+                f"{version!r}",
+    )
+
+
 def not_fresh(held: int) -> kb_pb2.Fault:
     """An import into a store that holds artifacts besides the type that describes types."""
     return kb_pb2.Fault(
