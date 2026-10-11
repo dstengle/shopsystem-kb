@@ -49,14 +49,15 @@ CREATE INDEX searched_by_artifact ON searched (artifact);
 
 
 def make(path: Path) -> None:
-    """A new database at path, its tables made and WAL mode set, once. Raises FileExistsError when anything is
-    there, sqlite3.Error when it cannot be made, and Unreadable as `supported` does."""
+    """A new database at path, its whole schema made in one transaction, so committed once, and then WAL mode set,
+    which SQLite sets only outside one. Raises FileExistsError when anything is there, sqlite3.Error when it cannot
+    be made, and Unreadable as `supported` does."""
     supported()
     if path.exists() or path.is_symlink():
         raise FileExistsError(f"a database is made only where nothing is: {path}")
     db = sqlite3.connect(_uri(path, "rwc"), uri=True)
     try:
-        db.executescript(SCHEMA)
+        db.executescript(f"BEGIN;{SCHEMA}COMMIT;")
         db.execute("PRAGMA journal_mode = WAL")
     finally:
         db.close()
