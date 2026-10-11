@@ -116,6 +116,9 @@ module that does not own it.
   being built, `-m slice-N --runxfail` runs its scenarios for real results, red on their own assertions and then
   green; `-rxX` lists the expected failures and the unexpected passes with their reasons. The suite record reads
   "N passed, M expected to fail, K unexpectedly passing, 0 failed" (pytest's `passed`, `xfailed`, `xpassed`).
+  A scenario row that the summary shows as `xpassed` is added to `tests/passing_before_their_slice.txt` (one node id a
+  line), which keeps it running as an ordinary test; its line is removed when its slice lands, which the suite then
+  demands (an id whose slice is built, or that no collected test has, stops the run).
 - `make image` builds kb's image from the checkout (`shopsystem-kb:dev`); `make image-check` builds its own and checks
   it serves a store beside its callers in a throwaway compose project (`docker/image_check.py`), leaving nothing
   behind. Neither is part of `make test`; a release that fails `image-check` does not ship.
