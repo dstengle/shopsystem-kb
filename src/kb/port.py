@@ -4,7 +4,8 @@ Above the port stay names, content checks, sections and items, signatures, fault
 adapter keeps the artifacts, their content at every revision, the links both ways, the search rows and the history,
 and lands a set of changes whole or not at all. An adapter keeps the versions of a type it is handed, each
 as made, and knows nothing of what a type declares: a change says the kind of its artifact, its type's IRI, and a link
-says which kinds it may land on and the held type its target sits under, read when the target is not held.
+says which kinds it may land on, the held type its target sits under, read when the target is not held, and whether
+the store already held that very link, waiting, read when its held target lacks the part it names.
 
 The port refuses with the exceptions named here. None of them is published, and kb translates them above the port.
 """
@@ -25,7 +26,9 @@ class Link:
     target's IRI to sit under, held or not, None for one under no held type; it is read only when the target is not
     held as the link lands, as one removed since the link was drafted is not: a link to an IRI not held lands only
     when the adapter holds that type and its IRI is among `kinds`, nothing but the link's target kept for it, and an
-    implicit link never does."""
+    implicit link never does. `waits` says kb found the store already holding this very link for the artifact,
+    landing on nothing held (decision/a-link-that-waits-keeps-waiting); it is read only when the link names a part
+    its held target lacks, and the link then lands only when the adapter held it so before the set (`held_as`)."""
     field: str
     place: str
     target: ArtifactId
@@ -33,6 +36,12 @@ class Link:
     kinds: tuple[str, ...]
     implicit: bool = False
     under: ArtifactId | None = None
+    waits: bool = False
+
+    @property
+    def held_as(self) -> tuple[str, str, ArtifactId, str]:
+        """What tells this link from every other its artifact holds, as `Linking.held_as` gives it."""
+        return self.field, self.place, self.target, self.part
 
 
 @dataclass(frozen=True)
@@ -43,6 +52,12 @@ class Linking:
     place: str
     target: ArtifactId
     part: str
+
+    @property
+    def held_as(self) -> tuple[str, str, ArtifactId, str]:
+        """What tells this link from every other its artifact holds: the field, its place there, the IRI it names
+        and the part. Two links of one artifact are the very same link when these are."""
+        return self.field, self.place, self.target, self.part
 
 
 @dataclass(frozen=True)
@@ -135,8 +150,8 @@ class Linked(Refusal):
 
 
 class Unlanded(Refusal):
-    """A link the set hands lands on an artifact of a kind it may not land on, on a part its artifact lacks, or on an
-    IRI the set leaves not held with no held type it may land on carried."""
+    """A link the set hands lands on an artifact of a kind it may not land on, on a part its artifact lacks that it
+    did not already wait on, or on an IRI the set leaves not held with no held type it may land on carried."""
 
     def __init__(self, links: list[Linking]):
         super().__init__(links)
@@ -180,10 +195,10 @@ class Port(Protocol):
     def inbound(self, artifact_id: ArtifactId) -> dict[tuple[str, str], int]:
         """How many artifacts link into an artifact or its parts, by the kind of the source and the field."""
 
-    def waiting(self) -> list[Linking]:
-        """Every link that lands on nothing held: one whose target is not held, or into a part its held target lacks;
-        never an implicit one. By the name it points at, whatever part of it, then the artifact holding it, then as
-        handed."""
+    def waiting(self, source: ArtifactId | None = None) -> list[Linking]:
+        """Every link that lands on nothing held, or those of the one artifact named: one whose target is not held,
+        or into a part its held target lacks; never an implicit one. By the name it points at, whatever part of it,
+        then the artifact holding it, then as handed."""
 
     def search(self, words: list[str], kind: Kind | None = None, sections: bool = True,
                fields: bool = True) -> list[Candidate]:
@@ -211,6 +226,7 @@ class Port(Protocol):
 
     def land(self, changes: list[Change], entries: list[Entry]) -> None:
         """The changes, in order, and the entries, as one set, or nothing. Every link is checked against the store as
-        the set leaves it: one to a held artifact by that artifact's kind and parts, one to an IRI not held by the
-        type it carries (`Link.under`). Raises Conflict, Linked or Unlanded; and Busy, as `exclusive` does, when
+        the set leaves it: one to a held artifact by that artifact's kind and parts, but that one the artifact
+        already held waiting, and says so (`Link.waits`), still lands into a part its target lacks; one to an IRI
+        not held by the type it carries (`Link.under`). Raises Conflict, Linked or Unlanded; and Busy, as `exclusive` does, when
         another change holds the write lock longer than the store waits for it."""

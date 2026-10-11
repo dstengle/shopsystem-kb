@@ -159,12 +159,12 @@ class SqliteStore(Checks):
                 "INSERT INTO sets (batch) VALUES (?)", (entries[0].batch if entries else None,),
             ).lastrowid
             self._unmoved(changes)
-            before = {}
+            before, waited = {}, self._waited(changes)
             for step, change in enumerate(changes):
                 held = self._compared(change.artifact, change.read)
                 before.setdefault(change.artifact, (held, set(self._parts(change.artifact))))
                 self._written(change, landed, step)
-            self._integral(changes, before)
+            self._integral(changes, before, waited)
             self._recorded(entries)
 
     @contextlib.contextmanager

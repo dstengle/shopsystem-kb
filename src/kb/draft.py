@@ -1,6 +1,7 @@
 """The store as a set's changes would leave it, read like the store: artifacts put here stand over the ones the store
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
-artifact), the links into an artifact and the links to IRIs it does not hold, over the port: those of what it put
+artifact), the links into an artifact, the links to IRIs it does not hold, and those of an artifact that waited
+before it, over the port: those of what it put
 read through the version each conforms to, the store's standing for everything else, a type it changed restating
 none. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
@@ -118,6 +119,11 @@ class Draft:
         read_here = set(self._pending) | self._removed
         held = [each for each in self._store.waiting() if each.source not in read_here]
         return _by_source([each for each in held + self._put() if not self.holds(each.target)])
+
+    def waited(self, artifact_id: ArtifactId) -> frozenset:
+        """The links the store holds for an artifact that land on nothing held, as it stood before the draft, each
+        as `Linking.held_as` gives it: those that already wait, whatever the draft does."""
+        return frozenset(each.held_as for each in self._store.waiting(artifact_id))
 
     def _put(self) -> list[Linking]:
         """Every link of the artifacts the draft put, each read through its own version of its type as the draft

@@ -45,3 +45,18 @@ def test_a_link_carries_the_held_type_its_target_sits_under_held_or_not(corpus, 
     of_its_type, supersedes = handed(corpus, target)
     assert (supersedes.target, supersedes.under) == (ArtifactId(target), under)
     assert (of_its_type.implicit, of_its_type.under) == (True, None)
+
+
+def test_a_link_says_it_waits_only_when_it_is_among_those_the_store_held_waiting_for_its_artifact(corpus):
+    """decision/a-link-that-waits-keeps-waiting: the mark is the store's own account of the artifact, field, place,
+    IRI and part alike."""
+    target = iri("decision", "nothing-here")
+    artifact = {**corpus.artifact(HELD), "supersedes": target}
+    typed = composition.conformed(artifact, corpus)
+    named = ArtifactId(iri("decision", "b"))
+    marks = lambda waited: [each.waits for each in links.handed(named, artifact, corpus, typed, waited)]
+    assert marks(frozenset()) == [False, False]
+    assert marks(frozenset({("supersedes", "supersedes", ArtifactId(target), "")})) == [False, True]
+    assert marks(frozenset({("supersedes", "supersedes", ArtifactId(target), "options/a")})) == [False, False]
+    assert marks(frozenset({("supersedes", "supersedes/0", ArtifactId(target), "")})) == [False, False]
+    assert marks(frozenset({("", "", ArtifactId(type_iri("decision")), "")})) == [False, False]

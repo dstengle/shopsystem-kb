@@ -58,6 +58,11 @@ def test_creating_an_artifact_without_the_part_a_link_points_into_leaves_that_li
     pass
 
 
+@scenario("check-a-change.feature", "Changing an artifact that holds a link waiting on a part its target lacks leaves the link waiting")
+def test_changing_an_artifact_that_holds_a_link_waiting_on_a_part_its_target_lacks_leaves():
+    pass
+
+
 @scenario("hand-over-content.feature", "Content given to a create that carries what travels beside it is refused")
 def test_content_given_to_a_create_that_carries_what_travels_beside_it_is_refused():
     pass
@@ -1281,6 +1286,50 @@ def _create_at_the_iri_without_the_option(client, name):
 def _the_placeholders_still_give_the_iri(client, created):
     assert created.id == FIRST_DECISION, created.faults
     assert _listed(client) == [(FIRST_DECISION, [(NOT_HELD, "supersedes", "supersedes", "options/rollback")])]
+
+
+# Slice 170.1: a link that waits keeps waiting when its artifact changes. Here the first decision is the one that
+# links, FIRST_DECISION, and the second the one linked to, at NOT_HELD.
+
+@given(
+    parsers.parse(
+        'a decision that supersedes the option "{name}" of a second decision, the second created afterwards with no '
+        'option named "{name_again}"'
+    )
+)
+def _a_decision_waiting_on_an_option_its_target_was_created_without(client, name, name_again):
+    assert name == name_again and name not in {slug(option["title"]) for option in OPTIONS}
+    first = request(client, "decision", "Price reviews happen weekly", {
+        "supersedes": f"{NOT_HELD}#options/{name}", "sections": SECTIONS,
+    })
+    assert first.id == FIRST_DECISION, first.faults
+    second = request(client, "decision", "Prices are reviewed monthly", {"sections": SECTIONS, "options": OPTIONS})
+    assert second.id == NOT_HELD, second.faults
+    assert _listed(client) == [(NOT_HELD, [(FIRST_DECISION, "supersedes", "supersedes", f"options/{name}")])]
+
+
+@when(
+    "the client replaces the first decision's rationale, leaving what it supersedes as it is, saying which role and why",
+    target_fixture="changed",
+)
+def _replace_the_rationale_of_the_decision_that_waits(client):
+    return replace(
+        client, FIRST_DECISION, {"title": "Rationale", "body": "Costs now move daily.\n"},
+        message="Say why again", path="sections/rationale",
+    )
+
+
+@then("the change is accepted")
+def _the_change_is_accepted(root, changed):
+    assert not changed.faults, changed.faults
+    assert changed.revision == 2
+    assert held.artifact(root, FIRST_DECISION)["sections"][1]["body"] == "Costs now move daily.\n"
+    assert held.artifact(root, FIRST_DECISION)["supersedes"] == ROLLBACK
+
+
+@then("asked for the placeholders, the client is still given the IRI the link points at, with the first decision linking to it")
+def _the_placeholders_still_give_the_part_waited_on(client):
+    assert _listed(client) == [(NOT_HELD, [(FIRST_DECISION, "supersedes", "supersedes", "options/rollback")])]
 
 
 def test_removing_the_artifact_that_filled_a_placeholder_is_refused_for_the_link_naming_the_linking_artifact(root):

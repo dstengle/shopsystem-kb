@@ -152,12 +152,14 @@ def _in_order(draft: Draft, change: Change, faults: list) -> list:
 
 
 def _fits(draft: Draft, change: Change) -> list:
-    """Every fault of what a change left against its type, its links landing, both as the set leaves them."""
+    """Every fault of what a change left against its type, its links landing, both as the set leaves them, but
+    that a link the store already held waiting still waits."""
     try:
         schema = _typed(draft, change)
     except Refused as refused:
         return list(refused.faults)
-    return validation.validate(str(change.artifact_id), settled.checked(change.left), schema["schema"], draft)
+    waited = draft.waited(change.artifact_id)
+    return validation.validate(str(change.artifact_id), settled.checked(change.left), schema["schema"], draft, waited)
 
 
 def _typed(draft: Draft, change: Change) -> dict:
@@ -216,9 +218,9 @@ def _handed(draft: Draft, change: Change, read: int, last: bool) -> port.Change:
             change.artifact_id, change.left, read=read, revision=change.revision, through=draft.as_read(made),
             searched=searched, kind=kind, version=version,
         )
-    typed = _typed(draft, change)
+    typed, waited = _typed(draft, change), draft.waited(change.artifact_id)
     return port.Change(
-        change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft, typed)),
+        change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft, typed, waited)),
         tuple(places.parts(change.left)), read, change.revision,
         draft.as_read([*composition.read_through(kind, typed["schema"], draft), *made]), searched, kind, version,
     )

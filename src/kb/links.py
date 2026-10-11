@@ -1,6 +1,8 @@
 """The one reading of links: every link an artifact carries, wherever it sits, read through its type's composition,
-and those links as the port takes them, each saying the held type its target sits under. The checks,
+and those links as the port takes them, each saying the held type its target sits under and whether it is one the
+store already held waiting. The checks,
 removal, reads and walks all read links here."""
+import dataclasses
 from typing import NamedTuple
 
 from kb import composition, names, port, values
@@ -29,14 +31,15 @@ def carried(artifact: dict, schema: dict, corpus) -> list[Link]:
     return inside(artifact, schema, corpus, artifact)
 
 
-def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) -> list[port.Link]:
+def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict, waited=frozenset()) -> list[port.Link]:
     """Every link an artifact carries as the port takes it: the artifact and the part it lands on read apart, with
     the kinds its field allows, read through the type given, the version of its type the artifact conforms to,
     whatever its type stands at, and the held type its target's IRI sits under (`port.Link.under`), held or not,
     since a held target may be removed before the link lands and the link then waits on its IRI. Every artifact
-    carries one implicit link, first, to the artifact of its type, which says nothing of what that sits under. A
-    value that could name nothing, which a type changed after it was written can leave in a link field, is not
-    handed."""
+    carries one implicit link, first, to the artifact of its type, which says nothing of what that sits under. Each
+    but that one says it waits (`port.Link.waits`) when it is among `waited`, the links the store held for the
+    artifact that landed on nothing held, each as `port.Linking.held_as` gives it. A value that could name nothing, which a type
+    changed after it was written can leave in a link field, is not handed."""
     kind = composition.artifact_kind(artifact)
     found = [port.Link("", "", values.type_of(kind), "", (values.TYPE_KIND.name,), implicit=True)]
     for link in carried(artifact, typed["schema"], corpus):
@@ -50,7 +53,7 @@ def handed(artifact_id: values.ArtifactId, artifact: dict, corpus, typed: dict) 
             link.field, link.place, target.id, names.placed(target.place), tuple(link.ref["targets"]),
             under=_under(target.id, corpus),
         ))
-    return found
+    return [found[0], *(dataclasses.replace(link, waits=link.held_as in waited) for link in found[1:])]
 
 
 def _under(target: values.ArtifactId, corpus) -> values.ArtifactId | None:

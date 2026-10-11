@@ -70,10 +70,11 @@ def removal(text, read):
     return port.Change(name(text), None, read=read, revision=read + 1)
 
 
-def link(field, place, target, kinds, part="", under=None):
-    """A link as kb hands it; `under` the held type kb says a target not held sits under, as the cases name it."""
+def link(field, place, target, kinds, part="", under=None, waits=False):
+    """A link as kb hands it; `under` the held type kb says a target not held sits under, as the cases name it;
+    `waits` whether kb says the store already held this very link, waiting."""
     return port.Link(field, place, name(target), part, tuple(type_iri(each) for each in kinds),
-                     under=under and name(under))
+                     under=under and name(under), waits=waits)
 
 
 def entry(entry_id, at=T0, seq=1, batch="", artifact="", role="tester", execution=""):
@@ -490,6 +491,114 @@ def test_a_link_into_a_part_of_an_iri_not_held_still_waits_when_what_is_created_
     ]
     land(store, put("decision/later", {}, parts=["options/b"]))
     assert store.waiting() == [port.Linking(name("note/n"), "into", "into/0", name("decision/later"), "options/a")]
+
+
+def test_the_links_landing_on_nothing_held_are_given_for_one_artifact_when_it_is_named(store):
+    land(store, put("schema/decision", {"title": "Decision"}), put("decision/held", {}, parts=["options/a"]))
+    to = lambda place, target, part="": link("uses", place, target, ["decision"], part, under="schema/decision")
+    land(store,
+         put("work/w", {}, links=[to("uses/0", "decision/b"), to("uses/1", "decision/held", "options/a"),
+                                  to("uses/2", "decision/a", "options/x")]),
+         put("note/n", {}, links=[to("uses", "decision/b")]))
+    assert store.waiting(name("work/w")) == [
+        port.Linking(name("work/w"), "uses", "uses/2", name("decision/a"), "options/x"),
+        port.Linking(name("work/w"), "uses", "uses/0", name("decision/b"), ""),
+    ]
+    assert store.waiting(name("note/n")) == [port.Linking(name("note/n"), "uses", "uses", name("decision/b"), "")]
+    assert store.waiting(name("decision/held")) == []
+    assert store.waiting(name("decision/nowhere")) == []
+
+
+def _a_note_waiting_on_an_option_its_decision_was_created_without(store):
+    """A store holding a note whose link into option `a` of a decision landed while the decision was not held, and
+    the decision, created since with option `b` only. Returns that link as kb hands it again, saying it waits."""
+    land(store, put("schema/decision", {"title": "Decision"}))
+    into = link("into", "into", "decision/d", ["decision"], "options/a", under="schema/decision")
+    land(store, put("note/n", {"title": "N"}, links=[into]))
+    land(store, put("decision/d", {"title": "D"}, parts=["options/b"]))
+    return dataclasses.replace(into, waits=True)
+
+
+WAITING = port.Linking(name("note/n"), "into", "into", name("decision/d"), "options/a")
+
+
+def test_a_link_into_a_part_its_held_target_lacks_lands_again_when_it_says_it_waits_and_the_artifact_held_it(store):
+    waits = _a_note_waiting_on_an_option_its_decision_was_created_without(store)
+    land(store, put("note/n", {"title": "N, said again"}, read=1, links=[waits]))
+    assert store.artifact(name("note/n")) == {"title": "N, said again"}
+    assert store.waiting() == [WAITING]
+    assert store.links_in(name("decision/d")) == [WAITING]
+    land(store, put("note/n", {"title": "N, a third time"}, read=2, links=[waits]))
+    assert store.waiting() == [WAITING]
+
+
+@pytest.mark.parametrize("handed", [
+    pytest.param(lambda waits: [dataclasses.replace(waits, waits=False)], id="not saying it waits"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, part="options/c")], id="into another part it lacks"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, place="into/0")], id="at another place"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, field="about", place="about")], id="in another field"),
+    pytest.param(lambda waits: [waits, dataclasses.replace(waits, place="into/1")], id="a second beside the first"),
+    pytest.param(lambda waits: [dataclasses.replace(waits, kinds=(type_iri("work"),))], id="of a kind it may not land on"),
+])
+def test_a_link_into_a_part_its_held_target_lacks_is_refused_unless_it_is_the_very_link_that_waits(store, handed):
+    links = handed(_a_note_waiting_on_an_option_its_decision_was_created_without(store))
+    before = written(store)
+    with pytest.raises(port.Unlanded) as refused:
+        land(store, put("note/n", {"title": "N, said again"}, read=1, links=links))
+    wrong = links[-1]
+    assert refused.value.links == [port.Linking(name("note/n"), wrong.field, wrong.place, wrong.target, wrong.part)]
+    assert written(store) == before
+    assert store.waiting() == [WAITING]
+
+
+def test_a_link_saying_it_waits_is_refused_from_an_artifact_that_did_not_hold_it(store):
+    waits = _a_note_waiting_on_an_option_its_decision_was_created_without(store)
+    with pytest.raises(port.Unlanded) as refused:
+        land(store, put("note/other", {"title": "Other"}, links=[waits]))
+    assert refused.value.links == [port.Linking(name("note/other"), "into", "into", name("decision/d"), "options/a")]
+    assert not store.holds(name("note/other"))
+
+
+def test_a_link_saying_it_waits_is_refused_when_the_artifact_held_it_landing_and_its_set_drops_the_part(store):
+    land(store, put("decision/d", {"title": "D"}, parts=["options/a"]))
+    into = link("into", "into", "decision/d", ["decision"], "options/a")
+    land(store, put("note/n", {"title": "N"}, links=[into]))
+    with pytest.raises(port.Unlanded) as refused:
+        land(store, put("decision/d", {"title": "D"}, read=1),
+             put("note/n", {"title": "N"}, read=1, links=[dataclasses.replace(into, waits=True)]))
+    assert refused.value.links == [WAITING]
+    assert store.waiting() == []
+
+
+def test_a_link_drafted_while_its_target_was_not_held_lands_after_a_create_there_without_its_part(opener, store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    into = link("into", "into", "decision/d", ["decision"], "options/a", under="schema/decision")
+    land(store, put("note/n", {"title": "N"}, links=[into]))
+    with opener() as one, opener() as other:
+        land(one, put("decision/d", {"title": "D"}, parts=["options/b"]))
+        land(other, put("note/n", {"title": "N, said again"}, read=1, links=[dataclasses.replace(into, waits=True)]))
+    assert store.artifact(name("note/n")) == {"title": "N, said again"}
+    assert store.waiting() == [WAITING]
+
+
+def test_a_link_saying_it_waits_lands_on_the_part_once_its_target_has_gained_it(opener, store):
+    waits = _a_note_waiting_on_an_option_its_decision_was_created_without(store)
+    with opener() as one, opener() as other:
+        land(one, put("decision/d", {"title": "D"}, read=1, parts=["options/a", "options/b"]))
+        land(other, put("note/n", {"title": "N, said again"}, read=1, links=[waits]))
+    assert store.waiting() == []
+    with pytest.raises(port.Linked):
+        land(store, put("decision/d", {"title": "D"}, read=2, parts=["options/b"]))
+
+
+def test_a_link_saying_it_waits_whose_target_is_still_not_held_lands_by_the_type_it_carries(store):
+    land(store, put("schema/decision", {"title": "Decision"}))
+    into = link("into", "into", "decision/d", ["decision"], "options/a", under="schema/decision")
+    land(store, put("note/n", {"title": "N"}, links=[into]))
+    land(store, put("note/n", {"title": "N, said again"}, read=1, links=[dataclasses.replace(into, waits=True)]))
+    assert store.waiting() == [WAITING]
+    with pytest.raises(port.Unlanded):
+        land(store, put("note/n", {"title": "N"}, read=2, links=[dataclasses.replace(into, waits=True, under=None)]))
 
 
 def test_a_link_stops_waiting_when_the_artifact_holding_it_drops_it_or_is_removed(store):
