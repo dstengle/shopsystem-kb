@@ -221,9 +221,43 @@ class Answer:
     __hash__ = None
 
 
+class Stream:
+    """A streamed answer as a step reads it, read to its end: `messages`, each as it came; whether it is a refusal,
+    which it is when any message of it is one; the faults of those; the files given, each its place and its text, in
+    the order they came; and the position the end carries. Only a stream whose last message is its one end is
+    `complete`."""
+
+    def __init__(self, stream):
+        self.messages = list(stream)
+        assert all(message.WhichOneof("outcome") is not None for message in self.messages), self.messages
+
+    @property
+    def refused(self):
+        return any(message.WhichOneof("outcome") == "refusal" for message in self.messages)
+
+    @property
+    def faults(self):
+        return [fault for message in self.messages for fault in message.refusal.faults]
+
+    @property
+    def files(self):
+        return [(message.result.file.place, message.result.file.text) for message in self.messages
+                if message.result.WhichOneof("part") == "file"]
+
+    @property
+    def complete(self):
+        ends = [message for message in self.messages if message.result.WhichOneof("part") == "end"]
+        return len(ends) == 1 and ends[0] is self.messages[-1]
+
+    @property
+    def position(self):
+        assert self.complete, self.messages
+        return self.messages[-1].result.end.position
+
+
 def answer(response):
-    """A response, its result or its refusal, as a step reads it."""
-    return Answer(response)
+    """A response, its result or its refusal, as a step reads it; a streamed answer read to its end."""
+    return Answer(response) if hasattr(response, "WhichOneof") else Stream(response)
 
 
 def signature(message, actor=CLIENT):
@@ -475,6 +509,11 @@ def check(client):
 def placeholders(client):
     """Every IRI a link points at that the store does not hold, each with the links into it, or the refusal."""
     return answer(client.Placeholders(kb_pb2.PlaceholdersRequest()))
+
+
+def export(client):
+    """The whole store exported through the contract, the stream read to its end."""
+    return answer(client.Export(kb_pb2.ExportRequest()))
 
 
 def next_version(client, kind, type_content, sections=None):

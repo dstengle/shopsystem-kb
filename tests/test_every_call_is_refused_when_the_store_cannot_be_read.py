@@ -1,13 +1,14 @@
 """Every rpc of contract v1 and every operator command that needs a store is refused with rule `unreadable`, writing
 nothing, whether the store's database is damaged or its marker is a later kb's. The scenarios of
 answer-a-damaged-file.feature pin each reason once, with one call; this table pins that no call goes round the
-boundary. A call added to the service without a row fails `test_every_rpc_has_a_row`."""
+boundary; `Export` answers with a stream, read to its end, whose one message is that refusal. A call added to the
+service without a row fails `test_every_rpc_has_a_row`."""
 import pytest
 
 import held
 from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, added, create, create_many, created, define, iri, journal
 from calls import listing, read, refs, remove, remove_many, removed, replace, replace_many, replaced, request
-from calls import search, snapshot, start_a_store, add, add_many, check, placeholders
+from calls import search, snapshot, start_a_store, add, add_many, check, export, placeholders
 from conftest import OPERATOR, _kb
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -37,6 +38,7 @@ RPCS = {
     "BatchAdd": lambda c: add_many(c, [added(DECISION, "options", {"title": "Go monthly"})]),
     "BatchRemove": lambda c: remove_many(c, [removed(DECISION)]),
     "Placeholders": lambda c: placeholders(c),
+    "Export": lambda c: export(c),
 }
 
 COMMANDS = {

@@ -690,3 +690,37 @@ class PlaceholdersResponse(_message.Message):
     result: Placeholders
     refusal: Refusal
     def __init__(self, result: _Optional[_Union[Placeholders, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+
+class ExportRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ExportedFile(_message.Message):
+    __slots__ = ("place", "text")
+    PLACE_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    place: str
+    text: str
+    def __init__(self, place: _Optional[str] = ..., text: _Optional[str] = ...) -> None: ...
+
+class ExportEnd(_message.Message):
+    __slots__ = ("position",)
+    POSITION_FIELD_NUMBER: _ClassVar[int]
+    position: str
+    def __init__(self, position: _Optional[str] = ...) -> None: ...
+
+class Exported(_message.Message):
+    __slots__ = ("file", "end")
+    FILE_FIELD_NUMBER: _ClassVar[int]
+    END_FIELD_NUMBER: _ClassVar[int]
+    file: ExportedFile
+    end: ExportEnd
+    def __init__(self, file: _Optional[_Union[ExportedFile, _Mapping]] = ..., end: _Optional[_Union[ExportEnd, _Mapping]] = ...) -> None: ...
+
+class ExportResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Exported
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Exported, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...

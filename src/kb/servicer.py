@@ -1,10 +1,10 @@
 """The contract's servicer: every rpc, over one store. Called in-process by a client, or hosted by grpc.server (kb.server).
 
-Each rpc is a request in, one call into the domain, a response out, inside kb.boundary's one boundary; which rpcs
-write is marked here (`changing`).
+Each rpc is a request in, one call into the domain, a response out, or, for `Export`, a stream of them, inside
+kb.boundary's one boundary; which rpcs write is marked here (`changing`).
 """
-from kb import changes, check, query, read, requests, responses, write
-from kb.boundary import boundary, guarded
+from kb import changes, check, export, query, read, requests, responses, write
+from kb.boundary import boundary, guarded, streamed
 from kb.contract import kb_pb2, kb_pb2_grpc
 
 
@@ -84,6 +84,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     @boundary(kb_pb2.PlaceholdersResponse, at_one_moment=True)
     def Placeholders(self, request, held):
         return query.placeholders(held)
+
+    @streamed(kb_pb2.ExportResponse)
+    def Export(self, request, held):
+        return map(responses.exported, export.taken(held))
 
     @changing(kb_pb2.SnapshotResponse)
     def Snapshot(self, request, held):

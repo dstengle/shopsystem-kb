@@ -56,6 +56,7 @@ READING = {
     "Follow": lambda: kb_pb2.FollowRequest(locator=kb_pb2.Locator(id=KEPT)),
     "List": lambda: kb_pb2.ListRequest(kind=type_iri("tag")),
     "Placeholders": lambda: kb_pb2.PlaceholdersRequest(),
+    "Export": lambda: kb_pb2.ExportRequest(),
 }
 
 

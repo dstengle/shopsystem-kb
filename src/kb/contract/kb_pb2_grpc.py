@@ -114,6 +114,11 @@ class KbStub:
                 request_serializer=kb_dot_contract_dot_kb__pb2.PlaceholdersRequest.SerializeToString,
                 response_deserializer=kb_dot_contract_dot_kb__pb2.PlaceholdersResponse.FromString,
                 _registered_method=True)
+        self.Export = channel.unary_stream(
+                '/kb.v2.Kb/Export',
+                request_serializer=kb_dot_contract_dot_kb__pb2.ExportRequest.SerializeToString,
+                response_deserializer=kb_dot_contract_dot_kb__pb2.ExportResponse.FromString,
+                _registered_method=True)
 
 
 class KbServicer:
@@ -215,6 +220,12 @@ class KbServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Export(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_KbServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -297,6 +308,11 @@ def add_KbServicer_to_server(servicer, server):
                     servicer.Placeholders,
                     request_deserializer=kb_dot_contract_dot_kb__pb2.PlaceholdersRequest.FromString,
                     response_serializer=kb_dot_contract_dot_kb__pb2.PlaceholdersResponse.SerializeToString,
+            ),
+            'Export': grpc.unary_stream_rpc_method_handler(
+                    servicer.Export,
+                    request_deserializer=kb_dot_contract_dot_kb__pb2.ExportRequest.FromString,
+                    response_serializer=kb_dot_contract_dot_kb__pb2.ExportResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -731,6 +747,33 @@ class Kb:
             '/kb.v2.Kb/Placeholders',
             kb_dot_contract_dot_kb__pb2.PlaceholdersRequest.SerializeToString,
             kb_dot_contract_dot_kb__pb2.PlaceholdersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Export(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/kb.v2.Kb/Export',
+            kb_dot_contract_dot_kb__pb2.ExportRequest.SerializeToString,
+            kb_dot_contract_dot_kb__pb2.ExportResponse.FromString,
             options,
             channel_credentials,
             insecure,

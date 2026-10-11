@@ -1,10 +1,12 @@
 """An rpc's or an operator's command's response, made from what its call gave or the faults it was refused for: a
 response with an outcome holds the result or a refusal, never both; any other carries its faults beside what it
-gives. A change's result, and a set's, are made here from what the set landed."""
+gives. A change's result, and a set's, are made here from what the set landed, and each message of an export's stream
+from what the export gave."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from kb import export
 from kb.contract import kb_pb2
 
 if TYPE_CHECKING:
@@ -49,3 +51,10 @@ def removed(result: write.Result) -> kb_pb2.Removed:
 def landed(result, set_landed: write.Landed, each):
     """A set's result of this type: the set's name, and each change's own result, in the order of the set."""
     return result(batch=set_landed.batch, results=[each(change) for change in set_landed.results])
+
+
+def exported(given: export.File | export.Position) -> kb_pb2.Exported:
+    """One message of an export's stream: a file, its place and its text, or the end, carrying the position."""
+    if isinstance(given, export.Position):
+        return kb_pb2.Exported(end=kb_pb2.ExportEnd(position=given.entry))
+    return kb_pb2.Exported(file=kb_pb2.ExportedFile(place=given.place, text=given.text))

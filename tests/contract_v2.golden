@@ -271,6 +271,18 @@ message Placeholders
 message PlaceholdersResponse
   result = 1 singular kb.v2.Placeholders oneof outcome
   refusal = 2 singular kb.v2.Refusal oneof outcome
+message ExportRequest
+message ExportedFile
+  place = 1 singular string
+  text = 2 singular string
+message ExportEnd
+  position = 1 singular string
+message Exported
+  file = 1 singular kb.v2.ExportedFile oneof part
+  end = 2 singular kb.v2.ExportEnd oneof part
+message ExportResponse
+  result = 1 singular kb.v2.Exported oneof outcome
+  refusal = 2 singular kb.v2.Refusal oneof outcome
 service Kb
   rpc Create(kb.v2.CreateRequest) returns (kb.v2.CreateResponse)
   rpc Read(kb.v2.ReadRequest) returns (kb.v2.ReadResponse)
@@ -288,3 +300,4 @@ service Kb
   rpc BatchAdd(kb.v2.BatchAddRequest) returns (kb.v2.BatchAddResponse)
   rpc BatchRemove(kb.v2.BatchRemoveRequest) returns (kb.v2.BatchRemoveResponse)
   rpc Placeholders(kb.v2.PlaceholdersRequest) returns (kb.v2.PlaceholdersResponse)
+  rpc Export(kb.v2.ExportRequest) returns (stream kb.v2.ExportResponse)

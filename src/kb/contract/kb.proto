@@ -8,7 +8,8 @@
 // and its number. A kind is named by its type's IRI. The type that
 // describes types is https://missingmass.io/kb/type.
 // Every response is its result or a refusal holding every fault, never
-// both; a refusal means nothing was written. A store is started off the
+// both; a refusal means nothing was written. `Export` alone answers with
+// a stream, and each message of the stream is such a response. A store is started off the
 // wire, by `kb.init` in the client's own process; no rpc starts one.
 syntax = "proto3";
 
@@ -32,6 +33,7 @@ service Kb {
   rpc BatchAdd(BatchAddRequest) returns (BatchAddResponse);
   rpc BatchRemove(BatchRemoveRequest) returns (BatchRemoveResponse);
   rpc Placeholders(PlaceholdersRequest) returns (PlaceholdersResponse);
+  rpc Export(ExportRequest) returns (stream ExportResponse);
 }
 
 // Who made an entry in the history: the role, and the piece of work. The
@@ -621,6 +623,48 @@ message Placeholders {
 message PlaceholdersResponse {
   oneof outcome {
     Placeholders result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// Asks for the whole store as its canonical files.
+message ExportRequest {
+}
+
+// One file of an export: its place below the directory an export is
+// written to, the host and the segments of its artifact's IRI joined by
+// `/`, the last followed by `.yaml`, a type version's by `@`, its number
+// and `.yaml`; and its canonical YAML text, the artifact whole.
+message ExportedFile {
+  string place = 1;
+  string text = 2;
+}
+
+// The end of an export: every file has been given. The position is the
+// position in the history the files reflect, the `id` of the last history
+// entry landed when the store stood at the export's moment; it names
+// that entry and promises no order between two positions.
+message ExportEnd {
+  string position = 1;
+}
+
+// One message of an export's stream: a file, or, once and last, the end.
+message Exported {
+  oneof part {
+    ExportedFile file = 1;
+    ExportEnd end = 2;
+  }
+}
+
+// An export answers with a stream of these: one for each file, every file
+// showing the store as it stood at one moment, then one carrying the end.
+// An export refused gives a refusal as its only message: no store found,
+// or one that cannot be read. One that fails after files were given ends
+// with a refusal in the end's place. Only a stream whose last message
+// carries the end is the whole export.
+message ExportResponse {
+  oneof outcome {
+    Exported result = 1;
     Refusal refusal = 2;
   }
 }

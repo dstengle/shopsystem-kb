@@ -3,7 +3,8 @@
 None; `kb.contract.kb_pb2`'s being importable, as package `kb.v2`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
 `place`; the reads `Read`, `List`, `Follow`, `Search`, `History` and `Placeholders`, the signed `Snapshot` and the
-`Check`, each answering its result or a refusal; that a placeholder is given by its IRI and the links into it, each with the part it names; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
+`Check`, each answering its result or a refusal; `Export`, which alone answers with a stream, each message of it its
+result, a file or the end with the position, or a refusal; that a placeholder is given by its IRI and the links into it, each with the part it names; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
 faults; that each item an `BatchAdd` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
 import dataclasses
@@ -180,6 +181,7 @@ READS = {
     "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
     "Check": ("CheckRequest", set(), "Checked", {"violations", "stale", "placeholders"}),
     "Placeholders": ("PlaceholdersRequest", set(), "Placeholders", {"placeholders"}),
+    "Export": ("ExportRequest", set(), "Exported", {"file", "end"}),
 }
 
 
@@ -193,6 +195,20 @@ def test_each_read_the_snapshot_and_the_check_answer_their_result_or_a_refusal(r
     outcome = method.output_type.oneofs_by_name["outcome"]
     assert [(field.name, field.message_type.name) for field in outcome.fields] == [("result", result), ("refusal", "Refusal")]
     assert _fields(f"{rpc}Response") == {"result", "refusal"}
+
+
+def test_an_export_alone_answers_with_a_stream_each_message_a_file_or_the_end_with_the_position():
+    """Each message of the stream is a response as every other is, its result or a refusal: the result is one file,
+    its place and its text, or the end, carrying the position."""
+    methods = kb_pb2.DESCRIPTOR.services_by_name["Kb"].methods
+    assert [method.name for method in methods if method.server_streaming] == ["Export"]
+    assert not any(method.client_streaming for method in methods)
+    part = kb_pb2.DESCRIPTOR.message_types_by_name["Exported"].oneofs_by_name["part"]
+    assert [(field.name, field.message_type.name) for field in part.fields] == [
+        ("file", "ExportedFile"), ("end", "ExportEnd"),
+    ]
+    assert _fields("ExportedFile") == {"place", "text"}
+    assert _fields("ExportEnd") == {"position"}
 
 
 def test_a_placeholder_is_given_by_its_iri_and_the_links_into_it_each_with_the_part_it_names():
