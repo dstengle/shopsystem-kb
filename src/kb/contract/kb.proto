@@ -50,7 +50,10 @@ message Signature {
   string message = 3;
 }
 
-// An artifact root when place is empty; a node inside it otherwise.
+// An artifact root when place is empty; otherwise a place inside the artifact,
+// which gives a part when it names one. A place naming a section, a field or a
+// collection gives no node. id may itself be a part's IRI, <IRI>#<place>;
+// giving both a part's IRI and a place is refused.
 message Locator {
   string id = 1;
   string place = 2;
@@ -119,7 +122,8 @@ message ReadRequest {
 // An artifact at the level read: its identity and its content at that
 // level; a summary's content is the fields the type shows at a glance,
 // with a stub of each reference target and of each part, and inbound
-// counts. Read at a glance or whole, each link the read shows that lands
+// counts. A part read gives the part alone as its content; its id, type,
+// revision and title are its artifact's. Read at a glance or whole, each link the read shows that lands
 // on nothing held, on an IRI the store does not hold or on a part the
 // artifact held there lacks, is given beside the content, where the link
 // stays as written: the links of the artifact read and, read whole

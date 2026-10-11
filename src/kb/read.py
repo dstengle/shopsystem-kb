@@ -183,7 +183,7 @@ def _summary(store: Port, read: _Read) -> kb_pb2.Artifact:
     response.placeholders.extend(_placeholders(store, {read.found["id"]: read.links}))
     for collection in read.declared["parts"]:
         for item in read.node.get(collection, []):
-            response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
+            response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item.get("title", "")))
     if read.node is read.found:
         for (type_name, field), count in store.inbound(ArtifactId(read.found["id"])).items():
             response.inbound.append(kb_pb2.InboundCount(kind=type_name, field=field, count=count))
