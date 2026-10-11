@@ -779,7 +779,14 @@ Everything kb reads of an artifact it reads through the version of its type the 
 date: 2026-10-10
 source: review questions (slice 162: reads of an artifact behind its type, and links restated when a type changes), answered under the person's delegation of 2026-10-10
 
+<<<<<<< HEAD
 ## decision/a-referred-type-is-not-removed
 A type is not removed while a held version of another type reads one of its versions, by a `kb:` reference to a shape or by being built on it: the removal is refused as one is while artifacts of its kind exist, naming each referring type, since every version of a type is kept as made and would otherwise read through a version no longer held. A removed type's own versions go with it.
 date: 2026-10-10
 source: review question (slice 165: a removal left `kb:<T>@1` dangling, and writes through it and the store's check refused as the store's own fault), answered under the person's delegation of 2026-10-10
+=======
+## decision/a-link-to-a-removed-artifact-waits-on-a-placeholder
+A removed artifact's IRI is an IRI the store does not hold: a link made to it after the removal lands on a placeholder like a link to any IRI not held under a held type that the link field allows, so a removal and a new link made at once may both land when the removal lands first; the removal landing second is still refused.
+date: 2026-10-10
+source: slicing question (K2, slice 166: the scenario of a removal and a new link made at once against decision/0024-a-link-may-land-on-a-placeholder), answered under the person's delegation of 2026-10-10
+>>>>>>> spec/link-to-a-removed-artifact

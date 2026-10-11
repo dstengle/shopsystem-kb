@@ -23,7 +23,7 @@ Feature: Check a change
     When the client creates a decision that supersedes an IRI under a type the store does not hold, saying which role and why
     Then the artifact is rejected because a link must land on a node of a kind the type allows
 
-  @slice-166
+  @slice-166.1
   Scenario: An artifact pointing at an IRI the store does not hold, under a type it holds that the link allows, lands its link on a placeholder
     Pins that a link may run ahead of what it points at, so a client can write what it knows before the rest is written.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options

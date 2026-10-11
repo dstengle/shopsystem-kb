@@ -55,7 +55,7 @@ Feature: Query the store
       | decision  | pricing/discounts   |
       | work item | pricing/rollout     |
 
-  @slice-166
+  @slice-166.1
   Scenario: The client asks for the placeholders
     Pins that every link to something the store does not hold can be found in one question, each such target with every link into it, the artifact holding that link and the place it sits at, while links to held artifacts are left out.
     Given a store where these links point at IRIs the store does not hold:

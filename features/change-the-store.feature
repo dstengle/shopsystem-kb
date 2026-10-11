@@ -219,19 +219,19 @@ Feature: Change the store
       | two clients in one program                               |
       | two clients in two separate programs on the same machine |
 
-  @slice-108
-  Scenario Outline: A removal and a new link to the same artifact made at once never both land
-    Pins that two clients working at once cannot between them leave a link pointing at nothing: whichever change comes second is judged against what the first one left.
+  @slice-166
+  Scenario Outline: A removal and a new link to the same artifact made at once are each judged against what the other left
+    Pins that two clients working at once are judged in turn: a removal that comes second is refused for the link already there, and a link that comes second waits on a placeholder where the artifact was.
     Given a store holding a tag nothing points at
     And one client is removing the tag while another is creating a decision that points at it, each saying which role and why
     When the client <first> lands its change first
-    Then the <second> is rejected because <reason>
+    Then <the second>
     And the store holds <held>
 
     Examples:
-      | first                 | second       | reason                                                | held                                       |
-      | creating the decision | removal      | something still points at it                          | the tag and the decision that points at it |
-      | removing the tag      | new decision | a link must land on a node of a kind the type allows | neither the tag nor the new decision       |
+      | first                 | the second                                                               | held                                       |
+      | creating the decision | the removal is rejected because something still points at it            | the tag and the decision that points at it |
+      | removing the tag      | the new decision lands, its link on a placeholder at the removed tag's IRI | the new decision and not the tag           |
 
   @slice-122
   Scenario: Two clients replace one artifact at the same time, neither saying the version it read
