@@ -142,14 +142,21 @@ def test_a_part_inside_a_part_is_read_alone(client):
 
 
 @pytest.mark.parametrize("title", ["Purpose", "Steps"])
-def test_a_section_of_a_part_is_refused_as_a_section_its_artifact_lacks_is(client, title):
+def test_a_section_of_a_part_is_refused_saying_the_part_holds_no_section_of_that_title(client, title):
     refused = client.Read(kb_pb2.ReadRequest(locator=_keep(), section=kb_pb2.ReadRequest.Section(title=title)))
+    assert not refused.HasField("result")
+    assert [(fault.artifact, fault.place, fault.rule, fault.message) for fault in refused.refusal.faults] == [
+        (WEEKLY, "options/keep", "not-found", f"'{WEEKLY}#options/keep' holds no section titled {title!r}"),
+    ]
+
+
+def test_a_section_the_artifact_lacks_is_refused_naming_the_artifact(client):
     lacking = client.Read(kb_pb2.ReadRequest(
         locator=kb_pb2.Locator(id=WEEKLY), section=kb_pb2.ReadRequest.Section(title="Steps"),
     ))
-    assert [(fault.artifact, fault.rule) for fault in refused.refusal.faults] == [(WEEKLY, "not-found")]
-    assert [(fault.artifact, fault.rule) for fault in lacking.refusal.faults] == [(WEEKLY, "not-found")]
-    assert refused.refusal.faults[0].message == lacking.refusal.faults[0].message.replace("Steps", title)
+    assert [(fault.artifact, fault.place, fault.rule, fault.message) for fault in lacking.refusal.faults] == [
+        (WEEKLY, "sections", "not-found", f"'{WEEKLY}' holds no section titled 'Steps'"),
+    ]
 
 
 @pytest.mark.parametrize("level", [

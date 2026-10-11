@@ -29,7 +29,7 @@ def artifact(store: Port, reading: Reading) -> kb_pb2.Artifact:
     if locator.place:
         places.resolve(found, locator)
     if reading.level == "section":
-        return _section(found, _node(found, locator) is found, reading.section)
+        return _section(found, "" if _node(found, locator) is found else names.placed(locator.place), reading.section)
     if reading.level == "whole":
         return _whole(store, _read(store, found, locator), reading.depth)
     return _summary(store, _read(store, found, locator))
@@ -164,12 +164,12 @@ def _lands(store: Port, target: Locator) -> bool:
     return not target.place or places.holds_part(store.artifact(target.id), target.place)
 
 
-def _section(found: dict, sectioned: bool, title: str) -> kb_pb2.Artifact:
+def _section(found: dict, part: str, title: str) -> kb_pb2.Artifact:
     """The first section with that title, at any depth, in the order the artifact holds them, and nothing else. A
-    part holds no section, so a read of one of a part is refused as a section the artifact lacks is."""
-    section = _find_section(found.get("sections", []), title) if sectioned else None
+    part, given by its place, holds no section: one asked of it is refused as lacking, of the part, not its artifact."""
+    section = None if part else _find_section(found.get("sections", []), title)
     if section is None:
-        raise Refused([refusals.no_section(ArtifactId(found["id"]), title)])
+        raise Refused([refusals.no_section(ArtifactId(found["id"]), title, part)])
     return _response(found, dumps(section))
 
 

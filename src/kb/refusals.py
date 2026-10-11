@@ -166,10 +166,11 @@ def unwritable(artifact_id: ArtifactId, problem: str, place: str = "") -> kb_pb2
     return kb_pb2.Fault(artifact=str(artifact_id), place=place, rule=rules.CONTENT, message=problem)
 
 
-def no_section(artifact_id: ArtifactId, title: str) -> kb_pb2.Fault:
+def no_section(artifact_id: ArtifactId, title: str, part: str = "") -> kb_pb2.Fault:
+    """An artifact lacking the section asked, or, for a part's place, that part, named by its IRI, which holds none."""
     return kb_pb2.Fault(
-        artifact=str(artifact_id), place="sections", rule=rules.NOT_FOUND,
-        message=f"{str(artifact_id)!r} holds no section titled {title!r}",
+        artifact=str(artifact_id), place=part or "sections", rule=rules.NOT_FOUND,
+        message=f"{names.pointing(artifact_id, part)!r} holds no section titled {title!r}",
     )
 
 
