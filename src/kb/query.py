@@ -24,8 +24,8 @@ def walk(store: Port, asked: Walk) -> kb_pb2.Followed:
     """What an artifact's links reach, out of it, or out of the place inside it the locator names, or into it, a step at
     a time out to the depth asked: each artifact once, by the shortest route, the one asked about never. A via or a
     kind narrows every step. An IRI a link points at that the store does not hold is reached as the IRI alone, of
-    no kind, and not walked on from. Raises Refused for a kind the store holds no type for, a name the store lacks, or, going
-    out, a place it holds nothing at."""
+    no kind, and not walked on from. Raises Refused for a kind the store holds no type for, a name the store lacks,
+    or, going out, a place it holds nothing at."""
     if asked.kind is not None:
         composition.kind_type(asked.kind, store)
     start = asked.locator.id
@@ -110,11 +110,11 @@ def _snapshotted(artifact_id: ArtifactId, artifact: dict) -> dict:
 
 def _outward(store: Port, locator: Locator) -> list[tuple[str, ArtifactId]]:
     """Each link out of an artifact, or out of the place inside it the locator names, as the field and the name it
-    points at."""
+    points at, which for a link into a part of an artifact is that artifact's."""
     artifact = store.artifact(locator.id)
     schema = composition.artifact_schema(artifact, store)["schema"]
     found = links.inside(artifact, schema, store, places.node(artifact, locator))
-    return [(link.field, values.artifact_id(link.target)) for link in found]
+    return [(link.field, values.target(link.target).id) for link in found]
 
 
 def _inward(store: Port, locator: Locator) -> list[tuple[str, ArtifactId]]:

@@ -1,6 +1,7 @@
 """Reads: an artifact whole, with its links followed as far as asked; one of its sections; or its summary, with a stub
 of each artifact it links to, each part it holds, and how many artifacts point at it. The stub is every query's too.
-A link to an IRI the store does not hold is never followed: its stub is the IRI alone, and read whole it stays a name."""
+A link to an IRI the store does not hold is never followed: its stub is the IRI alone, and read whole it stays a name.
+A link into a part of an artifact is read as a link to that artifact, and read whole it stays the reference written."""
 from dataclasses import replace
 
 from kb import composition, links, places, refusals, settled, values
@@ -111,7 +112,7 @@ def _summary(store: Port, locator: Locator) -> kb_pb2.Artifact:
     declared = composition.declared(schema, store)
     response = _response(found, dumps(_summary_fields(found, declared)))
     for link in links.carried(found, schema, store):
-        response.references.append(stub(store, link.field, values.artifact_id(link.target)))
+        response.references.append(stub(store, link.field, values.target(link.target).id))
     for collection in declared["parts"]:
         for item in found.get(collection, []):
             response.parts.append(kb_pb2.PartStub(collection=collection, id=item["id"], title=item["title"]))
@@ -130,14 +131,16 @@ def _response(found: dict, content: str) -> kb_pb2.Artifact:
 def _resolved(store: Port, artifact_id: ArtifactId, depth: int, on_path: set) -> dict:
     """The artifact as stored, each link in its own fields followed depth steps with the target, itself resolved, in
     place of its name; a link inside one of its items stays a name. A target on the path already being filled in
-    stays a name, so a loop ends, and so does one the store does not hold."""
+    stays a name, so a loop ends, and so does one the store does not hold; a link into a part of an artifact stays
+    the reference written, a part being no artifact."""
     found = store.artifact(artifact_id)
     if depth < 1:
         return found
     def fill(target):
-        if target in on_path or not store.holds(values.artifact_id(target)):
+        linked = values.target(target)
+        if linked.place or target in on_path or not store.holds(linked.id):
             return target
-        return _resolved(store, values.artifact_id(target), depth - 1, on_path | {target})
+        return _resolved(store, linked.id, depth - 1, on_path | {target})
     resolved = dict(found)
     carried = links.carried(found, composition.artifact_schema(found, store)["schema"], store)
     for field in {link.field for link in carried if link.own}:
