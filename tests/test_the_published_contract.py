@@ -176,7 +176,7 @@ READS = {
     "Search": ("SearchRequest", {"text", "kind", "scope"}, "Found", {"matches"}),
     "History": ("HistoryRequest", {"artifact", "role", "execution", "since", "batch"}, "Entries", {"entries"}),
     "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
-    "Check": ("CheckRequest", set(), "Checked", {"violations", "stale"}),
+    "Check": ("CheckRequest", set(), "Checked", {"violations", "stale", "placeholders"}),
     "Placeholders": ("PlaceholdersRequest", set(), "Placeholders", {"placeholders"}),
 }
 

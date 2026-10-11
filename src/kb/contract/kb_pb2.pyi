@@ -177,12 +177,14 @@ class CheckRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class Checked(_message.Message):
-    __slots__ = ("violations", "stale")
+    __slots__ = ("violations", "stale", "placeholders")
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
     STALE_FIELD_NUMBER: _ClassVar[int]
+    PLACEHOLDERS_FIELD_NUMBER: _ClassVar[int]
     violations: _containers.RepeatedCompositeFieldContainer[Fault]
     stale: _containers.RepeatedCompositeFieldContainer[Stale]
-    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., stale: _Optional[_Iterable[_Union[Stale, _Mapping]]] = ...) -> None: ...
+    placeholders: _containers.RepeatedCompositeFieldContainer[Placeholder]
+    def __init__(self, violations: _Optional[_Iterable[_Union[Fault, _Mapping]]] = ..., stale: _Optional[_Iterable[_Union[Stale, _Mapping]]] = ..., placeholders: _Optional[_Iterable[_Union[Placeholder, _Mapping]]] = ...) -> None: ...
 
 class CheckResponse(_message.Message):
     __slots__ = ("result", "refusal")

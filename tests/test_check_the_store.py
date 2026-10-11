@@ -57,6 +57,7 @@ SECTIONS = [
 
 
 WEEKLY = iri("decision", "price-reviews-happen-weekly")
+MONTHLY = iri("decision", "prices-are-reviewed-monthly")  # a decision no store of these steps holds
 
 
 def _store_with_a_decision(root):
@@ -76,22 +77,26 @@ def _store_where_everything_fits(root):
     return client
 
 
+MONDAYS = iri("work-item", "move-the-review-to-mondays")
+
+
 @given(
-    "a store where one artifact is missing a section its type requires and another points at something the store "
-    "does not hold",
+    "a store where one artifact is missing a section its type requires and another holds a field of a shape its type "
+    "does not allow",
     target_fixture="client",
 )
 def _store_with_two_faults(root):
-    """Both faults are made by hand behind the store's back, since the store refuses to write either."""
+    """Both faults are made by hand behind the store's back, since the store refuses to write either: the decision
+    loses its rationale, and the work item holds the one decision it serves alone, where its type asks for a list."""
     client = _store_with_a_decision(root)
     define(client, WORK_ITEM_TYPE)
     create(client, "work-item", {"title": "Move the review to Mondays", "decisions": [WEEKLY]})
     decision = held.artifact(root, WEEKLY)
     decision["sections"] = decision["sections"][:1]
     held.plant(root, WEEKLY, decision)
-    work_item = held.artifact(root, iri("work-item", "move-the-review-to-mondays"))
-    work_item["decisions"] = [iri("decision", "prices-are-reviewed-monthly")]
-    held.plant(root, iri("work-item", "move-the-review-to-mondays"), work_item)
+    work_item = held.artifact(root, MONDAYS)
+    work_item["decisions"] = WEEKLY
+    held.plant(root, MONDAYS, work_item)
     return client
 
 
@@ -99,9 +104,43 @@ def _store_with_two_faults(root):
 def _both_reported(checked):
     assert not checked.faults, checked.faults
     assert [(fault.artifact, fault.place, fault.rule) for fault in checked.violations] == [
-        (WEEKLY, "sections", "sections"),
-        (iri("work-item", "move-the-review-to-mondays"), "decisions/0", "ref"),
+        (WEEKLY, "sections", "sections"), (MONDAYS, "decisions", "type"),
     ]
+
+
+@given(
+    "a store where everything fits its type and one decision links to an IRI the store does not hold",
+    target_fixture="client",
+)
+def _store_where_everything_fits_and_one_decision_links_to_an_iri_not_held(root):
+    client = _store_with_a_decision(root)
+    create(client, "decision", {"title": "Prices are reviewed daily", "sections": SECTIONS, "supersedes": MONTHLY})
+    return client
+
+
+@then("the IRI is listed as a placeholder")
+def _the_iri_is_listed_as_a_placeholder(checked):
+    assert [each.id for each in checked.placeholders] == [MONTHLY]
+
+
+DAILY = iri("decision", "prices-are-reviewed-daily")
+
+
+@given(
+    "a store holding a decision that links to an IRI the store does not hold from one of its fields and again from "
+    "one of its sections",
+    target_fixture="client",
+)
+def _store_with_a_decision_linking_from_a_field_and_from_a_section(root):
+    """The decision supersedes the IRI, and its purpose, a section, holds the same link."""
+    client = _store_with_a_decision(root)
+    purpose, rationale = SECTIONS
+    made = create(client, "decision", {
+        "title": "Prices are reviewed daily", "supersedes": MONTHLY,
+        "sections": [{**purpose, "supersedes": MONTHLY}, rationale],
+    })
+    assert not made.faults, made.faults
+    return client
 
 
 @then("the client is told of no violation")

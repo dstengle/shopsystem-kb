@@ -175,10 +175,14 @@ message CheckRequest {
 // Every violation the store holds, each a fault naming the artifact, the
 // place and the rule; they are what the store holds, not a refusal. Every
 // artifact last checked against an older version of its type is listed as
-// stale, whether or not it still fits.
+// stale, whether or not it still fits. Every placeholder is listed apart,
+// with the links into it, as `Placeholders` gives them at that moment; a
+// placeholder is never a violation, nor is a link into a part that the
+// artifact held at its IRI lacks, which is listed there.
 message Checked {
   repeated Fault violations = 1;
   repeated Stale stale = 2;
+  repeated Placeholder placeholders = 3;
 }
 
 // A refusal: no store found, or one that cannot be read.
