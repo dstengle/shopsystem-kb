@@ -356,18 +356,44 @@ def _properties_in_another_order(target):
     declared = version["schema"]["properties"]
     version["schema"]["properties"] = {name: declared[name] for name in ("title", "body", "summary", "flag", "count", "meta")}
     _put(target, version, 1)
+    return {_file(type_iri("note"), 1): type_iri("note")}
 
 
 def _a_number_where_the_store_holds_a_truth(target):
     _put(target, {**_read(target, HELD_NOTE), "flag": 1})
+    return {_file(HELD_NOTE): HELD_NOTE}
 
 
 def _a_fraction_where_the_store_holds_a_whole_number(target):
     _put(target, {**_read(target, HELD_NOTE), "count": 1.0})
+    return {_file(HELD_NOTE): HELD_NOTE}
 
 
 def _a_mapping_in_another_order(target):
     _put(target, {**_read(target, HELD_NOTE), "meta": {"a": 2, "b": 1}})
+    return {_file(HELD_NOTE): HELD_NOTE}
+
+
+def _differs_at(root, target, differing, others=()):
+    """A directory checked for import into the store at root and then imported, with errors skipped and not: the
+    check reports each file given as differing, naming its IRI, and the other errors given and no more; each import
+    is refused naming each IRI once, in the order of names, shows the check's report, and lands nothing."""
+    client = kb_client.connect(root)
+    before, history = held.holds(root), held.history(client)
+    checked = _kb("import", "--check", str(target), cwd=root)
+    errors = [line for line in _report(checked) if line[0] == "error"]
+    assert (checked.returncode, checked.stderr) == (1, ""), checked.stdout
+    assert sorted((line[1], line[2]) for line in errors) == sorted(
+        [*((file, "differs") for file in differing), *others],
+    ), checked.stdout
+    assert all(repr(differing[line[1]]) in line[3] for line in errors if line[2] == "differs"), checked.stdout
+    for how in ((), ("--skip-errors",)):
+        ran = _kb("import", *how, str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+        refused = ran.stderr.splitlines()
+        assert (ran.returncode, ran.stdout, len(refused)) == (2, checked.stdout, len(set(differing.values()))), ran.stderr
+        for line, name in zip(refused, sorted(set(differing.values()))):
+            assert line.startswith("kb import: refused: differs: ") and repr(name) in line, ran.stderr
+        assert (held.holds(root), held.history(client)) == (before, history)
 
 
 @pytest.mark.parametrize("differently", [
@@ -382,13 +408,120 @@ def test_a_file_written_other_than_the_store_would_write_what_it_holds_is_a_diff
     create(client, "note", {"title": "Held", "flag": True, "count": 1, "meta": {"b": 1, "a": 2}})
     target = tmp_path / "exported"
     files = _export_of(root, target)
-    differently(target)
+    differing = differently(target)
     assert {file: (target / file).read_bytes() for file in files} != files
+
+    _differs_at(root, target, differing)
+
+
+def test_a_file_with_only_its_revision_changed_is_not_a_difference(root, tmp_path):
+    client = _started(root)
+    _decisions_and_a_work_item(client)
+    _a_note_type_at_two_versions(client)
+    target = tmp_path / "exported"
+    _export_of(root, target)
+    _put(target, {**_read(target, WEEKLY), "revision": 7})
+    _put(target, {**_read(target, type_iri("note"), 1), "revision": 9}, 1)
     before, history = held.holds(root), held.history(client)
 
-    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    _import_into(root, target)
 
-    assert ran.returncode != 0, ran.stdout
+    assert (held.holds(root), held.history(client)) == (before, history)
+
+
+def test_a_type_versions_file_that_differs_from_the_version_the_store_keeps_at_its_number_is_a_difference(
+    root, tmp_path,
+):
+    client = _started(root)
+    _a_note_type_at_two_versions(client)
+    note, target = type_iri("note"), tmp_path / "exported"
+    _export_of(root, target)
+    _put(target, {**_read(target, note, 1), "title": "Memo"}, 1)
+    _put(target, {**_artifact(iri("note", "new"), "New"), "type": version_iri("note", 2)})
+
+    _differs_at(root, target, {_file(note, 1): note})
+    assert not held.holds_artifact(root, iri("note", "new"))
+
+
+def _a_note_type_at_three_versions(client):
+    _a_note_type_at_two_versions(client)
+    assert not change_type(client, "note", _note_type("body", "summary", "owner")).faults
+
+
+def test_a_type_versions_file_numbered_below_the_version_the_stores_type_stands_at_that_it_does_not_keep_is_a_difference(
+    root, tmp_path,
+):
+    """The store's type for notes keeps versions 1 and 3 (a directory brought it so); a directory then brings its
+    version 2: the directory and the store disagree about that type's versions."""
+    _started(root)
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_three_versions)
+    second = (target / _file(note, 2)).read_bytes()
+    (target / _file(note, 2)).unlink()
+    _import_into(root, target)
+    assert held.versions(root)[note] == [1, 3]
+    (target / _file(note, 2)).write_bytes(second)
+
+    _differs_at(root, target, {_file(note, 2): note})
+    assert held.versions(root)[note] == [1, 3]
+
+
+def test_a_type_versions_file_above_the_stores_whose_revision_is_not_above_the_one_its_type_stands_at_is_a_difference(
+    root, tmp_path,
+):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_two_versions)
+    _put(target, {**_read(target, note, 2), "revision": held.artifact(root, note)["revision"]}, 2)
+
+    _differs_at(root, target, {_file(note, 2): note})
+    assert held.versions(root)[note] == [1]
+
+
+def test_a_file_written_against_a_version_only_the_directory_brings_of_an_artifact_the_store_holds_is_a_difference(
+    root, tmp_path,
+):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    create(client, "note", {"title": "Held", "summary": "It is held.", "body": "Before the import.\n"})
+    note, target = type_iri("note"), tmp_path / "exported"
+    _export_of(root, target)
+    first = _read(target, note, 1)
+    _put(target, {**first, "revision": 2, "version": 2, "schema": _note_type("summary", "body", "owner")}, 2)
+    _put(target, {**_read(target, HELD_NOTE), "type": version_iri("note", 2)})
+
+    _differs_at(root, target, {_file(HELD_NOTE): HELD_NOTE})
+    assert held.versions(root)[note] == [1]
+
+
+def test_a_difference_refuses_an_import_whatever_other_errors_the_directory_holds_which_stay_in_the_report(
+    root, tmp_path,
+):
+    client = _started(root)
+    _decisions_and_a_work_item(client)
+    target = tmp_path / "exported"
+    _export_of(root, target)
+    _put(target, {**_read(target, WEEKLY), "title": "Price reviews happen daily"})
+    unfit = _decision(THIRD)
+    _put(target, {**unfit, "sections": unfit["sections"][:1]})
+
+    _differs_at(root, target, {_file(WEEKLY): WEEKLY}, others=[(_file(THIRD), "sections")])
+
+
+def test_with_errors_skipped_a_directory_whose_sound_files_the_store_all_holds_lands_nothing_and_is_not_refused(
+    root, tmp_path,
+):
+    client = _started(root)
+    _decisions_and_a_work_item(client)
+    target = tmp_path / "exported"
+    _export_of(root, target)
+    unfit = _decision(THIRD)
+    _put(target, {**unfit, "sections": unfit["sections"][:1]})
+    before, history = held.holds(root), held.history(client)
+
+    ran = _kb("import", "--skip-errors", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    assert [line[:3] for line in _report(ran)] == [["error", _file(THIRD), "sections"]]
     assert (held.holds(root), held.history(client)) == (before, history)
 
 
@@ -886,6 +1019,96 @@ def _that_file_is_an_error(ran, target):
     (file,) = [path.relative_to(target).as_posix() for path in Path(target).rglob("*.yaml")]
     assert ran.stderr == ""
     assert ("error", file, "identity") in {tuple(line[:3]) for line in _report(ran)}, ran.stdout
+
+
+THIRD = iri("decision", "prices-are-set-by-the-buyer")
+
+
+def _two_decisions(client, rationale="Costs move weekly.\n"):
+    """The two decisions, written against the version the type for decisions stands at."""
+    for name in (WEEKLY, MONTHLY):
+        create(client, "decision", {"title": _titled(name), "sections": [
+            {"title": "Purpose", "body": "Keep prices in step with costs.\n"}, {"title": "Rationale", "body": rationale},
+        ]})
+
+
+def _decisions_at_two_versions(client):
+    """The type for decisions defined and written back as its second version, which every decision of the first fits."""
+    define(client, DECISION_TYPE)
+    assert not next_version(client, "decision", DECISION_TYPE).faults
+
+
+@given("a store holding a type for decisions at version 2 and two decisions written against version 2")
+def _a_store_with_two_decisions_at_version_2(root, before):
+    client = _started(root)
+    _decisions_at_two_versions(client)
+    _two_decisions(client)
+    assert {held.artifact(root, name)["type"] for name in (WEEKLY, MONTHLY)} == {version_iri("decision", 2)}
+    before.update(held=held.holds(root), history=held.history(client))
+
+
+def _with_other_content_against_version_2(client):
+    _decisions_at_two_versions(client)
+    _two_decisions(client, rationale="Costs move daily.\n")
+
+
+def _with_the_same_content_against_version_1(client):
+    define(client, DECISION_TYPE)
+    _two_decisions(client)
+
+
+DIFFERENCES = {
+    "with other content, written against version 2 of the type for decisions": (
+        _with_other_content_against_version_2, version_iri("decision", 2),
+    ),
+    "with the same content, written against version 1 of the type for decisions": (
+        _with_the_same_content_against_version_1, version_iri("decision", 1),
+    ),
+}
+
+
+@given(
+    parsers.re(
+        r"a directory for import holding both decisions at the same IRIs, each (?P<difference>with .+? of the type for "
+        r"decisions)(?P<third>, and a third decision the store does not hold)?"
+    ),
+    target_fixture="target",
+)
+def _for_import_with_two_differing_decisions(tmp_path, difference, third):
+    """The export of a store of its own holding the two decisions as the row says, and the third when one is named."""
+    differing, version = DIFFERENCES[difference]
+
+    def fill(client):
+        differing(client)
+        if third:
+            create(client, "decision", {"title": _titled(THIRD), "sections": _decision(THIRD)["sections"]})
+
+    target = _for_import(tmp_path, fill)
+    assert {_read(target, name)["type"] for name in (WEEKLY, MONTHLY)} == {version}
+    assert (target / _file(THIRD)).exists() == bool(third)
+    return target
+
+
+@then("each of the two decisions is reported as an error, naming its IRI")
+def _each_decision_differs(ran):
+    assert ran.stderr == ""
+    errors = {(line[1], line[2]): line[3] for line in _report(ran) if line[0] == "error"}
+    for name in (WEEKLY, MONTHLY):
+        assert name in errors.get((_file(name), "differs"), ""), ran.stdout
+
+
+@then("the import is rejected, naming the IRI of each of the two decisions")
+def _rejected_naming_each_decision(ran):
+    refused = ran.stderr.splitlines()
+    assert ran.returncode == 2 and len(refused) == 2, ran.stderr
+    for line, name in zip(refused, (WEEKLY, MONTHLY)):
+        assert line.startswith("kb import: refused: differs: ") and repr(name) in line, ran.stderr
+
+
+@then("nothing lands, the third decision included")
+def _nothing_lands_the_third_included(root, before):
+    assert not held.holds_artifact(root, THIRD)
+    assert (held.holds(root), held.history(kb_client.connect(root))) == (before["held"], before["history"])
 
 
 MINOR, SITTING = iri("decision", "minor"), iri("decision", "minor/ship-weekly")

@@ -21,7 +21,6 @@ from kb import content as kb_content
 from kb import testing as kb_testing
 from kb.content import NotCanonical, dumps, loads, text
 from kb.contract import kb_pb2
-from slices import waits_on
 
 SPEC = Path(__file__).resolve().parent.parent / "spec" / "index.md"
 
@@ -115,7 +114,6 @@ def test_connects_clock_is_a_keyword_defaulting_to_none():
     assert clock.default is None
 
 
-@waits_on("182")
 def test_the_rule_names_kb_gives_are_exactly_the_spec_lists():
     sentence = re.search(r"kb's own rule names:\s*(.*?)\.", SPEC.read_text(encoding="utf-8"), re.DOTALL)
     assert set(re.findall(r"`([a-z_-]+)`", sentence.group(1))) == set(rules.ALL)

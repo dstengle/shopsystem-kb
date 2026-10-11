@@ -7,7 +7,7 @@ compared, never drafted. The examination writes nothing."""
 from dataclasses import dataclass, field
 
 from kb import (
-    canonical, composition, definitions, file_refusals, links, naming, names, offers, rules, settled, skipping,
+    canonical, comparing, composition, definitions, file_refusals, links, naming, names, offers, rules, settled, skipping,
     validation, values,
 )
 from kb.draft import Draft
@@ -48,6 +48,8 @@ def examined(store: Port, offered: list[Offered]) -> Checked:
     for name in in_order(by_name):
         each = by_name[name]
         each.errors += [_of(each.file, fault) for fault in _faults(store, draft, each, by_name, unread, drafted)]
+    for each in comparing.compared(store, [each for each in offered if each.id != METASCHEMA_ID]).differing:
+        each.errors.append(file_refusals.differs(each.file, str(each.id)))
     return Checked(
         errors=[fault for each in offered for fault in each.errors], skipped=skipping.skipped(store, draft, offered, by_name),
     )

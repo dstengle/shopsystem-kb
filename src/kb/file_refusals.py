@@ -1,7 +1,8 @@
 """The faults of the operator's directories and files, each with its rule and its message, from plain values: a
 directory an export or an import is refused for, a place a backup cannot be written at, a file offered for restore
-that is not a backup this kb can read, a file offered for import that cannot be read, is not in canonical form or is
-of a kind nothing offers a type for, and an import refused whole."""
+that is not a backup this kb can read, a file offered for import that cannot be read, is not in canonical form, is of
+a kind nothing offers a type for or differs from what the store holds at its IRI (rule `differs`), and an import
+refused whole, for the errors of its check or for each IRI at which it differs."""
 from kb import rules
 from kb.contract import kb_pb2
 
@@ -60,10 +61,27 @@ def no_version_offered(file: str, version: str) -> kb_pb2.Fault:
     )
 
 
+def differs(file: str, iri: str) -> kb_pb2.Fault:
+    """A file offered for import that is not what the store holds at its IRI, or, for a type's version, not a version
+    the type the store holds there keeps or could gain."""
+    return kb_pb2.Fault(
+        artifact=file, rule=rules.DIFFERS,
+        message=f"it differs from what the store holds at {iri!r}, and an import replaces nothing the store holds",
+    )
+
+
 def check_failed(errors: int) -> kb_pb2.Fault:
     """An import of a directory whose check found errors, with none skipped."""
     return kb_pb2.Fault(
         rule=rules.CONTENT, message=f"the check found {errors} error(s) in the directory, and nothing was written",
+    )
+
+
+def differing(iri: str) -> kb_pb2.Fault:
+    """An import of a directory that differs from what the store holds at an IRI, with errors skipped or not."""
+    return kb_pb2.Fault(
+        rule=rules.DIFFERS,
+        message=f"the directory differs from what the store holds at {iri!r}, and nothing was written",
     )
 
 
