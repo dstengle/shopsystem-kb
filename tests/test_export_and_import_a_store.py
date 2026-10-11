@@ -557,81 +557,17 @@ def _decision(name, **fields):
     ])
 
 
-def _a_file_with_an_error(target):
-    """A decision missing the section its type requires second."""
-    broken = _decision(iri("decision", "broken"))
-    broken["sections"] = broken["sections"][:1]
-    _put(target, broken)
-    return iri("decision", "broken")
-
-
 def _a_broken_decision_type(target):
     """The type for decisions with a version that is not a number, which the type that describes types refuses."""
     _put(target, {**_read(target, type_iri("decision"), 1), "version": "one"}, 1)
     return type_iri("decision")
 
 
-def _linking_directly(target, broken):
-    _put(target, _decision(iri("decision", "linking"), supersedes=broken))
-    return {"linking": iri("decision", "linking")}
-
-
-def _linking_through_a_second(target, broken):
-    _put(target, _decision(iri("decision", "second"), supersedes=broken))
-    _put(target, _artifact(iri("work-item", "first"), "First", decisions=[iri("decision", "second")]))
-    return {"second": iri("decision", "second"), "first": iri("work-item", "first")}
-
-
-def _a_decision_of_the_broken_type(target, broken):
-    _put(target, _decision(iri("decision", "of-the-type")))
-    return {"decision": iri("decision", "of-the-type")}
-
-
-def _a_work_item_to_a_decision_of_the_broken_type(target, broken):
-    _put(target, _decision(iri("decision", "of-the-type")))
-    _put(target, _artifact(iri("work-item", "to-the-decision"), "To the decision", decisions=[iri("decision", "of-the-type")]))
-    return {"decision": iri("decision", "of-the-type"), "work item": iri("work-item", "to-the-decision")}
-
-
-BROKEN = {
-    "a file with an error": _a_file_with_an_error,
-    "a type for decisions whose content does not fit the type that describes types": _a_broken_decision_type,
-}
-LINKING = {
-    "a file that links to the broken file directly": _linking_directly,
-    "a file that links to a second file, which links to the broken file": _linking_through_a_second,
-    "a decision, whose link to its own type leads to the broken file": _a_decision_of_the_broken_type,
-    "a work item that links to a decision, whose link to its own type leads to the broken file":
-        _a_work_item_to_a_decision_of_the_broken_type,
-}
-
-
-@given(
-    parsers.re(
-        r"a directory for import holding (?P<broken>a file with an error|a type for decisions whose content does not "
-        r"fit the type that describes types), and (?P<linking>.+)"
-    ),
-    target_fixture="target",
-)
-def _for_import_with_a_broken_file_and_links_to_it(tmp_path, broken, linking, files):
-    target = _for_import(tmp_path, _the_two_types)
-    files["broken"] = BROKEN[broken](target)
-    files.update(LINKING[linking](target, files["broken"]))
-    return target
-
-
 @pytest.fixture
 def files():
-    """The names of the files a Given put in a directory, by the part each plays."""
+    """The files a Given put in a directory that an import leaves out, each with why: `error`, or the chain that leads
+    from it to a broken file as the report writes it."""
     return {}
-
-
-SKIPPED = {
-    "the file that links to it is": [("linking", "broken")],
-    "the second file and the first file are": [("second", "broken"), ("first", "second", "broken")],
-    "the decision is": [("decision", "broken")],
-    "the decision and the work item are": [("decision", "broken"), ("work item", "decision", "broken")],
-}
 
 
 @given(
@@ -1066,47 +1002,83 @@ def test_importing_with_errors_skipped():
 
 
 STANDALONE = iri("work-item", "stands-alone")
+DECISIONS = type_iri("decision")
+AT_TWO = iri("decision", "review-prices-on-fridays")
+LINKING_UNDER = iri("work-item", "find-the-decision")
 
 
-def _with_an_error_and_one_linking(target):
-    _a_file_with_an_error(target)
-    _linking_directly(target, iri("decision", "broken"))
-    return {iri("decision", "broken"): "error", iri("decision", "linking"): "decision/linking -> decision/broken"}
+def _decisions_at(client, number):
+    """The type for decisions defined, and revised when it is to stand at version 2."""
+    define(client, DECISION_TYPE)
+    if number == 2:
+        revised = replace(client, DECISIONS, {key: REVISED_DECISION_TYPE[key] for key in ("version", "schema")})
+        assert not revised.faults, revised.faults
 
 
-def _with_an_error_and_two_linking(target):
-    left_out = _with_an_error_and_one_linking(target)
-    _put(target, _decision(iri("decision", "onward"), supersedes=iri("decision", "linking")))
-    return {**left_out, iri("decision", "onward"): "decision/onward -> decision/linking -> decision/broken"}
+def _a_decision_of_the_type(client):
+    """A decision conforming to the version the type for decisions stands at."""
+    create(client, "decision", {"title": "Review prices on Fridays", "sections": [
+        {"title": title, "body": "Costs move weekly.\n"} for title in ("Purpose", "Rationale", "Consequences")
+    ]})
 
 
-def _with_a_broken_type_and_a_decision(target):
-    _a_broken_decision_type(target)
-    _put(target, _decision(iri("decision", "of-the-type")))
-    return {type_iri("decision"): "error", iri("decision", "of-the-type"): "decision/of-the-type -> schema/decision"}
+def _breaks(target, name, number):
+    """A type version's file given a schema of a type JSON Schema does not know, so its content does not fit the type
+    that describes types. Returns the file."""
+    version = _read(target, name, number)
+    version["schema"]["type"] = "objekt"
+    _put(target, version, number)
+    return _file(name, number)
 
 
-TOGETHER_WITH = {
-    "a type for decisions, a decision with an error and a decision that links to it": _with_an_error_and_one_linking,
-    "a type for decisions, a decision with an error, a decision that links to it, and a decision that links to that "
-    "one": _with_an_error_and_two_linking,
-    "a type for decisions whose content does not fit the type that describes types, and a decision":
-        _with_a_broken_type_and_a_decision,
+def _a_work_item_linking_under_the_type(client):
+    """The type for work items, and a work item whose link names an IRI under the type for decisions that nothing
+    holds."""
+    define(client, WORK_ITEM_TYPE)
+    create(client, "work-item", {"title": "Find the decision", "decisions": [iri("decision", "not-anywhere")]})
+
+
+LEADING = {  # what each row's source store is given beside the type for decisions, standing at version 2
+    "a decision conforming to version 2 of the type for decisions": _a_decision_of_the_type,
+    "a type for work items whose link field allows decisions, and a work item whose link names an IRI under the type "
+    "for decisions": _a_work_item_linking_under_the_type,
 }
 
 
 @given(
     parsers.parse(
-        "a directory for import holding a type for work items and a work item that leads to no broken file, together "
-        "with {broken}"
+        "a directory for import holding version 2 of a type for decisions, whose content does not fit the type that "
+        "describes types, and {leading}"
     ),
     target_fixture="target",
 )
-def _for_import_with_errors_to_skip(tmp_path, broken, files):
-    target = _for_import(tmp_path, _the_two_types)
-    _put(target, _artifact(STANDALONE, "Stands alone"))
-    files.update(TOGETHER_WITH[broken](target))
+def _for_import_with_a_broken_version_and_what_leads_to_it(tmp_path, leading, files):
+    def fill(client):
+        _decisions_at(client, 2)
+        LEADING[leading](client)
+
+    target = _for_import(tmp_path, fill)
+    (Path(target) / _file(DECISIONS, 1)).unlink()
+    files[_breaks(target, DECISIONS, 2)] = "error"
     return target
+
+
+SKIPPED = {  # each file a row says would be skipped, with the files its chain passes before the broken one
+    "the decision is": [(_file(AT_TWO),)],
+    "the work item is": [(_file(LINKING_UNDER),)],
+}
+
+
+@then(parsers.parse(
+    "{skipped} reported as a file that would be skipped, each with the chain that leads from it to the broken file"
+))
+def _reported_as_skipped_with_its_chain(ran, files, skipped):
+    (broken,) = files
+    assert (ran.returncode, ran.stderr) == (1, ""), ran.stderr
+    assert {line[1] for line in _report(ran) if line[0] == "error"} == {broken}, ran.stdout
+    assert {line[1]: line[2] for line in _report(ran) if line[0] == "skipped"} == {
+        chain[0]: " -> ".join((*chain, broken)) for chain in SKIPPED[skipped]
+    }, ran.stdout
 
 
 @when("the operator imports the directory with errors skipped, saying which role they are", target_fixture="ran")
