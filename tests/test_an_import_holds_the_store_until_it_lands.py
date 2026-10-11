@@ -1,8 +1,9 @@
-"""An import goes only into a freshly started store, and the store stays fresh until the import lands: a client that
-changes the store while an import is under way, after the import found the store fresh and before it lands, waits for
-the import, is refused as busy when the import holds the store longer than the store waits, and is never merged with
-it. The client's change is made from inside the import's reading of the directory, so it falls in that window every
-time. Through the operator's commands beside the contract, and the contract, over stores under the test's tmp_path."""
+"""An import holds the store's write lock from before it reads the directory until it has landed, so what the store
+holds is judged as it stands when the import lands: a client that changes the store while an import is under way waits
+for the import, is refused as busy when the import holds the store longer than the store waits, and is never merged
+with it. The client's change is made from inside the import's reading of the directory, so it falls in that window
+every time. Through the operator's commands beside the contract, and the contract, over stores under the test's
+tmp_path."""
 from calls import DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, define, request, start_a_store, type_iri
 import held
 from kb import client as kb_client

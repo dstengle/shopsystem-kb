@@ -5,7 +5,8 @@ of its changes drops; each change then as the port takes it, with the revisions 
 the types it was read through and the IRIs where a type could be defined nearer, as holding nothing (kb.standing);
 and whether the set lands only as drafted while the write lock is held. The imports a set makes of one type's versions are handed one after another, in the order of
 their numbers whatever order the set gave them in, each the version its file names at the revision its file gives, read
-at the revision the one before it left the type at; an imported artifact is checked, and its links read, through the
+at the revision the one before it left the type at, the first at the revision the store's type stands at when
+it is a version the store does not keep; an imported artifact is checked, and its links read, through the
 version of its type its file names. Only
 what the set changes is handed: a type's change restates the links of no artifact, which stay as the version it
 conforms to declares them. A fault anywhere refuses the whole set with every fault found."""
@@ -42,7 +43,7 @@ def drafted(held: port.Port, operations: list) -> Drafted:
     last = {change.artifact_id: index for index, change in enumerate(changes)}
     handed = [
         handing.handed(draft, change, read, last[change.artifact_id] == index)
-        for index, (change, read) in enumerate(zip(changes, _read_at(changes), strict=True))
+        for index, (change, read) in enumerate(zip(changes, _read_at(held, changes), strict=True))
     ]
     handed, below = standing.guarded(handed, draft)
     locked = below or any(standing.removes_a_type(change) or standing.defines_a_type(change) for change in changes)
@@ -64,15 +65,30 @@ def _by_number(operations: list) -> list:
     return ordered
 
 
-def _read_at(changes: list[Change]) -> list[int]:
+def _read_at(held: port.Port, changes: list[Change]) -> list[int]:
     """The revision each change read its artifact at: the one before the one it leaves; or, for an import, which
-    keeps the revision its file gives, the one the set's change before it left that artifact at, 0, as not held, for
-    the first. So the versions of one type a set imports land one after another, the type standing at the last."""
+    keeps the revision its file gives, the one the set's change before it left that artifact at, and for the first
+    the one the store's type stands at when it brings a version the store does not keep, else 0, as not held. So the
+    versions of one type a set imports land one after another, the type standing at the last."""
     left, read = {}, []
     for change in changes:
-        read.append(left.get(change.artifact_id, 0) if change.op == "import" else change.revision - 1)
+        before = left.get(change.artifact_id)
+        if change.op != "import":
+            read.append(change.revision - 1)
+        else:
+            read.append(_gained_at(held, change) if before is None else before)
         left[change.artifact_id] = change.revision
     return read
+
+
+def _gained_at(held: port.Port, change: Change) -> int:
+    """The revision a type the store holds stands at, for an import of a version of it the store does not keep; 0
+    for any other import, which lands only where nothing is held."""
+    if not (settled.typed(change.left) and held.holds(change.artifact_id)):
+        return 0
+    if change.left["version"] in held.versions(change.artifact_id):
+        return 0
+    return held.artifact(change.artifact_id)["revision"]
 
 
 def _drafted(draft: Draft, operations: list) -> list[Change]:

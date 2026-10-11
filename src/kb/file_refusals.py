@@ -60,15 +60,6 @@ def no_version_offered(file: str, version: str) -> kb_pb2.Fault:
     )
 
 
-def not_fresh(held: int) -> kb_pb2.Fault:
-    """An import into a store that holds artifacts besides the type that describes types."""
-    return kb_pb2.Fault(
-        rule=rules.STORE,
-        message=f"import goes only into a freshly started store; this one holds {held} artifact(s) besides the type "
-                f"that describes types",
-    )
-
-
 def check_failed(errors: int) -> kb_pb2.Fault:
     """An import of a directory whose check found errors, with none skipped."""
     return kb_pb2.Fault(

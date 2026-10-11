@@ -1,5 +1,5 @@
 """kb's own command line, for the operator: set a store up, empty or seeded from a directory of files, check one,
-export one, back one up, restore a backup, check a directory for import, import one into a freshly started store, and
+export one, back one up, restore a backup, check a directory for import, import one into a store, and
 serve one to callers over the network. Nothing else; every other change to content goes through a client.
 
 Each command is one call on the client, or on one of the operator's commands beside it, or, to set a store up seeded

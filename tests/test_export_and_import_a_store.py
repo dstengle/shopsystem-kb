@@ -68,9 +68,9 @@ KEPT, NAMELESS = "kept-name", "Roll back"
 
 @given("a store holding a type for decisions whose decisions carry options")
 def _a_store_with_decisions_that_carry_options(root):
-    """The store imported into, freshly started: the type is brought by the directory, which is the export of a store
-    holding it."""
-    _started(root)
+    """The store imported into holds the type; the directory, the export of a store holding it, brings the same
+    version of it, which is passed over."""
+    define(_started(root), DECISION_TYPE)
 
 
 @given(
@@ -160,6 +160,100 @@ def test_the_operator_imports_a_directory_holding_an_artifact_the_store_already_
 @scenario("export-and-import-a-store.feature", "The operator imports a directory that checks clean into a store, saying which role they are")
 def test_the_operator_imports_a_directory_that_checks_clean_into_a_store_saying_which_rol():
     pass
+
+
+# An import into a store that already holds artifacts (slice 181): what the store holds identically is passed over,
+# with no import entry, and the rest lands.
+
+def _import_into(root, target):
+    """A directory checked for import into the store at root, found clean, then imported there."""
+    checked = _kb("import", "--check", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (checked.returncode, _report(checked)[-1][0]) == (0, "clean"), checked.stdout
+    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    return ran
+
+
+def _import_entries(root):
+    return [entry for entry in held.history(kb_client.connect(root)) if entry.op == "import"]
+
+
+def _export_of(root, to):
+    ran = _kb("export", str(to), cwd=root)
+    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    return {file: (to / file).read_bytes() for file in _files(to)}
+
+
+def test_a_stores_own_export_imported_into_it_lands_nothing_adds_no_history_entry_and_exports_the_same_bytes(
+    root, tmp_path,
+):
+    client = _started(root)
+    _decisions_and_a_work_item(client)
+    _a_note_type_at_two_versions(client)
+    files = _export_of(root, tmp_path / "exported")
+    history = held.history(client)
+
+    _import_into(root, tmp_path / "exported")
+
+    assert held.history(client) == history
+    assert _export_of(root, tmp_path / "exported-again") == files
+
+
+def test_a_type_the_store_holds_gains_a_version_by_import_and_the_versions_it_keeps_are_passed_over(root, tmp_path):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    create(client, "note", {"title": "Held", "summary": "It is held.", "body": "Before the import.\n"})
+    note, target = type_iri("note"), _for_import(tmp_path, _a_note_type_at_two_versions)
+    _put(target, {**_read(target, note, 2), "revision": 7, "title": "Memo"}, 2)
+
+    _import_into(root, target)
+
+    assert held.versions(root)[note] == [1, 2]
+    standing = held.artifact(root, note)
+    assert (standing["version"], standing["revision"], standing["title"]) == (2, 7, "Memo")
+    assert canonical.dump(held.version(root, note, 1)) == (target / _file(note, 1)).read_text("utf-8")
+    assert [(entry.artifact, entry.revision) for entry in _import_entries(root)] == [(note, 7)]
+    assert held.artifact(root, iri("note", "held"))["type"] == version_iri("note", 1)
+
+
+def test_an_import_lands_in_a_store_holding_other_artifacts_which_are_left_as_they_were(root, tmp_path):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": _note_type("summary", "body")})
+    create(client, "note", {"title": "Held", "summary": "It is held.", "body": "Before the import.\n"})
+    before, history = held.names(root), held.history(client)
+    target = _for_import(tmp_path)
+
+    _import_into(root, target)
+
+    assert held.names(root) == sorted([*before, *_exported_names(target)])
+    assert held.history(client)[:len(history)] == history
+    assert sorted(entry.artifact for entry in _import_entries(root)) == _exported_names(target)
+
+
+def test_a_file_whose_item_carries_no_name_is_passed_over_when_it_is_imported_a_second_time(root, tmp_path):
+    client = _started(root)
+    target = _the_decision_file(tmp_path, ["  - title: Roll back\n"])
+    _import_into(root, target)
+    held_before, history = held.holds(root), held.history(client)
+
+    _import_into(root, target)
+
+    assert (held.holds(root), held.history(client)) == (held_before, history)
+
+
+def test_a_file_that_differs_from_what_the_store_holds_at_its_iri_lands_nothing(root, tmp_path):
+    client = _started(root)
+    _decisions_and_a_work_item(client)
+    target = tmp_path / "exported"
+    _export_of(root, target)
+    _put(target, {**_read(target, WEEKLY), "title": "Price reviews happen daily"})
+    _put(target, _decision(iri("decision", "a-third")))
+    before, history = held.holds(root), held.history(client)
+
+    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+    assert ran.returncode != 0
+    assert (held.holds(root), held.history(client)) == (before, history)
 
 
 @scenario(FEATURE, "The operator exports the store to a directory that is empty or does not exist")
