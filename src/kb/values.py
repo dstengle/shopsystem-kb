@@ -83,7 +83,7 @@ def artifact_id(text: str) -> ArtifactId:
     """An artifact's IRI as a request names it, of kb's grammar, which holds neither a version nor a place."""
     if not names.iri(text):
         raise Refused([kb_pb2.Fault(artifact=text, rule=rules.LOCATOR, message=(
-            f"a name is an IRI of kb's grammar, https://, a host and plain segments, never a path; {text!r} is not"
+            f"a name is an IRI, never a path: a name is an IRI of kb's grammar, https://, a host and plain segments; {text!r} is not"
         ))])
     return ArtifactId(text)
 
@@ -93,7 +93,7 @@ def version(text: str) -> Version:
     found = names.version(text)
     if found is None:
         raise Refused([kb_pb2.Fault(artifact=text, rule=rules.LOCATOR,
-            message=f"a version of a type is named by the type's IRI, @ and its number; {text!r} is not")])
+            message=f'a version of a type is named by the type\'s IRI, "@" and its number; {text!r} is not')])
     return Version(Kind(found[0]), found[1])
 
 

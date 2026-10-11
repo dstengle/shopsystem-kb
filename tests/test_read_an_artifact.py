@@ -11,6 +11,7 @@ from calls import (
 import held
 import serving
 from kb import client as kb_client
+from kb import names
 from kb import store as kb_store
 from kb.content import loads
 from kb.contract import kb_pb2
@@ -36,6 +37,11 @@ def test_a_read_by_an_iri_links_point_at_that_the_store_does_not_hold_is_refused
 
 @scenario("name-what-is-asked-for.feature", "A read by an IRI under no type the store holds is refused")
 def test_a_read_by_an_iri_under_no_type_the_store_holds_is_refused():
+    pass
+
+
+@scenario("name-what-is-asked-for.feature", "A name a call carries is an IRI of kb's grammar")
+def test_a_name_a_call_carries_is_an_iri_of_kb_s_grammar():
     pass
 
 
@@ -250,15 +256,23 @@ def _given_the_decision_answered(shown, channels, served, how):
     assert channels == ANSWERED[how](served)
 
 
+@pytest.fixture
+def asked_by_name():
+    """The name a read asked for, filled in by the When that made it."""
+    return {}
+
+
 @when("the client reads an artifact by a name the store holds nothing under", target_fixture="shown")
-def _read_a_name_the_store_lacks(client):
-    return read(client, iri("decision", "nothing-of-the-sort"))
+def _read_a_name_the_store_lacks(client, asked_by_name):
+    asked_by_name["name"] = iri("decision", "nothing-of-the-sort")
+    return read(client, asked_by_name["name"])
 
 
 @then("the read is rejected because the store holds nothing by that name, and the name asked for is given back")
-def _rejected_as_not_held(shown):
-    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(iri("decision", "nothing-of-the-sort"), "not-found")]
-    assert iri("decision", "nothing-of-the-sort") in shown.faults[0].message
+def _rejected_as_not_held(shown, asked_by_name):
+    name = asked_by_name["name"]
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(name, "not-found")]
+    assert name in shown.faults[0].message
 
 
 @given("a store holding a decision that links to an IRI the store does not hold", target_fixture="client")
@@ -278,13 +292,91 @@ def _store_with_a_link_to_an_iri_not_held(root):
 
 
 @when("the client reads an artifact by that IRI", target_fixture="shown")
-def _read_the_iri_a_link_points_at(client):
-    return read(client, iri("decision", "nothing-of-the-sort"))
+def _read_the_iri_a_link_points_at(client, asked_by_name):
+    asked_by_name["name"] = iri("decision", "nothing-of-the-sort")
+    return read(client, asked_by_name["name"])
 
 
 @when(parsers.parse('the client reads an artifact by the name "{name}"'), target_fixture="shown")
 def _read_by_the_name(client, name):
     return read(client, name)
+
+
+@then('the read is rejected because a name is an IRI, never a path')
+def _rejected_as_a_path(shown):
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [("/etc/passwd", "locator")]
+    assert "a name is an IRI, never a path" in shown.faults[0].message
+
+
+@given("a store holding three decisions, one of them superseded", target_fixture="client")
+def _store_with_three_decisions(root):
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    sections = [{"title": "Purpose", "body": "Keep prices current.\n"}, {"title": "Rationale", "body": "It was agreed.\n"}]
+    create(client, "decision", {"title": "Prices are reviewed monthly", "sections": sections})
+    create(client, "decision", {"title": "Price reviews happen weekly", "supersedes": OLDER, "sections": sections})
+    create(client, "decision", {"title": "Restock on Thursdays", "sections": sections})
+    return client
+
+
+@when("the client reads an artifact by an IRI under no type the store holds", target_fixture="shown")
+def _read_an_iri_under_no_type_held(client, asked_by_name):
+    asked_by_name["name"] = iri("invoice", "march")
+    return read(client, asked_by_name["name"])
+
+
+WITH_DOTS = DECISION.replace("/price-reviews", "/../price-reviews")
+HOST, _, PATH = DECISION.removeprefix("https://").partition("/")
+_PADDED = DECISION.rpartition("/")[0] + "/"
+NAMES = {
+    'the decision\'s IRI with the scheme "http"': DECISION.replace("https://", "http://", 1),
+    "the decision's IRI with its host in upper case": f"https://{HOST.upper()}/{PATH}",
+    "the decision's IRI with two dots together in its host": f"https://{HOST.replace('.', '..', 1)}/{PATH}",
+    "the decision's IRI with a segment holding an upper-case letter": DECISION.replace("price", "Price", 1),
+    "the decision's IRI with a segment holding two hyphens together": DECISION.replace("price-reviews", "price--reviews"),
+    "the decision's IRI with an empty segment in its path": DECISION.replace("/decision/", "/decision//", 1),
+    "the decision's IRI followed by a query": DECISION + "?as=of",
+    "the decision's IRI followed by a slash": DECISION + "/",
+    "the decision's IRI with a segment percent-encoded": DECISION.replace("price-reviews", "price%2dreviews"),
+    "a name of 513 characters, otherwise of kb's grammar": _PADDED + "a" * (names.LONGEST + 1 - len(_PADDED)),
+    "a name of 512 characters, of kb's grammar, that the store holds nothing under":
+        _PADDED + "a" * (names.LONGEST - len(_PADDED)),
+    'the decision\'s IRI with "@" in its host': DECISION.replace("https://", "https://someone@", 1),
+    'the decision\'s IRI holding "#" twice': DECISION + "#sections#purpose",
+}
+assert len(NAMES["a name of 512 characters, of kb's grammar, that the store holds nothing under"]) == names.LONGEST
+REASONS = {
+    "a name is an IRI of kb's grammar": "locator",
+    "the store holds nothing by that name": "not-found",
+}
+
+
+@when(parsers.re(f"the client reads an artifact by (?P<which>{'|'.join(map(re.escape, NAMES))})$"), target_fixture="shown")
+def _read_by_a_name_of_the_grammar(client, asked_by_name, which):
+    asked_by_name["name"] = NAMES[which]
+    return read(client, NAMES[which])
+
+
+@then(parsers.re(f"the read is rejected because (?P<why>{'|'.join(map(re.escape, REASONS))})$"))
+def _rejected_for_its_reason(shown, asked_by_name, why):
+    name = asked_by_name["name"]
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(name, REASONS[why])]
+    assert (shown.id, shown.content) == ("", "")
+
+
+@when('the client reads an artifact by a name whose path holds ".."', target_fixture="shown")
+def _read_a_name_with_dots(client, asked_by_name):
+    asked_by_name["name"] = WITH_DOTS
+    return read(client, WITH_DOTS)
+
+
+@then("the read is rejected because a name is an IRI of kb's grammar, and the name asked for is given back")
+def _rejected_as_not_an_iri(shown, asked_by_name):
+    name = asked_by_name["name"]
+    assert [(fault.artifact, fault.rule) for fault in shown.faults] == [(name, "locator")]
+    assert "a name is an IRI of kb's grammar" in shown.faults[0].message
+    assert repr(name) in shown.faults[0].message
 
 
 @then("no content comes back, from inside the store or outside it")

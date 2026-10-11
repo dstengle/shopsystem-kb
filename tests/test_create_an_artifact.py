@@ -4,9 +4,9 @@ import re
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
-    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, PROCESS_TYPE, READING_ORDER, TYPE_OF_TYPES, check, create,
-    define, iri, next_version, placeholders, read, refs, remove, replace, request, slug, start_a_store, type_iri,
-    version_iri,
+    DECISION_TYPE, MISORDERED_DECISION, ORDERED_DECISION_TYPE, PROCESS_TYPE, READING_ORDER, TYPE_OF_TYPES, answer, check,
+    create, creating, define, iri, next_version, placeholders, read, refs, remove, replace, request, slug, start_a_store,
+    type_iri, version_iri,
 )
 import held
 from kb import content, client as kb_client
@@ -130,11 +130,6 @@ def test_a_create_naming_a_type_version_the_store_does_not_hold_is_refused():
 
 @scenario('name-what-is-asked-for.feature', 'A create naming a version of a type not shaped as a type\'s IRI, "@" and a number is refused')
 def test_a_create_naming_a_version_of_a_type_not_shaped_as_a_type_s_iri_and_a_number_is_r():
-    pass
-
-
-@scenario('name-what-is-asked-for.feature', "A name a call carries is an IRI of kb's grammar")
-def test_a_name_a_call_carries_is_an_iri_of_kb_s_grammar():
     pass
 
 
@@ -656,6 +651,26 @@ def _create_with_a_section_without_a_body(client):
 def _rejected_for_a_section_missing_a_key(refused):
     assert (refused.id, refused.revision) == ("", 0)
     assert [(fault.place, fault.rule) for fault in refused.faults] == [("sections/0", "required")]
+
+
+@when(
+    'the client creates an artifact naming the version of a type "../schema/decision@1", with a title and both '
+    "required sections, saying which role and why",
+    target_fixture="attempt",
+)
+def _create_naming_a_version_shaped_as_a_path(client, tmp_path):
+    before = held.everything_in(tmp_path)
+    asked = creating("decision", "Price reviews happen weekly", {"sections": SECTIONS}, message="Record it")
+    asked.type = "../schema/decision@1"
+    return {"response": answer(client.Create(asked)), "before": before, "after": held.everything_in(tmp_path)}
+
+
+@then('the artifact is rejected because a version of a type is named by the type\'s IRI, "@" and its number')
+def _rejected_for_a_version_not_shaped_as_one(attempt):
+    refused = attempt["response"]
+    assert (refused.id, refused.revision) == ("", 0)
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [("../schema/decision@1", "locator")]
+    assert 'a version of a type is named by the type\'s IRI, "@" and its number' in refused.faults[0].message
 
 
 @then("nothing is looked up or written anywhere, inside the store or outside it")

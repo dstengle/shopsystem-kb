@@ -351,6 +351,26 @@ def _rejected_as_not_held(attempt):
     assert iri("decision", "nothing-of-the-sort") in refused.faults[0].message
 
 
+@when(
+    'the client replaces an artifact by a name whose path holds "..", saying which role and why',
+    target_fixture="attempt",
+)
+def _replace_a_name_with_dots(root, client, tmp_path):
+    name = DECISION.replace("/price-reviews", "/../price-reviews")
+    before = held.everything_in(tmp_path)
+    response = replace(client, name, {"sections": SECTIONS}, message="Change it")
+    return {"response": response, "name": name, "before": before, "after": held.everything_in(tmp_path)}
+
+
+@then("the change is rejected because a name is an IRI of kb's grammar, and the name asked for is given back")
+def _rejected_as_not_an_iri(attempt):
+    refused = attempt["response"]
+    assert refused.revision == 0
+    assert [(fault.artifact, fault.rule) for fault in refused.faults] == [(attempt["name"], "locator")]
+    assert "a name is an IRI of kb's grammar" in refused.faults[0].message
+    assert repr(attempt["name"]) in refused.faults[0].message
+
+
 @then("nothing is written anywhere in the store")
 def _nothing_written_in_the_store(attempt):
     assert attempt["after"] == attempt["before"]
