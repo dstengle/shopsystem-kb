@@ -95,7 +95,7 @@ def served_store(store_root, tmp_path):
 
 `kb` is the operator's command line. `kb validate`, `kb export`, `kb import` and `kb backup` find the store upward
 from the working directory, or the one `KB_ROOT` names; `kb init`, `kb import` and a store `kb serve --start` starts
-take the operator's role from `KB_ACTOR`. A refusal is one line on stderr and exit 2.
+take the operator's role from `KB_ACTOR`. A refusal is one line for each fault on stderr and exit 2.
 
 - `kb init <root>` starts an empty store inside an existing directory `<root>`, as `<root>/kb/`.
   `kb init <root> --seed <dir>` starts one holding the files in `<dir>`, as `kb import` lands them; a seed that
@@ -110,7 +110,8 @@ take the operator's role from `KB_ACTOR`. A refusal is one line on stderr and ex
   `<dir>/missingmass.io/kb/type@1.yaml`. Each file gives the artifact's `id`, `type`, `revision` and `title`, then
   its content. It is the layout the contract's `Export` names its files by.
 - `kb import <dir> --check` reads every file of a directory laid out that way and reports each error, naming the
-  file and the rule, writing nothing; exit 1 when it finds one.
+  file and the rule, and each file that would be skipped because it leads to a file with one, writing nothing; exit 1
+  when it finds an error.
 - `kb import <dir>` checks first, then lands everything as one signed set, into a store that is fresh or already
   holds artifacts. An artifact the store already holds at the same IRI with the same content and type version is
   passed over; one it holds with other content or another type version refuses the whole import with rule
@@ -169,7 +170,9 @@ volumes:
 - `agent` stands for your caller: put your caller's image in place of `my-shop-knol-role`.
 - The `build:` URL's `#v${KB_VERSION}` names the tag of the release of kb to build: set `KB_VERSION` to that
   release's version (the `version` in its `pyproject.toml`) in the environment `docker compose` runs in, as in
-  `KB_VERSION=<version> docker compose up`; with none set, compose refuses, saying so. The tag exists once that
+  `KB_VERSION=<version> docker compose up`; with none set, compose refuses, saying so. Every `docker compose`
+  command shown here reads the file and so needs it: export `KB_VERSION`, or put `KB_VERSION=<version>` in a `.env`
+  file beside the compose file, once. The tag exists once that
   release is tagged and the repository is reachable from where you build. Until then, build from a checkout: `build: <path to the checkout>`, or `make image`
   in the checkout and `image: shopsystem-kb:dev` in place of `build:`.
 - The example sets no `restart:` policy on purpose: a refusal (no `KB_ACTOR` on an empty volume, a store it cannot

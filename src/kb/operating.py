@@ -34,7 +34,8 @@ class Operator:
 
     @boundary(examining.Checked, at_one_moment=True)
     def import_check(self, directory: str, held):
-        """A directory read as a set for import into the store, its errors and what would be skipped; nothing written."""
+        """A directory read as a set for import into the store, its errors and what would be skipped; nothing
+        written."""
         return examining.checked(held, roots.directory(directory))
 
     @boundary(examining.Checked, writes=lambda request: True)
