@@ -135,45 +135,52 @@ def _named(target) -> ArtifactId | None:
 
 
 def _skipped(draft: Draft, offered: list[Offered], by_name: dict) -> list[Skipped]:
-    """Each file without an error that leads to a broken one by its links, its implicit link to its type file or, for a
-    type, what it is built on or refers to, with the shortest chain of files that leads there. The type that describes
-    types is the store's own, led to by none."""
+    """Each file without an error that leads to a broken one by its links, its implicit link to its type version's
+    file or, for a type, a version it is built on or refers to, with the shortest chain of files that leads there. The
+    type that describes types is the store's own, led to by none."""
     files = {name: each.file for name, each in by_name.items() if each.id != METASCHEMA_ID}
     broken = {each.file for each in offered if each.errors}
+    holding = _holding(by_name)
     leads = {
-        each.file: [files[name] for target in _leads_to(draft, each, by_name) for name in _named_by(target, by_name)
-                    if name in files]
+        each.file: [files[name] for name in _leads_to(draft, each, by_name, holding) if name in files]
         for each in offered if each.name in files and each.file not in broken
     }
     chains = [(file, _chain(file, leads, broken)) for file in leads]
     return [Skipped(file, chain) for file, chain in chains if chain is not None]
 
 
-def _leads_to(draft: Draft, each: Offered, by_name: dict) -> list[ArtifactId]:
-    """Where an artifact leads: the type files it is read through, then, unless one of them is broken or leads to a
-    broken one, every link it carries, read through the version of its type it names."""
+def _holding(by_name: dict) -> dict[ArtifactId, list[ArtifactId]]:
+    """The names of the files offered, by the IRI of the artifact each holds: one, or, for a type, one for each
+    version the directory brings."""
+    holding: dict[ArtifactId, list[ArtifactId]] = {}
+    for name, each in by_name.items():
+        holding.setdefault(each.id, []).append(name)
+    return holding
+
+
+def _leads_to(draft: Draft, each: Offered, by_name: dict, holding: dict) -> list[ArtifactId]:
+    """The names of the files an artifact leads to: the type version files it is read through, which its implicit
+    link to its type stands for, then, unless one of them is broken or leads to a broken one, the files holding what
+    each link it carries names, the links read through the version of its type it names."""
     beneath = _beneath(each, by_name)
     if _held_back(each, by_name):
         return beneath
-    typed = composition.conformed(each.artifact, draft)
-    return [*beneath, *(link.target for link in links.handed(each.id, each.artifact, draft, typed))]
+    handed = links.handed(each.id, each.artifact, draft, composition.conformed(each.artifact, draft))
+    return [*beneath, *(name for link in handed if not link.implicit for name in holding.get(link.target, []))]
 
 
 def _beneath(each: Offered, by_name: dict) -> list[ArtifactId]:
-    """The type files the directory brings that a file is read through: its type's, other than the store's own type
-    of types, and, for a type, those its schema is built on or refers to by a kb: reference."""
+    """The names of the type version files the directory brings that a file is read through: that of the version of
+    its type it conforms to, other than the store's own type of types, and, for a type, of each version its schema is
+    built on or refers to by a kb: reference, at the number the reference names. No other version of those types."""
     if each.artifact is None:
         return []
-    found = [values.type_of(composition.artifact_kind(each.artifact))]
+    found = [str(composition.conforming(each.artifact))]
     if each.typed:
-        found += composition.referred(each.artifact.get("schema"))
-    return [name for under in dict.fromkeys(found) if under != METASCHEMA_ID for name in _named_by(under, by_name)]
-
-
-def _named_by(target: ArtifactId, by_name: dict) -> list[ArtifactId]:
-    """The names of the files offered that hold the artifact an IRI names: one, or, for a type, one for each version
-    the directory brings."""
-    return [name for name, each in by_name.items() if each.id == target]
+        referred = composition.references(each.artifact.get("schema"))
+        found += [names.versioned(str(to.type_id), to.number) for to in referred]
+    read_through = dict.fromkeys(ArtifactId(name) for name in found)
+    return [name for name in read_through if name in by_name and by_name[name].id != METASCHEMA_ID]
 
 
 def _held_back(each: Offered, by_name: dict, seen: frozenset = frozenset()) -> bool:
