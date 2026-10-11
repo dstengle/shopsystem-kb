@@ -176,6 +176,9 @@ class Reads:
         return [entry_id for (entry_id,) in self._rows("SELECT id FROM entries WHERE moment = ?", moment(at))]
 
 
+    def landed_last(self) -> str:
+        return "".join(entry_id for (entry_id,) in self._rows("SELECT id FROM entries ORDER BY landing DESC LIMIT 1"))
+
 def _linking(source: str, field: str, place: str, target: str, part: str, holder: str | None) -> Linking:
     return Linking(ArtifactId(source), field, place, ArtifactId(target), part, holder)
 

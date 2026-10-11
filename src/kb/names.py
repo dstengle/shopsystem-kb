@@ -66,6 +66,11 @@ def place(artifact_id, number: int | None = None) -> tuple[str, ...]:
     return (host, *segments[:-1], f"{last}{FILE}")
 
 
+def placing(artifact_id, number: int | None = None) -> str:
+    """That place written as one path below the directory, its steps joined by slashes."""
+    return "/".join(place(artifact_id, number))
+
+
 def filed(steps: tuple[str, ...]) -> tuple[str, int | None] | None:
     """The IRI of the artifact the export layout puts at a file's place, given the place's steps below the directory,
     and the version's number when the place is a type version's, None when it is not; None for a place where the

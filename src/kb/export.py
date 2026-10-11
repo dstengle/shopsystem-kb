@@ -5,6 +5,7 @@ Each artifact's entries are written in the order the version of its type it conf
 revision and type version are written as the store holds them, a type's version with the content, the revision and
 the title it was made with."""
 from dataclasses import dataclass, field
+from typing import Iterator, NamedTuple
 
 from kb import canonical, composition, file_refusals, names, settled
 from kb.port import Port
@@ -19,35 +20,57 @@ class Exported:
     faults: list = field(default_factory=list)
 
 
-def written(store: Port, into: Named) -> None:
-    """Every artifact the store holds and every version it holds of every type, all read at one moment, then written
-    as canonical text into the directory, which is made, with any directory above it, when it does not exist. Raises
-    Refused, before the store is read and writing nothing, when it is not a directory or holds anything."""
-    _empty(into)
-    with store.at_one_moment():
-        files = {place: _ordered(store, artifact) for place, artifact in _held(store)}
-    into.path.mkdir(parents=True, exist_ok=True)
-    for (*folders, filename), artifact in files.items():
-        (into.path.joinpath(*folders)).mkdir(parents=True, exist_ok=True)
-        with into.path.joinpath(*folders, filename).open("x", encoding="utf-8") as file:
-            file.write(canonical.dump(artifact))
+class File(NamedTuple):
+    """One file of an export: its place below the export's directory, as `names.placing` writes it, and its
+    canonical text."""
+    place: str
+    text: str
 
 
-def _held(store: Port):
-    """Each file's place with what it gives: every version held of a type at the type's place and the version's
-    number, any other artifact at its own."""
+class Position(NamedTuple):
+    """The position in the history an export's files reflect: the id of the entry landed last at their moment,
+    empty when none has landed (decision/journal-position-is-an-entry)."""
+    entry: str
+
+
+def taken(store: Port) -> Iterator[File | Position]:
+    """The store's files, each read as it is asked for, then the position they reflect. The caller holds the store
+    at one moment from before the first is asked for until the position is given."""
+    yield from files(store)
+    yield Position(store.landed_last())
+
+
+def files(store: Port) -> Iterator[File]:
+    """Every artifact the store holds and every version it holds of every type, each at its place as canonical
+    text, read as it is asked for."""
     for name in store.ids():
         artifact = store.artifact(name)
         if settled.typed(artifact):
             yield from _versions(store, name)
         else:
-            yield names.place(name), artifact
+            yield File(names.placing(name), canonical.dump(_ordered(store, artifact)))
 
 
-def _versions(store: Port, name):
-    """The place of every version the store holds of a type, with the version as its file gives it."""
+def written(store: Port, into: Named) -> None:
+    """Those files, all read at one moment, then written into the directory, which is made, with any directory above
+    it, when it does not exist. Raises Refused, before the store is read and writing nothing, when it is not a
+    directory or holds anything."""
+    _empty(into)
+    with store.at_one_moment():
+        read = list(files(store))
+    into.path.mkdir(parents=True, exist_ok=True)
+    for file in read:
+        (into.path / file.place).parent.mkdir(parents=True, exist_ok=True)
+        with (into.path / file.place).open("x", encoding="utf-8") as made:
+            made.write(file.text)
+
+
+def _versions(store: Port, name) -> Iterator[File]:
+    """Every version the store holds of a type, each at the type's place and the version's number, as its file
+    gives it."""
     for number in store.versions(name):
-        yield names.place(name, number), _version(store.type_version(Version(Kind(str(name)), number)), name)
+        made = _version(store.type_version(Version(Kind(str(name)), number)), name)
+        yield File(names.placing(name, number), canonical.dump(_ordered(store, made)))
 
 
 def _version(made: TypeVersion, name) -> dict:

@@ -98,6 +98,10 @@ class Port(Protocol):
     def entry_ids(self, at: datetime) -> list[str]:
         """The ids of the entries stamped at a moment."""
 
+    def landed_last(self) -> str:
+        """The id of the entry that landed last, by the order entries landed in, whatever their moments; empty when
+        none has landed."""
+
     def exclusive(self) -> ContextManager[None]:
         """A block holding the store's write lock from its start to its end: its reads see every set landed before it,
         no other set lands until it ends, and what `land` lands in it is kept when the block ends without raising.

@@ -728,6 +728,24 @@ def test_a_read_narrowed_to_one_artifact_keeps_landing_order_whatever_else_it_ca
     assert ids(role="writer") == ["late", "early"]
 
 
+def test_the_entry_landed_last_is_the_last_by_landing_whatever_its_moment(store):
+    assert store.landed_last() == ""
+    store.land([], [entry("late", at=T0 + timedelta(hours=2))])
+    assert store.landed_last() == "late"
+    store.land([], [entry("first", seq=1, batch="pair"), entry("second", seq=2, batch="pair")])
+    assert store.landed_last() == "second"  # stamped before "late", landed after it
+
+
+def test_the_entry_landed_last_read_at_one_moment_is_that_moments(opener, store):
+    store.land([], [entry("before")])
+    with store.at_one_moment():
+        assert store.landed_last() == "before"
+        with opener() as other:
+            other.land([], [entry("meanwhile")])
+        assert store.landed_last() == "before"
+    assert store.landed_last() == "meanwhile"
+
+
 def test_an_entry_id_already_held_is_refused(store):
     store.land([put("note/a", {})], [entry("once")])
     before = written(store)
