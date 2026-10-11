@@ -1,16 +1,17 @@
 """The contract's servicer: every rpc, over one store. Called in-process by a client, or hosted by grpc.server (kb.server).
 
 Each rpc is a request in, one call into the domain, a response out, or, for `Export`, a stream of them, inside
-kb.boundary's one boundary; which rpcs write is marked here (`changing`).
+kb.boundary's one boundary; which rpcs write is marked here (`changing`), a set of creates or of replacements writing
+unless its request asks for it to be checked only.
 """
 from kb import changes, check, export, query, read, requests, responses, write
-from kb.boundary import boundary, guarded, streamed
+from kb.boundary import boundary, guarded, never, streamed
 from kb.contract import kb_pb2, kb_pb2_grpc
 
 
-def changing(response):
-    """The boundary of an rpc that writes."""
-    return boundary(response, writes=True)
+def changing(response, unless=never):
+    """The boundary of an rpc that writes, but for a request that says it only reads (`unless`)."""
+    return boundary(response, writes=lambda request: not unless(request))
 
 
 class KbServicer(kb_pb2_grpc.KbServicer):
@@ -37,13 +38,13 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def Remove(self, request, held):
         return responses.removed(self._land(held, changes.removing(request)).results[0])
 
-    @changing(kb_pb2.BatchCreateResponse)
+    @changing(kb_pb2.BatchCreateResponse, unless=changes.checked_only)
     def BatchCreate(self, request, held):
-        return responses.landed(kb_pb2.BatchCreated, self._land(held, changes.creating_many(request)), responses.created)
+        return responses.landed(kb_pb2.BatchCreated, self._set(held, request, changes.creating_many(request)), responses.created)
 
-    @changing(kb_pb2.BatchReplaceResponse)
+    @changing(kb_pb2.BatchReplaceResponse, unless=changes.checked_only)
     def BatchReplace(self, request, held):
-        return responses.landed(kb_pb2.BatchReplaced, self._land(held, changes.replacing_many(request)), responses.replaced)
+        return responses.landed(kb_pb2.BatchReplaced, self._set(held, request, changes.replacing_many(request)), responses.replaced)
 
     @changing(kb_pb2.BatchAddResponse)
     def BatchAdd(self, request, held):
@@ -52,6 +53,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     @changing(kb_pb2.BatchRemoveResponse)
     def BatchRemove(self, request, held):
         return responses.landed(kb_pb2.BatchRemoved, self._land(held, changes.removing_many(request)), responses.removed)
+
+    def _set(self, held, request, change) -> write.Landed:
+        """A set landed under its signature, or, asked to be checked only, answered as it would land."""
+        return write.checked(held, change[0]) if changes.checked_only(request) else self._land(held, change)
 
     def _land(self, held, change) -> write.Landed:
         """A set of changes landed under its signature."""

@@ -160,6 +160,28 @@ def test_each_change_takes_one_signature_and_answers_its_result_or_a_refusal(rpc
     assert _fields(f"{rpc}Response") == {"result", "refusal"}
 
 
+SETS = {
+    "BatchCreateRequest": {"items", "signature", "check_only"},
+    "BatchReplaceRequest": {"items", "signature", "check_only"},
+    "BatchAddRequest": {"items", "signature"},
+    "BatchRemoveRequest": {"items", "signature"},
+}
+
+
+@pytest.mark.parametrize("asked", sorted(SETS))
+def test_only_a_set_of_creates_or_of_replacements_may_be_asked_to_be_checked_only(asked):
+    assert _fields(asked) == SETS[asked]
+    for single in CHANGES.values():
+        assert "check_only" not in _fields(single[0])
+
+
+def test_a_set_is_asked_to_be_checked_only_with_a_flag_that_is_off_unless_set():
+    for asked in ("BatchCreateRequest", "BatchReplaceRequest"):
+        flag = kb_pb2.DESCRIPTOR.message_types_by_name[asked].fields_by_name["check_only"]
+        assert (flag.type, flag.is_repeated) == (flag.TYPE_BOOL, False)
+        assert getattr(kb_pb2, asked)().check_only is False
+
+
 def test_the_small_values_name_kinds_and_places_in_the_specs_words():
     assert _fields("Signature") == {"role", "execution", "message"}
     assert _fields("Refusal") == {"faults"}

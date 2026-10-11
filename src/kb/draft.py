@@ -1,11 +1,11 @@
 """The store as a set's changes would leave it, read like the store: artifacts put here stand over the ones the store
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
-artifact), the links into an artifact, the links to IRIs it does not hold, and those of an artifact that waited
-before it, over the port: those of what it put
+artifact), the links into an artifact, the links to IRIs it does not hold, those of an artifact that waited
+before it, and the parts it leaves an artifact without, over the port: those of what it put
 read through the version each conforms to, the store's standing for everything else, a type it changed restating
 none. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
-from kb import composition, links, names, settled
+from kb import composition, links, names, places, settled
 from kb.port import Port
 from kb.port_values import Linking, TypeVersion, held_waiting
 from kb.values import ArtifactId, Kind, Version, type_of
@@ -128,6 +128,13 @@ class Draft:
         if artifact_id not in self._waited:
             self._waited[artifact_id] = held_waiting(self._store.waiting(artifact_id))
         return self._waited[artifact_id]
+
+    def dropped(self, artifact_id: ArtifactId) -> set[str]:
+        """The places of the parts the store holds in an artifact, as it stood before the draft, that the draft
+        leaves it without; none for an artifact the draft did not put, removed, or put where the store held none."""
+        if artifact_id not in self._pending or artifact_id in self._removed or not self._store.holds(artifact_id):
+            return set()
+        return set(places.parts(self._store.artifact(artifact_id))) - set(places.parts(self._pending[artifact_id]))
 
     def _put(self) -> list[Linking]:
         """Every link of the artifacts the draft put, each read through its own version of its type as the draft

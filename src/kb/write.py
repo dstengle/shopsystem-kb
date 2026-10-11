@@ -6,10 +6,13 @@ nothing, at an IRI a type could be defined at nearer to what it makes or links t
 drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again; a
 set of which the port compares nothing that would show what landed since lands only so, as its draft says
 (`drafting.Drafted.locked`). A fault anywhere refuses the whole set with every fault found, and nothing is written.
-Starting a store and recording a snapshot land through the port too."""
+Starting a store and recording a snapshot land through the port too. A set asked to be checked only (`checked`) is
+drafted the same way, against the store at one moment, and answered as it would land, with nothing handed to the port."""
 from typing import NamedTuple
 
-from kb import canonical, drafting, journal, names, port, port_values, query, refusals, search, settled, store, values
+from kb import (
+    canonical, drafting, journal, names, port, port_values, query, refusals, search, settled, store, values,
+)
 from kb.draft import Draft
 from kb.metaschema import METASCHEMA
 from kb.signatures import Actor, Signed
@@ -28,7 +31,8 @@ class Result(NamedTuple):
 
 
 class Landed(NamedTuple):
-    """A set landed: the name of the set, and what it did to each artifact, in the order of its operations."""
+    """A set landed: the name of the set, and what it did to each artifact, in the order of its operations; or a set
+    checked only, with no name, and what it would do to each."""
     batch: str
     results: list[Result]
 
@@ -71,6 +75,20 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
         return _landing(held, *_readied(held, operations, clock), signed)
 
 
+def checked(held: port.Port, operations: list) -> Landed:
+    """The set as landing it would answer, and nothing landed: drafted and checked as `land` drafts it, against the
+    store as it stands at one moment, a change that says the revision it read compared there. It takes no write lock,
+    reads no clock and mints no id, so it has no name and is never busy. Raises Refused with every fault landing it
+    would give."""
+    with held.at_one_moment():
+        return Landed("", _results(drafting.drafted(held, operations)))
+
+
+def _results(drafted: drafting.Drafted) -> list[Result]:
+    """What the drafted set does to each artifact, in the order of its operations."""
+    return [Result(change.artifact_id, change.revision, change.item) for change in drafted.changes]
+
+
 def _readied(held: port.Port, operations: list, clock: journal.Clock | None) -> tuple[drafting.Drafted, list]:
     """The set drafted against the store as it stands, and its moments, read from the clock once it is drafted: so
     before the write lock is asked for, a set refused or a clock that fails never taking it."""
@@ -90,7 +108,7 @@ def _landing(held: port.Port, drafted: drafting.Drafted, moments: list, signed: 
         for change, text, stamp in zip(drafted.changes, drafted.texts, stamps, strict=True)
     ]
     _landed(held, drafted, entries)
-    return Landed(batch, [Result(change.artifact_id, change.revision, change.item) for change in drafted.changes])
+    return Landed(batch, _results(drafted))
 
 
 def _landed(held: port.Port, drafted: drafting.Drafted, entries: list) -> None:

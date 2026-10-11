@@ -1,6 +1,7 @@
 """A set drafted against the store as it stands: its operations applied in order to a draft, each acting on it as
 the operations before it left it, then every change checked, its content, its links and a type as a type, against the
-store as the whole set leaves it; each change then as the port takes it, with the revisions of
+store as the whole set leaves it, and a set with no other fault refused for every link from outside it into a part one
+of its changes drops; each change then as the port takes it, with the revisions of
 the types it was read through and the IRIs where a type could be defined nearer, as holding nothing (kb.standing);
 and whether the set lands only as drafted while the write lock is held. The imports a set makes of one type's versions are handed one after another, in the order of
 their numbers whatever order the set gave them in, each the version its file names at the revision its file gives, read
@@ -37,6 +38,7 @@ def drafted(held: port.Port, operations: list) -> Drafted:
     draft = Draft(held)
     changes = _drafted(draft, _by_number(operations))
     texts = _serialised(changes)
+    _kept_whole(draft, changes)
     last = {change.artifact_id: index for index, change in enumerate(changes)}
     handed = [
         _handed(draft, change, read, last[change.artifact_id] == index)
@@ -112,6 +114,21 @@ def _faults(draft: Draft, outcome: Change | list) -> list:
     if not faults and typed:
         faults = definitions.faults(outcome.artifact_id, settled.checked(outcome.left), draft)
     return _in_order(draft, outcome, faults)
+
+
+def _kept_whole(draft: Draft, changes: list[Change]) -> None:
+    """Refused, when the set has no other fault, with every link into a part the store held in an artifact and the
+    set leaves it without, from an artifact the set leaves as it is (one the set changes is checked as it leaves it):
+    the artifacts in the order the set first changes them, the links into each in the order of the names of the
+    artifacts holding them, the part named as a link writes it."""
+    dropped = {change.artifact_id: draft.dropped(change.artifact_id) for change in changes}
+    linked = [
+        refusals.still_linked(names.pointing(artifact_id, each.part), each.source, each.place)
+        for artifact_id, gone in dropped.items() if gone
+        for each in draft.links_in(artifact_id) if each.part in gone and not draft.changed(each.source)
+    ]
+    if linked:
+        raise Refused(linked)
 
 
 def _in_order(draft: Draft, change: Change, faults: list) -> list:

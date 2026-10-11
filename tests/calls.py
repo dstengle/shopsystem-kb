@@ -380,16 +380,20 @@ def replaced(artifact_id, content, revision=0, version=""):
     )
 
 
-def create_many(client, items, message="Make several changes", actor=CLIENT):
-    """A BatchCreate of the creates in order, under the client's role unless another actor is given. Returns the
-    answer, faults and all."""
-    return answer(client.BatchCreate(kb_pb2.BatchCreateRequest(items=items, signature=signature(message, actor))))
+def create_many(client, items, message="Make several changes", actor=CLIENT, check_only=False):
+    """A BatchCreate of the creates in order, under the client's role unless another actor is given, asked to be
+    checked only when that is said. Returns the answer, faults and all."""
+    return answer(client.BatchCreate(kb_pb2.BatchCreateRequest(
+        items=items, signature=signature(message, actor), check_only=check_only,
+    )))
 
 
-def replace_many(client, items, message="Make several changes", actor=CLIENT):
-    """A BatchReplace of the replacements in order, under the client's role unless another actor is given. Returns the
-    answer, faults and all."""
-    return answer(client.BatchReplace(kb_pb2.BatchReplaceRequest(items=items, signature=signature(message, actor))))
+def replace_many(client, items, message="Make several changes", actor=CLIENT, check_only=False):
+    """A BatchReplace of the replacements in order, under the client's role unless another actor is given, asked to
+    be checked only when that is said. Returns the answer, faults and all."""
+    return answer(client.BatchReplace(kb_pb2.BatchReplaceRequest(
+        items=items, signature=signature(message, actor), check_only=check_only,
+    )))
 
 
 def added(artifact_id, collection, content, revision=0):
