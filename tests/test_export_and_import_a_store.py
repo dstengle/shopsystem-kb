@@ -172,7 +172,7 @@ def _import_into(root, target):
     checked = _kb("import", "--check", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
     assert (checked.returncode, _report(checked)[-1][0]) == (0, "clean"), checked.stdout
     ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
-    assert (ran.returncode, ran.stderr) == (0, ""), ran.stderr
+    assert (ran.returncode, ran.stderr, ran.stdout) == (0, "", ""), ran.stderr
     return ran
 
 
@@ -340,6 +340,55 @@ def test_a_file_that_differs_from_what_the_store_holds_at_its_iri_lands_nothing(
     ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
 
     assert ran.returncode != 0
+    assert (held.holds(root), held.history(client)) == (before, history)
+
+
+LOOSE_NOTE = {"type": "object", "required": ["title"], "properties": {
+    "title": {"type": "string"}, "summary": {"type": "string"}, "body": {"type": "string"},
+    "flag": {}, "count": {}, "meta": {},
+}}
+HELD_NOTE = iri("note", "held")
+
+
+def _properties_in_another_order(target):
+    """The note type's version declaring its body before its summary: another order to write a note's entries in."""
+    version = _read(target, type_iri("note"), 1)
+    declared = version["schema"]["properties"]
+    version["schema"]["properties"] = {name: declared[name] for name in ("title", "body", "summary", "flag", "count", "meta")}
+    _put(target, version, 1)
+
+
+def _a_number_where_the_store_holds_a_truth(target):
+    _put(target, {**_read(target, HELD_NOTE), "flag": 1})
+
+
+def _a_fraction_where_the_store_holds_a_whole_number(target):
+    _put(target, {**_read(target, HELD_NOTE), "count": 1.0})
+
+
+def _a_mapping_in_another_order(target):
+    _put(target, {**_read(target, HELD_NOTE), "meta": {"a": 2, "b": 1}})
+
+
+@pytest.mark.parametrize("differently", [
+    _properties_in_another_order, _a_number_where_the_store_holds_a_truth,
+    _a_fraction_where_the_store_holds_a_whole_number, _a_mapping_in_another_order,
+], ids=lambda differently: differently.__name__.strip("_").replace("_", " "))
+def test_a_file_written_other_than_the_store_would_write_what_it_holds_is_a_difference_and_nothing_lands(
+    root, tmp_path, differently,
+):
+    client = _started(root)
+    define(client, {"title": "Note", "version": 1, "schema": LOOSE_NOTE})
+    create(client, "note", {"title": "Held", "flag": True, "count": 1, "meta": {"b": 1, "a": 2}})
+    target = tmp_path / "exported"
+    files = _export_of(root, target)
+    differently(target)
+    assert {file: (target / file).read_bytes() for file in files} != files
+    before, history = held.holds(root), held.history(client)
+
+    ran = _kb("import", str(target), cwd=root, env={"KB_ACTOR": OPERATOR})
+
+    assert ran.returncode != 0, ran.stdout
     assert (held.holds(root), held.history(client)) == (before, history)
 
 
