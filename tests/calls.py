@@ -472,6 +472,11 @@ def check(client):
     return answer(client.Check(kb_pb2.CheckRequest()))
 
 
+def placeholders(client):
+    """Every IRI a link points at that the store does not hold, each with the links into it, or the refusal."""
+    return answer(client.Placeholders(kb_pb2.PlaceholdersRequest()))
+
+
 def next_version(client, kind, type_content, sections=None):
     """Write the type of a kind back at its next version, the sections it requires replaced when sections are given,
     so what the store holds of that kind falls behind it. Returns the Replace's answer."""

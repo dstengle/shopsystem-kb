@@ -132,6 +132,10 @@ class KbServicer(kb_pb2_grpc.KbServicer):
     def List(self, request, held):
         return query.listing(held, requests.listing(request))
 
+    @boundary(kb_pb2.PlaceholdersResponse, at_one_moment=True)
+    def Placeholders(self, request, held):
+        return kb_pb2.Placeholders()
+
     @changing(kb_pb2.SnapshotResponse)
     def Snapshot(self, request, held):
         return kb_pb2.Recorded(entry=write.record(held, *requests.snapshot(request), self._clock))

@@ -7,7 +7,7 @@ import pytest
 import held
 from calls import DECISION_TYPE, PROCESS_TYPE, TAG_TYPE, added, create, create_many, created, define, iri, journal
 from calls import listing, read, refs, remove, remove_many, removed, replace, replace_many, replaced, request
-from calls import search, snapshot, start_a_store, add, add_many, check
+from calls import search, snapshot, start_a_store, add, add_many, check, placeholders
 from conftest import OPERATOR, _kb
 from kb import client as kb_client
 from kb.contract import kb_pb2
@@ -36,6 +36,7 @@ RPCS = {
     "BatchReplace": lambda c: replace_many(c, [replaced(DECISION, NEW)]),
     "BatchAdd": lambda c: add_many(c, [added(DECISION, "options", {"title": "Go monthly"})]),
     "BatchRemove": lambda c: remove_many(c, [removed(DECISION)]),
+    "Placeholders": lambda c: placeholders(c),
 }
 
 COMMANDS = {

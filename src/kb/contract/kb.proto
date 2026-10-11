@@ -31,6 +31,7 @@ service Kb {
   rpc BatchReplace(BatchReplaceRequest) returns (BatchReplaceResponse);
   rpc BatchAdd(BatchAddRequest) returns (BatchAddResponse);
   rpc BatchRemove(BatchRemoveRequest) returns (BatchRemoveResponse);
+  rpc Placeholders(PlaceholdersRequest) returns (PlaceholdersResponse);
 }
 
 // Who made an entry in the history: the role, and the piece of work. The
@@ -556,6 +557,43 @@ message BatchRemoved {
 message BatchRemoveResponse {
   oneof outcome {
     BatchRemoved result = 1;
+    Refusal refusal = 2;
+  }
+}
+
+// Asks for every placeholder: each IRI a link points at that the store
+// does not hold.
+message PlaceholdersRequest {
+}
+
+// A link into a placeholder: the artifact holding it, the field, and the
+// link's place in that artifact.
+message Linking {
+  string artifact = 1;
+  string field = 2;
+  string place = 3;
+}
+
+// An IRI linked to and not held, or, when its links point into a part,
+// that IRI and the part's place, with every link into it, in the order of
+// the names of the artifacts holding them. Nothing is stored for it: it is
+// there while a link points at it.
+message Placeholder {
+  string id = 1;
+  string part = 2;  // the place of the part the links point into; empty for the IRI itself
+  repeated Linking links = 3;
+}
+
+// The placeholders, in the order of their names. Links to what the store
+// holds are left out.
+message Placeholders {
+  repeated Placeholder placeholders = 1;
+}
+
+// A refusal: no store found, or one that cannot be read.
+message PlaceholdersResponse {
+  oneof outcome {
+    Placeholders result = 1;
     Refusal refusal = 2;
   }
 }

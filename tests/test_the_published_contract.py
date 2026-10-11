@@ -2,8 +2,8 @@
 `text` and `NotCanonical`; that `NotCanonical` has `path`; `kb.client.connect`, and its `clock` keyword, defaulting to
 None; `kb.contract.kb_pb2`'s being importable, as package `kb.v2`; the changes `Create`, `Replace`, `Add` and `Remove`,
 each taking one `Signature` and answering its result or a refusal, and the small values naming kinds `kind` and places
-`place`; the reads `Read`, `List`, `Follow`, `Search` and `History`, the signed `Snapshot` and the `Check`, each
-answering its result or a refusal; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
+`place`; the reads `Read`, `List`, `Follow`, `Search`, `History` and `Placeholders`, the signed `Snapshot` and the
+`Check`, each answering its result or a refusal; that a placeholder is given by its IRI, its part and the links into it; that no rpc starts a store, `kb.init` does, raising `kb.NotStarted` with its
 faults; that each item an `BatchAdd` adds names the artifact it went to; and the set of kb's own rule names against
 the spec's list. It does not pin the wording of any fault."""
 import dataclasses
@@ -177,6 +177,7 @@ READS = {
     "History": ("HistoryRequest", {"artifact", "role", "execution", "since", "batch"}, "Entries", {"entries"}),
     "Snapshot": ("SnapshotRequest", {"signature", "artifacts"}, "Recorded", {"entry"}),
     "Check": ("CheckRequest", set(), "Checked", {"violations", "stale"}),
+    "Placeholders": ("PlaceholdersRequest", set(), "Placeholders", {"placeholders"}),
 }
 
 
@@ -190,6 +191,15 @@ def test_each_read_the_snapshot_and_the_check_answer_their_result_or_a_refusal(r
     outcome = method.output_type.oneofs_by_name["outcome"]
     assert [(field.name, field.message_type.name) for field in outcome.fields] == [("result", result), ("refusal", "Refusal")]
     assert _fields(f"{rpc}Response") == {"result", "refusal"}
+
+
+def test_a_placeholder_is_given_by_its_iri_its_part_and_the_links_into_it():
+    assert _fields("Placeholder") == {"id", "part", "links"}
+    assert _fields("Linking") == {"artifact", "field", "place"}
+    assert _field_type("Placeholders", "placeholders") == "Placeholder"
+    assert _field_type("Placeholder", "links") == "Linking"
+    for message, field in (("Placeholders", "placeholders"), ("Placeholder", "links")):
+        assert kb_pb2.DESCRIPTOR.message_types_by_name[message].fields_by_name[field].is_repeated
 
 
 def test_a_read_asks_for_one_level():

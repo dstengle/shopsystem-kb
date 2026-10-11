@@ -90,6 +90,9 @@ class Client:
     def List(self, request, timeout=None):
         return self._call("List", request, kb_pb2.ListResponse)
 
+    def Placeholders(self, request, timeout=None):
+        return self._call("Placeholders", request, kb_pb2.PlaceholdersResponse)
+
     def Snapshot(self, request, timeout=None):
         return self._call("Snapshot", request, kb_pb2.SnapshotResponse)
 

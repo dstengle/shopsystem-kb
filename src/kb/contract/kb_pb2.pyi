@@ -642,3 +642,41 @@ class BatchRemoveResponse(_message.Message):
     result: BatchRemoved
     refusal: Refusal
     def __init__(self, result: _Optional[_Union[BatchRemoved, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
+
+class PlaceholdersRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class Linking(_message.Message):
+    __slots__ = ("artifact", "field", "place")
+    ARTIFACT_FIELD_NUMBER: _ClassVar[int]
+    FIELD_FIELD_NUMBER: _ClassVar[int]
+    PLACE_FIELD_NUMBER: _ClassVar[int]
+    artifact: str
+    field: str
+    place: str
+    def __init__(self, artifact: _Optional[str] = ..., field: _Optional[str] = ..., place: _Optional[str] = ...) -> None: ...
+
+class Placeholder(_message.Message):
+    __slots__ = ("id", "part", "links")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    PART_FIELD_NUMBER: _ClassVar[int]
+    LINKS_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    part: str
+    links: _containers.RepeatedCompositeFieldContainer[Linking]
+    def __init__(self, id: _Optional[str] = ..., part: _Optional[str] = ..., links: _Optional[_Iterable[_Union[Linking, _Mapping]]] = ...) -> None: ...
+
+class Placeholders(_message.Message):
+    __slots__ = ("placeholders",)
+    PLACEHOLDERS_FIELD_NUMBER: _ClassVar[int]
+    placeholders: _containers.RepeatedCompositeFieldContainer[Placeholder]
+    def __init__(self, placeholders: _Optional[_Iterable[_Union[Placeholder, _Mapping]]] = ...) -> None: ...
+
+class PlaceholdersResponse(_message.Message):
+    __slots__ = ("result", "refusal")
+    RESULT_FIELD_NUMBER: _ClassVar[int]
+    REFUSAL_FIELD_NUMBER: _ClassVar[int]
+    result: Placeholders
+    refusal: Refusal
+    def __init__(self, result: _Optional[_Union[Placeholders, _Mapping]] = ..., refusal: _Optional[_Union[Refusal, _Mapping]] = ...) -> None: ...
