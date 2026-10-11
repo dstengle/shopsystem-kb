@@ -133,11 +133,25 @@ def moves_to(artifact: dict, version: values.Version, corpus) -> bool:
 def nearest_type(artifact_id: values.ArtifactId, corpus) -> values.ArtifactId | None:
     """The type an IRI belongs to: the nearest IRI it sits under that the corpus holds a type at. None when it sits
     under no held type."""
-    for above in names.above(artifact_id):
-        type_id = values.ArtifactId(above)
-        if corpus.holds(type_id) and settled.typed(corpus.artifact(type_id)):
-            return type_id
-    return None
+    return next((each for each in _above(artifact_id) if _typed_at(each, corpus)), None)
+
+
+def nearest_was(artifact_id: values.ArtifactId, type_id: values.ArtifactId, corpus) -> bool:
+    """Whether an IRI belonged to a type the corpus no longer holds: it sits under that type's IRI, and under no
+    nearer IRI the corpus holds a type at."""
+    for each in _above(artifact_id):
+        if each == type_id or _typed_at(each, corpus):
+            return each == type_id
+    return False
+
+
+def _above(artifact_id: values.ArtifactId) -> list[values.ArtifactId]:
+    return [values.ArtifactId(each) for each in names.above(artifact_id)]
+
+
+def _typed_at(type_id: values.ArtifactId, corpus) -> bool:
+    """Whether the corpus holds a type at an IRI."""
+    return corpus.holds(type_id) and settled.typed(corpus.artifact(type_id))
 
 
 def kind_of(artifact_id: values.ArtifactId, corpus) -> values.Kind:

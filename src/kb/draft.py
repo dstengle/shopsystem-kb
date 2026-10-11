@@ -1,7 +1,8 @@
 """The store as a set's changes would leave it, read like the store: artifacts put here stand over the ones the store
 holds, artifacts removed here are no longer held, and nothing is written. It answers the corpus's reads (holds,
-artifact) and the links into an artifact, over the port: those of what it put read through the version each conforms
-to, the store's standing for everything else, a type it changed restating none. A type it reads from the store is kept as first read, so
+artifact), the links into an artifact and the links to IRIs it does not hold, over the port: those of what it put
+read through the version each conforms to, the store's standing for everything else, a type it changed restating
+none. A type it reads from the store is kept as first read, so
 every check of a set reads one version of it, and the revision it was read at is what the set hands the port."""
 from kb import composition, links, names, settled
 from kb.port import Linking, Port, TypeVersion
@@ -104,17 +105,28 @@ class Draft:
         draft leaves it, one whose own version of its type the draft does not keep carrying none."""
         read_here = set(self._pending) | self._removed
         held = [each for each in self._store.links_in(target) if each.source not in read_here]
+        return _by_source(held + [each for each in self._put() if each.target == target])
+
+    def waiting(self) -> list[Linking]:
+        """Every link from an artifact the draft holds to an IRI the draft does not hold, in the order of the names
+        of the artifacts holding them: the store's, but for what the draft changed, which is read here as the draft
+        leaves it, as `links_in` reads it."""
+        read_here = set(self._pending) | self._removed
+        held = [each for each in self._store.waiting() if each.source not in read_here]
+        return _by_source([each for each in held + self._put() if not self.holds(each.target)])
+
+    def _put(self) -> list[Linking]:
+        """Every link of the artifacts the draft put, each read through its own version of its type as the draft
+        keeps it, never the link to its type."""
         sources = [
             (source, artifact, self._own(artifact)) for source, artifact in self._pending.items()
             if source not in self._removed
         ]
-        drafted = [
+        return [
             Linking(source, link.field, link.place, link.target, link.part)
             for source, artifact, own in sources if own is not None
-            for link in links.handed(source, artifact, self, own)
-            if link.target == target and not link.implicit
+            for link in links.handed(source, artifact, self, own) if not link.implicit
         ]
-        return sorted(held + drafted, key=lambda each: names.order(each.source))
 
     def _own(self, artifact: dict) -> dict | None:
         """The version of its type an artifact the draft put conforms to, as the draft keeps it; None when it keeps
@@ -122,3 +134,8 @@ class Draft:
         version = composition.conforming(artifact)
         found = composition.kept(type_of(version.kind), version.number, self)
         return found and found.content
+
+
+def _by_source(found: list[Linking]) -> list[Linking]:
+    """Links in the order of the names of the artifacts holding them, each artifact's as they were found."""
+    return sorted(found, key=lambda each: names.order(each.source))

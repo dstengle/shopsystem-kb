@@ -90,9 +90,9 @@ def _acted(draft: Draft, operation) -> Change | list:
 
 def _faults(draft: Draft, outcome: Change | list) -> list:
     """An operation's faults: those it was refused with as it acted; for a removal, every link the set leaves pointing
-    at what it removed; for a change, those it found as it acted, then what it left against its type as the set leaves
-    it, and, for every change the set makes to a type, each making a version that is kept, what it left checked as a
-    type."""
+    at what it removed, then what stands in the way of a type's removal; for a change, those it found as it acted,
+    then what it left against its type as the set leaves it, and, for every change the set makes to a type, each
+    making a version that is kept, what it left checked as a type."""
     if not isinstance(outcome, Change):
         return outcome
     if outcome.left is None:
@@ -113,14 +113,18 @@ def removes_a_type(change: Change) -> bool:
 
 
 def _read_by(draft: Draft, removal: Change) -> list:
-    """What still stands in the way of a type's removal once another type the set leaves reads it: each type any held
-    version of which reads a version of it, and each artifact of its kind the set leaves, in the order of their
-    names. None for a type no other reads, whose artifacts the port finds, and for anything that is not a type."""
+    """What still stands in the way of a type's removal as the set leaves the store: each type any held version of
+    which reads a version of it, each artifact holding a link to an IRI not held that belonged to it, and, beside
+    either, each artifact of its kind, every one once, in the order of their names. None for a type nothing reads or
+    waits under, whose artifacts the port finds, and for anything that is not a type."""
     removed = removal.artifact_id
-    readers = composition.readers(removed, draft) if removes_a_type(removal) else []
-    if not readers:
+    if not removes_a_type(removal):
         return []
-    standing = sorted([*readers, *draft.ids(values.Kind(str(removed)))], key=names.order)
+    waiting = [each.source for each in draft.waiting() if composition.nearest_was(each.target, removed, draft)]
+    standing = {*composition.readers(removed, draft), *waiting}
+    if not standing:
+        return []
+    standing = sorted(standing | set(draft.ids(values.Kind(str(removed)))), key=names.order)
     return [refusals.still_linked(str(removed), each, "") for each in standing]
 
 

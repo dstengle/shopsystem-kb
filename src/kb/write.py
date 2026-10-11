@@ -3,7 +3,8 @@ settled by the clock and the set handed to the port, which lands every change an
 set in one transaction. When another change lands between the draft and the landing, an artifact the set changes or a
 type it was read through having moved or been removed, the port refuses it, and the set is
 drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again; so
-is a set that removes a type, whose draft found no other type reading it, which the port compares nothing of. A
+is a set that removes a type, whose draft found no other type reading it and no link waiting on an IRI under it, of
+which the port compares nothing. A
 fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store and recording a
 snapshot land through the port too."""
 from typing import NamedTuple
@@ -56,8 +57,9 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
     """The set drafted against the store as it stands, each entry's moment read from the clock, then landed. When
     another change lands between the draft and the landing, the set is drafted, stamped and landed again while the
     port holds the write lock, where a change that says the revision it read is compared again, and refused if its
-    artifact moved; a set that removes a type lands only there, where no type reading it can be made between its
-    draft and its landing. Raises Refused with every fault, having written nothing."""
+    artifact moved; a set that removes a type lands only there, where no type reading it can be made, and no link to
+    an IRI not held under it landed, between its draft and its landing. Raises Refused with every fault, having
+    written nothing."""
     drafted, moments = _readied(held, operations, clock)
     if not _lands_only_locked(drafted):
         try:
@@ -77,7 +79,7 @@ def _readied(held: port.Port, operations: list, clock: journal.Clock | None) -> 
 
 def _lands_only_locked(drafted: drafting.Drafted) -> bool:
     """Whether a set lands only as drafted while the write lock is held: one that removes a type, which the port
-    compares nothing of that would show a type reading it was made since."""
+    compares nothing of that would show a type reading it was made since, or a link landed that waits under it."""
     return any(drafting.removes_a_type(change) for change in drafted.changes)
 
 

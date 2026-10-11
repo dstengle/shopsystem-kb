@@ -5,7 +5,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from calls import (
     DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, change_type, check, create, define, iri, kb_ref, listing,
-    next_version, read, refs, remove, request, slug, targets, type_iri, version_iri,
+    next_version, read, refs, remove, request, slug, tagged_decision_type, targets, type_iri, version_iri,
 )
 import held
 from kb.content import loads
@@ -882,3 +882,37 @@ def _the_first_type_and_its_versions_still_held(client, read_by_another):
         made = read(client, f"{first}@{number}", whole=True)
         assert not made.faults, made.faults
         assert loads(made.content) == {"version": number, "schema": schema}
+
+
+WAITED_ON, WAITING = iri("tag", "pricing"), iri("decision", "ship-weekly")
+
+
+@given("a tag type the store holds, with no artifacts of its kind, and a decision that links to a tag the store does not hold")
+def _a_tag_type_a_link_waits_under(client):
+    define(client, TAG_TYPE)
+    define(client, tagged_decision_type())
+    create(client, "decision", {"title": "Ship weekly", "tags": [WAITED_ON], "sections": [
+        {"title": "Purpose", "body": "Ship what is ready.\n"}, {"title": "Rationale", "body": "Small steps.\n"},
+    ]})
+    assert list(listing(client, "tag", ids_only=True).ids) == []
+    assert read(client, WAITED_ON).faults
+
+
+@when("the client removes the tag type", target_fixture="attempt")
+def _remove_the_tag_type(root, client):
+    before = held.holds(root)
+    return {"response": remove(client, type_iri("tag")), "before": before, "after": held.holds(root)}
+
+
+@then("the removal is rejected because something still points at it, naming the decision")
+def _rejected_naming_the_decision(attempt):
+    faults = attempt["response"].faults
+    assert [(fault.artifact, fault.place, fault.rule) for fault in faults] == [(WAITING, "", "on_delete")]
+    assert repr(type_iri("tag")) in faults[0].message
+    assert attempt["after"] == attempt["before"]
+
+
+@then("the store still holds the tag type")
+def _the_tag_type_still_held(client):
+    standing = read(client, type_iri("tag"), whole=True)
+    assert not standing.faults, standing.faults

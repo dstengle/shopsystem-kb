@@ -376,6 +376,18 @@ def test_a_link_to_an_iri_not_held_is_refused_once_the_type_it_carries_has_been_
     assert store.ids() == []
 
 
+def test_the_port_lands_the_removal_of_a_type_a_link_waits_under_which_kb_refuses_before_it_hands_the_set(store):
+    """The port keeps nothing of the type a waiting link was handed under and knows nothing of which IRIs sit under
+    which, so it lands what it is handed; kb refuses such a removal as it drafts it, holding the write lock
+    (tests/test_a_type_removed_while_a_link_waits_under_it.py). The link still reads as waiting."""
+    land(store, put("schema/decision", {"title": "Decision"}))
+    about = link("about", "about", "decision/later", ["decision"], under="schema/decision")
+    land(store, put("note/n", {"about": "decision/later"}, links=[about]))
+    land(store, removal("schema/decision", 1))
+    assert not store.holds(name("schema/decision"))
+    assert store.waiting() == [port.Linking(name("note/n"), "about", "about", name("decision/later"), "")]
+
+
 def test_two_new_artifacts_in_one_set_that_link_each_other_land(store):
     land(store,
          put("note/a", {"to": "note/b"}, links=[link("to", "to", "note/b", ["note"])]),
