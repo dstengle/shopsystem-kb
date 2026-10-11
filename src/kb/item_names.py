@@ -1,7 +1,8 @@
 """Item names: the name a title gives, the numbering that keeps an item's name free, the names the items of an
-artifact's collections are given, those they carry kept, and the names they held, the names a create gives its items
-that an item may not carry, and the names a revision hands back that the store could not have given. Nothing here reads or writes; whether a name is taken is asked of the caller. The grammar of a plain name
-is `names.py`'s."""
+artifact's collections are given, those they carry kept, the names a create gives its items that an item may not
+carry, and the names a revision hands back that the store could not have given, each in every collection at every
+depth. Nothing here reads or writes; whether a name is taken is asked of the caller. The grammar of a plain name is
+`names.py`'s."""
 import re
 from typing import Callable, NamedTuple
 
@@ -54,15 +55,6 @@ def items(parts: dict, node: dict, inner: Callable[[dict], dict]) -> None:
             items(inner(part), item, inner)
 
 
-def held(parts: dict, node: dict) -> dict[str, set]:
-    """The names the items of each collection the node holds carry; an item that is not a set of named entries, or a
-    collection that is not a list, carries none."""
-    return {
-        collection: {item.get("id") for item in _listed(node, collection) if isinstance(item, dict)}
-        for collection in parts
-    }
-
-
 class Misnamed(NamedTuple):
     """A name on an item that it may not carry: the place of its collection and where in it the item stands, the
     name, and why not: "not-plain", "repeated", or, handed back on a change, "unknown" when no item of that
@@ -73,24 +65,34 @@ class Misnamed(NamedTuple):
     why: str
 
 
-def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misnamed]:
-    """Every name on an item of a collection that is not the name of an item the collection held, given once. held
-    is the names each collection held before the change."""
+def handed_back(
+    parts: dict, node: dict, before: dict, inner: Callable[[dict], dict], under: tuple = (),
+) -> list[Misnamed]:
+    """Every name a revision's items carry that the store could not have given, in every collection at every depth,
+    as `items` walks them: one that is not a plain name, one an item before it in its collection carries, and one no
+    item of that collection had. before is the node as it was held, an item of it the item that had its name, and
+    nothing for an item that had none. Each collection is said by its place, as `given` says it."""
     found = []
-    for collection in schema.get("parts", {}):
-        seen = set()
-        for index, item in enumerate(_listed(content, collection)):
-            if not isinstance(item, dict) or "id" not in item:
+    for collection, part in parts.items():
+        here, seen = names.placed((*under, collection)), set()
+        had = {item["id"]: item for item in _listed(before, collection) if _named(item)}
+        for index, item in enumerate(_listed(node, collection)):
+            if not isinstance(item, dict):
                 continue
-            name = item["id"]
-            if not isinstance(name, str) or not names.plain(name):
-                found.append(Misnamed(collection, index, name, "not-plain"))
-            elif name in seen:
-                found.append(Misnamed(collection, index, name, "repeated"))
-            elif name not in held.get(collection, set()):
-                found.append(Misnamed(collection, index, name, "unknown"))
-            seen.add(name)
+            if "id" in item:
+                found += _unfit(here, index, item["id"], seen) or _unknown(here, index, item, had)
+            was = had.get(item["id"], {}) if _named(item) else {}
+            found += handed_back(inner(part), item, was, inner, (here, str(index)))
     return found
+
+
+def _named(item) -> bool:
+    """Whether an item carries a name that is text, the only kind the store gives."""
+    return isinstance(item, dict) and isinstance(item.get("id"), str)
+
+
+def _unknown(collection: str, index: int, item: dict, had: dict) -> list[Misnamed]:
+    return [] if item["id"] in had else [Misnamed(collection, index, item["id"], "unknown")]
 
 
 def given(parts: dict, node: dict, inner: Callable[[dict], dict], under: tuple = ()) -> list[Misnamed]:
@@ -110,7 +112,8 @@ def given(parts: dict, node: dict, inner: Callable[[dict], dict], under: tuple =
 
 
 def _unfit(collection: str, index: int, name, seen: set) -> list[Misnamed]:
-    """Why a name given to an item cannot be its name, if it cannot; a name that can is seen from here on."""
+    """Why a name given to an item cannot be its name, if it cannot: it is not text, or not a plain name, or an
+    item seen before it carries it; a plain name is seen from here on."""
     if not isinstance(name, str) or not names.plain(name):
         return [Misnamed(collection, index, name, "not-plain")]
     if name in seen:

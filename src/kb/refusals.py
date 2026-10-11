@@ -129,7 +129,7 @@ def unlanded(artifact: str, place: str, target: str) -> kb_pb2.Fault:
 
 
 MISNAMED = {
-    "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
+    "not-plain": "a name is a plain name of lower-case letters, digits and single hyphens; {unfit}",
     "repeated": "the items of a collection each have a name of their own; {name!r} is on more than one",
     "unknown": "a name on an item names an item already in that collection; {collection!r} held no item named {name!r}",
 }
@@ -138,12 +138,18 @@ MISNAMED = {
 def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     return kb_pb2.Fault(
         artifact=str(artifact_id), place=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
-        message=MISNAMED[found.why].format(name=found.name, collection=found.collection),
+        message=MISNAMED[found.why].format(name=found.name, collection=found.collection, unfit=_unfit(found.name)),
     )
 
 
+def _unfit(name) -> str:
+    """What is said of a name given that is not a plain name: text as it was given, and anything else, which has no
+    one way of being written, as not text."""
+    return f"{name!r} is not" if isinstance(name, str) else "a name is text, and what was given is not"
+
+
 PART_MISNAMED = {
-    "not-plain": "a part's name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
+    "not-plain": "a part's name is a plain name of lower-case letters, digits and single hyphens; {unfit}",
     "repeated": "a part's name is unique in its collection; {name!r} is on more than one",
 }
 
@@ -152,7 +158,7 @@ def misnamed_part(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     """A name a create gives a part that the part may not carry, at the part's place in what the create carried."""
     return kb_pb2.Fault(
         artifact=str(artifact_id), place=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
-        message=PART_MISNAMED[found.why].format(name=found.name),
+        message=PART_MISNAMED[found.why].format(name=found.name, unfit=_unfit(found.name)),
     )
 
 

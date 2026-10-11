@@ -1,8 +1,8 @@
 """What names a create's artifact and the items in what an operation puts in the draft: the IRI a create gives, which
 the type it names must be the nearest held one under and nothing may be held at, and a type's free of any other
-type's place (kb.standing); and the items of a new or a revised artifact named, those a create names and those it held kept
-(kb.item_names decides what a name looks like and whether it is free); and a type's content given the number of its
-version."""
+type's place (kb.standing); and the items of a new or a revised artifact named, those a create names and those it
+held kept (kb.item_names decides what a name looks like and whether it is free); and a type's content given the
+number of its version."""
 from kb import composition, item_names, refusals, standing, values
 from kb.draft import Draft
 
@@ -30,7 +30,8 @@ def items(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content:
     names keeping the names it gives them. Returns the faults of the names it gives that an item may not carry, with
     any of which no item is named."""
     inner = _parts(draft)
-    misnamed = [refusals.misnamed_part(artifact_id, found) for found in item_names.given(declared["parts"], content, inner)]
+    given = item_names.given(declared["parts"], content, inner)
+    misnamed = [refusals.misnamed_part(artifact_id, found) for found in given]
     if not misnamed:
         item_names.items(declared["parts"], content, inner)
     return tuple(misnamed)
@@ -38,11 +39,12 @@ def items(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content:
 
 def revised(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content: dict, current: dict) -> tuple:
     """The items of a revised artifact's content named, those it held kept. Returns the faults of the names its items
-    hand back that the artifact did not hold, with any of which no item is named."""
-    held = item_names.held(declared["parts"], current)
-    misnamed = [refusals.misnamed(artifact_id, found) for found in item_names.handed_back(declared, content, held)]
+    hand back that the artifact did not hold, in a collection at any depth, with any of which no item is named."""
+    inner = _parts(draft)
+    handed_back = item_names.handed_back(declared["parts"], content, current, inner)
+    misnamed = [refusals.misnamed(artifact_id, found) for found in handed_back]
     if not misnamed:
-        item_names.items(declared["parts"], content, _parts(draft))
+        item_names.items(declared["parts"], content, inner)
     return tuple(misnamed)
 
 

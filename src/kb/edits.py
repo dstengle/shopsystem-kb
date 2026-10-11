@@ -110,7 +110,8 @@ def _ends_at(draft: Draft, artifact_id: ArtifactId, current: dict, named: values
 
 
 def _append(draft: Draft, addition: changes.Add) -> Change:
-    """One item put at the end of a collection the artifact's type declares, and named there."""
+    """One item put at the end of a collection the artifact's type declares, and named there, unless a name inside
+    it refuses it, when it is given none."""
     locator = addition.locator
     _as_read(draft, locator.id, addition.expected)
     if addition.item.problems:
@@ -127,7 +128,8 @@ def _append(draft: Draft, addition: changes.Add) -> Change:
     item = copy.deepcopy(addition.item.tree)
     spot.holder.setdefault(spot.key, []).append(item)
     faults = _revise(draft, locator.id, current, content, composition.conforming(current))
-    return Change("append", locator.id, names.placed((*locator.place, item["id"])), item["id"], faults=faults)
+    named = (item["id"],) if "id" in item else ()
+    return Change("append", locator.id, names.placed((*locator.place, *named)), "".join(named), faults=faults)
 
 
 def _collections_at(draft: Draft, locator: values.Locator) -> dict:

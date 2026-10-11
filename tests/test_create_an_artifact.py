@@ -1,6 +1,7 @@
 import copy
 import re
 
+import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
 from calls import (
@@ -1397,28 +1398,37 @@ def _parts_held(client, collection):
     parsers.parse('the client creates a decision carrying an option it names "{name}", saying which role and why'),
     target_fixture="created",
 )
-def _create_naming_an_option(client, name):
-    return _create_with_parts(client, "options", [{"title": "Go monthly"}, {"id": name, "title": "Review prices every week"}])
+def _create_naming_an_option(client, sent, name):
+    sent["options"] = [{"title": "Go monthly"}, {"id": name, "title": "Review prices every week"}]
+    sent["named"] = sent["options"][1]
+    return _create_with_parts(client, "options", sent["options"])
+
+
+@pytest.fixture
+def sent():
+    """The options a create carried and the one of them it named, filled in by the When that made it."""
+    return {}
 
 
 @then(parsers.parse('the option is named "{name}"'))
-def _the_option_is_named(client, created, name):
+def _the_option_is_named(client, created, sent, name):
     assert not created.faults, created.faults
-    assert _parts_held(client, "options")[1] == {"id": name, "title": "Review prices every week"}
+    assert sent["named"]["id"] == name
+    assert _parts_held(client, "options")[sent["options"].index(sent["named"])] == sent["named"]
 
 
 @then("the artifact is rejected because a part's name is a plain name")
-def _rejected_as_not_a_plain_name(created):
+def _rejected_as_not_a_plain_name(created, sent):
     assert (created.id, created.revision) == ("", 0)
     assert [(fault.artifact, fault.rule) for fault in created.faults] == [(WITH_PARTS, "item-name")]
     assert created.faults[0].message.startswith("a part's name is a plain name")
-    assert repr("Keep Weekly!") in created.faults[0].message
+    assert repr(sent["named"]["id"]) in created.faults[0].message
 
 
 @then("the refusal names the place of that option")
-def _the_refusal_names_the_options_place(created):
+def _the_refusal_names_the_options_place(created, sent):
     [fault] = created.faults
-    assert fault.place == "options/1/id"
+    assert fault.place == f"options/{sent['options'].index(sent['named'])}/id"
 
 
 UNNAMED = {
@@ -1475,4 +1485,4 @@ def _given_the_step_named_draft(shown):
     given = shown["given"]
     assert not given.faults, given.faults
     assert shown["asked"] == f"{given.id}#steps/draft"
-    assert RESTOCK_STEPS[1] in content.loads(given.content)["steps"]
+    assert content.loads(given.content) == RESTOCK_STEPS[1]

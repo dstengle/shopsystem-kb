@@ -51,10 +51,10 @@ def test_a_read_by_a_parts_iri_gives_what_the_read_by_its_place_gives(client, pl
     assert by_iri == client.Read(kb_pb2.ReadRequest(locator=_by_place(place), **level))
 
 
-def test_a_read_by_a_parts_iri_is_answered_with_the_artifact_holding_the_part_as_a_read_by_its_place_is(client):
+def test_a_read_by_a_parts_iri_is_answered_with_the_part_alone_beside_its_artifacts_name(client):
     read = answer(client.Read(kb_pb2.ReadRequest(locator=_by_iri("options/keep-weekly"), whole=kb_pb2.ReadRequest.Whole())))
     assert read.id == DECISION
-    assert OPTIONS[0] in loads(read.content)["options"]
+    assert loads(read.content) == OPTIONS[0]
 
 
 @pytest.mark.parametrize("place", ["options/no-such-option", "options/keep-weekly/steps/none", "no-such/place"])
