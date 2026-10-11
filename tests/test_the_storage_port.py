@@ -157,6 +157,16 @@ def test_a_change_read_through_a_type_that_has_since_moved_is_refused_and_writes
     land(store, port.Change(name("note/b"), {"title": "B"}, revision=1, through=((name("schema/note"), 2),), kind=kind("note")))
     assert store.holds(name("note/b"))
 
+def test_a_change_read_through_a_type_that_has_since_been_removed_is_refused_and_writes_nothing(store):
+    """A removed type stands at no revision, so it differs from every revision it was read at."""
+    land(store, put("schema/note", {"title": "Note"}), put("schema/tag", {"title": "Tag"}))
+    land(store, removal("schema/tag", 1))
+    before = written(store)
+    with pytest.raises(port.Conflict):
+        land(store, dataclasses.replace(put("note/a", {"title": "A"}), through=((name("schema/tag"), 1),)))
+    assert written(store) == before
+
+
 def _race(opener, *sets):
     """Each set landed on a connection of its own, all let go at once; what each gave, None when it landed."""
     outcomes, ready = [None] * len(sets), threading.Barrier(len(sets))

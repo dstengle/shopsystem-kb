@@ -1,7 +1,7 @@
 """The write path: a set drafted and checked (kb.drafting); only when every change passes is each entry's stamp
 settled by the clock and the set handed to the port, which lands every change and one entry per operation naming the
 set in one transaction. When another change lands between the draft and the landing, an artifact the set changes or a
-type it was read through having moved, the port refuses it, and the set is
+type it was read through having moved or been removed, the port refuses it, and the set is
 drafted again, stamped and landed while the port holds the write lock, so that nothing can land before it again; so
 is a set that removes a type, whose draft found no other type reading it, which the port compares nothing of. A
 fault anywhere refuses the whole set with every fault found, and nothing is written. Starting a store and recording a
@@ -58,29 +58,30 @@ def land(held: port.Port, operations: list, signed: Signed, clock: journal.Clock
     port holds the write lock, where a change that says the revision it read is compared again, and refused if its
     artifact moved; a set that removes a type lands only there, where no type reading it can be made between its
     draft and its landing. Raises Refused with every fault, having written nothing."""
-    try:
-        landed = _round(held, operations, signed, clock, locked=False)
-    except port.Conflict:
-        landed = None
-    if landed is not None:
-        return landed
+    drafted, moments = _readied(held, operations, clock)
+    if not _lands_only_locked(drafted):
+        try:
+            return _landing(held, drafted, moments, signed)
+        except port.Conflict:
+            pass
     with held.exclusive():
-        return _round(held, operations, signed, clock, locked=True)
+        return _landing(held, *_readied(held, operations, clock), signed)
 
 
-def _round(
-    held: port.Port, operations: list, signed: Signed, clock: journal.Clock | None, locked: bool,
-) -> Landed | None:
-    """The set drafted, its moments read from the clock after the draft, and landed; None, with nothing handed to
-    the port, for a set that removes a type drafted while the write lock is not held."""
+def _readied(held: port.Port, operations: list, clock: journal.Clock | None) -> tuple[drafting.Drafted, list]:
+    """The set drafted against the store as it stands, and its moments, read from the clock once it is drafted: so
+    before the write lock is asked for, a set refused or a clock that fails never taking it."""
     drafted = drafting.drafted(held, operations)
-    moments = journal.moments(len(drafted.changes), clock)
-    if not locked and any(drafting.removes_a_type(change) for change in drafted.changes):
-        return None
-    return _landing(held, drafted, signed, moments)
+    return drafted, journal.moments(len(drafted.changes), clock)
 
 
-def _landing(held: port.Port, drafted: drafting.Drafted, signed: Signed, moments: list) -> Landed:
+def _lands_only_locked(drafted: drafting.Drafted) -> bool:
+    """Whether a set lands only as drafted while the write lock is held: one that removes a type, which the port
+    compares nothing of that would show a type reading it was made since."""
+    return any(drafting.removes_a_type(change) for change in drafted.changes)
+
+
+def _landing(held: port.Port, drafted: drafting.Drafted, moments: list, signed: Signed) -> Landed:
     """The drafted set landed, one entry per change, under ids minted at its moments now."""
     stamps = journal.minted(held, moments)
     batch = stamps[0].id

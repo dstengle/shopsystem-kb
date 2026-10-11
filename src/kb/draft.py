@@ -90,9 +90,10 @@ class Draft:
         return last + 1
 
     def as_read(self, type_ids: list[ArtifactId]) -> tuple[tuple[ArtifactId, int], ...]:
-        """Each type given that the draft read from the store and leaves as it is, with the revision it was read at."""
+        """Each type given, once, that the draft read from the store and leaves as it is, with the revision it was
+        read at."""
         return tuple(
-            (each, self._types[each]["revision"]) for each in type_ids
+            (each, self._types[each]["revision"]) for each in dict.fromkeys(type_ids)
             if each in self._types and each not in self._pending and each not in self._removed
         )
 

@@ -63,7 +63,8 @@ class Change:
     """One change of a set: the artifact, its whole content after the change (None for a removal), its links and the
     places of the parts it holds, the revision the change read it at (0 when it was not held), the revision it
     leaves it at, and the types it was checked and its links read through that the set does not change, each with
-    the revision it was read at. The adapter lands none of the set when any of those has since moved. `searched` are
+    the revision it was read at. The adapter lands none of the set when any of those has since moved or is no longer
+    held. `searched` are
     the rows the artifact is found by, as kb gives them (search.searchable): each `(what, label, words)`, what being
     "section" or "field", in order; the adapter keeps them in place of those it held, and answers `search` from them.
     `kind` is the kind of the artifact a change leaves, None for a removal. `version` is given by a change that
@@ -116,8 +117,8 @@ class Refusal(Exception):
 
 
 class Conflict(Refusal):
-    """A change read its artifact, or a type it was read through, at a revision that has since moved; or an entry's
-    id is already held."""
+    """A change read its artifact, or a type it was read through, at a revision that has since moved, a type since
+    removed standing at none; or an entry's id is already held."""
 
 
 class Linked(Refusal):

@@ -11,10 +11,11 @@ import pytest
 
 import at_once
 from calls import (
-    TAG_TYPE, change_type, check, create, creating, define, iri, kb_ref, read, refs, remove, removing, replace, replacing,
-    request, start_a_store, targets, type_iri, version_iri,
+    TAG_TYPE, TYPES as TYPE_OF_TYPES, change_type, check, create, creating, define, iri, kb_ref, read, refs, remove,
+    removing, replace, replaced, replacing, request, signature, start_a_store, targets, type_iri, version_iri,
 )
 from kb import client as kb_client
+from kb.contract import kb_pb2
 
 ABOUT = {"type": "string"}
 LINKED = {"type": "string", "ref": {"targets": targets("tag"), "cardinality": "one", "parts": False, "on_delete": "refuse"}}
@@ -278,3 +279,88 @@ def test_a_type_is_not_removed_when_a_type_reading_it_was_defined_while_its_remo
     assert [(fault.place, fault.rule) for fault in misfit.faults] == [("label", "maxLength")]
     checked = check(client)
     assert (checked.faults, list(checked.violations), list(checked.stale)) == ([], [], [])
+
+
+READS = {
+    "refers to a shape of it": (_labelled(1), "schema/properties/label/$ref"),
+    "is built on it": (_typed("Note", {}, built_on="tool")["schema"], "schema/allOf/0/$ref"),
+}
+PLAINLY = [replaced(type_iri("note"), {"schema": {**PLAIN, "description": "Plainly"}})]
+
+
+def _defined(schema):
+    return "Create", creating(TYPE_OF_TYPES, "Note", {"schema": schema}, message="Define Note")
+
+
+def _changed(schema):
+    return "Replace", replacing(type_iri("note"), {"schema": schema}, message="Change a type")
+
+
+def _changed_twice(schema):
+    """A set changing the note type twice: the version its first change makes reads the tool type, the one it is
+    left standing at does not."""
+    items = [replaced(type_iri("note"), {"schema": schema}), *PLAINLY]
+    return "BatchReplace", kb_pb2.BatchReplaceRequest(items=items, signature=signature("Change a type twice"))
+
+
+WRITTEN = {
+    "defined": (_defined, None),
+    "changed": (_changed, 1),
+    "changed twice in one set, the first reading it": (_changed_twice, 1),
+}
+
+
+@pytest.mark.parametrize("reads", sorted(READS))
+@pytest.mark.parametrize("written", sorted(WRITTEN))
+def test_a_type_reading_a_type_removed_while_it_was_being_written_does_not_land(root, written, reads):
+    """The note type's new version is drafted while the tool type is held, and the tool type is removed before it
+    lands: the removal lands, nothing then reading the tool type, and the note type's define or change is drafted
+    again and refused as a type naming a version not held is, nothing of it written. The store checks."""
+    schema, place = READS[reads]
+    asked, standing = WRITTEN[written]
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, {"title": "Tool", "schema": SHAPED})
+    if standing:
+        define(client, {"title": "Note", "schema": PLAIN})
+    held = at_once.OnAThread(root, *asked(schema))
+
+    def first():
+        removed = remove(client, type_iri("tool"))
+        assert not removed.faults, removed.faults
+
+    landed = at_once.landed_second(held, first)
+    assert [(fault.artifact, fault.place, fault.rule) for fault in landed.faults] == [(type_iri("note"), place, "shape")]
+    assert [fault.rule for fault in read(client, type_iri("tool")).faults] == ["not-found"]
+    note_type = read(client, type_iri("note"), whole=True)
+    assert (note_type.revision if standing else [fault.rule for fault in note_type.faults]) == (standing or ["not-found"])
+    checked = check(client)
+    assert (checked.faults, list(checked.violations), list(checked.stale)) == ([], [], [])
+
+
+@pytest.mark.parametrize("reads", sorted(READS))
+@pytest.mark.parametrize("written", ["defined", "changed"])
+def test_a_type_reading_a_type_that_moved_on_while_it_was_being_written_lands_reading_the_version_it_names(
+    root, written, reads,
+):
+    """Every version is kept as made: the tool type changing under the note type's define or change takes nothing
+    the note type reads, so it is drafted again, a type it reads having moved, and lands."""
+    schema, _ = READS[reads]
+    asked, standing = WRITTEN[written]
+    client = kb_client.connect(root)
+    start_a_store(root)
+    define(client, {"title": "Tool", "schema": SHAPED})
+    if standing:
+        define(client, {"title": "Note", "schema": PLAIN})
+    held = at_once.OnAThread(root, *asked(schema))
+
+    def first():
+        moved = change_type(client, "tool", {**SHAPED, "description": "Moved on"})
+        assert not moved.faults, moved.faults
+
+    landed = at_once.landed_second(held, first)
+    assert not landed.faults, landed.faults
+    assert held.drafts == 2
+    assert not request(client, "note", "X", {}).faults
+    checked = check(client)
+    assert (checked.faults, list(checked.violations)) == ([], [])

@@ -158,23 +158,34 @@ def _handed(draft: Draft, change: Change, last: bool) -> port.Change:
     its content as it left the artifact with the rows it is found by, and, for the last change the set makes to that
     artifact, its links and the places of its parts as the set leaves them, read through the type it was checked
     against, with the revisions of the types that version is read through, each kb: reference followed at the version
-    it names, that the set leaves as they are."""
+    it names, that the set leaves as they are; every change that leaves a type with those of the types the version it
+    makes reads."""
     read = 0 if change.op == "import" else change.revision - 1
     if change.left is None:
         return port.Change(change.artifact_id, None, read=read, revision=change.revision)
     searched, kind = tuple(search.searchable(change.left)), composition.artifact_kind(change.left)
     version = _stands_at(change.left) if kind == values.TYPE_KIND else None
+    made = _read_by_the_version_made(draft, change)
     if not last:
         return port.Change(
-            change.artifact_id, change.left, read=read, revision=change.revision, searched=searched, kind=kind,
-            version=version,
+            change.artifact_id, change.left, read=read, revision=change.revision, through=draft.as_read(made),
+            searched=searched, kind=kind, version=version,
         )
     typed = _typed(draft, change)
     return port.Change(
         change.artifact_id, change.left, tuple(links.handed(change.artifact_id, change.left, draft, typed)),
         tuple(places.parts(change.left)), read, change.revision,
-        draft.as_read(composition.read_through(kind, typed["schema"], draft)), searched, kind, version,
+        draft.as_read([*composition.read_through(kind, typed["schema"], draft), *made]), searched, kind, version,
     )
+
+
+def _read_by_the_version_made(draft: Draft, change: Change) -> list:
+    """The other types the version of a type a change makes refers to a shape of or is built on, each kb: reference
+    followed at the version it names: were one removed before the set lands, that version would read a version no
+    longer held. None for a change that leaves no type."""
+    if composition.artifact_kind(change.left) != values.TYPE_KIND:
+        return []
+    return composition.read_through(values.TYPE_KIND, change.left.get("schema"), draft)[1:]
 
 
 def _stands_at(held: dict) -> port.Versioned:
