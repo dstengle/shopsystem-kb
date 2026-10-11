@@ -83,7 +83,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     the store's; or, unless it is read through a type file that is broken or leads to one, its kind, the version of
     its type it names, which the directory or the store must hold, its form, its content and its links against that
     version, whatever its type stands at, and for a type, the type as a type. A link to a file that could not be read
-    is left to the skipping."""
+    is no error: that file does not land, and its IRI is left a placeholder."""
     if each.artifact is None:
         return []
     if each.id == METASCHEMA_ID:

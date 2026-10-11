@@ -544,19 +544,6 @@ def _each_reported_with_its_reason(ran, broken):
         assert (file, rule) in errors, (file, rule, ran.stdout)
 
 
-def _the_two_types(client):
-    define(client, DECISION_TYPE)
-    define(client, WORK_ITEM_TYPE)
-
-
-def _decision(name, **fields):
-    """A decision that fits its type, carrying the fields given."""
-    return _artifact(name, _titled(name), **fields, sections=[
-        {"title": "Purpose", "body": "Keep prices in step with costs.\n"},
-        {"title": "Rationale", "body": "Costs move weekly.\n"},
-    ])
-
-
 def _a_broken_decision_type(target):
     """The type for decisions with a version that is not a number, which the type that describes types refuses."""
     _put(target, {**_read(target, type_iri("decision"), 1), "version": "one"}, 1)
@@ -1178,6 +1165,13 @@ TOGETHER_WITH = {
     "version 1 of a type for decisions whose content does not fit the type that describes types, and a second work "
     "item whose link names an IRI under the type for decisions":
         _a_broken_only_version_and(_a_second_work_item_linking_under_the_type, (_file(LINKING_UNDER),)),
+    "version 1 of a type for decisions whose content does not fit the type that describes types, version 1 of a type "
+    "for notes, which refers to it by a kb: reference, and a note conforming to version 1 of the type for notes":
+        _a_broken_only_version_and(_notes_of(1), (NOTES,), (NOTE, NOTES)),
+    "version 1 of a type for decisions whose content does not fit the type that describes types, version 1 of a type "
+    "for notes, which refers to it by a kb: reference, version 1 of a type for tasks, which refers to that one by a "
+    "kb: reference, and a task conforming to version 1 of the type for tasks":
+        _a_broken_only_version_and(_tasks_of(1), (NOTES,), (TASKS, NOTES), (TASK, TASKS, NOTES)),
     "version 1 of a type for decisions, version 2 of it whose content does not fit the type that describes types, "
     "and a decision conforming to version 2 that the work item links to":
         _a_broken_second_version_and_a_decision_linked_to,
@@ -1214,6 +1208,8 @@ def _the_work_item_lands(ran, root, target):
 LEFT_OUT = {
     "the decision with an error": [_file(BROKEN)],
     "the type version and the second work item": [_file(DECISIONS, 1), _file(LINKING_UNDER)],
+    "the two type versions and the note": [_file(DECISIONS, 1), NOTES, NOTE],
+    "the three type versions and the task": [_file(DECISIONS, 1), NOTES, TASKS, TASK],
     "version 2 of the type for decisions and the decision": [_file(DECISIONS, 2), _file(AT_TWO)],
 }
 
@@ -1271,6 +1267,59 @@ def _told_what_was_skipped(ran, files):
         line[1]: "error" if line[0] == "error" else line[2] for line in _report(ran) if line[0] in ("error", "skipped")
     }
     assert told == files, ran.stdout
+
+
+def _checked_row(leading):
+    return lambda tmp_path: (_for_import_with_a_broken_version_and_what_leads_to_it(tmp_path, leading, {}), None)
+
+
+@pytest.mark.parametrize("made", [*map(_checked_row, LEADING), *TOGETHER_WITH.values()], ids=[
+    *(f"check row {number}" for number in range(1, len(LEADING) + 1)),
+    *(f"import row {number}" for number in range(1, len(TOGETHER_WITH) + 1)),
+])
+def test_what_the_check_calls_an_error_or_a_skip_is_what_an_import_with_errors_skipped_leaves_out(root, tmp_path, made):
+    target, _ = made(tmp_path)
+    _started(root)
+    report = _report(_kb("import", str(target), "--check", cwd=root))
+    left_out = {line[1] for line in report if line[0] in ("error", "skipped")}
+    landing = [file for file in _directory_files(target) if file not in left_out]
+
+    ran = _kb_import_skipping_errors(root, target)
+
+    assert (ran.returncode, ran.stderr) == (0, "") if landing else (
+        2, "kb import: refused: operations: nothing in the directory would land, and nothing was written\n",
+    )
+    assert _held_files(root) == sorted([*landing, _file(TYPE_OF_TYPES, 1)])
+
+
+def _skips(root, target):
+    """The files the check says would be skipped, each with its chain."""
+    return {line[1]: line[2] for line in _report(_kb("import", str(target), "--check", cwd=root)) if line[0] == "skipped"}
+
+
+def test_a_file_skipped_for_its_link_names_the_broken_version_of_that_type_with_the_lowest_number(root, tmp_path):
+    def fill(client):
+        _decisions_at(client, 2)
+        _a_work_item_linking_under_the_type(client)
+
+    target = _for_import(tmp_path, fill)
+    first, _ = (_breaks(target, DECISIONS, number) for number in (1, 2))
+    _started(root)
+
+    assert _skips(root, target) == {_file(LINKING_UNDER): f"{_file(LINKING_UNDER)} -> {first}"}
+
+
+def test_a_link_under_a_type_the_store_holds_is_not_skipped_though_no_version_of_it_would_land(root, tmp_path):
+    def fill(client):
+        _decisions_at(client, 2)
+        _a_work_item_linking_under_the_type(client)
+
+    target = _for_import(tmp_path, fill)
+    (Path(target) / _file(DECISIONS, 1)).unlink()
+    _breaks(target, DECISIONS, 2)
+    define(_started(root), DECISION_TYPE)
+
+    assert _skips(root, target) == {}
 
 
 @given("a directory for import that checks clean", target_fixture="target")
