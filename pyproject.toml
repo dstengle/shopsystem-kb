@@ -24,6 +24,8 @@ dev = [
   "pytest>=9,<10",
   "pytest-bdd>=8.1.0,<9",
   "pytest-xdist>=3.6",
+  "coverage>=7.6",
+  "pytest-cov>=6",
   "grpcio-tools>=1.84.0",
 ]
 
@@ -36,3 +38,7 @@ kb = ["contract/*.proto"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 bdd_features_base_dir = "features"
+
+[tool.coverage.run]
+source = ["src/kb"]
+data_file = ".coverage-map"

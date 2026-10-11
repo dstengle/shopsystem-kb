@@ -122,6 +122,16 @@ module that does not own it.
 - `make image` builds kb's image from the checkout (`shopsystem-kb:dev`); `make image-check` builds its own and checks
   it serves a store beside its callers in a throwaway compose project (`docker/image_check.py`), leaving nothing
   behind. Neither is part of `make test`; a release that fails `image-check` does not ship.
+- `make coverage-map` runs the whole suite once under coverage of `src/kb`, in parallel, one context per test
+  (`pytest-cov`, `--cov-context=test`), and writes `.coverage-map` and `.coverage-map.passed` (the passing tests;
+  both git-ignored). It takes about 80 s (against 25 s for `make test`) and is not part of `make test`. Tests that
+  start another program (the installed `kb`, `at_once.InAnotherProgram`, `tests/serving.py`'s programs) are not
+  traced; the in-process ones, the operator's commands among them, are. `make coverage-ask ARGS="..."`
+  (`tools/coverage_map.py`) answers from it, in plain text, and refuses a map missing or older than `src/kb` or
+  `tests/` ("run make coverage-map"): `ARGS="tests-for src/kb/examining.py"` (or `src/kb/draft.py:127`, or
+  `kb.draft.Draft.waited`) names the passing tests that execute a file, a line or a function; `ARGS="unexecuted"`
+  gives, per file, the lines inside functions no passing test executes, as ranges with a count. A module's own
+  top level runs at import, before any test, and is not asked after.
 - Behaviour comes from `features/`; code is written red-green against a
   scenario, one at a time, and never adds behaviour no scenario asks for.
 - A refactor is an enabling slice: its check is the suite still green and
