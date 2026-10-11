@@ -11,7 +11,7 @@ from typing import Callable
 from kb import network, refusals, responses, store
 from kb.backups import BackedUp
 from kb.export import Exported
-from kb.importing import Checked
+from kb.examining import Checked
 from kb.contract import kb_pb2
 from kb.operating import Importing, Operator
 from kb.servicer import KbServicer

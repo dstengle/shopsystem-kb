@@ -4,7 +4,7 @@ the command's values made, one call into the domain, and any refusal or escaping
 from pathlib import Path
 from typing import NamedTuple
 
-from kb import backups, export, importing, roots, signatures
+from kb import backups, examining, export, importing, roots, signatures
 from kb.contract import kb_pb2
 from kb.servicer import boundary
 
@@ -30,12 +30,12 @@ class Operator:
         export.written(held, roots.directory(directory))
         return export.Exported()
 
-    @boundary(importing.Checked, at_one_moment=True)
+    @boundary(examining.Checked, at_one_moment=True)
     def import_check(self, directory: str, held):
         """A directory read as a set for import into the store, its errors and what would be skipped; nothing written."""
-        return importing.checked(held, roots.directory(directory))
+        return examining.checked(held, roots.directory(directory))
 
-    @boundary(importing.Checked)
+    @boundary(examining.Checked)
     def import_(self, request: Importing, held):
         """A directory checked, then landed in the store as one set signed by the role, with a message naming it."""
         signed = signatures.signed(kb_pb2.Signature(role=request.role, message=f"import {request.directory}"))
