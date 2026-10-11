@@ -5,7 +5,7 @@ from pytest_bdd import given, scenarios, then, when
 
 import held
 from calls import (DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, answer, create, define, export, filed, iri, journal,
-                   replace, start_a_store, type_iri)
+                   next_version, replace, start_a_store, type_iri)
 from kb import client as kb_client
 from kb.content import dumps, loads
 from kb.contract import kb_pb2
@@ -156,3 +156,26 @@ def _given_the_export(exported, holding):
 def _not_refused_as_busy(exported):
     assert not exported.refused, exported.faults
     assert "busy" not in [fault.rule for fault in exported.faults]
+
+
+@given("a store holding a type for decisions at its third version")
+def _a_type_at_its_third_version(root, client):
+    start_a_store(root)
+    define(client, DECISION_TYPE)
+    for version in (1, 2):
+        assert not next_version(client, "decision", {**DECISION_TYPE, "version": version}).faults
+
+
+@then("the client is given one file for each of the three versions of the type for decisions")
+def _one_file_for_each_version(exported):
+    """Three files for the type, one for each number, each giving the version its number says."""
+    assert not exported.refused, exported.faults
+    versions = {place: loads(text) for place, text in exported.files if loads(text)["id"] == type_iri("decision")}
+    assert sorted(versions) == sorted(filed(type_iri("decision"), number) for number in (1, 2, 3))
+    assert sorted(file["version"] for file in versions.values()) == [1, 2, 3]
+
+
+@then("each of those files is at the type's place, followed by `@` and that version's number")
+def _each_at_the_type_place_and_number(exported):
+    placed = {place: loads(text)["version"] for place, text in exported.files if loads(text)["id"] == type_iri("decision")}
+    assert placed == {filed(type_iri("decision"), number): number for number in (1, 2, 3)}
