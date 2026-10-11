@@ -9,7 +9,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 from ruamel.yaml import YAML
 
 from calls import (
-    DECISION_TYPE, TYPE_OF_TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
+    DECISION_TYPE, TAG_TYPE, TYPE_OF_TYPES, TYPES, WORK_ITEM_TYPE, a_decision_type_and_a_decision, change_type, check, create, define,
     filed, iri, journal, kb_ref, listing, next_version, placeholders, read, refs, remove, replace, request, start_a_store,
     targets, type_iri, version_iri,
 )
@@ -807,6 +807,78 @@ def broken():
 @when("the operator checks the directory for import", target_fixture="ran")
 def _kb_import_check(root, target):
     return _kb("import", str(target), "--check", cwd=root)
+
+
+@given("a store holding a type for decisions and a type for work items")
+def _a_store_with_the_two_types(root):
+    client = _started(root)
+    define(client, DECISION_TYPE)
+    define(client, WORK_ITEM_TYPE)
+
+
+@given(
+    parsers.parse("a directory for import holding a work item whose IRI {sits}"),
+    target_fixture="target",
+)
+def _for_import_with_a_misplaced_work_item(tmp_path, sits):
+    """A directory holding a work item of the type for work items at an IRI that is not under that type's."""
+    name = {
+        "sits under the type for decisions": iri("decision", "move-the-review-to-mondays"),
+        "sits under no type the directory or the store holds": iri("memo", "move-the-review-to-mondays"),
+    }[sits]
+    target = tmp_path / "import"
+    target.mkdir()
+    _put(target, {**_artifact(name, _titled(name)), "type": version_iri("work-item", 1)})
+    return target
+
+
+@then("that file is reported as an error, naming the file")
+def _that_file_is_an_error(ran, target):
+    (file,) = [path.relative_to(target).as_posix() for path in Path(target).rglob("*.yaml")]
+    assert ran.stderr == ""
+    assert ("error", file, "identity") in {tuple(line[:3]) for line in _report(ran)}, ran.stdout
+
+
+MINOR, SITTING = iri("decision", "minor"), iri("decision", "minor/ship-weekly")
+
+
+def _decision_content(title):
+    """A decision as a user writes it: its title inside, the sections its type requires."""
+    return {"title": title, "sections": _decision(WEEKLY)["sections"]}
+
+
+def _a_type_file_over_a_held_decision(root, tmp_path):
+    """A store holding the type for decisions and a decision under `minor`, and a directory for import holding a
+    type for tags at `minor` and a decision at a place of its own."""
+    client = _started(root)
+    define(client, DECISION_TYPE)
+    create(client, "decision", _decision_content("Ship weekly"), at=SITTING)
+
+    def fill(source):
+        define(source, DECISION_TYPE)
+        assert not request(source, TYPES, "Minor", {"schema": TAG_TYPE["schema"]}, "Define Minor", at=MINOR).faults
+        create(source, "decision", _decision_content("Price reviews happen weekly"))
+    return exported(tmp_path, fill)
+
+
+def test_a_types_file_standing_where_a_define_would_be_refused_is_an_error_of_the_check(root, tmp_path):
+    target = _a_type_file_over_a_held_decision(root, tmp_path)
+
+    ran = _kb("import", str(target), "--check", cwd=root)
+
+    errors = {tuple(line[1:3]) for line in _report(ran) if line[0] == "error"}
+    assert (_file(MINOR, 1), "identity") in errors, ran.stdout
+
+
+def test_with_errors_skipped_a_types_file_standing_where_a_define_would_be_refused_is_left_out_and_the_rest_lands(
+    root, tmp_path,
+):
+    target = _a_type_file_over_a_held_decision(root, tmp_path)
+
+    ran = _kb("import", str(target), "--skip-errors", cwd=root, env={"KB_ACTOR": OPERATOR})
+
+    assert (ran.returncode, ran.stderr) == (0, "")
+    assert MINOR not in held.names(root) and WEEKLY in held.names(root), held.names(root)
 
 
 def _report(ran):

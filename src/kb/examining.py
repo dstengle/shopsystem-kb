@@ -113,7 +113,7 @@ def _faults(store: Port, draft: Draft, each: Offered, by_name: dict, unread: set
     landing, misnamed = drafted.get(each.name, (each.artifact, ()))
     schema, content = version.content["schema"], settled.checked(landing)
     found = [
-        *_form(draft, each, schema), *misnamed,
+        *_form(draft, each, schema), *misnamed, *naming.placed(draft, each.id, values.type_of(kind)),
         *_fit(draft, each, content, schema, unread),
     ]
     if not found and each.typed:

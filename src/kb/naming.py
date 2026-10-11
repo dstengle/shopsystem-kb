@@ -14,17 +14,35 @@ def identity(draft: Draft, creation, type_id: values.ArtifactId) -> list:
     type it sits under, while a type's is any IRI its client chooses under which nothing yet belongs to another type
     (kb.standing); and neither a create before it in its set carries it, said once and as the set's, nor does the
     draft hold anything at it."""
-    name, faults, defines = creation.name, [], type_id == values.type_of(values.TYPE_KIND)
-    if not defines and composition.nearest_type(name, draft) != type_id:
-        faults.append(refusals.not_under(name, type_id))
+    name, faults = creation.name, _under(draft, creation.name, type_id)
     if creation.carried:
         faults += creation.carried
     elif draft.holds(name):
         faults.append(refusals.already_held(name))
-    elif defines:
-        other, sitting = standing.under(name, draft)
-        faults += [refusals.belongs(name, each, other) for each in sitting]
+    else:
+        faults += _standing(draft, name, type_id)
     return faults
+
+
+def placed(draft: Draft, name: values.ArtifactId, type_id: values.ArtifactId) -> list:
+    """The faults of the place an artifact a file brings stands at, as a create's IRI is held to it but for what the
+    draft holds there, which is the file's own: it sits under the type it names, or, a type's, under nothing that
+    belongs to another type."""
+    return [*_under(draft, name, type_id), *_standing(draft, name, type_id)]
+
+
+def _under(draft: Draft, name: values.ArtifactId, type_id: values.ArtifactId) -> list:
+    """The fault of an artifact's IRI that is not under the nearest held type it sits under, a type's being free."""
+    defines = type_id == values.type_of(values.TYPE_KIND)
+    return [] if defines or composition.nearest_type(name, draft) == type_id else [refusals.not_under(name, type_id)]
+
+
+def _standing(draft: Draft, name: values.ArtifactId, type_id: values.ArtifactId) -> list:
+    """The faults of a type's IRI under which an artifact belongs to another type (kb.standing); none for an artifact."""
+    if type_id != values.type_of(values.TYPE_KIND):
+        return []
+    other, sitting = standing.under(name, draft)
+    return [refusals.belongs(name, each, other) for each in sitting]
 
 
 def items(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content: dict) -> tuple:
