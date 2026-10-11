@@ -110,6 +110,18 @@ Feature: Export and import a store
       | with other content, written against version 2 of the type for decisions    |
       | with the same content, written against version 1 of the type for decisions |
 
+  Scenario Outline: The operator checks a directory for import holding a file whose IRI does not sit under its type
+    Pins that an import holds a file to the place its type gives it, as a create is held: a file filed under another type's IRI is an error of the check.
+    Given a store holding a type for decisions and a type for work items
+    And a directory for import holding a work item whose IRI <sits>
+    When the operator checks the directory for import
+    Then that file is reported as an error, naming the file
+
+    Examples:
+      | sits                                                    |
+      | sits under the type for decisions                       |
+      | sits under no type the directory or the store holds     |
+
   @slice-184
   Scenario Outline: The operator checks a directory for import that holds a type version's file with an error
     Pins a broken type version's reach: the type versions built on it, however indirectly, the artifacts written against it or against any of them, and the artifacts whose link would wait under a type no version of which would land, are named as ones that would be skipped, with the way each leads there.
@@ -270,6 +282,15 @@ Feature: Export and import a store
     When the operator imports that kb directory, saying which role they are
     Then its types and artifacts land as they would from an export
     And its history and its store marker are passed over, neither landing in the store
+
+  Scenario: Importing into a store a server serves is refused
+    Pins that an import is a change like any other to a served store: asked of the store's files directly, it is refused and the operator is told where the server is.
+    Given a store holding a type for decisions and a decision
+    And a server serves that store
+    And a directory for import that checks clean, holding a second decision
+    When the operator imports the directory, saying which role they are
+    Then the import is rejected because the store is served, naming the server's address
+    And nothing is written
 
   @slice-112
   Scenario: Importing when nothing names the operator's role is refused

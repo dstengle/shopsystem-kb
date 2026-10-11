@@ -24,6 +24,7 @@ The operator takes a store out as files people can read and review, checks a dir
 - If the operator imports from something that is not a directory, the import is refused because files for import are read from a directory, and nothing is written.
 - When the operator checks a directory for import, every file is read and each error is reported, naming the file and the reason: it cannot be read as YAML 1.2 or is not in canonical form, it claims a type neither the directory nor the store holds, it conforms to a version of its type neither the directory nor the store holds, its content does not fit its type, or it carries a link to an IRI under a type neither the directory nor the store holds.
 - When the operator checks a directory for import holding an artifact the store holds at the same IRI with other content or another type version, the check reports it as an error, naming the IRI.
+- When the operator checks a directory for import holding a file whose IRI does not sit under the type it conforms to, or sits under a nearer type the directory or the store holds, that file is reported as an error, naming the file.
 - When the operator checks a directory for import that holds a type version's file with an error, every file of a type version referring to it by a `kb:` reference, directly or through other type versions, of an artifact conforming to that version or to any of those, and of an artifact carrying a link to an IRI under a type no version of which would land, is reported as one that would be skipped, with the chain that leads to the broken file.
 - When the operator checks a directory for import that holds no error, the check reports success.
 - If a directory checked for import holds an error, the check reports failure.
@@ -38,6 +39,7 @@ The operator takes a store out as files people can read and review, checks a dir
 - If a directory imported holds an error, the import is refused because the check found errors, the check's report is shown, and nothing is written.
 - Where the operator imports with errors skipped, everything lands except the broken files, the files of type versions referring to a broken type version by a `kb:` reference, directly or through other type versions, of artifacts conforming to the broken version or to any of those, and of artifacts carrying a link to an IRI under a type no version of which lands, a link to a file that does not land landing on a placeholder under a type that does, and the operator is told what was skipped and why.
 - When the operator imports the kb directory of an existing store, it is imported as an export is, its history and its store marker passed over.
+- While a server serves the store, if the operator imports into it, the import is refused because the store is served, naming the server's address, and nothing is written.
 - If nothing names the operator's role, the import is refused because the role must be named through `KB_ACTOR`, and nothing is written.
 - When the operator checks a directory for import, the store holds what it held before.
 - kb export and kb import find the store as kb validate does, with the same refusals.

@@ -818,3 +818,8 @@ source: review question (batch 35, slice 170.1: a link waiting inside an unnamed
 An import's history gains one entry for each file that lands, each version of a type counted; a file conforming to a version of its type that neither the directory nor the store holds is an error of the check.
 date: 2026-10-11
 source: slicing questions (K3, slices 165.6 and 181: version files in the history's count; a version nobody holds), answered under the person's delegation of 2026-10-10
+
+## decision/an-import-is-held-as-a-change-is
+An import that goes into a store already holding artifacts is a change to that store like any other: asked while a server serves the store it is refused because the store is served, and each file is held to the place its type gives it as a create is, a file whose IRI does not sit under its type, or sits under a nearer held type, being an error of the check.
+date: 2026-10-11
+source: research findings (K3, slice 181: an import landed under a running server, and a file filed under another type's IRI landed), answered under the person's delegation of 2026-10-10
