@@ -134,6 +134,21 @@ def _read_the_journal_for_the_decision(client):
     return list(response.entries)
 
 
+@when("the client reads the history", target_fixture="entries")
+def _read_the_whole_history(client):
+    response = journal(client)
+    assert not response.faults, response.faults
+    return list(response.entries)
+
+
+@then("each entry the client is given gives its position in the history")
+def _each_entry_gives_its_position(entries):
+    assert entries, "the history gave no entry"
+    positions = [entry.id for entry in entries]
+    assert all(positions), positions
+    assert len(set(positions)) == len(positions), positions
+
+
 @then("there is one entry for each change")
 def _one_entry_for_each_change(entries):
     assert [(entry.op, entry.artifact) for entry in entries] == [("create", DECISION), ("write", DECISION)]
