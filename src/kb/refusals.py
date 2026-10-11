@@ -142,6 +142,20 @@ def misnamed(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
     )
 
 
+PART_MISNAMED = {
+    "not-plain": "a part's name is a plain name of lower-case letters, digits and single hyphens; {name!r} is not",
+    "repeated": "a part's name is unique in its collection; {name!r} is on more than one",
+}
+
+
+def misnamed_part(artifact_id: ArtifactId, found: Misnamed) -> kb_pb2.Fault:
+    """A name a create gives a part that the part may not carry, at the part's place in what the create carried."""
+    return kb_pb2.Fault(
+        artifact=str(artifact_id), place=f"{found.collection}/{found.index}/id", rule=rules.ITEM_NAME,
+        message=PART_MISNAMED[found.why].format(name=found.name),
+    )
+
+
 def unwritable(artifact_id: ArtifactId, problem: str, place: str = "") -> kb_pb2.Fault:
     return kb_pb2.Fault(artifact=str(artifact_id), place=place, rule=rules.CONTENT, message=problem)
 

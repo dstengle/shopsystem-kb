@@ -1,6 +1,6 @@
 """Item names: the name a title gives, the numbering that keeps an item's name free, the names the items of an
-artifact's collections are given and the names they held, and the names a revision hands back that the store could not
-have given. Nothing here reads or writes; whether a name is taken is asked of the caller. The grammar of a plain name
+artifact's collections are given, those they carry kept, and the names they held, the names a create gives its items
+that an item may not carry, and the names a revision hands back that the store could not have given. Nothing here reads or writes; whether a name is taken is asked of the caller. The grammar of a plain name
 is `names.py`'s."""
 import re
 from typing import Callable, NamedTuple
@@ -32,26 +32,26 @@ def numbered(name: str, taken) -> str:
     return candidate
 
 
-def items(parts: dict, node: dict, keep_named: bool, inner: Callable[[dict], dict]) -> None:
+def items(parts: dict, node: dict, inner: Callable[[dict], dict]) -> None:
     """Every item of every collection the node holds given its name, and the items of the collections inside each
     item in turn, at every depth. parts is the collections the node's type declares, and inner gives those an item's
-    type declares from the collection's declaration. An item is named from its title when the title is text, a
-    number, true or false, as an artifact's is, otherwise from its place in the collection, counted from 1, with a
-    number added when an item beside it already has that name. On a write an item already
-    carrying a name is the item of that name, moved or changed where it stands, and keeps it; a name is minted once
-    and never worked out again. An item that is not a set of named entries carries no name, and is passed over, as is
-    a collection that is not a list."""
+    type declares from the collection's declaration. An item already carrying a name, one its create gave it or one
+    the store gave it before, keeps it: a name is given once and never worked out again. The names carried are taken
+    first, wherever their items stand, so no name made here is one of them. Any other item is named from its title
+    when the title is text, a number, true or false, as an artifact's is, otherwise from its place in the collection,
+    counted from 1, with a number added when an item beside it already has that name. An item that is not a set of
+    named entries carries no name, and is passed over, as is a collection that is not a list."""
     for collection, part in parts.items():
         found = _listed(node, collection)
-        taken = {item["id"] for item in found if isinstance(item, dict) and keep_named and "id" in item}
+        taken = {item["id"] for item in found if isinstance(item, dict) and "id" in item}
         for place, item in enumerate(found, start=1):
             if not isinstance(item, dict):
                 continue
-            if not (keep_named and "id" in item):
+            if "id" not in item:
                 text = title(item.get("title"))
                 item["id"] = numbered(slug(text) if text is not None else str(place), taken.__contains__)
                 taken.add(item["id"])
-            items(inner(part), item, keep_named, inner)
+            items(inner(part), item, inner)
 
 
 def held(parts: dict, node: dict) -> dict[str, set]:
@@ -64,8 +64,9 @@ def held(parts: dict, node: dict) -> dict[str, set]:
 
 
 class Misnamed(NamedTuple):
-    """A name handed back on an item that the store could not have given it: where it is, the name, and why not:
-    "not-plain", "repeated", or "unknown" when no item of that collection had it."""
+    """A name on an item that it may not carry: the place of its collection and where in it the item stands, the
+    name, and why not: "not-plain", "repeated", or, handed back on a change, "unknown" when no item of that
+    collection had it."""
     collection: str
     index: int
     name: object
@@ -90,6 +91,32 @@ def handed_back(schema: dict, content: dict, held: dict[str, set]) -> list[Misna
                 found.append(Misnamed(collection, index, name, "unknown"))
             seen.add(name)
     return found
+
+
+def given(parts: dict, node: dict, inner: Callable[[dict], dict], under: tuple = ()) -> list[Misnamed]:
+    """Every name a new artifact's items carry that an item may not be given, in every collection at every depth, as
+    `items` walks them: one that is not a plain name, and one an item before it in its collection carries. Each
+    collection is said by its place, an item on the way to it by where it stands."""
+    found = []
+    for collection, part in parts.items():
+        here, seen = (*under, collection), set()
+        for index, item in enumerate(_listed(node, collection)):
+            if not isinstance(item, dict):
+                continue
+            if "id" in item:
+                found += _unfit(names.placed(here), index, item["id"], seen)
+            found += given(inner(part), item, inner, (*here, str(index)))
+    return found
+
+
+def _unfit(collection: str, index: int, name, seen: set) -> list[Misnamed]:
+    """Why a name given to an item cannot be its name, if it cannot; a name that can is seen from here on."""
+    if not isinstance(name, str) or not names.plain(name):
+        return [Misnamed(collection, index, name, "not-plain")]
+    if name in seen:
+        return [Misnamed(collection, index, name, "repeated")]
+    seen.add(name)
+    return []
 
 
 def _listed(node: dict, collection: str) -> list:

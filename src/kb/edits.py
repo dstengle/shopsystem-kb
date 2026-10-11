@@ -22,7 +22,7 @@ class Change(NamedTuple):
     """What one operation did, to which artifact, at which place in it, and, for an item added, the item's name; the
     version its entry records and the IRI of the type version it conforms to; the artifact as this
     operation left it, None for a removal; the type of its kind as it acted, which it is checked against when the set
-    leaves none; and the faults of the names it handed back, which refuse the set while it still acts, so what it
+    leaves none; and the faults of the names it gave or handed back, which refuse the set while it still acts, so what it
     leaves is checked too."""
     op: str
     artifact_id: ArtifactId
@@ -50,15 +50,16 @@ def _changed(draft: Draft, operation) -> Change:
         draft.put(operation.artifact_id, copy.deepcopy(operation.artifact))
         return Change("import", operation.artifact_id)
     if isinstance(operation, changes.Create):
-        return Change("create", _create(draft, operation))
+        return _create(draft, operation)
     if isinstance(operation, changes.Add):
         return _append(draft, operation)
     return _replace(draft, operation)
 
 
-def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
+def _create(draft: Draft, creation: changes.Create) -> Change:
     """A new artifact at the IRI its create gives, conforming to the type version it names, which the draft must
-    hold."""
+    hold, its items named, those it names keeping their names. Its faults are those of the names it gives them that
+    an item may not carry."""
     schema = _named(draft, creation)
     type_id = values.type_of(creation.version.kind)
     faults = [
@@ -71,10 +72,10 @@ def _create(draft: Draft, creation: changes.Create) -> ArtifactId:
     if type_id == values.type_of(values.TYPE_KIND):
         naming.numbered(draft, creation.name, content)
     declared = composition.declared(schema["schema"], draft)
-    naming.items(draft, declared, content)
+    misnamed = naming.items(draft, creation.name, declared, content)
     artifact = settled.given(content, str(creation.name), str(creation.version), 1, creation.title)
     draft.put(creation.name, settled.order(artifact, declared))
-    return creation.name
+    return Change("create", creation.name, faults=misnamed)
 
 
 def _named(draft: Draft, creation: changes.Create) -> dict:

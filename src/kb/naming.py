@@ -1,6 +1,6 @@
 """What names a create's artifact and the items in what an operation puts in the draft: the IRI a create gives, which
 the type it names must be the nearest held one under and nothing may be held at, and a type's free of any other
-type's place (kb.standing); and the items of a new or a revised artifact named, those it held kept
+type's place (kb.standing); and the items of a new or a revised artifact named, those a create names and those it held kept
 (kb.item_names decides what a name looks like and whether it is free); and a type's content given the number of its
 version."""
 from kb import composition, item_names, refusals, standing, values
@@ -25,9 +25,15 @@ def identity(draft: Draft, creation, type_id: values.ArtifactId) -> list:
     return faults
 
 
-def items(draft: Draft, declared: dict, content: dict) -> None:
-    """The items of a new artifact's content named, each as its collection's item type declares."""
-    item_names.items(declared["parts"], content, False, _parts(draft))
+def items(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content: dict) -> tuple:
+    """The items of a new artifact's content named, each as its collection's item type declares, those its create
+    names keeping the names it gives them. Returns the faults of the names it gives that an item may not carry, with
+    any of which no item is named."""
+    inner = _parts(draft)
+    misnamed = [refusals.misnamed_part(artifact_id, found) for found in item_names.given(declared["parts"], content, inner)]
+    if not misnamed:
+        item_names.items(declared["parts"], content, inner)
+    return tuple(misnamed)
 
 
 def revised(draft: Draft, artifact_id: values.ArtifactId, declared: dict, content: dict, current: dict) -> tuple:
@@ -36,7 +42,7 @@ def revised(draft: Draft, artifact_id: values.ArtifactId, declared: dict, conten
     held = item_names.held(declared["parts"], current)
     misnamed = [refusals.misnamed(artifact_id, found) for found in item_names.handed_back(declared, content, held)]
     if not misnamed:
-        item_names.items(declared["parts"], content, True, _parts(draft))
+        item_names.items(declared["parts"], content, _parts(draft))
     return tuple(misnamed)
 
 
