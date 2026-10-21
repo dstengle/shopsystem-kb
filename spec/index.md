@@ -1,3 +1,6 @@
+---
+id: bounded-context/missingmass.io/shopsystem/kb
+---
 # kb
 
 ## Purpose

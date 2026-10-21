@@ -132,7 +132,7 @@ kb ships no domain schemas and no renderers. A client such as
 [shopsystem-knowledge](https://github.com/dstengle/shopsystem-knowledge)
 supplies the types, seed content, and presentation.
 
-Spec: `spec/index.md`. Storage design: `docs/superpowers/specs/2026-10-01-kb-storage-sqlite-design.md`.
+Spec: `spec/index.md`. Storage design: `.shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md`.
 `make bench` checks the performance bounds at 30,000 artifacts.
 
 ## Running kb in Docker

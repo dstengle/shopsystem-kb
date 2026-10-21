@@ -120,7 +120,7 @@ module that does not own it.
   `make contract` regenerates the stubs after `kb.proto` changes.
 - The suite is green between slices: `make test` reports 0 failed, and a failure is a regression. A test carrying a
   `slice-<n>` marker (a scenario from its feature's `@slice-<n>` tag, a plain test from `slices.waits_on("<n>")`) is
-  expected to fail while the living plan (`docs/superpowers/plans/2026-09-24-kb-slices.md`) lists slice n with a
+  expected to fail while the living plan (`.shop/records/archive/plans/2026-09-24-kb-slices.md`) lists slice n with a
   Status other than `green` (`tests/slices.py`): it still runs, its failure is counted as `xfailed` with the reason
   "slice <n> not built", and its passing before the plan says green as `xpassed`, never as a failure. A slice the plan
   no longer lists is built, and its tests run for real; a plan that cannot be read, or that gives a slice a Status

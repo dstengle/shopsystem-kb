@@ -1,9 +1,9 @@
 ---
-id: capability/reach-a-served-store
+id: capability/missingmass.io/shopsystem/kb/reach-a-served-store
 title: Reach a served store
 narrator: the client
-rests_on: [decision/0020-a-server-found-where-the-store-is, decision/published-contract-v2, decision/runtime-shape, decision/write-lock-and-expected-revision, decision/contract-v1, decision/contract-v2, decision/starting-leaves-the-wire, decision/serving-built, decision/served-store-marked-by-a-lock, decision/served-store-rules, decision/a-server-stamps-with-its-own-clock]
-formulated_as: features/reach-a-served-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/a-server-found-where-the-store-is, design-decision/missingmass.io/shopsystem/kb/published-contract-v2, design-decision/missingmass.io/shopsystem/kb/runtime-shape, design-decision/missingmass.io/shopsystem/kb/write-lock-and-expected-revision, design-decision/missingmass.io/shopsystem/kb/contract-v1, design-decision/missingmass.io/shopsystem/kb/contract-v2, design-decision/missingmass.io/shopsystem/kb/starting-leaves-the-wire, design-decision/missingmass.io/shopsystem/kb/serving-built, design-decision/missingmass.io/shopsystem/kb/served-store-marked-by-a-lock, design-decision/missingmass.io/shopsystem/kb/served-store-rules, design-decision/missingmass.io/shopsystem/kb/a-server-stamps-with-its-own-clock]
+retired: []
 ---
 
 # Reach a served store
@@ -14,17 +14,17 @@ Several clients share one store through a server that hosts the same contract ov
 
 ## Behaviour
 
-- While a server serves a store, a client that reaches it makes the same calls and is given the same answers as a client that reaches the store in process.
-- If the connection to a server cannot be read or names no address, the call is refused because the connection cannot be read or names no address, naming the connection.
-- If the server a connection names cannot be reached, whether no server was ever there or one that answered earlier calls has since stopped, the call is refused because the server cannot be reached, naming the address, and the call comes back with its answer rather than breaking off.
-- While a server serves a store, each change is checked against the store as every earlier change left it, in the order the changes arrive.
-- While a server serves a store, a client that finds that store directly can read it.
-- If a client that finds a served store directly asks for a change, the change is refused because the store is served, naming the server's address.
-- When the server that served a store has stopped, however it stopped, a change asked by a client that finds the store directly is not refused because the store is served.
-- While a client reaches a server the operator runs with kb serve, each change it makes is stamped in the history with the moment the machine's clock gives.
-- If a client readied with a clock finds a server and asks for a change, the change is refused because the clock belongs to a client that reaches its store in process.
-- The store never writes the connection to a server.
-- While a client readied with a clock finds a server, its reads are answered.
+- [r1] While a server serves a store, a client that reaches it makes the same calls and is given the same answers as a client that reaches the store in process.
+- [r2] If the connection to a server cannot be read or names no address, the call is refused because the connection cannot be read or names no address, naming the connection.
+- [r3] If the server a connection names cannot be reached, whether no server was ever there or one that answered earlier calls has since stopped, the call is refused because the server cannot be reached, naming the address, and the call comes back with its answer rather than breaking off.
+- [r4] While a server serves a store, each change is checked against the store as every earlier change left it, in the order the changes arrive.
+- [r5] While a server serves a store, a client that finds that store directly can read it.
+- [r6] If a client that finds a served store directly asks for a change, the change is refused because the store is served, naming the server's address.
+- [r7] When the server that served a store has stopped, however it stopped, a change asked by a client that finds the store directly is not refused because the store is served.
+- [r8] While a client reaches a server the operator runs with kb serve, each change it makes is stamped in the history with the moment the machine's clock gives.
+- [r9] If a client readied with a clock finds a server and asks for a change, the change is refused because the clock belongs to a client that reaches its store in process.
+- [r10] The store never writes the connection to a server.
+- [r11] While a client readied with a clock finds a server, its reads are answered.
 
 ## Implementation, may change
 

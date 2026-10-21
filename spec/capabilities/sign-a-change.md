@@ -1,9 +1,9 @@
 ---
-id: capability/sign-a-change
+id: capability/missingmass.io/shopsystem/kb/sign-a-change
 title: Sign a change
 narrator: the client
-rests_on: [decision/0012-writes-need-role-and-message, decision/0014-signature-refused-before-operations, decision/0015-missing-message-rule, decision/0017-blank-role-or-message, decision/every-change-is-attributable, decision/one-signature]
-formulated_as: features/sign-a-change.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/writes-need-role-and-message, design-decision/missingmass.io/shopsystem/kb/signature-refused-before-operations, design-decision/missingmass.io/shopsystem/kb/missing-message-rule, design-decision/missingmass.io/shopsystem/kb/blank-role-or-message, design-decision/missingmass.io/shopsystem/kb/every-change-is-attributable, design-decision/missingmass.io/shopsystem/kb/one-signature]
+retired: []
 ---
 
 # Sign a change
@@ -14,9 +14,9 @@ Every change says which role made it and why, so that every entry in the history
 
 ## Behaviour
 
-- If the client creates, changes, adds an item, removes, or asks for several changes in one go without saying which role it is or without saying why, or gives either as blank space only, the change is refused because every entry in the history names the role that made it, or because every entry says why it was made; the artifact reads as before at the revision it held, the store holds no artifact it did not hold before, and the history holds no entry for it.
-- If a change or a snapshot lacks a role, a message or both, it is refused with those faults alone, the role's first, then the message's, then for a snapshot the piece of work's, and its operations are not checked.
-- When a role or message holds anything besides blank space, the history keeps it exactly as given, its blank space included.
+- [r1] If the client creates, changes, adds an item, removes, or asks for several changes in one go without saying which role it is or without saying why, or gives either as blank space only, the change is refused because every entry in the history names the role that made it, or because every entry says why it was made; the artifact reads as before at the revision it held, the store holds no artifact it did not hold before, and the history holds no entry for it.
+- [r2] If a change or a snapshot lacks a role, a message or both, it is refused with those faults alone, the role's first, then the message's, then for a snapshot the piece of work's, and its operations are not checked.
+- [r3] When a role or message holds anything besides blank space, the history keeps it exactly as given, its blank space included.
 
 ## Implementation, may change
 

@@ -1,9 +1,9 @@
 ---
-id: capability/query-the-store
+id: capability/missingmass.io/shopsystem/kb/query-the-store
 title: Query the store
 narrator: the client
-rests_on: [decision/typed-refs-cover-the-questions, decision/search-ranking, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/one-method-per-action, decision/0023-an-artifacts-iri-sits-under-its-types, decision/0024-a-link-may-land-on-a-placeholder, decision/path-selection-is-a-segment-prefix]
-formulated_as: features/query-the-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/typed-refs-cover-the-questions, design-decision/missingmass.io/shopsystem/kb/search-ranking, design-decision/missingmass.io/shopsystem/kb/sections-carry-no-links, design-decision/missingmass.io/shopsystem/kb/storage-behind-a-port, design-decision/missingmass.io/shopsystem/kb/one-method-per-action, design-decision/missingmass.io/shopsystem/kb/an-artifacts-iri-sits-under-its-types, design-decision/missingmass.io/shopsystem/kb/a-link-may-land-on-a-placeholder, design-decision/missingmass.io/shopsystem/kb/path-selection-is-a-segment-prefix]
+retired: []
 ---
 
 # Query the store
@@ -14,22 +14,22 @@ The client finds artifacts without knowing their names. It can list a kind, opti
 
 ## Behaviour
 
-- When the client lists a kind, it is given a stub of each artifact of that kind.
-- When the client lists a kind narrowed by a field, it is given only the artifacts that match.
-- When the client lists a kind asking for names only, it is given the names and nothing else.
-- When the client lists by a path below the type, it is given a stub of each artifact whose IRI's path below its type's IRI begins with the segments given, whole segments only, whatever its type.
-- When the client follows links narrowed to a path below the type, it is given only what is found whose IRI's path below its type's IRI begins with the segments given, whole segments only, whatever its type.
-- When the client asks for the placeholders, it is given every IRI a link points at that the store does not hold, each with what links to it.
-- When the client follows the links out of an artifact, it is given a stub of each thing the artifact points at.
-- When the client follows the links into an artifact, it is given a stub of each thing that points at it.
-- When the client follows the links into an artifact only through one link and only from one kind, it is given only what points at it through that link from that kind.
-- When the client follows the links out of an artifact two steps, it is given what is found at each step, each with the route taken to it.
-- When the client follows the links out of one place inside an artifact, it is given a stub of what that place points at and nothing else the artifact points at.
-- A link into a part of an artifact counts as a link into that artifact: following the links into the artifact finds what points at the part, reading the artifact at a glance counts it, and removing the artifact is refused while it points there.
-- When the client searches the prose, each result comes with the title of the section it matched and a snippet of it, and the one whose section mentions the words most often comes first.
-- When the client searches within one kind, it is given only artifacts of that kind.
-- When the client searches the fields as well as the prose, it is also given artifacts whose fields, such as a title, match.
-- If the client follows links out of a section, it is given nothing.
+- [r1] When the client lists a kind, it is given a stub of each artifact of that kind.
+- [r2] When the client lists a kind narrowed by a field, it is given only the artifacts that match.
+- [r3] When the client lists a kind asking for names only, it is given the names and nothing else.
+- [r4] When the client lists by a path below the type, it is given a stub of each artifact whose IRI's path below its type's IRI begins with the segments given, whole segments only, whatever its type.
+- [r5] When the client follows links narrowed to a path below the type, it is given only what is found whose IRI's path below its type's IRI begins with the segments given, whole segments only, whatever its type.
+- [r6] When the client asks for the placeholders, it is given every IRI a link points at that the store does not hold, each with what links to it.
+- [r7] When the client follows the links out of an artifact, it is given a stub of each thing the artifact points at.
+- [r8] When the client follows the links into an artifact, it is given a stub of each thing that points at it.
+- [r9] When the client follows the links into an artifact only through one link and only from one kind, it is given only what points at it through that link from that kind.
+- [r10] When the client follows the links out of an artifact two steps, it is given what is found at each step, each with the route taken to it.
+- [r11] When the client follows the links out of one place inside an artifact, it is given a stub of what that place points at and nothing else the artifact points at.
+- [r12] A link into a part of an artifact counts as a link into that artifact: following the links into the artifact finds what points at the part, reading the artifact at a glance counts it, and removing the artifact is refused while it points there.
+- [r13] When the client searches the prose, each result comes with the title of the section it matched and a snippet of it, and the one whose section mentions the words most often comes first.
+- [r14] When the client searches within one kind, it is given only artifacts of that kind.
+- [r15] When the client searches the fields as well as the prose, it is also given artifacts whose fields, such as a title, match.
+- [r16] If the client follows links out of a section, it is given nothing.
 
 ## Implementation, may change
 

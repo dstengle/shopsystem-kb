@@ -1,9 +1,9 @@
 ---
-id: capability/serve-a-store-for-tests
+id: capability/missingmass.io/shopsystem/kb/serve-a-store-for-tests
 title: Serve a store for tests
 narrator: the client
-rests_on: [decision/served-double-is-kb-serve, decision/a-server-stamps-with-its-own-clock, decision/published-contract-v1-in-0-6-0, decision/runtime-shape]
-formulated_as: features/serve-a-store-for-tests.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/served-double-is-kb-serve, design-decision/missingmass.io/shopsystem/kb/a-server-stamps-with-its-own-clock, design-decision/missingmass.io/shopsystem/kb/published-contract-v1-in-0-6-0, design-decision/missingmass.io/shopsystem/kb/runtime-shape]
+retired: []
 ---
 
 # Serve a store for tests
@@ -14,10 +14,10 @@ The client's own tests serve a store they started with kb's own server, so the c
 
 ## Behaviour
 
-- When the client serves a started store for its tests, naming another directory to hold the connection, it is given the address the store is served at, and a client working in that directory reaches the store through a server at that address.
-- When the client's tests are done with a store they served, however they ended, the server is stopped and the directory named for the connection no longer holds it.
-- If the client serves a store for its tests naming a directory that already holds the connection to a server, serving is refused because that directory already holds a connection, and that connection is left as it was.
-- Where the client serves a store for its tests with a clock, each change made through that server is stamped in the history with the moment the clock gives.
+- [r1] When the client serves a started store for its tests, naming another directory to hold the connection, it is given the address the store is served at, and a client working in that directory reaches the store through a server at that address.
+- [r2] When the client's tests are done with a store they served, however they ended, the server is stopped and the directory named for the connection no longer holds it.
+- [r3] If the client serves a store for its tests naming a directory that already holds the connection to a server, serving is refused because that directory already holds a connection, and that connection is left as it was.
+- [r4] Where the client serves a store for its tests with a clock, each change made through that server is stamped in the history with the moment the clock gives.
 
 ## Implementation, may change
 

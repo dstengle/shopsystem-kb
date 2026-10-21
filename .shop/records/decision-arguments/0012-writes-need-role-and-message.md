@@ -1,0 +1,8 @@
+---
+id: decision-argument/missingmass.io/shopsystem/kb/0012-writes-need-role-and-message
+kind: decision-argument
+about: bounded-context/missingmass.io/shopsystem/kb
+---
+# 0012 A change without a role or a message is refused before anything is written
+
+2026-09-26. Create, Write, Append, Delete, Apply and Snapshot under an actor with no role, or with no message, are refused with nothing on disk and nothing in the history. Scenarios approved 2026-09-27.

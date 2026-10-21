@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-PLAN = "docs/superpowers/plans/2026-09-24-kb-slices.md"
+PLAN = ".shop/records/archive/plans/2026-09-24-kb-slices.md"
 PASSING = "passing_before_their_slice.txt"
 
 _REFUSAL = "slices_refusal"

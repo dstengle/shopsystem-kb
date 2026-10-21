@@ -1,9 +1,9 @@
 ---
-id: capability/snapshot-what-work-read
+id: capability/missingmass.io/shopsystem/kb/snapshot-what-work-read
 title: Snapshot what work read
 narrator: the client
-rests_on: [decision/0004-journal-batch-and-snapshots, decision/one-current-corpus, decision/0014-signature-refused-before-operations, decision/busy-rule, decision/one-signature, decision/0022-ids-are-chosen-by-the-client-in-a-namespace]
-formulated_as: features/snapshot-what-work-read.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/journal-batch-and-snapshots, design-decision/missingmass.io/shopsystem/kb/one-current-corpus, design-decision/missingmass.io/shopsystem/kb/signature-refused-before-operations, design-decision/missingmass.io/shopsystem/kb/busy-rule, design-decision/missingmass.io/shopsystem/kb/one-signature, design-decision/missingmass.io/shopsystem/kb/ids-are-chosen-by-the-client-in-a-namespace]
+retired: []
 ---
 
 # Snapshot what work read
@@ -14,9 +14,9 @@ A named piece of work records which revisions of which artifacts it read, in one
 
 ## Behaviour
 
-- When the client snapshots artifacts for a piece of work, the history holds one entry listing each of them with the revision read and a fingerprint of it, and the client is given the name of that entry.
-- If a snapshot names no piece of work, names an artifact the store holds nothing under, does not say which role it is or why, or gives either as blank space only, the snapshot is refused naming the reason, and the history holds no entry for it.
-- If a snapshot waits longer than the store waits while another change is being written, the snapshot is refused because the store was busy with another change, the history holds no entry for it, and the same snapshot may be asked for again.
+- [r1] When the client snapshots artifacts for a piece of work, the history holds one entry listing each of them with the revision read and a fingerprint of it, and the client is given the name of that entry.
+- [r2] If a snapshot names no piece of work, names an artifact the store holds nothing under, does not say which role it is or why, or gives either as blank space only, the snapshot is refused naming the reason, and the history holds no entry for it.
+- [r3] If a snapshot waits longer than the store waits while another change is being written, the snapshot is refused because the store was busy with another change, the history holds no entry for it, and the same snapshot may be asked for again.
 
 ## Implementation, may change
 

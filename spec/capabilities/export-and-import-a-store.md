@@ -1,9 +1,9 @@
 ---
-id: capability/export-and-import-a-store
+id: capability/missingmass.io/shopsystem/kb/export-and-import-a-store
 title: Export and import a store
 narrator: the operator
-rests_on: [decision/files-are-an-export, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/kb-runs-no-git, decision/busy-rule, decision/earlier-store-told-apart, decision/operator-directory-refused-by-shape, decision/0026-import-passes-over-identical-refuses-differing, decision/0024-a-link-may-land-on-a-placeholder, decision/0023-an-artifacts-iri-sits-under-its-types, decision/each-type-version-a-file, decision/import-skips-only-by-type, decision/import-check-reports-differing, decision/rules-for-iri-refusals, decision/an-artifact-is-read-through-its-version]
-formulated_as: features/export-and-import-a-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/files-are-an-export, design-decision/missingmass.io/shopsystem/kb/sqlite-canonical, design-decision/missingmass.io/shopsystem/kb/yaml-is-export-and-wire, design-decision/missingmass.io/shopsystem/kb/kb-runs-no-git, design-decision/missingmass.io/shopsystem/kb/busy-rule, design-decision/missingmass.io/shopsystem/kb/earlier-store-told-apart, design-decision/missingmass.io/shopsystem/kb/operator-directory-refused-by-shape, design-decision/missingmass.io/shopsystem/kb/import-passes-over-identical-refuses-differing, design-decision/missingmass.io/shopsystem/kb/a-link-may-land-on-a-placeholder, design-decision/missingmass.io/shopsystem/kb/an-artifacts-iri-sits-under-its-types, design-decision/missingmass.io/shopsystem/kb/each-type-version-a-file, design-decision/missingmass.io/shopsystem/kb/import-skips-only-by-type, design-decision/missingmass.io/shopsystem/kb/import-check-reports-differing, design-decision/missingmass.io/shopsystem/kb/rules-for-iri-refusals, design-decision/missingmass.io/shopsystem/kb/an-artifact-is-read-through-its-version]
+retired: []
 ---
 
 # Export and import a store
@@ -14,40 +14,40 @@ The operator takes a store out as files people can read and review, checks a dir
 
 ## Behaviour
 
-- When the operator exports the store to a directory that is empty or does not exist, the directory holds one file for each artifact, at a place that follows the path of its IRI, and for a type one file for each version the store holds and no other, at the type's place, `@` and the version's number, a version's file giving that version's own revision and title, each giving the artifact's identity first (its IRI, the IRI of the version of its type it conforms to, its revision and its title) and then its content, as the store stood at one moment.
-- When the operator exports a store holding an artifact that conforms to an earlier version of its type, that artifact's file gives its content in the order the version it conforms to declares.
-- When the operator opens an exported artifact's file, every piece of prose stands as a block of its own however short, each list is written beneath the name it belongs to, indented under it, no line of prose is broken to fit a width, and nothing in the file tells a reader how to build a value.
-- When two stores given the same content by the same client are exported, their files for it are the same, byte for byte.
-- If the directory named for an export holds anything, the export is refused because export never overwrites, and what the directory holds is left as it was.
-- If the operator exports to something that is a file, not a directory, the export is refused because export writes into a directory, and the file is left as it was.
-- If the operator checks for import something that is not a directory, the check is refused because files for import are read from a directory, and nothing is written.
-- If the operator imports from something that is not a directory, the import is refused because files for import are read from a directory, and nothing is written.
-- When the operator checks a directory for import, every file is read and each error is reported, naming the file and the reason: it cannot be read as YAML 1.2 or is not in canonical form, it claims a type neither the directory nor the store holds, it conforms to a version of its type neither the directory nor the store holds, its content does not fit its type, or it carries a link to an IRI under a type neither the directory nor the store holds.
-- When the operator checks a directory for import holding an artifact the store holds at the same IRI with other content or another type version, the check reports it as an error, naming the IRI.
-- When the operator checks a directory for import holding a file whose IRI does not sit under the type it conforms to, or sits under a nearer type the directory or the store holds, that file is reported as an error, naming the file.
-- When the operator checks a directory for import that holds a type version's file with an error, every file of a type version referring to it by a `kb:` reference, directly or through other type versions, of an artifact conforming to that version or to any of those, and of an artifact carrying a link to an IRI under a type no version of which would land, is reported as one that would be skipped, with the chain that leads to the broken file.
-- When the operator checks a directory for import that holds no error, the check reports success.
-- If a directory checked for import holds an error, the check reports failure.
-- When the operator imports a directory that checks clean into a store, saying which role they are, everything in it lands as one set signed by that role, with a message naming the directory, each artifact keeping its IRI, title, revision and type version.
-- When the operator imports a directory that checks clean, each type lands before the artifacts of its kind, and the store's history gains one import entry for each file that lands, each version of a type counted.
-- When the operator imports the export of a store that held an artifact conforming to an earlier version of its type, every version of that type lands as its file gives it, the artifact is checked against the version it conforms to, and afterwards it is read, listed, checked and replaced as it was in the store exported.
-- When the operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version, that artifact is passed over and the rest lands.
-- If the operator imports a directory holding an artifact the store already holds at the same IRI with other content or another type version, with errors skipped or not, the import is refused naming each such IRI, and nothing lands.
-- When the operator imports a directory holding a link to an IRI neither the directory nor the store holds, under a type one of them holds that the link field allows, the import lands and the link lands on a placeholder at that IRI.
-- When the operator imports a directory holding a link into a part that the artifact at its IRI, held by the directory or the store, lacks, the import lands and the link waits on a placeholder for that part.
-- When the operator imports a file holding an item that carries no name, the item lands named as a write names it, and an item that carries a name keeps it.
-- If a directory imported holds an error, the import is refused because the check found errors, the check's report is shown, and nothing is written.
-- Where the operator imports with errors skipped, everything lands except the broken files, the files of type versions referring to a broken type version by a `kb:` reference, directly or through other type versions, of artifacts conforming to the broken version or to any of those, and of artifacts carrying a link to an IRI under a type no version of which lands, a link to a file that does not land landing on a placeholder under a type that does, and the operator is told what was skipped and why.
-- When the operator imports the kb directory of an existing store, it is imported as an export is, its history and its store marker passed over.
-- While a server serves the store, if the operator imports into it, the import is refused because the store is served, naming the server's address, and nothing is written.
-- If nothing names the operator's role, the import is refused because the role must be named through `KB_ACTOR`, and nothing is written.
-- When the operator checks a directory for import, the store holds what it held before.
-- kb export and kb import find the store as kb validate does, with the same refusals.
-- If, with errors skipped, nothing would land, the import is refused because nothing would land, and nothing is written.
-- When the operator imports a directory whose type that describes types matches the store's, the directory's copy is passed over and the store's is kept.
-- When the operator checks a directory for import whose type that describes types differs from the store's, that file is reported as an error, naming the file.
-- If the import waits longer than the store waits while another change is being written, the import is refused because the store was busy with another change, nothing is written, and the same import may be run again.
-- While another change is being written to the store, when the operator exports the store, the export is written and is not refused because the store was busy with another change.
+- [r1] When the operator exports the store to a directory that is empty or does not exist, the directory holds one file for each artifact, at a place that follows the path of its IRI, and for a type one file for each version the store holds and no other, at the type's place, `@` and the version's number, a version's file giving that version's own revision and title, each giving the artifact's identity first (its IRI, the IRI of the version of its type it conforms to, its revision and its title) and then its content, as the store stood at one moment.
+- [r2] When the operator exports a store holding an artifact that conforms to an earlier version of its type, that artifact's file gives its content in the order the version it conforms to declares.
+- [r3] When the operator opens an exported artifact's file, every piece of prose stands as a block of its own however short, each list is written beneath the name it belongs to, indented under it, no line of prose is broken to fit a width, and nothing in the file tells a reader how to build a value.
+- [r4] When two stores given the same content by the same client are exported, their files for it are the same, byte for byte.
+- [r5] If the directory named for an export holds anything, the export is refused because export never overwrites, and what the directory holds is left as it was.
+- [r6] If the operator exports to something that is a file, not a directory, the export is refused because export writes into a directory, and the file is left as it was.
+- [r7] If the operator checks for import something that is not a directory, the check is refused because files for import are read from a directory, and nothing is written.
+- [r8] If the operator imports from something that is not a directory, the import is refused because files for import are read from a directory, and nothing is written.
+- [r9] When the operator checks a directory for import, every file is read and each error is reported, naming the file and the reason: it cannot be read as YAML 1.2 or is not in canonical form, it claims a type neither the directory nor the store holds, it conforms to a version of its type neither the directory nor the store holds, its content does not fit its type, or it carries a link to an IRI under a type neither the directory nor the store holds.
+- [r10] When the operator checks a directory for import holding an artifact the store holds at the same IRI with other content or another type version, the check reports it as an error, naming the IRI.
+- [r11] When the operator checks a directory for import holding a file whose IRI does not sit under the type it conforms to, or sits under a nearer type the directory or the store holds, that file is reported as an error, naming the file.
+- [r12] When the operator checks a directory for import that holds a type version's file with an error, every file of a type version referring to it by a `kb:` reference, directly or through other type versions, of an artifact conforming to that version or to any of those, and of an artifact carrying a link to an IRI under a type no version of which would land, is reported as one that would be skipped, with the chain that leads to the broken file.
+- [r13] When the operator checks a directory for import that holds no error, the check reports success.
+- [r14] If a directory checked for import holds an error, the check reports failure.
+- [r15] When the operator imports a directory that checks clean into a store, saying which role they are, everything in it lands as one set signed by that role, with a message naming the directory, each artifact keeping its IRI, title, revision and type version.
+- [r16] When the operator imports a directory that checks clean, each type lands before the artifacts of its kind, and the store's history gains one import entry for each file that lands, each version of a type counted.
+- [r17] When the operator imports the export of a store that held an artifact conforming to an earlier version of its type, every version of that type lands as its file gives it, the artifact is checked against the version it conforms to, and afterwards it is read, listed, checked and replaced as it was in the store exported.
+- [r18] When the operator imports a directory holding an artifact the store already holds at the same IRI, with the same content and the same type version, that artifact is passed over and the rest lands.
+- [r19] If the operator imports a directory holding an artifact the store already holds at the same IRI with other content or another type version, with errors skipped or not, the import is refused naming each such IRI, and nothing lands.
+- [r20] When the operator imports a directory holding a link to an IRI neither the directory nor the store holds, under a type one of them holds that the link field allows, the import lands and the link lands on a placeholder at that IRI.
+- [r21] When the operator imports a directory holding a link into a part that the artifact at its IRI, held by the directory or the store, lacks, the import lands and the link waits on a placeholder for that part.
+- [r22] When the operator imports a file holding an item that carries no name, the item lands named as a write names it, and an item that carries a name keeps it.
+- [r23] If a directory imported holds an error, the import is refused because the check found errors, the check's report is shown, and nothing is written.
+- [r24] Where the operator imports with errors skipped, everything lands except the broken files, the files of type versions referring to a broken type version by a `kb:` reference, directly or through other type versions, of artifacts conforming to the broken version or to any of those, and of artifacts carrying a link to an IRI under a type no version of which lands, a link to a file that does not land landing on a placeholder under a type that does, and the operator is told what was skipped and why.
+- [r25] When the operator imports the kb directory of an existing store, it is imported as an export is, its history and its store marker passed over.
+- [r26] While a server serves the store, if the operator imports into it, the import is refused because the store is served, naming the server's address, and nothing is written.
+- [r27] If nothing names the operator's role, the import is refused because the role must be named through `KB_ACTOR`, and nothing is written.
+- [r28] When the operator checks a directory for import, the store holds what it held before.
+- [r29] kb export and kb import find the store as kb validate does, with the same refusals.
+- [r30] If, with errors skipped, nothing would land, the import is refused because nothing would land, and nothing is written.
+- [r31] When the operator imports a directory whose type that describes types matches the store's, the directory's copy is passed over and the store's is kept.
+- [r32] When the operator checks a directory for import whose type that describes types differs from the store's, that file is reported as an error, naming the file.
+- [r33] If the import waits longer than the store waits while another change is being written, the import is refused because the store was busy with another change, nothing is written, and the same import may be run again.
+- [r34] While another change is being written to the store, when the operator exports the store, the export is written and is not refused because the store was busy with another change.
 
 ## Implementation, may change
 

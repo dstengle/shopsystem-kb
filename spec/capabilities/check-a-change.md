@@ -1,9 +1,9 @@
 ---
-id: capability/check-a-change
+id: capability/missingmass.io/shopsystem/kb/check-a-change
 title: Check a change
 narrator: the client
-rests_on: [decision/0006-validation-from-composed-schema, decision/every-fault-at-once, decision/a-refused-write-changes-nothing, decision/stale-is-safe, decision/0011-sections-carry-no-links, decision/storage-behind-a-port, decision/integrity-checked-both-ways, decision/write-lock-and-expected-revision, decision/faults-ordered-by-reading-order-then-rule-name, decision/0024-a-link-may-land-on-a-placeholder, decision/0027-each-type-version-is-its-own-iri, decision/an-artifact-keeps-its-version, decision/links-into-parts-of-placeholders, decision/a-link-that-waits-keeps-waiting]
-formulated_as: features/check-a-change.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/validation-from-composed-schema, design-decision/missingmass.io/shopsystem/kb/every-fault-at-once, design-decision/missingmass.io/shopsystem/kb/a-refused-write-changes-nothing, design-decision/missingmass.io/shopsystem/kb/stale-is-safe, design-decision/missingmass.io/shopsystem/kb/sections-carry-no-links, design-decision/missingmass.io/shopsystem/kb/storage-behind-a-port, design-decision/missingmass.io/shopsystem/kb/integrity-checked-both-ways, design-decision/missingmass.io/shopsystem/kb/write-lock-and-expected-revision, design-decision/missingmass.io/shopsystem/kb/faults-ordered-by-reading-order-then-rule-name, design-decision/missingmass.io/shopsystem/kb/a-link-may-land-on-a-placeholder, design-decision/missingmass.io/shopsystem/kb/each-type-version-is-its-own-iri, design-decision/missingmass.io/shopsystem/kb/an-artifact-keeps-its-version, design-decision/missingmass.io/shopsystem/kb/links-into-parts-of-placeholders, design-decision/missingmass.io/shopsystem/kb/a-link-that-waits-keeps-waiting]
+retired: []
 ---
 
 # Check a change
@@ -14,30 +14,30 @@ Every create, change and added item is checked against a version of its type and
 
 ## Behaviour
 
-- When the client creates an artifact naming a version of its type, the artifact is checked against that version.
-- If an artifact is missing a section its type requires, the artifact is refused because the sections the type requires must all be present, in order.
-- If an artifact points at an IRI under a type the store does not hold, the artifact is refused because a link must land on a node of a kind the type allows.
-- When an artifact points at an IRI the store does not hold, under a type the store holds that the link field allows, the artifact is accepted and the link lands on a placeholder at that IRI.
-- When an artifact points into a part of an IRI the store does not hold, under a type the store holds that the link field allows, the artifact is accepted and the link lands on a placeholder.
-- If an artifact points into a part an artifact the store holds does not have, the artifact is refused because a link must land on a node of a kind the type allows.
-- If an artifact points at an IRI the store does not hold, under a type the store holds that the link field does not allow, the artifact is refused because a link must land on a node of a kind the type allows.
-- When the client creates an artifact at an IRI that links already point at, those links land on the new artifact, and the IRI is no longer a placeholder.
-- When the client creates an artifact at an IRI a link points into a part of, and the new artifact has no such part, that link stays on a placeholder and is listed as any placeholder is.
-- When the client changes an artifact that holds a link waiting on a part its target does not have, and the change leaves that link as it is, the change is accepted and the link still waits; a link the change adds or alters is checked as any new link is.
-- If an artifact has several faults, it is refused with every one of them, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
-- If an artifact has faults found by different rules, such as a shape its type does not allow and a missing section, it is refused with all of them together, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
-- If an artifact is refused with several faults, they are given in the order its places stand in the artifact as it would read back, which is the order its type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and faults at one place come in the alphabetical order of the names of the rules they break.
-- If a section carries anything besides its title, its body and the sections inside it, the artifact is refused because a section holds exactly those, naming the extra entry.
-- If a section carries a body and no title, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
-- If a section carries a title and no body, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
-- When a section's body is empty, the artifact is accepted and the section reads back with an empty body.
-- While an artifact is behind its type, when the client changes it naming no version, it is checked against the version it conforms to and is still listed as behind its type.
-- While an artifact is behind its type, when the client changes it naming the latest version of its type with content that fits that version, it records that version and is no longer listed as behind it.
-- If the client changes an artifact that is behind its type naming a later version with content that does not fit that version, the change is refused because the content does not fit the version it names, like any change that does not fit; the artifact reads as before at the revision it held, and it is still listed as behind its type.
-- If a change would leave an artifact missing a section its type requires, the change is refused because the sections the type requires must all be present, in order, and the artifact reads as before, at the revision it held.
-- If an added item points at an IRI under a type the store does not hold, the item is refused because a link must land on a node of a kind the type allows, and the artifact holds the items it held before, at the revision it held.
-- If an added item is missing something its own type requires, the item is refused because the content does not fit the type, and the artifact holds the items it held before, at the revision it held.
-- Where a type requires sections, an artifact may carry further sections after the required ones, at any level.
+- [r1] When the client creates an artifact naming a version of its type, the artifact is checked against that version.
+- [r2] If an artifact is missing a section its type requires, the artifact is refused because the sections the type requires must all be present, in order.
+- [r3] If an artifact points at an IRI under a type the store does not hold, the artifact is refused because a link must land on a node of a kind the type allows.
+- [r4] When an artifact points at an IRI the store does not hold, under a type the store holds that the link field allows, the artifact is accepted and the link lands on a placeholder at that IRI.
+- [r5] When an artifact points into a part of an IRI the store does not hold, under a type the store holds that the link field allows, the artifact is accepted and the link lands on a placeholder.
+- [r6] If an artifact points into a part an artifact the store holds does not have, the artifact is refused because a link must land on a node of a kind the type allows.
+- [r7] If an artifact points at an IRI the store does not hold, under a type the store holds that the link field does not allow, the artifact is refused because a link must land on a node of a kind the type allows.
+- [r8] When the client creates an artifact at an IRI that links already point at, those links land on the new artifact, and the IRI is no longer a placeholder.
+- [r9] When the client creates an artifact at an IRI a link points into a part of, and the new artifact has no such part, that link stays on a placeholder and is listed as any placeholder is.
+- [r10] When the client changes an artifact that holds a link waiting on a part its target does not have, and the change leaves that link as it is, the change is accepted and the link still waits; a link the change adds or alters is checked as any new link is.
+- [r11] If an artifact has several faults, it is refused with every one of them, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
+- [r12] If an artifact has faults found by different rules, such as a shape its type does not allow and a missing section, it is refused with all of them together, each naming the artifact, the place in it and the rule broken, and the store is unchanged.
+- [r13] If an artifact is refused with several faults, they are given in the order its places stand in the artifact as it would read back, which is the order its type declares, a collection's items in their order, sections in their order and a section's inner sections after it, and faults at one place come in the alphabetical order of the names of the rules they break.
+- [r14] If a section carries anything besides its title, its body and the sections inside it, the artifact is refused because a section holds exactly those, naming the extra entry.
+- [r15] If a section carries a body and no title, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
+- [r16] If a section carries a title and no body, the artifact is refused because a section carries both a title and a body, as anything else that does not fit its type is.
+- [r17] When a section's body is empty, the artifact is accepted and the section reads back with an empty body.
+- [r18] While an artifact is behind its type, when the client changes it naming no version, it is checked against the version it conforms to and is still listed as behind its type.
+- [r19] While an artifact is behind its type, when the client changes it naming the latest version of its type with content that fits that version, it records that version and is no longer listed as behind it.
+- [r20] If the client changes an artifact that is behind its type naming a later version with content that does not fit that version, the change is refused because the content does not fit the version it names, like any change that does not fit; the artifact reads as before at the revision it held, and it is still listed as behind its type.
+- [r21] If a change would leave an artifact missing a section its type requires, the change is refused because the sections the type requires must all be present, in order, and the artifact reads as before, at the revision it held.
+- [r22] If an added item points at an IRI under a type the store does not hold, the item is refused because a link must land on a node of a kind the type allows, and the artifact holds the items it held before, at the revision it held.
+- [r23] If an added item is missing something its own type requires, the item is refused because the content does not fit the type, and the artifact holds the items it held before, at the revision it held.
+- [r24] Where a type requires sections, an artifact may carry further sections after the required ones, at any level.
 
 ## Implementation, may change
 

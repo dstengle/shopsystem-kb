@@ -1,9 +1,9 @@
 ---
-id: capability/hand-over-content
+id: capability/missingmass.io/shopsystem/kb/hand-over-content
 title: Hand over content
 narrator: the client
-rests_on: [decision/0005-content-as-canonical-text, decision/0007-input-safety-at-the-boundary, decision/sqlite-canonical, decision/yaml-is-export-and-wire, decision/one-method-per-action, decision/paired-escapes-are-one-character, decision/not-canonical-names-its-place, decision/0027-each-type-version-is-its-own-iri]
-formulated_as: features/hand-over-content.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/content-as-canonical-text, design-decision/missingmass.io/shopsystem/kb/input-safety-at-the-boundary, design-decision/missingmass.io/shopsystem/kb/sqlite-canonical, design-decision/missingmass.io/shopsystem/kb/yaml-is-export-and-wire, design-decision/missingmass.io/shopsystem/kb/one-method-per-action, design-decision/missingmass.io/shopsystem/kb/paired-escapes-are-one-character, design-decision/missingmass.io/shopsystem/kb/not-canonical-names-its-place, design-decision/missingmass.io/shopsystem/kb/each-type-version-is-its-own-iri]
+retired: []
 ---
 
 # Hand over content
@@ -14,22 +14,22 @@ When the client creates, changes or adds, it hands the store content as text. Th
 
 ## Behaviour
 
-- If content given to a create carries what travels beside it, such as the artifact's IRI, the version of its type or a revision for the artifact itself, the artifact is refused because content holds only what the type declares, naming each such entry.
-- If content given to a create carries a title of its own as well as the title given alongside it, the artifact is refused because a title is given alongside the content, never inside it, naming the title the content carried.
-- If content given to a change carries a revision of its own, the change is refused because content holds only what the type declares, naming that entry, and the artifact reads as before, at the revision it held.
-- If an added item's content carries a name of its own, the item is refused because content holds only what the type declares, naming that entry, and the artifact holds the items it held before, at the revision it held.
-- If content carries a tag on one of its values, it is refused because content is read plainly as written and carries no tags.
-- If content holds more than one document, it is refused because content holds exactly one document.
-- When content carries one field written "on" and another written "1:20", both read back as the text written, not as a yes or a no and not as a number.
-- If content writes a value once and points back at it from another place, it is refused because nothing in content stands in for a value written somewhere else.
-- If content opens by declaring the format it is written in, it is refused because content opens with no declaration of its format, naming the place the declaration stands.
-- If content names the same entry twice in one place, it is refused because an entry is named once and only once, naming the place the second one stands.
-- When content carries a field written "true", one left as nothing and one written "12.5", they read back as a yes-or-no, as nothing and as a number, and none as text.
-- If content cannot be read as written, is not a set of named entries (a list, a single bare value, or nothing at all), or holds sections or collections of a shape the type does not declare, it is refused naming the reason and the place it went wrong, the call comes back with its answer rather than breaking off, and nothing is written.
-- When content writes a character beyond the first 65,536 as two escapes, one for each half, as JSON does, the two halves read together as that one character, and the content reads back holding it.
-- If content holds half of a character alone, with no other half beside it, it is refused because the content cannot be read as written.
-- When content carries a field written as a bare date, it reads back as the text written, not as a date.
-- If a line of prose ends in a space, so the store could not write it back as a block, the content is refused because every piece of prose is written as a block, naming the place, and nothing is written.
+- [r1] If content given to a create carries what travels beside it, such as the artifact's IRI, the version of its type or a revision for the artifact itself, the artifact is refused because content holds only what the type declares, naming each such entry.
+- [r2] If content given to a create carries a title of its own as well as the title given alongside it, the artifact is refused because a title is given alongside the content, never inside it, naming the title the content carried.
+- [r3] If content given to a change carries a revision of its own, the change is refused because content holds only what the type declares, naming that entry, and the artifact reads as before, at the revision it held.
+- [r4] If an added item's content carries a name of its own, the item is refused because content holds only what the type declares, naming that entry, and the artifact holds the items it held before, at the revision it held.
+- [r5] If content carries a tag on one of its values, it is refused because content is read plainly as written and carries no tags.
+- [r6] If content holds more than one document, it is refused because content holds exactly one document.
+- [r7] When content carries one field written "on" and another written "1:20", both read back as the text written, not as a yes or a no and not as a number.
+- [r8] If content writes a value once and points back at it from another place, it is refused because nothing in content stands in for a value written somewhere else.
+- [r9] If content opens by declaring the format it is written in, it is refused because content opens with no declaration of its format, naming the place the declaration stands.
+- [r10] If content names the same entry twice in one place, it is refused because an entry is named once and only once, naming the place the second one stands.
+- [r11] When content carries a field written "true", one left as nothing and one written "12.5", they read back as a yes-or-no, as nothing and as a number, and none as text.
+- [r12] If content cannot be read as written, is not a set of named entries (a list, a single bare value, or nothing at all), or holds sections or collections of a shape the type does not declare, it is refused naming the reason and the place it went wrong, the call comes back with its answer rather than breaking off, and nothing is written.
+- [r13] When content writes a character beyond the first 65,536 as two escapes, one for each half, as JSON does, the two halves read together as that one character, and the content reads back holding it.
+- [r14] If content holds half of a character alone, with no other half beside it, it is refused because the content cannot be read as written.
+- [r15] When content carries a field written as a bare date, it reads back as the text written, not as a date.
+- [r16] If a line of prose ends in a space, so the store could not write it back as a block, the content is refused because every piece of prose is written as a block, naming the place, and nothing is written.
 
 ## Implementation, may change
 

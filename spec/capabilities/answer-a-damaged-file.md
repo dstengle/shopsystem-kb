@@ -1,9 +1,9 @@
 ---
-id: capability/answer-a-damaged-file
+id: capability/missingmass.io/shopsystem/kb/answer-a-damaged-file
 title: Answer a damaged file
 narrator: the client
-rests_on: [decision/damaged-database-one-fault, decision/read-only-store-unreadable, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/0007-input-safety-at-the-boundary, decision/pre-v2-stores-not-migrated, decision/v1-store-cannot-be-moved]
-formulated_as: features/answer-a-damaged-file.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/damaged-database-one-fault, design-decision/missingmass.io/shopsystem/kb/read-only-store-unreadable, design-decision/missingmass.io/shopsystem/kb/earlier-store-told-apart, design-decision/missingmass.io/shopsystem/kb/later-store-told-apart, design-decision/missingmass.io/shopsystem/kb/input-safety-at-the-boundary, design-decision/missingmass.io/shopsystem/kb/pre-v2-stores-not-migrated, design-decision/missingmass.io/shopsystem/kb/v1-store-cannot-be-moved]
+retired: []
 ---
 
 # Answer a damaged file
@@ -14,12 +14,12 @@ A store this kb cannot read never reaches a client or the operator as a crash. T
 
 ## Behaviour
 
-- If the store's database cannot be read, because it is damaged or missing beside its marker, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the database cannot be read, naming the database; the refusal is given as any other fault, never breaking off, and nothing is written, in the store or in a directory an export was aimed at, which stays as it was.
-- If the store's database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the database cannot be read, naming the database; the refusal is given as any other fault, never breaking off, and nothing is written, in the store or in a directory an export was aimed at, which stays as it was.
-- If the store found was made by a kb before contract v2, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by an earlier version of kb, which this kb cannot read or move; nothing is written.
-- If the store found has a marker naming a form of store this kb does not know, one a later kb made, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by a later version of kb, which is needed to read it; the store is not opened and nothing is written.
-- If the store found has a marker that cannot be read at all, whatever its bytes, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by a later version of kb, which is needed to read it, as for a form this kb does not know; the refusal is given as any other fault, never breaking off, and nothing is written.
-- If the operator runs kb serve on a store whose database cannot be read, it is refused because the database cannot be read, naming the database, and nothing is served.
+- [r1] If the store's database cannot be read, because it is damaged or missing beside its marker, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the database cannot be read, naming the database; the refusal is given as any other fault, never breaking off, and nothing is written, in the store or in a directory an export was aimed at, which stays as it was.
+- [r2] If the store's database cannot be opened for writing, because the directory, the file or the mount it is on is read-only, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the database cannot be read, naming the database; the refusal is given as any other fault, never breaking off, and nothing is written, in the store or in a directory an export was aimed at, which stays as it was.
+- [r3] If the store found was made by a kb before contract v2, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by an earlier version of kb, which this kb cannot read or move; nothing is written.
+- [r4] If the store found has a marker naming a form of store this kb does not know, one a later kb made, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by a later version of kb, which is needed to read it; the store is not opened and nothing is written.
+- [r5] If the store found has a marker that cannot be read at all, whatever its bytes, then every call other than starting a store, and the operator's kb validate, kb export and kb import, is refused because the store was made by a later version of kb, which is needed to read it, as for a form this kb does not know; the refusal is given as any other fault, never breaking off, and nothing is written.
+- [r6] If the operator runs kb serve on a store whose database cannot be read, it is refused because the database cannot be read, naming the database, and nothing is served.
 
 ## Implementation, may change
 

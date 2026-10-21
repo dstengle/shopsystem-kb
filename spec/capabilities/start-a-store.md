@@ -1,9 +1,9 @@
 ---
-id: capability/start-a-store
+id: capability/missingmass.io/shopsystem/kb/start-a-store
 title: Start a store
 narrator: the client
-rests_on: [decision/sqlite-canonical, decision/kb-runs-no-git, decision/init-refuses-inside-or-above, decision/types-are-data, decision/earlier-store-told-apart, decision/later-store-told-apart, decision/starting-leaves-the-wire, decision/init-carries-a-piece-of-work, decision/type-of-types-iri]
-formulated_as: features/start-a-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/sqlite-canonical, design-decision/missingmass.io/shopsystem/kb/kb-runs-no-git, design-decision/missingmass.io/shopsystem/kb/init-refuses-inside-or-above, design-decision/missingmass.io/shopsystem/kb/types-are-data, design-decision/missingmass.io/shopsystem/kb/earlier-store-told-apart, design-decision/missingmass.io/shopsystem/kb/later-store-told-apart, design-decision/missingmass.io/shopsystem/kb/starting-leaves-the-wire, design-decision/missingmass.io/shopsystem/kb/init-carries-a-piece-of-work, design-decision/missingmass.io/shopsystem/kb/type-of-types-iri]
+retired: []
 ---
 
 # Start a store
@@ -14,23 +14,23 @@ The client starts a store in a directory it names, in its own process and never 
 
 ## Behaviour
 
-- When the client starts a store in a directory, saying which role it is, the store holds the one type that describes what a type is, no other type and no content, and the client can define its own types in it straight away.
-- When the client starts a store, the store's history holds one entry, under the client's role, with the message "initialise store", which is the writing of the type that describes types at its first revision, with a fingerprint of what was written.
-- When the client starts a store naming a piece of work, the store's one history entry names that piece of work beside the role.
-- Where the client was readied with a clock, when it starts a store, the store's one history entry says it happened at the moment the clock gives.
-- If the client starts a store without saying which role it is, starting is refused because a store can only be started under a role, and the directory holds no store.
-- When the client starts a store in a directory holding other files, the store is made inside that directory in a place of its own, and the files already there are left as they were.
-- If the directory named already has a store inside it, starting is refused because that directory already has a store inside it, and that store holds what it held before.
-- If the directory named already has a store inside it made by an earlier kb, starting is refused because that directory already has a store inside it, and that store is left as it was.
-- If the directory named already has a store inside it made by a later kb, starting is refused because that directory already has a store inside it, and that store is left as it was.
-- If the directory named sits inside a store, starting is refused because that directory is inside a store, and that store holds what it held before.
-- While the client is working inside a store, when it starts a store in a directory elsewhere that sits inside no store, the store is made in the directory named and the store it was working in is left as it was.
-- If the client names no directory, starting is refused because a store is started in a directory that was named and that exists, and no store is made anywhere.
-- If the directory named does not exist, starting is refused because a store is started in a directory that exists, and nothing is made at that place.
-- If what is named is a file rather than a directory, starting is refused because a store is started in a directory and what was named is not one, and the file is left as it was.
-- If the place a store goes inside the named directory already holds an empty folder or a file, starting is refused because that directory already holds the place a store goes, and what was there is left as it was.
-- While the client was readied where no store could be found and nothing named one, when it starts a store in a directory it names, the store is made there and the client can read and write in it straight away.
-- While a store holds nothing but the type that describes types, when the client lists the kind of types, it is given the type that describes types alone.
+- [r1] When the client starts a store in a directory, saying which role it is, the store holds the one type that describes what a type is, no other type and no content, and the client can define its own types in it straight away.
+- [r2] When the client starts a store, the store's history holds one entry, under the client's role, with the message "initialise store", which is the writing of the type that describes types at its first revision, with a fingerprint of what was written.
+- [r3] When the client starts a store naming a piece of work, the store's one history entry names that piece of work beside the role.
+- [r4] Where the client was readied with a clock, when it starts a store, the store's one history entry says it happened at the moment the clock gives.
+- [r5] If the client starts a store without saying which role it is, starting is refused because a store can only be started under a role, and the directory holds no store.
+- [r6] When the client starts a store in a directory holding other files, the store is made inside that directory in a place of its own, and the files already there are left as they were.
+- [r7] If the directory named already has a store inside it, starting is refused because that directory already has a store inside it, and that store holds what it held before.
+- [r8] If the directory named already has a store inside it made by an earlier kb, starting is refused because that directory already has a store inside it, and that store is left as it was.
+- [r9] If the directory named already has a store inside it made by a later kb, starting is refused because that directory already has a store inside it, and that store is left as it was.
+- [r10] If the directory named sits inside a store, starting is refused because that directory is inside a store, and that store holds what it held before.
+- [r11] While the client is working inside a store, when it starts a store in a directory elsewhere that sits inside no store, the store is made in the directory named and the store it was working in is left as it was.
+- [r12] If the client names no directory, starting is refused because a store is started in a directory that was named and that exists, and no store is made anywhere.
+- [r13] If the directory named does not exist, starting is refused because a store is started in a directory that exists, and nothing is made at that place.
+- [r14] If what is named is a file rather than a directory, starting is refused because a store is started in a directory and what was named is not one, and the file is left as it was.
+- [r15] If the place a store goes inside the named directory already holds an empty folder or a file, starting is refused because that directory already holds the place a store goes, and what was there is left as it was.
+- [r16] While the client was readied where no store could be found and nothing named one, when it starts a store in a directory it names, the store is made there and the client can read and write in it straight away.
+- [r17] While a store holds nothing but the type that describes types, when the client lists the kind of types, it is given the type that describes types alone.
 
 ## Implementation, may change
 

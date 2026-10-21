@@ -1,9 +1,9 @@
 ---
-id: capability/change-the-store
+id: capability/missingmass.io/shopsystem/kb/change-the-store
 title: Change the store
 narrator: the client
-rests_on: [decision/graph-as-records, decision/shared-parts-are-artifacts, decision/refuse-is-enough-for-deletes, decision/integrity-checked-both-ways, decision/a-refused-write-changes-nothing, decision/a-set-lands-in-one-transaction, decision/write-lock-and-expected-revision, decision/busy-rule, decision/clock-failure-rule, decision/0007-input-safety-at-the-boundary, decision/expected-revision, decision/one-method-per-action, decision/result-or-refusal, decision/0022-ids-are-chosen-by-the-client-in-a-namespace, decision/0027-each-type-version-is-its-own-iri, decision/an-artifact-keeps-its-version, decision/create-echoes-its-iri, decision/removal-still-refused-under-placeholders, decision/rules-for-iri-refusals, decision/a-link-to-a-removed-artifact-waits-on-a-placeholder]
-formulated_as: features/change-the-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/graph-as-records, design-decision/missingmass.io/shopsystem/kb/shared-parts-are-artifacts, design-decision/missingmass.io/shopsystem/kb/refuse-is-enough-for-deletes, design-decision/missingmass.io/shopsystem/kb/integrity-checked-both-ways, design-decision/missingmass.io/shopsystem/kb/a-refused-write-changes-nothing, design-decision/missingmass.io/shopsystem/kb/a-set-lands-in-one-transaction, design-decision/missingmass.io/shopsystem/kb/write-lock-and-expected-revision, design-decision/missingmass.io/shopsystem/kb/busy-rule, design-decision/missingmass.io/shopsystem/kb/clock-failure-rule, design-decision/missingmass.io/shopsystem/kb/input-safety-at-the-boundary, design-decision/missingmass.io/shopsystem/kb/expected-revision, design-decision/missingmass.io/shopsystem/kb/one-method-per-action, design-decision/missingmass.io/shopsystem/kb/result-or-refusal, design-decision/missingmass.io/shopsystem/kb/ids-are-chosen-by-the-client-in-a-namespace, design-decision/missingmass.io/shopsystem/kb/each-type-version-is-its-own-iri, design-decision/missingmass.io/shopsystem/kb/an-artifact-keeps-its-version, design-decision/missingmass.io/shopsystem/kb/create-echoes-its-iri, design-decision/missingmass.io/shopsystem/kb/removal-still-refused-under-placeholders, design-decision/missingmass.io/shopsystem/kb/rules-for-iri-refusals, design-decision/missingmass.io/shopsystem/kb/a-link-to-a-removed-artifact-waits-on-a-placeholder]
+retired: []
 ---
 
 # Change the store
@@ -14,32 +14,32 @@ The client creates an artifact at an IRI it chooses, naming the version of its t
 
 ## Behaviour
 
-- When the client creates an artifact, giving its IRI, the IRI of the version of its type it conforms to, a title and content, and saying which role and why, it is given the artifact's IRI and its first revision; the artifact is held at that IRI, records that version, and reads back as written, in the order that version declares.
-- If the client creates an artifact without a title, the artifact is refused because an artifact cannot be created without a title.
-- When the client replaces an artifact, saying which role and why, its revision goes up by one.
-- When the client replaces an artifact, or adds an item to it, naming no version of its type, the artifact keeps the version it conforms to and is checked against it.
-- When the client replaces an artifact naming a later version of its type, the content is checked against that version, and the artifact records it and keeps its IRI.
-- If the client replaces an artifact naming a version earlier than the one it conforms to, or a version of another type, the change is refused because an artifact moves only to a later version of its own type, and it reads as before.
-- When the client replaces one node inside an artifact, only that node changes and the rest of the artifact reads as before.
-- When the client replaces one item of a collection, only that item changes, it keeps the name it was given when it was created, and anything pointing at it still lands on it.
-- When the client adds an item to a collection, it is given the new item's name and the artifact's new revision, and the new item comes after the items already there.
-- When the client adds an item that points at a shared artifact together with its settings, the settings are held by the new item and the shared artifact is unchanged.
-- When the client adds an item to a collection inside an item, it is given the new item's name and the artifact's new revision, and the rest of the artifact is unchanged.
-- When the client removes an artifact nothing points at, the store no longer holds it and the removal is recorded in the history like any other change.
-- If something points at the artifact being removed, the removal is refused because something still points at it, and the client is given every link that blocks it.
-- If an item inside another artifact points at the artifact being removed, the removal is refused because something still points at it, and that link is among the links given.
-- If recording a change in the store's history fails, the client is given a fault and the store holds what it held before.
-- If the clock fails during a change, the client is given a fault and the store holds what it held before.
-- If the client removes a place inside an artifact, the removal is refused because only a whole artifact is removed.
-- If the client replaces an artifact, or a node in it, so that an item something links into is no longer there, the change is refused because something still points at that item, and the client is given each such link.
-- When the client replaces an artifact, adds an item to it or removes it, saying the revision it read the artifact at, and the artifact still stands at that revision, the change lands.
-- If the client replaces an artifact, adds an item to it or removes it, saying the revision it read the artifact at, and the artifact stands at another revision when the change lands, the change is refused because the artifact moved since it was read, naming the revision it stands at, and nothing is written.
-- When the client replaces an artifact, adds an item to it or removes it without saying the revision it read the artifact at, the change acts on the artifact as it stands.
-- While several clients on one machine, in one program or in several, change one store at the same time, none saying the revision it read the artifact at, each change is checked against the store as every earlier change left it, so two items added to one collection at once are both kept.
-- When one client removes an artifact while another adds a link to it, each is judged against the store as the other left it: a removal that lands second is refused because something still points at it, and a link that lands second lands on a placeholder at the removed artifact's IRI, its type still held.
-- When two clients replace one artifact at the same time, neither saying the revision it read the artifact at, each replacement leaves a revision of its own, both are in the history, and the artifact holds the content of the later one.
-- If a change waits longer than the store waits while another change is being written, the change is refused because the store was busy with another change, nothing is written, and the same change may be made again.
-- No read is refused because the store was busy with another change.
+- [r1] When the client creates an artifact, giving its IRI, the IRI of the version of its type it conforms to, a title and content, and saying which role and why, it is given the artifact's IRI and its first revision; the artifact is held at that IRI, records that version, and reads back as written, in the order that version declares.
+- [r2] If the client creates an artifact without a title, the artifact is refused because an artifact cannot be created without a title.
+- [r3] When the client replaces an artifact, saying which role and why, its revision goes up by one.
+- [r4] When the client replaces an artifact, or adds an item to it, naming no version of its type, the artifact keeps the version it conforms to and is checked against it.
+- [r5] When the client replaces an artifact naming a later version of its type, the content is checked against that version, and the artifact records it and keeps its IRI.
+- [r6] If the client replaces an artifact naming a version earlier than the one it conforms to, or a version of another type, the change is refused because an artifact moves only to a later version of its own type, and it reads as before.
+- [r7] When the client replaces one node inside an artifact, only that node changes and the rest of the artifact reads as before.
+- [r8] When the client replaces one item of a collection, only that item changes, it keeps the name it was given when it was created, and anything pointing at it still lands on it.
+- [r9] When the client adds an item to a collection, it is given the new item's name and the artifact's new revision, and the new item comes after the items already there.
+- [r10] When the client adds an item that points at a shared artifact together with its settings, the settings are held by the new item and the shared artifact is unchanged.
+- [r11] When the client adds an item to a collection inside an item, it is given the new item's name and the artifact's new revision, and the rest of the artifact is unchanged.
+- [r12] When the client removes an artifact nothing points at, the store no longer holds it and the removal is recorded in the history like any other change.
+- [r13] If something points at the artifact being removed, the removal is refused because something still points at it, and the client is given every link that blocks it.
+- [r14] If an item inside another artifact points at the artifact being removed, the removal is refused because something still points at it, and that link is among the links given.
+- [r15] If recording a change in the store's history fails, the client is given a fault and the store holds what it held before.
+- [r16] If the clock fails during a change, the client is given a fault and the store holds what it held before.
+- [r17] If the client removes a place inside an artifact, the removal is refused because only a whole artifact is removed.
+- [r18] If the client replaces an artifact, or a node in it, so that an item something links into is no longer there, the change is refused because something still points at that item, and the client is given each such link.
+- [r19] When the client replaces an artifact, adds an item to it or removes it, saying the revision it read the artifact at, and the artifact still stands at that revision, the change lands.
+- [r20] If the client replaces an artifact, adds an item to it or removes it, saying the revision it read the artifact at, and the artifact stands at another revision when the change lands, the change is refused because the artifact moved since it was read, naming the revision it stands at, and nothing is written.
+- [r21] When the client replaces an artifact, adds an item to it or removes it without saying the revision it read the artifact at, the change acts on the artifact as it stands.
+- [r22] While several clients on one machine, in one program or in several, change one store at the same time, none saying the revision it read the artifact at, each change is checked against the store as every earlier change left it, so two items added to one collection at once are both kept.
+- [r23] When one client removes an artifact while another adds a link to it, each is judged against the store as the other left it: a removal that lands second is refused because something still points at it, and a link that lands second lands on a placeholder at the removed artifact's IRI, its type still held.
+- [r24] When two clients replace one artifact at the same time, neither saying the revision it read the artifact at, each replacement leaves a revision of its own, both are in the history, and the artifact holds the content of the later one.
+- [r25] If a change waits longer than the store waits while another change is being written, the change is refused because the store was busy with another change, nothing is written, and the same change may be made again.
+- [r26] No read is refused because the store was busy with another change.
 
 ## Implementation, may change
 

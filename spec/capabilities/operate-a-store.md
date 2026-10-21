@@ -1,9 +1,9 @@
 ---
-id: capability/operate-a-store
+id: capability/missingmass.io/shopsystem/kb/operate-a-store
 title: Operate a store
 narrator: the operator
-rests_on: [decision/init-refuses-inside-or-above, decision/0003-init-refuses-inside-a-store, decision/0008-contract-is-the-stable-boundary, decision/0020-a-server-found-where-the-store-is, decision/files-are-an-export, decision/busy-rule, decision/serving-built, decision/a-server-stamps-with-its-own-clock, decision/0021-kb-served-from-a-container, decision/published-contract-v2, decision/seed-may-be-the-root, decision/unwritable-root-refused, decision/0028-backup-and-restore-beside-export, decision/0025-placeholders-are-reported-never-a-fault, decision/0026-import-passes-over-identical-refuses-differing]
-formulated_as: features/operate-a-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/init-refuses-inside-or-above, design-decision/missingmass.io/shopsystem/kb/init-refuses-inside-a-store, design-decision/missingmass.io/shopsystem/kb/contract-is-the-stable-boundary, design-decision/missingmass.io/shopsystem/kb/a-server-found-where-the-store-is, design-decision/missingmass.io/shopsystem/kb/files-are-an-export, design-decision/missingmass.io/shopsystem/kb/busy-rule, design-decision/missingmass.io/shopsystem/kb/serving-built, design-decision/missingmass.io/shopsystem/kb/a-server-stamps-with-its-own-clock, design-decision/missingmass.io/shopsystem/kb/kb-served-from-a-container, design-decision/missingmass.io/shopsystem/kb/published-contract-v2, design-decision/missingmass.io/shopsystem/kb/seed-may-be-the-root, design-decision/missingmass.io/shopsystem/kb/unwritable-root-refused, design-decision/missingmass.io/shopsystem/kb/backup-and-restore-beside-export, design-decision/missingmass.io/shopsystem/kb/placeholders-are-reported-never-a-fault, design-decision/missingmass.io/shopsystem/kb/import-passes-over-identical-refuses-differing]
+retired: []
 ---
 
 # Operate a store
@@ -14,58 +14,58 @@ From a shell, without any client, the operator sets a store up, empty or seeded 
 
 ## Behaviour
 
-- When the operator runs kb init against a directory with no store inside it, saying which role they are, there is a store inside that directory in a place of its own, and a client can define its own types in it straight away.
-- If nothing names the operator's role, kb init is refused because the role must be named through `KB_ACTOR`, and the directory still has no store inside it.
-- If the directory already has a store inside it, kb init is refused because that directory already has a store inside it, and that store holds what it held before.
-- If the directory sits inside a store, kb init is refused because that directory is inside a store, and that store holds what it held before.
-- When the operator runs kb init with a seed directory on a directory with no store inside it, saying which role they are, there is a store inside that directory holding the files in the seed directory as kb import lands them into a freshly started store (export-and-import-a-store).
-- If the operator runs kb init with a seed directory whose files do not check clean, kb init is refused because the seed directory's files do not check clean, the check's report is shown, and the directory still has no store inside it.
-- If kb init with a seed directory is stopped before it finishes, however it was stopped, the directory has no store inside it, and the same kb init run again starts a store holding the files in the seed directory.
-- If the directory already has a store inside it, kb init with a seed directory is refused because that directory already has a store inside it, and that store holds what it held before.
-- If nothing names the operator's role, kb init with a seed directory is refused because the role must be named through `KB_ACTOR`, and the directory still has no store inside it.
-- If the directory sits inside a store, kb init with a seed directory is refused because that directory is inside a store, and that store holds what it held before.
-- If the seed directory named is not a directory, kb init is refused because files for import are read from a directory, and the directory still has no store inside it.
-- When the operator runs kb init with a seed directory that is the directory the store is started in, or holds it, saying which role they are, there is a store inside that directory holding the files the seed directory held, as kb import lands them into a freshly started store, and nothing kb made while starting it is among them.
-- If the directory a store would be started in cannot be written, kb init, with a seed directory or without, and kb serve with `--start` are refused because a store can only be started in a directory kb can write, naming the directory; nothing is served, and nothing is made in it.
-- When the operator runs kb validate, they are told of everything in the store that does not fit its type, and where, of everything behind the type it conforms to, and of every placeholder with what links to it, each listed apart.
-- When the operator runs kb validate on a store whose only findings are placeholders, the store checks clean.
-- The command line offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a store, and nothing else that changes what the store holds.
-- When the operator backs up a store, the backup holds the store whole, its history and its journal included.
-- When the operator backs up a store, the backup holds the store as it stood at one moment, each set landing meanwhile either in it whole or not at all.
-- While clients are writing to the store, when the operator backs it up, the backup is made and the clients go on writing, none of their changes refused because of the backup.
-- While another change is being written to the store, when the operator backs it up, the backup is made and is not refused because the store was busy with another change.
-- While a server serves the store, when the operator backs it up, the backup is made and the server goes on serving.
-- If anything is already at the place a backup would be written, even an empty file or directory, the backup is refused because a backup never overwrites, and what is there is left as it was.
-- kb backup finds the store as kb validate does, and is refused as kb validate is: when no store is found, when `KB_ROOT` names none or another, when the store was made by an earlier or a later kb, and when its database cannot be read.
-- Where a connection to a server is found and no store, kb backup is refused because a backup is made where the store's files are, not through a server.
-- When the operator restores a backup in a directory with no store inside it, there is a store inside that directory holding everything the store backed up held, its history and its journal included, and no role is needed.
-- When the operator restores a backup, the restored store's history ends with the last entry the store held when backed up.
-- If the directory already has a store inside it, the restore is refused because that directory already has a store inside it, and that store holds what it held before.
-- If the directory sits inside a store, the restore is refused because that directory is inside a store, and that store holds what it held before.
-- If the directory a backup would be restored in cannot be written, the restore is refused because a store can only be restored in a directory kb can write, naming the directory, and nothing is made in it.
-- If what the operator restores is not a backup kb made, the restore is refused because it is not a backup, and nothing is made.
-- If the backup was made by an earlier kb, the restore is refused because this kb cannot read a store an earlier kb made, and nothing is made.
-- If the backup was made by a later kb, the restore is refused because a later version of kb is needed to read it, and nothing is made.
-- If a restore is stopped before it finishes, however it was stopped, the directory has no store inside it, and the same restore run again restores the backup.
-- While the operator works in a folder deep inside the directory a store sits in, when they run kb validate, the store found above where they are working is the one checked.
-- While the operator works outside any store with `KB_ROOT` naming one, when they run kb validate, the store `KB_ROOT` names is the one checked.
-- If the operator works outside any store and nothing names one, kb validate is refused because no store was found, neither above where they are working nor named outright.
-- If `KB_ROOT` names a directory that holds no store, kb validate is refused because `KB_ROOT` names a directory that holds no store.
-- If the operator works inside one store while `KB_ROOT` names a different store, kb validate is refused because `KB_ROOT` names a store other than the one they are standing in, and neither is guessed at.
-- When the operator runs kb serve on a directory holding a store, giving an address, the store is served at that address, on whatever interface it names, all of them included.
-- If the operator runs kb serve without an address, it is refused because no address is assumed.
-- If the operator runs kb serve giving an address it cannot serve at, because it is not a host and a port or nothing can listen there, it is refused because the store cannot be served at that address, naming the address, and nothing is served.
-- When the operator runs kb serve with `--start` on a directory holding no store, saying which role they are, a store is started there and then served at the address given.
-- When the operator runs kb serve with `--start` on a directory already holding a store, that store is served as it stands, and no role is needed.
-- If the operator runs kb serve with `--start` on a directory holding no store and nothing names their role, it is refused because a store can only be started under a role named through `KB_ACTOR`; nothing is served, and the directory still holds no store.
-- If the operator runs kb serve with `--start` on a directory holding no store, giving an address it cannot serve at, it is refused because the store cannot be served at that address, naming the address; nothing is served, and the directory still holds no store.
-- If the operator runs kb serve with `--start` on a directory that sits inside a store, it is refused because that directory is inside a store; nothing is served, and that store holds what it held before.
-- kb serve with `--start` is refused as kb serve without it is:
+- [r1] When the operator runs kb init against a directory with no store inside it, saying which role they are, there is a store inside that directory in a place of its own, and a client can define its own types in it straight away.
+- [r2] If nothing names the operator's role, kb init is refused because the role must be named through `KB_ACTOR`, and the directory still has no store inside it.
+- [r3] If the directory already has a store inside it, kb init is refused because that directory already has a store inside it, and that store holds what it held before.
+- [r4] If the directory sits inside a store, kb init is refused because that directory is inside a store, and that store holds what it held before.
+- [r5] When the operator runs kb init with a seed directory on a directory with no store inside it, saying which role they are, there is a store inside that directory holding the files in the seed directory as kb import lands them into a freshly started store (export-and-import-a-store).
+- [r6] If the operator runs kb init with a seed directory whose files do not check clean, kb init is refused because the seed directory's files do not check clean, the check's report is shown, and the directory still has no store inside it.
+- [r7] If kb init with a seed directory is stopped before it finishes, however it was stopped, the directory has no store inside it, and the same kb init run again starts a store holding the files in the seed directory.
+- [r8] If the directory already has a store inside it, kb init with a seed directory is refused because that directory already has a store inside it, and that store holds what it held before.
+- [r9] If nothing names the operator's role, kb init with a seed directory is refused because the role must be named through `KB_ACTOR`, and the directory still has no store inside it.
+- [r10] If the directory sits inside a store, kb init with a seed directory is refused because that directory is inside a store, and that store holds what it held before.
+- [r11] If the seed directory named is not a directory, kb init is refused because files for import are read from a directory, and the directory still has no store inside it.
+- [r12] When the operator runs kb init with a seed directory that is the directory the store is started in, or holds it, saying which role they are, there is a store inside that directory holding the files the seed directory held, as kb import lands them into a freshly started store, and nothing kb made while starting it is among them.
+- [r13] If the directory a store would be started in cannot be written, kb init, with a seed directory or without, and kb serve with `--start` are refused because a store can only be started in a directory kb can write, naming the directory; nothing is served, and nothing is made in it.
+- [r14] When the operator runs kb validate, they are told of everything in the store that does not fit its type, and where, of everything behind the type it conforms to, and of every placeholder with what links to it, each listed apart.
+- [r15] When the operator runs kb validate on a store whose only findings are placeholders, the store checks clean.
+- [r16] The command line offers setting a store up, checking and exporting one, backing one up, restoring a backup, and importing into a store, and nothing else that changes what the store holds.
+- [r17] When the operator backs up a store, the backup holds the store whole, its history and its journal included.
+- [r18] When the operator backs up a store, the backup holds the store as it stood at one moment, each set landing meanwhile either in it whole or not at all.
+- [r19] While clients are writing to the store, when the operator backs it up, the backup is made and the clients go on writing, none of their changes refused because of the backup.
+- [r20] While another change is being written to the store, when the operator backs it up, the backup is made and is not refused because the store was busy with another change.
+- [r21] While a server serves the store, when the operator backs it up, the backup is made and the server goes on serving.
+- [r22] If anything is already at the place a backup would be written, even an empty file or directory, the backup is refused because a backup never overwrites, and what is there is left as it was.
+- [r23] kb backup finds the store as kb validate does, and is refused as kb validate is: when no store is found, when `KB_ROOT` names none or another, when the store was made by an earlier or a later kb, and when its database cannot be read.
+- [r24] Where a connection to a server is found and no store, kb backup is refused because a backup is made where the store's files are, not through a server.
+- [r25] When the operator restores a backup in a directory with no store inside it, there is a store inside that directory holding everything the store backed up held, its history and its journal included, and no role is needed.
+- [r26] When the operator restores a backup, the restored store's history ends with the last entry the store held when backed up.
+- [r27] If the directory already has a store inside it, the restore is refused because that directory already has a store inside it, and that store holds what it held before.
+- [r28] If the directory sits inside a store, the restore is refused because that directory is inside a store, and that store holds what it held before.
+- [r29] If the directory a backup would be restored in cannot be written, the restore is refused because a store can only be restored in a directory kb can write, naming the directory, and nothing is made in it.
+- [r30] If what the operator restores is not a backup kb made, the restore is refused because it is not a backup, and nothing is made.
+- [r31] If the backup was made by an earlier kb, the restore is refused because this kb cannot read a store an earlier kb made, and nothing is made.
+- [r32] If the backup was made by a later kb, the restore is refused because a later version of kb is needed to read it, and nothing is made.
+- [r33] If a restore is stopped before it finishes, however it was stopped, the directory has no store inside it, and the same restore run again restores the backup.
+- [r34] While the operator works in a folder deep inside the directory a store sits in, when they run kb validate, the store found above where they are working is the one checked.
+- [r35] While the operator works outside any store with `KB_ROOT` naming one, when they run kb validate, the store `KB_ROOT` names is the one checked.
+- [r36] If the operator works outside any store and nothing names one, kb validate is refused because no store was found, neither above where they are working nor named outright.
+- [r37] If `KB_ROOT` names a directory that holds no store, kb validate is refused because `KB_ROOT` names a directory that holds no store.
+- [r38] If the operator works inside one store while `KB_ROOT` names a different store, kb validate is refused because `KB_ROOT` names a store other than the one they are standing in, and neither is guessed at.
+- [r39] When the operator runs kb serve on a directory holding a store, giving an address, the store is served at that address, on whatever interface it names, all of them included.
+- [r40] If the operator runs kb serve without an address, it is refused because no address is assumed.
+- [r41] If the operator runs kb serve giving an address it cannot serve at, because it is not a host and a port or nothing can listen there, it is refused because the store cannot be served at that address, naming the address, and nothing is served.
+- [r42] When the operator runs kb serve with `--start` on a directory holding no store, saying which role they are, a store is started there and then served at the address given.
+- [r43] When the operator runs kb serve with `--start` on a directory already holding a store, that store is served as it stands, and no role is needed.
+- [r44] If the operator runs kb serve with `--start` on a directory holding no store and nothing names their role, it is refused because a store can only be started under a role named through `KB_ACTOR`; nothing is served, and the directory still holds no store.
+- [r45] If the operator runs kb serve with `--start` on a directory holding no store, giving an address it cannot serve at, it is refused because the store cannot be served at that address, naming the address; nothing is served, and the directory still holds no store.
+- [r46] If the operator runs kb serve with `--start` on a directory that sits inside a store, it is refused because that directory is inside a store; nothing is served, and that store holds what it held before.
+- [r47] kb serve with `--start` is refused as kb serve without it is:
   - at an address it cannot serve at;
   - on a store another server owns;
   - on a store made by an earlier or a later kb;
   - on a directory holding a connection.
-- While another change is being written to the store, when the operator runs kb validate, the store is checked and kb validate is not refused because the store was busy with another change.
+- [r48] While another change is being written to the store, when the operator runs kb validate, the store is checked and kb validate is not refused because the store was busy with another change.
 
 ## Implementation, may change
 

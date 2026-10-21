@@ -1,9 +1,9 @@
 ---
-id: capability/find-the-store
+id: capability/missingmass.io/shopsystem/kb/find-the-store
 title: Find the store
 narrator: the client
-rests_on: [decision/0003-init-refuses-inside-a-store, decision/0020-a-server-found-where-the-store-is, decision/0007-input-safety-at-the-boundary, decision/where-is-the-clients-search]
-formulated_as: features/find-the-store.feature
+rests_on: [design-decision/missingmass.io/shopsystem/kb/init-refuses-inside-a-store, design-decision/missingmass.io/shopsystem/kb/a-server-found-where-the-store-is, design-decision/missingmass.io/shopsystem/kb/input-safety-at-the-boundary, design-decision/missingmass.io/shopsystem/kb/where-is-the-clients-search]
+retired: []
 ---
 
 # Find the store
@@ -14,26 +14,26 @@ Every call except starting a store finds its store on each call, the way git fin
 
 ## Behaviour
 
-- While the client works in a folder deep inside the directory a store sits in, when it calls, the call is answered from the store found above where it is working.
-- While the client works outside any store and `KB_ROOT` names a store, when it calls, the call is answered from the store `KB_ROOT` names.
-- If the client works outside any store and nothing names one, the call is refused because no store was found, neither above where it is working nor named outright.
-- If `KB_ROOT` names a directory that holds no store, the call is refused because `KB_ROOT` names a directory that holds no store, and no content comes back.
-- If the client works inside one store while `KB_ROOT` names a different store, the call is refused because `KB_ROOT` names a store other than the one it is working in, neither is guessed at, and no content comes back from either.
-- While the client's working directory has been removed and `KB_ROOT` names a store, when it calls, the call is answered from the store `KB_ROOT` names, whether the removed directory was outside any store or inside a different one.
-- If the client's working directory has been removed and nothing names a store, the call is refused because the directory it is working in is gone, whether or not a store once sat above it, and no content comes back.
-- If the client's working directory has gone and nothing names a store, the client is given that refusal as it is given any other fault, the call never breaking off.
-- When a client readied where there was no store calls after a store has been started where it is working, the call is answered from that store without the client being readied again.
-- If `KB_ROOT` is set to nothing, names a directory that does not exist, or names a file, the call is refused because `KB_ROOT` names no store, naming `KB_ROOT`, where the client is working is not fallen back on, and no content comes back.
-- When the search stops at a directory holding a store, the call is answered by that store in process; when it stops at a directory holding the connection to a server, the call is answered by that server over the network.
-- If the directory the search stops at holds both a store and the connection to a server, the call is refused, naming that directory.
-- When the client's working directory has moved into a different store, its next call is answered from the store it now sits in.
-- Where the client was readied with a root, the store is looked for from that root the way it is looked for from the working directory.
-- Where the client was readied with a root, `KB_ROOT` is not consulted.
-- While the search a call would make stops at a directory holding a store, when the client asks where its store is, it is given that directory and no fault.
-- While the search a call would make stops at a store this kb cannot read, when the client asks where its store is, it is given that directory and no fault.
-- While the search a call would make stops at a directory holding the connection to a server, when the client asks where its store is, it is given that directory and the address the connection names, and the server is not called.
-- If the search a call would make finds nothing when the client asks where its store is, the client is given the faults that say why nothing was found, and no directory.
-- If the directory the search stops at holds both a store and the connection to a server, when the client asks where its store is, it is given a fault naming that directory, and no directory.
+- [r1] While the client works in a folder deep inside the directory a store sits in, when it calls, the call is answered from the store found above where it is working.
+- [r2] While the client works outside any store and `KB_ROOT` names a store, when it calls, the call is answered from the store `KB_ROOT` names.
+- [r3] If the client works outside any store and nothing names one, the call is refused because no store was found, neither above where it is working nor named outright.
+- [r4] If `KB_ROOT` names a directory that holds no store, the call is refused because `KB_ROOT` names a directory that holds no store, and no content comes back.
+- [r5] If the client works inside one store while `KB_ROOT` names a different store, the call is refused because `KB_ROOT` names a store other than the one it is working in, neither is guessed at, and no content comes back from either.
+- [r6] While the client's working directory has been removed and `KB_ROOT` names a store, when it calls, the call is answered from the store `KB_ROOT` names, whether the removed directory was outside any store or inside a different one.
+- [r7] If the client's working directory has been removed and nothing names a store, the call is refused because the directory it is working in is gone, whether or not a store once sat above it, and no content comes back.
+- [r8] If the client's working directory has gone and nothing names a store, the client is given that refusal as it is given any other fault, the call never breaking off.
+- [r9] When a client readied where there was no store calls after a store has been started where it is working, the call is answered from that store without the client being readied again.
+- [r10] If `KB_ROOT` is set to nothing, names a directory that does not exist, or names a file, the call is refused because `KB_ROOT` names no store, naming `KB_ROOT`, where the client is working is not fallen back on, and no content comes back.
+- [r11] When the search stops at a directory holding a store, the call is answered by that store in process; when it stops at a directory holding the connection to a server, the call is answered by that server over the network.
+- [r12] If the directory the search stops at holds both a store and the connection to a server, the call is refused, naming that directory.
+- [r13] When the client's working directory has moved into a different store, its next call is answered from the store it now sits in.
+- [r14] Where the client was readied with a root, the store is looked for from that root the way it is looked for from the working directory.
+- [r15] Where the client was readied with a root, `KB_ROOT` is not consulted.
+- [r16] While the search a call would make stops at a directory holding a store, when the client asks where its store is, it is given that directory and no fault.
+- [r17] While the search a call would make stops at a store this kb cannot read, when the client asks where its store is, it is given that directory and no fault.
+- [r18] While the search a call would make stops at a directory holding the connection to a server, when the client asks where its store is, it is given that directory and the address the connection names, and the server is not called.
+- [r19] If the search a call would make finds nothing when the client asks where its store is, the client is given the faults that say why nothing was found, and no directory.
+- [r20] If the directory the search stops at holds both a store and the connection to a server, when the client asks where its store is, it is given a fault naming that directory, and no directory.
 
 ## Implementation, may change
 
