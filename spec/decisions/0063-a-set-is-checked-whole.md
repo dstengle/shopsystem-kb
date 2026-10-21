@@ -4,6 +4,7 @@ summary: "A set is checked once as a whole against the state it leaves, so its c
 date: 2026-10-01
 status: superseded
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 ---
 
 # a-set-is-checked-whole

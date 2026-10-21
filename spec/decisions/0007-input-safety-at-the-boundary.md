@@ -4,6 +4,7 @@ summary: "Every request field becomes a validated value before the domain sees i
 date: 2026-09-24
 status: accepted
 by: ".shop/records/decision-arguments/0007-input-safety-at-the-boundary.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0007-input-safety-at-the-boundary
 ---
 
 # input-safety-at-the-boundary

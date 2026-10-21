@@ -4,6 +4,7 @@ summary: "`kb.testing.served(store_root, connection_dir, *, clock=None)` is a pu
 date: 2026-10-06
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-06-kb-shop-knowledge-requests-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-requests-design
 ---
 
 # served-double-is-kb-serve

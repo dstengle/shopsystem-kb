@@ -5,7 +5,7 @@ Feature: Read an artifact
   Background:
     Given a store holding a decision that supersedes an older decision, has a purpose and a rationale, carries two options, and is pointed at by two work items
 
-  @slice-1
+  @slice-1 @r1
   Scenario: The client reads a summary
     Pins the walking skeleton's read, and the belief it rests on: a summary carries enough of the surroundings that a client can move through the store without reading anything whole.
     When the client reads the decision at a glance
@@ -13,38 +13,38 @@ Feature: Read an artifact
     And a stub of each thing it points at and of each of its parts
     And how many things point at it, counted by their kind and by the link they use
 
-  @slice-169
+  @slice-169 @r2
   Scenario: At a glance, the stub of a link to an IRI the store does not hold is marked as not held
     Pins that a summary tells a client which of the things an artifact points at the store does not hold, before it tries to read one.
     Given the decision also points at a decision under an IRI the store does not hold
     When the client reads the decision at a glance
     Then the stub of the link to that IRI is marked as not held
 
-  @slice-21
+  @slice-21 @r3
   Scenario: The client reads one section by its title
     Pins the read the store expects to see most: one section by name, and nothing else carried along with it.
     When the client reads the rationale of the decision
     Then the client is given that section and nothing else
 
-  @slice-21
+  @slice-21 @r4
   Scenario: The client reads the whole artifact
     Pins the full read, and that what comes back is in the order the type declares rather than the order it happened to be written.
     When the client reads the whole decision
     Then the client is given every field, every section and every part, in the order the type declares
 
-  @slice-159
+  @slice-159 @r5
   Scenario: Reading the whole artifact gives its IRI, its type version's IRI, its revision and its title beside its content
     Pins that a whole read says which artifact it is and what it conforms to, so a client holding only the read can find the artifact again and know the version of its type.
     When the client reads the whole decision
     Then beside its content the client is given its IRI, the IRI of the version of the decision type it conforms to, its revision and its title
 
-  @slice-21
+  @slice-21 @r6
   Scenario: Without being asked to follow them, links come back as names
     Pins the default: a read does not drag in the neighbourhood unasked, so the cost of a read is the artifact and no more.
     When the client reads the whole decision without asking for its links to be followed
     Then the older decision is given as the name it is known by, and nothing more
 
-  @slice-169
+  @slice-169 @r7
   Scenario Outline: A link to an IRI the store does not hold comes back marked as landing on nothing held, at any level and following links or not
     Pins that a client can always tell a link that lands on nothing held from one that lands, however it reads, and that nothing is ever put in place of such a link.
     Given the decision also points at a decision under an IRI the store does not hold
@@ -59,14 +59,14 @@ Feature: Read an artifact
       | the whole decision following its links one step          |
       | the whole decision following its links two steps         |
 
-  @slice-21
+  @slice-21 @r8
   Scenario: The client reads the whole artifact with what it points at filled in
     Pins the one-step fill-in, and that it stops there: what the neighbour points at is still just names.
     When the client reads the whole decision following its links one step
     Then the older decision is given in place of the link, as the store holds it now
     And what the older decision itself points at is given as names
 
-  @slice-21
+  @slice-21 @r9
   Scenario: The client reads an artifact following its links two steps
     Pins that the depth asked for is honoured all the way down, so a client can pull back exactly as much of the graph as it means to show.
     Given the older decision is tagged "pricing"
@@ -74,7 +74,7 @@ Feature: Read an artifact
     Then the older decision is given in place of the link
     And the tag is given in place of the link inside the older decision
 
-  @slice-12
+  @slice-12 @r10
   Scenario: A loop in the links stops instead of going round
     Pins that a circle in the graph is safe to read: anything already filled in on the way comes back as a name, so a read ends.
     Given two decisions that point at each other
@@ -82,20 +82,20 @@ Feature: Read an artifact
     Then the other decision is given in place of the link
     And where that one points back, the decision being read is given as a name rather than filled in again
 
-  @slice-21
+  @slice-21 @r11
   Scenario: The branches inside a process are not followed
     Pins the line between a link between artifacts and a step naming a step beside it, so following links does not unroll a process's own flow.
     Given a store holding a process whose steps branch to other steps of the same process
     When the client reads the whole process following its links one step
     Then the branches are given as written, naming the steps of that process
 
-  @slice-159
+  @slice-159 @r12
   Scenario: A link filled in comes with its IRI, its type version's IRI, its title and its revision, ahead of its content
     Pins that a target put in place of a link says which artifact it is and what it conforms to, before the content, so a client can tell what it has been handed.
     When the client reads the whole decision following its links one step
     Then the older decision comes with its IRI, the IRI of the version of the decision type it conforms to, its title and its revision, ahead of its content
 
-  @slice-163.1
+  @slice-163.1 @r13
   Scenario Outline: An artifact that conforms to an earlier version of its type is read as that version declares
     Pins that a type moving on changes nothing about how an artifact left at its earlier version reads: what is shown at a glance and what counts as a link are its own version's.
     Given a note type whose first version shows a summary at a glance and holds a reference as plain text, and whose second version shows an owner at a glance and makes the reference a link

@@ -4,6 +4,7 @@ summary: "A store whose marker names a form of store this kb does not know, one 
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-batch24-review-answers.md; the controller's answer to the integration's question 1, under the person's delegation"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-batch24-review-answers
 ---
 
 # later-store-told-apart

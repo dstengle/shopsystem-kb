@@ -4,6 +4,7 @@ summary: "One repository, an incremental load cache, batch operations, and, when
 date: 2026-09-30
 status: superseded
 by: "the migration gate; .shop/records/decision-arguments/0020-a-server-found-where-the-store-is.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0020-a-server-found-where-the-store-is
 supersedes: design-decision/missingmass.io/shopsystem/kb/scale
 revisit_when: "changes wait at the server in growing numbers"
 ---

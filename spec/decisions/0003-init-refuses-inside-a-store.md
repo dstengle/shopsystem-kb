@@ -4,6 +4,7 @@ summary: "Starting a store where one already exists, above or below, is refused;
 date: 2026-09-23
 status: superseded
 by: ".shop/records/decision-arguments/0003-init-refuses-inside-a-store.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0003-init-refuses-inside-a-store
 ---
 
 # init-refuses-inside-a-store

@@ -4,6 +4,7 @@ summary: "A type has a stable IRI, the root its artifacts' IRIs sit under, and e
 date: 2026-10-10
 status: accepted
 by: ".shop/records/decision-arguments/0027-each-type-version-is-its-own-iri.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0027-each-type-version-is-its-own-iri
 ---
 
 # each-type-version-is-its-own-iri

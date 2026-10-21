@@ -4,6 +4,7 @@ summary: "Several callers reach one store through `kb serve <root> --listen <hos
 date: 2026-09-28
 status: superseded
 by: ".shop/records/decision-arguments/0020-a-server-found-where-the-store-is.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0020-a-server-found-where-the-store-is
 ---
 
 # a-server-found-where-the-store-is

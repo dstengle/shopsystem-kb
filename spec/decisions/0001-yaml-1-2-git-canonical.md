@@ -4,6 +4,7 @@ summary: "Every artifact is one YAML 1.2 file under `<root>/kb/`, itself the git
 date: 2026-09-23
 status: superseded
 by: ".shop/records/decision-arguments/0001-yaml-1-2-git-canonical.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0001-yaml-1-2-git-canonical
 ---
 
 # yaml-1-2-git-canonical

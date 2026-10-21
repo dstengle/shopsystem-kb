@@ -4,6 +4,7 @@ summary: "A database that cannot be opened or read refuses every call and every 
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 ---
 
 # damaged-database-one-fault

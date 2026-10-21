@@ -4,6 +4,7 @@ summary: "The API is the stable boundary; storage, git-first included, may chang
 date: 2026-09-23
 status: superseded
 by: ".shop/records/archive/design-notes/2026-09-23-kb-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-09-23-kb-design
 ---
 
 # contract-stability

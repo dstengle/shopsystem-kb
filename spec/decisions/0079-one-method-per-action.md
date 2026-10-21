@@ -4,6 +4,7 @@ summary: "Every rpc is one action named in the spec's words (`Create`, `Replace`
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-contract-v1-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-contract-v1-design
 ---
 
 # one-method-per-action

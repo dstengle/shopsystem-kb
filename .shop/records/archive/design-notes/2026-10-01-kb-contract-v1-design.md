@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-contract-v1-des
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-01.
+
 # kb contract v1
 
 Date: 2026-10-01. Note 2 of three (storage, the contract, the type language). Decided by the person across this

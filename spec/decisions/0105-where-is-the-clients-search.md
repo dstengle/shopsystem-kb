@@ -4,6 +4,7 @@ summary: "The client publishes `where()`, which searches as a call would and ans
 date: 2026-10-06
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-06-kb-shop-knowledge-requests-design.md; the integration's questions 5-7 answered under the person's delegation"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-requests-design
 ---
 
 # where-is-the-clients-search

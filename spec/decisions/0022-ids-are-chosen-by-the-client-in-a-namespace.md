@@ -4,6 +4,7 @@ summary: "An artifact's id is chosen by the client as a namespaced name, kb chec
 date: 2026-10-09
 status: accepted
 by: ".shop/records/decision-arguments/0022-ids-are-chosen-by-the-client-in-a-namespace.md; supersedes design-decision/missingmass.io/shopsystem/kb/ids-minted-from-titles (for artifacts)"
+source: decision-argument/missingmass.io/shopsystem/kb/0022-ids-are-chosen-by-the-client-in-a-namespace
 supersedes: design-decision/missingmass.io/shopsystem/kb/ids-minted-from-titles
 ---
 

@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-eleventh-review
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-01.
+
 # Answers to the eleventh architecture review
 
 Date: 2026-10-01. The review is kept at /home/vscode/kb-reviews/eleventh-review.md. The person delegated every question

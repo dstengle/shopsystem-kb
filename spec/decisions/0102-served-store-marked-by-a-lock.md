@@ -4,6 +4,7 @@ summary: "While it serves, the server holds a lock of the operating system on a 
 date: 2026-10-06
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-06-kb-shop-knowledge-requests-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-requests-design
 ---
 
 # served-store-marked-by-a-lock

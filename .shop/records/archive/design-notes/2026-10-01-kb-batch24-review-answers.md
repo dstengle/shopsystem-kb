@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-batch24-review-
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-01.
+
 # Answers to the batch 24 review
 
 Date: 2026-10-01. The review is at /home/vscode/kb-reviews/batch24-review.md. The person delegated every question to

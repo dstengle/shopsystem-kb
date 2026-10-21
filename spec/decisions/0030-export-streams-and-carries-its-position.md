@@ -4,6 +4,7 @@ summary: "The contract's export answers as a stream, one file to a message, sele
 date: 2026-10-10
 status: accepted
 by: ".shop/records/decision-arguments/0030-export-streams-and-carries-its-position.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0030-export-streams-and-carries-its-position
 revisit_when: "a store needs an export of only what changed since a position"
 ---
 

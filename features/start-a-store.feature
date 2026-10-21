@@ -2,7 +2,7 @@
 Feature: Start a store
   Narrator: the client
 
-  @slice-1
+  @slice-1 @r1
   Scenario: The client starts a store
     Pins what a brand new store contains: the one type that describes types, and nothing of any domain, so the store knows nothing until a client teaches it.
     Given an empty directory
@@ -11,7 +11,7 @@ Feature: Start a store
     And the store holds no other type and no content
     And the client can define its own types straight away
 
-  @slice-1.4
+  @slice-1.4 @r2
   Scenario: Starting a store is recorded in the store's history
     Pins that the history begins with the store itself: even the first thing written is attributed and accounted for like every change after it.
     Given an empty directory
@@ -19,14 +19,14 @@ Feature: Start a store
     Then the store's history holds one entry, under that role, with the message "initialise store"
     And that entry is the writing of the one type that describes what a type is, at its first version, with a fingerprint of what was written
 
-  @slice-136
+  @slice-136 @r3
   Scenario: Starting a store naming a piece of work is recorded under that piece of work
     Pins that the first entry in a history can be accounted to the run of work that made it, just as every later change can.
     Given an empty directory
     When the client starts a store there, saying which role it is and naming a piece of work
     Then the store's one history entry names that piece of work beside the role
 
-  @slice-102
+  @slice-102 @r4
   Scenario: Starting a store is stamped with the moment the client's clock gives
     Pins that the first entry in a history is timed like every entry after it, so a client laying down a history across several days can begin it on the day it chooses.
     Given an empty directory
@@ -34,7 +34,7 @@ Feature: Start a store
     When the client starts a store there, saying which role it is
     Then the store's one history entry says it happened at 2026-09-20 at 08:00
 
-  @slice-1.10
+  @slice-1.10 @r5
   Scenario: Starting a store without saying which role is refused
     Pins that there is no unattributed change anywhere, so a store cannot come into being without someone answering for it.
     Given an empty directory
@@ -42,7 +42,7 @@ Feature: Start a store
     Then starting the store is rejected because a store can only be started under a role
     And that directory holds no store
 
-  @slice-45
+  @slice-45 @r6
   Scenario: A directory holding other things can still be given a store
     Pins that the store keeps to its own corner of the directory it is given, so it can live alongside a project without claiming any of it.
     Given a directory holding files that have nothing to do with a store
@@ -50,7 +50,7 @@ Feature: Start a store
     Then the store is made inside that directory, in a place of its own
     And the files that were already there are left as they were, and none of them is the store's concern
 
-  @slice-45
+  @slice-45 @r7
   Scenario: Starting a store in a directory that already has one inside it is refused
     Pins that starting a store never writes over one, so an existing store cannot be lost to a repeated command.
     Given a directory that already has a store inside it, with content in that store
@@ -58,7 +58,7 @@ Feature: Start a store
     Then starting the store is rejected because that directory already has a store inside it
     And the store that is there holds what it held before
 
-  @slice-117
+  @slice-117 @r8
   Scenario: Starting a store in a directory that already has one made by an earlier kb is refused
     Pins that a store made by an earlier kb counts as a store here, so starting never writes over it whichever kb made it.
     Given a directory that already has a store inside it, made by an earlier kb
@@ -66,7 +66,7 @@ Feature: Start a store
     Then starting the store is rejected because that directory already has a store inside it
     And the store that is there is left as it was
 
-  @slice-118.3
+  @slice-118.3 @r9
   Scenario: Starting a store in a directory that already has one made by a later kb is refused
     Pins that a store made by a later kb counts as a store here, so starting never writes over it whichever kb made it.
     Given a directory that already has a store inside it, made by a later kb
@@ -74,7 +74,7 @@ Feature: Start a store
     Then starting the store is rejected because that directory already has a store inside it
     And the store that is there is left as it was
 
-  @slice-45
+  @slice-45 @r10
   Scenario: Starting a store inside a store is refused
     Pins that stores do not nest, so looking upward for a store can only ever find one.
     Given a directory that sits inside a store
@@ -82,7 +82,7 @@ Feature: Start a store
     Then starting the store is rejected because that directory is inside a store
     And the store it sits inside holds what it held before
 
-  @slice-1.16
+  @slice-1.16 @r11
   Scenario: Where a store is started is settled by the directory named, not by where the client is working
     Pins that starting a store is the one call that does not look around for a store: it goes where it is told, and leaves the client's own store alone.
     Given the client is working inside a store
@@ -91,7 +91,7 @@ Feature: Start a store
     Then the store is made in the directory the client named
     And the store the client was working in is left as it was
 
-  @slice-1.23
+  @slice-1.23 @r12
   Scenario: Starting a store without naming a directory at all is refused
     Pins that the directory is an input checked like any other, so an empty one is refused outright rather than falling back on somewhere convenient.
     Given the client has nothing at all to name as the directory to start a store in
@@ -99,7 +99,7 @@ Feature: Start a store
     Then starting the store is rejected because a store is started in a directory that was named and that exists
     And no store is made anywhere
 
-  @slice-1.26
+  @slice-1.26 @r13
   Scenario: Starting a store in a directory that is not there is refused
     Pins that the directory must already exist: the store settles in where it is put and does not build a tree on the way.
     Given a place on the disk where no directory exists
@@ -107,7 +107,7 @@ Feature: Start a store
     Then starting the store is rejected because a store is started in a directory that exists
     And nothing is made at that place
 
-  @slice-1.26
+  @slice-1.26 @r14
   Scenario: Starting a store where a file sits instead of a directory is refused
     Pins that what was named must be a directory, and that a file standing in that place is left untouched rather than written through.
     Given a place on the disk holding a file rather than a directory
@@ -115,7 +115,7 @@ Feature: Start a store
     Then starting the store is rejected because a store is started in a directory, and what was named is not one
     And that file is left as it was
 
-  @slice-94
+  @slice-94 @r15
   Scenario Outline: Starting a store where the store's own corner is already taken is refused
     Pins that the store's corner of a directory is never written over or grown into, whatever is sitting in it and whether or not it is a store.
     Given a directory holding <what>
@@ -128,7 +128,7 @@ Feature: Start a store
       | an empty folder where a store would go  |
       | a file where a store would go           |
 
-  @slice-94
+  @slice-94 @r16
   Scenario: A client readied where there was no store can still start one
     Pins that starting a store is the one call needing no store to be found first, so the client that brings the first store into being does not have to exist after it.
     Given the client was readied to call a store while working where there was none and nothing named one
@@ -137,7 +137,7 @@ Feature: Start a store
     Then the store is made in the directory the client named
     And the client can read and write in it straight away
 
-  @slice-136
+  @slice-136 @r17
   Scenario: Listing the kind of types in a store holding nothing but the type that describes types
     Pins how a client tells that a store is still as it was started: asking for its types gives back the one type every store begins with and nothing else.
     Given a store holding nothing but the one type that describes what a type is

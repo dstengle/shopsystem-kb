@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-01.
+
 # kb storage behind a port, SQLite first
 
 Date: 2026-10-01

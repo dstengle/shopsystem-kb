@@ -4,6 +4,7 @@ summary: "A create in `CreateMany` may carry a key of the client's choosing, uni
 date: 2026-10-01
 status: superseded
 by: ".shop/records/archive/design-notes/2026-10-01-kb-contract-v1-design.md; the controller's answers to the integration's questions 1, 2 and 8, under the person's delegation of 2026-10-01"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-contract-v1-design
 ---
 
 # references-inside-a-set

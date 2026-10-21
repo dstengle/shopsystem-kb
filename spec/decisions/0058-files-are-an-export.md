@@ -4,6 +4,7 @@ summary: "Reviewable files are the operator's output, written on demand by `kb e
 date: 2026-10-01
 status: superseded
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 revisit_when: "someone needs to combine stores"
 ---
 

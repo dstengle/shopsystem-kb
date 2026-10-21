@@ -4,6 +4,7 @@ summary: "A change or snapshot with no role, no message or neither is refused wi
 date: 2026-09-27
 status: accepted
 by: ".shop/records/decision-arguments/0014-signature-refused-before-operations.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0014-signature-refused-before-operations
 ---
 
 # signature-refused-before-operations

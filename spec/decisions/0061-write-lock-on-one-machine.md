@@ -4,6 +4,7 @@ summary: "On one machine the database's write lock serialises writers across thr
 date: 2026-10-01
 status: superseded
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 supersedes: design-decision/missingmass.io/shopsystem/kb/scale-without-a-lock
 ---
 

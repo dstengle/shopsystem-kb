@@ -4,6 +4,7 @@ summary: "At 30,000 artifacts a summary read and a three-step traversal take und
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 revisit_when: "the scale targets are set"
 ---
 

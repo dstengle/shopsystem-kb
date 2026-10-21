@@ -4,6 +4,7 @@ summary: "Every journal entry names the set (batch) it landed in and the journal
 date: 2026-09-23
 status: accepted
 by: ".shop/records/decision-arguments/0004-journal-batch-and-snapshots.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0004-journal-batch-and-snapshots
 ---
 
 # journal-batch-and-snapshots

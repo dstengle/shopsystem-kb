@@ -4,6 +4,7 @@ summary: "A store is started by the operator's `kb init` or by a client in its o
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-contract-v1-design.md; the controller's answer to the integration's question 5, under the person's delegation of 2026-10-01"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-contract-v1-design
 ---
 
 # starting-leaves-the-wire

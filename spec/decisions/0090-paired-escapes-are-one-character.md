@@ -4,6 +4,7 @@ summary: "Content may write a character beyond the first 65,536 as two escapes, 
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-batch24-review-answers.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-batch24-review-answers
 ---
 
 # paired-escapes-are-one-character

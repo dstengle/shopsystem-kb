@@ -4,6 +4,7 @@ summary: "`kb validate` and kb's check answer list every placeholder with what l
 date: 2026-10-10
 status: accepted
 by: ".shop/records/decision-arguments/0025-placeholders-are-reported-never-a-fault.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0025-placeholders-are-reported-never-a-fault
 ---
 
 # placeholders-are-reported-never-a-fault

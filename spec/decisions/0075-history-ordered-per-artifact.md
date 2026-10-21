@@ -4,6 +4,7 @@ summary: "Moments order each artifact's history, not the whole store's: one arti
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-pr1-review-answers.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-pr1-review-answers
 ---
 
 # history-ordered-per-artifact

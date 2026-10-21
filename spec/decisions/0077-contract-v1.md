@@ -4,6 +4,7 @@ summary: "kb's contract is published again as one breaking release in which ever
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-contract-v1-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-contract-v1-design
 ---
 
 # contract-v1

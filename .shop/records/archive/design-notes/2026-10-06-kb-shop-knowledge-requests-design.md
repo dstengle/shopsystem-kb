@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-06.
+
 # shop-knowledge's requests of 2026-10-06: serving, where a store is, and what is relied on unpublished
 
 Date: 2026-10-06. shop-knowledge pins kb 0.5.0 (contract v1) and asked for seven things. Three block its

@@ -2,7 +2,7 @@
 Feature: Name artifacts and items
   Narrator: the client
 
-  @slice-156
+  @slice-156 @r1
   Scenario: An artifact created at an IRI of the client's choosing under its type's IRI is held at that IRI
     Pins that the client names every artifact it creates and the store keeps the name it was given, never one of its own.
     Given a store holding a decision type at "https://shop.example/kb/decision"
@@ -10,7 +10,7 @@ Feature: Name artifacts and items
     Then the decision is held at "https://shop.example/kb/decision/pricing/weekly-reviews"
     And the store made up no other IRI for it
 
-  @slice-158
+  @slice-158 @r2
   Scenario: An artifact created at an IRI not under its type's IRI is refused
     Pins that where an artifact is named says what kind it is, so an IRI outside its type's is never held.
     Given a store holding a decision type at "https://shop.example/kb/decision"
@@ -19,7 +19,7 @@ Feature: Name artifacts and items
     And the refusal names "https://shop.example/kb/process/weekly-reviews"
     And nothing is written
 
-  @slice-158
+  @slice-158 @r3
   Scenario: An artifact created at an IRI the store already holds an artifact at is refused
     Pins that an IRI names one artifact: a second create there is refused rather than numbered or put over the first.
     Given a store holding a decision type at "https://shop.example/kb/decision"
@@ -29,7 +29,7 @@ Feature: Name artifacts and items
     And the refusal names "https://shop.example/kb/decision/weekly-reviews"
     And the decision already there reads as it did, at the revision it held
 
-  @slice-158
+  @slice-158 @r4
   Scenario: An artifact keeps the IRI it was created with for life
     Pins that changing an artifact never moves it, so anything pointing at its IRI still finds it.
     Given a store holding a decision type at "https://shop.example/kb/decision"
@@ -37,35 +37,35 @@ Feature: Name artifacts and items
     When the client reads the decision at "https://shop.example/kb/decision/weekly-reviews"
     Then the client is given the decision, at its latest revision
 
-  @slice-179
+  @slice-179 @r11
   Scenario: Two items created with the same title in one collection, neither given a name, are given names of their own
     Pins the clash rule for parts the store names on create: neither is left unnamed, and the second takes the first's name with a number added.
     Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
     When the client creates a decision carrying two options with the same title, neither given a name, saying which role and why
     Then each option is given a name of its own, the second the name of the first with a number added
 
-  @slice-179
+  @slice-179 @r12
   Scenario: An item's title with capitals and punctuation gives a plain name
     Pins exactly how an item's title becomes its name, so the same title always gives the same name and every name is safe to put in an IRI.
     Given a store holding a process with two steps and a shared step other processes use
     When the client adds a step titled "Count stock: shelf, then back room!" to the process, saying which role and why
     Then the name the client is given for the new item is that title in lower case, with each run of anything that is not a letter or a digit turned into a single hyphen, and no hyphen at either end
 
-  @slice-158
+  @slice-158 @r13
   Scenario: A title that reads as a date is still a title
     Pins that a title is always text: nothing quietly reads it as a date on the way in and hands back something the client never wrote.
     Given a store holding a decision type at "https://shop.example/kb/decision"
     When the client creates a decision titled "2026-09-24", saying which role and why
     Then the title reads back as the text that was written, not as a date
 
-  @slice-158
+  @slice-158 @r14
   Scenario: A title that reads as yes is still a title
     Pins the same for the words older readers turn into yes and no, which is the classic way a title comes back as something else entirely.
     Given a store holding a decision type at "https://shop.example/kb/decision"
     When the client creates a decision titled "yes", saying which role and why
     Then the title reads back as the text that was written, not as a yes or a no
 
-  @slice-158
+  @slice-158 @r15
   Scenario: A title given as the yes-or-no true is still a title
     Pins that a title is turned into text whatever arrives, so a client that sends an unquoted word still gets a title it can use.
     Given a store holding a decision type at "https://shop.example/kb/decision"
@@ -73,7 +73,7 @@ Feature: Name artifacts and items
     When the client creates a decision with that title, saying which role and why
     Then the title reads back as the text "true"
 
-  @slice-158
+  @slice-158 @r16
   Scenario: A title given as the number 12 is still a title
     Pins the same for a number, which is how a title like a year or a version arrives when nobody quoted it.
     Given a store holding a decision type at "https://shop.example/kb/decision"
@@ -81,7 +81,7 @@ Feature: Name artifacts and items
     When the client creates a decision with that title, saying which role and why
     Then the title reads back as the text "12"
 
-  @slice-39
+  @slice-39 @r17
   Scenario: The name of a new item comes from its title
     Pins that the store mints an item's name from the item's own title, so a client never chooses names and two clients cannot disagree about them.
     Given a store holding a process with two steps and a shared step other processes use
@@ -89,7 +89,7 @@ Feature: Name artifacts and items
     Then the name the client is given for the new item is made from that title
     And the client never said what the name should be
 
-  @slice-39
+  @slice-39 @r18
   Scenario: An item of a kind that carries no title is named by its place
     Pins the fallback for collections whose items have no title: the store still mints a name, from where the item went in, so every item is addressable.
     Given a store holding a process with two steps and a shared step other processes use
@@ -97,7 +97,7 @@ Feature: Name artifacts and items
     When the client adds an item to that collection, saying which role and why
     Then the name the client is given for the new item is made from its place in the collection
 
-  @slice-39
+  @slice-39 @r19
   Scenario: A second item with a title already used in the collection gets a name of its own
     Pins that names are unique within a collection: a clash is settled by adding a number, and the item already there is never renamed under anything pointing at it.
     Given a store holding a process with two steps and a shared step other processes use
@@ -105,7 +105,7 @@ Feature: Name artifacts and items
     Then the name the client is given for the new item is the name already taken with a number added
     And the step already there keeps the name it had
 
-  @slice-39
+  @slice-39 @r20
   Scenario: Taking an item out does not rename the items left
     Pins that a name is minted once and never worked out again, so removing an item cannot quietly move every later item's name out from under a link.
     Given a store holding a process with two steps and a shared step other processes use
@@ -114,7 +114,7 @@ Feature: Name artifacts and items
     Then every item left keeps the name it was given when it was added
     And no item is named again from where it now sits
 
-  @slice-14
+  @slice-14 @r21
   Scenario: Putting items in a different order does not rename them
     Pins the same for reordering: order is content, names are identity, and rearranging a collection leaves every link landing where it did.
     Given a store holding a process with two steps and a shared step other processes use
@@ -123,7 +123,7 @@ Feature: Name artifacts and items
     Then every item keeps the name it was given when it was added
     And anything pointing at one of them still lands on the same item
 
-  @slice-179
+  @slice-179 @r22
   Scenario Outline: An added item's title becomes its name, read as text, refused if it leaves nothing
     Pins how an added item's title turns into its name: read as text whatever it looks like, and refused rather than given an empty name when it boils down to nothing.
     Given a store holding a process with two steps and a shared step other processes use
@@ -136,7 +136,7 @@ Feature: Name artifacts and items
       | the number 12 rather than text      | the name the client is given for the new item is made from the text "12"           |
       | the yes-or-no true rather than text | the name the client is given for the new item is made from the text "true"         |
 
-  @slice-86
+  @slice-86 @r23
   Scenario: Items sent back with their names are the same items, and one without a name is new
     Pins what a client sends when it rewrites a whole collection: the names the store gave are what say which item is which, and an item arriving without one is new and is named by the store.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -145,7 +145,7 @@ Feature: Name artifacts and items
     Then the two options are the same items as before, keeping their names
     And the third option is new and is given a name of its own
 
-  @slice-67
+  @slice-67 @r24
   Scenario Outline: Every way an item's name can be wrong on a change is refused
     Pins that item names are the store's to give and the client's only to hand back: anything else is refused rather than stored as the client wrote it.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -160,7 +160,7 @@ Feature: Name artifacts and items
       | both of which carry the same name                            | the items of a collection each have a name of their own                   |
       | one of which carries a name that is not a plain name         | a name is a plain name of lower-case letters, digits and single hyphens   |
 
-  @slice-158
+  @slice-158 @r5
   Scenario: After an artifact has been removed, a new artifact may be created at its IRI
     Pins that an IRI belongs to an artifact for its life and no longer, so a new artifact may take it, starting over at its own first revision.
     Given a store holding a tag type at "https://shop.example/kb/tag"
@@ -169,21 +169,21 @@ Feature: Name artifacts and items
     Then the new tag is held at "https://shop.example/kb/tag/seasonal"
     And the new tag is at its first revision
 
-  @slice-179
+  @slice-179 @r6
   Scenario: A part is named by its artifact's IRI, # and its place in it
     Pins how a part inside an artifact is written, so a client can name any part from the artifact's IRI and where the part sits.
     Given a store holding a process at "https://shop.example/kb/process/restock" whose steps include one named draft
     When the client reads "https://shop.example/kb/process/restock#steps/draft"
     Then the client is given the step named draft of that process
 
-  @slice-179
+  @slice-179 @r7
   Scenario: A part given a name of the client's choosing on create holds that name
     Pins that a create may name the parts it carries, so the client knows each part's name before the store answers.
     Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
     When the client creates a decision carrying an option it names "keep-weekly", saying which role and why
     Then the option is named "keep-weekly"
 
-  @slice-179
+  @slice-179 @r8
   Scenario Outline: A part given no name on create is named by the store from its title or its place
     Pins that a part the client leaves unnamed is named the way an added item is, so every part is addressable from the moment it exists.
     Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry <collection>
@@ -195,7 +195,7 @@ Feature: Name artifacts and items
       | a collection of options, each with a title     | an option titled "Keep weekly reviews" | from its title, as an added item would be   |
       | a collection whose items carry no title         | an item                                | from its place, as an added item would be   |
 
-  @slice-179
+  @slice-179 @r9
   Scenario: An artifact created giving two parts of one collection the same name is refused
     Pins that a name the client gives a part must tell it apart from the other parts of its collection.
     Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options
@@ -204,7 +204,7 @@ Feature: Name artifacts and items
     And the refusal names "keep-weekly"
     And nothing is written
 
-  @slice-179
+  @slice-179 @r10
   Scenario: An artifact created giving a part a name that is not a plain name is refused
     Pins that a name the client gives a part keeps to the grammar of names the store gives, so every part can be written into an IRI.
     Given a store holding a decision type at "https://shop.example/kb/decision" whose decisions may carry a collection of options

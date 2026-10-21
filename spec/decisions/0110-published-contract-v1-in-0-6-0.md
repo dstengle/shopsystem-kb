@@ -4,6 +4,7 @@ summary: "What a client may depend on is still versioned together by the release
 date: 2026-10-06
 status: superseded
 by: ".shop/records/archive/design-notes/2026-10-06-kb-shop-knowledge-requests-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-requests-design
 supersedes: design-decision/missingmass.io/shopsystem/kb/published-contract-v1
 ---
 

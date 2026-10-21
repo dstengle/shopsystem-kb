@@ -4,6 +4,7 @@ summary: "Create, Write, Append, Delete, Apply and Snapshot under an actor with 
 date: 2026-09-26
 status: accepted
 by: ".shop/records/decision-arguments/0012-writes-need-role-and-message.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0012-writes-need-role-and-message
 ---
 
 # writes-need-role-and-message

@@ -4,6 +4,7 @@ summary: "A server stamps each change with its own clock: the machine's under `k
 date: 2026-10-06
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-06-kb-shop-knowledge-requests-design.md; supersedes design-decision/missingmass.io/shopsystem/kb/a-server-found-where-the-store-is (its clause "the clock stays the in-process client's")"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-requests-design
 supersedes: design-decision/missingmass.io/shopsystem/kb/a-server-found-where-the-store-is
 ---
 

@@ -4,6 +4,7 @@ summary: "`Replace`, `Add` and `Remove`, alone or in a set, may say the revision
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-contract-v1-design.md; the controller's answers to the integration's questions 3 and 4, under the person's delegation of 2026-10-01"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-contract-v1-design
 ---
 
 # expected-revision

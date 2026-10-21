@@ -4,6 +4,7 @@ summary: "An artifact's id is `kind/name`, the name made from its title by kb's 
 date: 2026-09-23
 status: superseded
 by: ".shop/records/decision-arguments/0002-ids-minted-from-titles.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0002-ids-minted-from-titles
 ---
 
 # ids-minted-from-titles

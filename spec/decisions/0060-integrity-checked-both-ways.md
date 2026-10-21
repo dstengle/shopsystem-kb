@@ -4,6 +4,7 @@ summary: "A change is checked for the links into what it changes as well as the 
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 ---
 
 # integrity-checked-both-ways

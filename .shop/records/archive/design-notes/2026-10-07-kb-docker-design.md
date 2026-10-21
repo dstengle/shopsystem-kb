@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-07-kb-docker-design
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-07.
+
 # kb served from a Docker container
 
 Date: 2026-10-07. The person asked for kb to be wrapped so its server runs easily from a Docker container, with the

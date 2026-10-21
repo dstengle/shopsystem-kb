@@ -4,6 +4,7 @@ summary: "Requests 2 to 10 of the portable-knowledge note (portable identity, K2
 date: 2026-10-10
 status: accepted
 by: ".shop/records/archive/requests/2026-10-10-requests-to-kb-portable-knowledge.md"
+source: initiative-archive/missingmass.io/shopsystem/kb/2026-10-10-requests-to-kb-portable-knowledge
 ---
 
 # contract-v2

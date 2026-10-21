@@ -4,6 +4,7 @@ summary: "Required fields and structural rules are JSON Schema 2020-12 fragments
 date: 2026-09-24
 status: superseded
 by: ".shop/records/decision-arguments/0006-validation-from-composed-schema.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0006-validation-from-composed-schema
 ---
 
 # validation-from-composed-schema

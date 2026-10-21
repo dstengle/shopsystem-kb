@@ -4,6 +4,7 @@ summary: "A set's links and types are checked once against the state the whole s
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md; the formulation question on make-several-changes-in-one-go #9, answered 2026-10-01"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 supersedes: design-decision/missingmass.io/shopsystem/kb/a-set-is-checked-whole
 ---
 

@@ -4,6 +4,7 @@ summary: "The contract has no historical read; git serves past states."
 date: 2026-09-23
 status: superseded
 by: ".shop/records/archive/design-notes/2026-09-23-kb-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-09-23-kb-design
 revisit_when: "a client needs a past state through the contract"
 ---
 

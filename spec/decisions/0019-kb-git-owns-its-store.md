@@ -4,6 +4,7 @@ summary: "Every git call kb makes clears the variables git lists as locating a r
 date: 2026-09-27
 status: superseded
 by: ".shop/records/decision-arguments/0019-kb-git-owns-its-store.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0019-kb-git-owns-its-store
 ---
 
 # kb-git-owns-its-store

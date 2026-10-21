@@ -4,6 +4,7 @@ summary: "A client exports through the contract: the store's canonical files, wh
 date: 2026-10-10
 status: accepted
 by: ".shop/records/decision-arguments/0029-export-over-the-contract.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0029-export-over-the-contract
 ---
 
 # export-over-the-contract

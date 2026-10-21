@@ -4,6 +4,7 @@ summary: "A link to an IRI the store does not hold, under a type it does hold, l
 date: 2026-10-10
 status: accepted
 by: ".shop/records/decision-arguments/0024-a-link-may-land-on-a-placeholder.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0024-a-link-may-land-on-a-placeholder
 ---
 
 # a-link-may-land-on-a-placeholder

@@ -4,6 +4,7 @@ summary: "The type that describes types is `schema/schema`, and that id is publi
 date: 2026-10-06
 status: superseded
 by: ".shop/records/archive/design-notes/2026-10-06-kb-shop-knowledge-requests-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-06-kb-shop-knowledge-requests-design
 ---
 
 # type-of-types-id-published

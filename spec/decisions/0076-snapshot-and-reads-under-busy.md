@@ -4,6 +4,7 @@ summary: "A snapshot writes to the store, so it is a call that changes the store
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-pr1-review-answers.md; the person's answers of 2026-10-01 to the integration's questions 5 to 8"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-pr1-review-answers
 ---
 
 # snapshot-and-reads-under-busy

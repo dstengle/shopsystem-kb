@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-pr1-review-answ
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-01.
+
 # Answers to the PR #1 review's questions
 
 Date: 2026-10-01. Answers to four questions for the spec raised while reviewing the batch 23 storage change

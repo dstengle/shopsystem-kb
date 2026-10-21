@@ -4,6 +4,7 @@ summary: "A store whose database cannot be opened for writing, because the direc
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-pr1-review-answers.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-pr1-review-answers
 ---
 
 # read-only-store-unreadable

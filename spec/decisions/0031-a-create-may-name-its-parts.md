@@ -4,6 +4,7 @@ summary: "A create, alone or in a set, may give any part it carries a name of th
 date: 2026-10-10
 status: accepted
 by: ".shop/records/decision-arguments/0031-a-create-may-name-its-parts.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0031-a-create-may-name-its-parts
 ---
 
 # a-create-may-name-its-parts

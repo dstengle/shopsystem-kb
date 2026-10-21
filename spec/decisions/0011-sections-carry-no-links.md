@@ -4,6 +4,7 @@ summary: "A section has exactly title, body and sections; a place a traversal st
 date: 2026-09-26
 status: accepted
 by: ".shop/records/decision-arguments/0011-sections-carry-no-links.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0011-sections-carry-no-links
 ---
 
 # sections-carry-no-links

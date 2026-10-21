@@ -4,6 +4,7 @@ summary: "Types are data; anything behavioural about a type is client code, and 
 date: 2026-09-23
 status: accepted
 by: ".shop/records/archive/design-notes/2026-09-23-kb-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-09-23-kb-design
 revisit_when: "a new type needs a change to kb"
 ---
 

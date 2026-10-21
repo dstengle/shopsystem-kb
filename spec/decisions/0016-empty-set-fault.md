@@ -4,6 +4,7 @@ summary: "An Apply with no operations is refused with one fault, rule `operation
 date: 2026-09-27
 status: accepted
 by: ".shop/records/decision-arguments/0016-empty-set-fault.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0016-empty-set-fault
 ---
 
 # empty-set-fault

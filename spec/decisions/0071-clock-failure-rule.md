@@ -4,6 +4,7 @@ summary: "A clock that fails during a change gives the client a fault with rule 
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md; the controller's answer of 2026-10-01"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 ---
 
 # clock-failure-rule

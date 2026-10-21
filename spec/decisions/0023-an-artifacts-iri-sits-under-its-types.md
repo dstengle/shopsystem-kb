@@ -4,6 +4,7 @@ summary: "An artifact's id is an https IRI made of its type's IRI, a `/`, and a 
 date: 2026-10-09
 status: accepted
 by: ".shop/records/decision-arguments/0023-an-artifacts-iri-sits-under-its-types.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0023-an-artifacts-iri-sits-under-its-types
 ---
 
 # an-artifacts-iri-sits-under-its-types

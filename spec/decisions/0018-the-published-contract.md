@@ -4,6 +4,7 @@ summary: "A client depends on kb only through `kb.proto` and `kb.contract.kb_pb2
 date: 2026-09-27
 status: superseded
 by: ".shop/records/decision-arguments/0018-the-published-contract.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0018-the-published-contract
 ---
 
 # the-published-contract

@@ -5,7 +5,7 @@ Feature: Sign a change
   Background:
     Given a store holding a decision with a purpose and a rationale, at its first version
 
-  @slice-96
+  @slice-96 @r1
   Scenario Outline: A change that does not say which role made it, or why, is refused
     Pins that every change is attributable before anything is written: whichever call makes it, a change missing its role or its reason leaves nothing on disk to be read and nothing in the history.
     Given the decision carries two options

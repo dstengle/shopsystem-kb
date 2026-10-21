@@ -4,6 +4,7 @@ summary: "The operator is an activity a developer takes on, not a person, and th
 date: 2026-10-07
 status: accepted
 by: ".shop/records/decision-arguments/0021-kb-served-from-a-container.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0021-kb-served-from-a-container
 ---
 
 # kb-served-from-a-container

@@ -4,6 +4,7 @@ summary: "Artifact content crosses the protobuf contract as canonical YAML text,
 date: 2026-09-24
 status: accepted
 by: ".shop/records/decision-arguments/0005-content-as-canonical-text.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0005-content-as-canonical-text
 ---
 
 # content-as-canonical-text

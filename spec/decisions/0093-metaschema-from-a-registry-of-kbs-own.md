@@ -4,6 +4,7 @@ summary: "The type of types resolves the 2020-12 metaschema through a registry k
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-type-language-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-type-language-design
 ---
 
 # metaschema-from-a-registry-of-kbs-own

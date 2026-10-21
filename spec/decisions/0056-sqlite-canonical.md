@@ -4,6 +4,7 @@ summary: "The store is one SQLite database, `kb/store.sqlite3` in WAL mode besid
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 supersedes: design-decision/missingmass.io/shopsystem/kb/yaml-1-2-git-canonical
 ---
 

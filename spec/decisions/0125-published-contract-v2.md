@@ -4,6 +4,7 @@ summary: "What a client may depend on is still versioned together by the release
 date: 2026-10-10
 status: accepted
 by: ".shop/records/archive/requests/2026-10-10-requests-to-kb-portable-knowledge.md; the person's delegation of 2026-10-10"
+source: initiative-archive/missingmass.io/shopsystem/kb/2026-10-10-requests-to-kb-portable-knowledge
 supersedes: design-decision/missingmass.io/shopsystem/kb/published-contract-v1-in-0-7-0
 ---
 

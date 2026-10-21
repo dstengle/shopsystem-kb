@@ -4,6 +4,7 @@ summary: "Export aimed at a file, and a check for import or an import aimed at s
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-eleventh-review-answers.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-eleventh-review-answers
 ---
 
 # operator-directory-refused-by-shape

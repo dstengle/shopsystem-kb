@@ -2,7 +2,7 @@
 Feature: Change the store
   Narrator: the client
 
-  @slice-156
+  @slice-156 @r1
   Scenario: The client creates an artifact, giving its IRI and the IRI of the version of its type it conforms to
     Pins the write at its simplest: the client chooses where the artifact lives and which version of its type it answers to, and gets that place back with the artifact's first revision.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
@@ -12,21 +12,21 @@ Feature: Change the store
     And the decision records that version of the decision type
     And reading it back gives what was written, in the order that version declares
 
-  @slice-1.6
+  @slice-1.6 @r2
   Scenario: An artifact created without a title is refused
     Pins that a title is not optional, because the store has nothing to make a name from without one.
     Given a store holding a decision type whose artifacts require a purpose then a rationale, may link to the decision they supersede, and may carry a collection of options
     When the client creates a decision with both required sections and no title, saying which role and why
     Then the artifact is rejected because an artifact cannot be created without a title
 
-  @slice-156
+  @slice-156 @r3
   Scenario: The client replaces an artifact
     Pins what a successful replacement leaves behind: the artifact's revision counts up by one.
     Given a store holding a decision with a purpose and a rationale, at its first revision
     When the client replaces the decision, saying which role and why
     Then the decision's revision goes up by one
 
-  @slice-163
+  @slice-163 @r4
   Scenario Outline: A change naming no version of its type keeps the artifact at the version it conforms to
     Pins that a later version of a type never takes an artifact over by itself: until a change names one, the artifact stays at its own version and is held to that version's rules.
     Given a store holding two versions of a decision type, the later one also requiring a consequence the earlier does not have
@@ -40,7 +40,7 @@ Feature: Change the store
       | replaces the decision          |
       | adds an option to the decision |
 
-  @slice-163
+  @slice-163 @r5
   Scenario: A replacement naming a later version of the artifact's type moves the artifact to it
     Pins how an artifact moves on to a later version of its type: the client names that version, the content is held to it, and the artifact stays where it was.
     Given a store holding two versions of a decision type, the later one also requiring a consequence the earlier does not have
@@ -50,7 +50,7 @@ Feature: Change the store
     And the decision records the later version of the decision type
     And the store holds the decision at the IRI it had before
 
-  @slice-163
+  @slice-163 @r6
   Scenario Outline: A replacement naming an earlier version of the artifact's type, or a version of another type, is refused
     Pins that an artifact only ever moves forward within its own type: it never goes back to an earlier version and never becomes an artifact of another type.
     Given a store holding two versions of a decision type and a tag type
@@ -64,7 +64,7 @@ Feature: Change the store
       | the earlier version of the decision type |
       | the version of the tag type          |
 
-  @slice-13
+  @slice-13 @r7
   Scenario: The client changes one node inside an artifact
     Pins that a change can be aimed at a node inside an artifact, so a client can correct one section without resending everything around it.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -72,7 +72,7 @@ Feature: Change the store
     Then only that section changes
     And the rest of the decision reads as before
 
-  @slice-86
+  @slice-86 @r8
   Scenario: The client changes one item of a collection
     Pins that a change can be aimed at one item of a collection, and that the item keeps the name it was given, because a name is worked out once and never again.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -82,7 +82,7 @@ Feature: Change the store
     And it keeps the name it was given when it was created
     And anything pointing at it still lands on it
 
-  @slice-39
+  @slice-39 @r9
   Scenario: The client adds an item to a collection
     Pins adding as an operation of its own: one item goes in without resending the artifact, and what comes back is a name for that item plus the artifact's new version.
     Given a store holding a process with two steps and a shared step other processes use
@@ -90,7 +90,7 @@ Feature: Change the store
     Then the client is given the new item's name and the artifact's new version
     And the new item comes after the items already there
 
-  @slice-39
+  @slice-39 @r10
   Scenario: An item that uses another artifact keeps its settings on itself
     Pins where state belonging to a use lives: on the item doing the using, never on the shared thing, so one use's settings cannot leak into another's.
     Given a store holding a process with two steps and a shared step other processes use
@@ -98,7 +98,7 @@ Feature: Change the store
     Then the settings are held by the new item
     And the shared step is unchanged
 
-  @slice-77
+  @slice-77 @r11
   Scenario: The client adds an item to a collection inside an item
     Pins that a collection inside an item is a collection like any other, named by the item it sits in, so growing one does not mean rewriting the whole artifact.
     Given a store holding a process with two steps and a shared step other processes use
@@ -107,7 +107,7 @@ Feature: Change the store
     Then the client is given the new check's name and the artifact's new version
     And the rest of the process is unchanged
 
-  @slice-41
+  @slice-41 @r12
   Scenario: The client removes an artifact nothing points at
     Pins that removal is a change like any other, recorded in the history, and not a quiet disappearance.
     Given a store holding a tag nothing points at
@@ -116,7 +116,7 @@ Feature: Change the store
     Then the store no longer holds it
     And the removal is recorded like any other change
 
-  @slice-41
+  @slice-41 @r13
   Scenario: A removal something points at is refused
     Pins the only rule the store has for removals: refuse, and hand back every link in the way so the client can decide what to do about them.
     Given a store holding a tag nothing points at
@@ -125,7 +125,7 @@ Feature: Change the store
     Then the removal is rejected because something still points at it
     And the client is given every link that blocks it
 
-  @slice-87
+  @slice-87 @r14
   Scenario: A link from inside a part blocks a removal like any other
     Pins that a link is a link wherever it sits: one written inside an item of a collection holds back a removal too, so nothing is ever left pointing at nothing.
     Given a store holding a tag nothing points at
@@ -135,7 +135,7 @@ Feature: Change the store
     Then the removal is rejected because something still points at it
     And the client is given that link among the links that block it
 
-  @slice-104
+  @slice-104 @r16
   Scenario: The clock fails during a change
     Pins that a clock that breaks down never leaves a change half made: the client hears about it, and nothing it asked for has happened.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -144,7 +144,7 @@ Feature: Change the store
     Then the client is given a fault
     And the store holds what it held before
 
-  @slice-105
+  @slice-105 @r18
   Scenario Outline: A replacement that leaves out an item something links into is refused
     Pins that dropping an item is held to the same rule as removing an artifact, whether the whole artifact or only a part of it is resent, so no link is left pointing at nothing.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -159,7 +159,7 @@ Feature: Change the store
       | replaces the decision with content that leaves that option out            |
       | replaces the decision's collection of options with one that leaves it out |
 
-  @slice-122
+  @slice-122 @r19
   Scenario Outline: A change that says the version its artifact still stands at lands
     Pins that saying what was read costs nothing while nobody else has changed the artifact: the change goes through as it would without it.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -173,7 +173,7 @@ Feature: Change the store
       | adds an option to the decision  |
       | removes the decision            |
 
-  @slice-122
+  @slice-122 @r20
   Scenario Outline: A change that says a version its artifact no longer stands at is refused
     Pins that a client which says what it read never overwrites a change it did not see: it is told the artifact moved, and where it stands now, so it can read again.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -190,7 +190,7 @@ Feature: Change the store
       | adds an option to the decision  |
       | removes the decision            |
 
-  @slice-122
+  @slice-122 @r21
   Scenario Outline: A change that says no version acts on its artifact as it stands
     Pins that a client which does not say what it read is never refused for a change it did not see: its change is made on whatever the artifact is now.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -205,7 +205,7 @@ Feature: Change the store
       | adds an option to the decision  | the new option comes after the options the other client's replacement left, one version on from that version |
       | removes the decision            | the store no longer holds the decision                                                                        |
 
-  @slice-122
+  @slice-122 @r22
   Scenario Outline: Several clients on one machine change one store at the same time, none saying the version it read
     Pins that changes made at once are taken one after another, each against what the earlier ones left, so neither of two items added to one collection together is lost, whether the clients share a program or not.
     Given a store holding a process with two steps and a shared step other processes use
@@ -219,7 +219,7 @@ Feature: Change the store
       | two clients in one program                               |
       | two clients in two separate programs on the same machine |
 
-  @slice-166
+  @slice-166 @r23
   Scenario Outline: A removal and a new link to the same artifact made at once are each judged against what the other left
     Pins that two clients working at once are judged in turn: a removal that comes second is refused for the link already there, and a link that comes second waits on a placeholder where the artifact was.
     Given a store holding a tag nothing points at
@@ -233,7 +233,7 @@ Feature: Change the store
       | creating the decision | the removal is rejected because something still points at it            | the tag and the decision that points at it |
       | removing the tag      | the new decision lands, its link on a placeholder at the removed tag's IRI | the new decision and not the tag           |
 
-  @slice-122
+  @slice-122 @r24
   Scenario: Two clients replace one artifact at the same time, neither saying the version it read
     Pins that two replacements made at once each count: neither is lost from the history and neither takes the other's version, and the artifact ends with whichever came last.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -243,7 +243,7 @@ Feature: Change the store
     And both replacements are in the history
     And the decision holds the different rationale
 
-  @slice-115
+  @slice-115 @r25
   Scenario: A change that waits longer than the store waits for another change is refused as busy
     Pins that a change never waits for ever behind another: it is refused as busy, leaves nothing behind, and can simply be made again.
     Given a store holding a decision with a purpose and a rationale, at its first version
@@ -253,7 +253,7 @@ Feature: Change the store
     And nothing is written
     And the same change may be made again
 
-  @slice-115
+  @slice-115 @r26
   Scenario: A read while another change is being written is not refused as busy
     Pins that reading never meets the wait for another change: a client can always read, however long a change holds the store.
     Given a store holding a decision with a purpose and a rationale, at its first version

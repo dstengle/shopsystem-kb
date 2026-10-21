@@ -4,6 +4,7 @@ summary: "The only delete rule is refuse, naming every reference that blocks it.
 date: 2026-09-23
 status: accepted
 by: ".shop/records/archive/design-notes/2026-09-23-kb-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-09-23-kb-design
 revisit_when: "operators need cascade or detach"
 ---
 

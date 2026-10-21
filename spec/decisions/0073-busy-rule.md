@@ -4,6 +4,7 @@ summary: "A change, a set or the operator's import that waits for the write lock
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-pr1-review-answers.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-pr1-review-answers
 ---
 
 # busy-rule

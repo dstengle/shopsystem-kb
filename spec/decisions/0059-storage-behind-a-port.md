@@ -4,6 +4,7 @@ summary: "kb's own rules (names, content checks, sections and items, signatures,
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 revisit_when: "a workload needs queries the port cannot answer within its bounds, such as transitive or pattern queries over transcripts and work state"
 ---
 

@@ -3,6 +3,8 @@ id: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-type-language-d
 kind: decision-argument
 about: bounded-context/missingmass.io/shopsystem/kb
 ---
+Proposal, integrated into spec/ on 2026-10-01.
+
 # kb's type language: kept, and narrowed to what kb reads
 
 Date: 2026-10-01. Note 3 of three (storage, the contract, the type language), "if still wanted". The person

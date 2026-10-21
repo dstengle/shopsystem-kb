@@ -2,28 +2,28 @@
 Feature: Query the store
   Narrator: the client
 
-  @slice-29
+  @slice-29 @r1
   Scenario: The client lists every artifact of a kind
     Pins the way into the store when a client knows no names at all: ask by kind and get a stub of each one.
     Given a store holding three decisions, one of them superseded
     When the client lists the decisions
     Then the client is given a stub of each of the three
 
-  @slice-29
+  @slice-29 @r2
   Scenario: The client lists the artifacts matching a field
     Pins that a listing can be narrowed by a field, so the common "show me only these" question is answered by the store rather than by the client sifting.
     Given a store holding three decisions, one of them superseded
     When the client lists the decisions that are superseded
     Then the client is given only the superseded one
 
-  @slice-29
+  @slice-29 @r3
   Scenario: The client lists names only
     Pins that a client can ask for just the names, for when it means to work through them one by one and does not want everything up front.
     Given a store holding three decisions, one of them superseded
     When the client lists the decisions asking for names only
     Then the client is given three names and nothing else
 
-  @slice-175
+  @slice-175 @r4
   Scenario: The client lists by a path below the type
     Pins that a listing can select by where an artifact sits below its type rather than by its kind, across every type, matching whole segments and never part of one.
     Given a store holding these artifacts:
@@ -40,7 +40,7 @@ Feature: Query the store
       | decision  | pricing/discounts   |
       | work item | pricing/rollout     |
 
-  @slice-175
+  @slice-175 @r5
   Scenario: The client follows links narrowed to a path below the type
     Pins that a traversal can be held to where what it finds sits below its type, across every type, matching whole segments and never part of one.
     Given a store where a decision at "roadmap" below its type points at each of these:
@@ -55,7 +55,7 @@ Feature: Query the store
       | decision  | pricing/discounts   |
       | work item | pricing/rollout     |
 
-  @slice-166.1
+  @slice-166.1 @r6
   Scenario: The client asks for the placeholders
     Pins that every link to something the store does not hold can be found in one question, each such target with every link into it, the artifact holding that link and the place it sits at, while links to held artifacts are left out.
     Given a store where these links point at IRIs the store does not hold:
@@ -74,7 +74,7 @@ Feature: Query the store
       | first        | the work item             | its first step         |
       | second       | the work item             | its second step        |
 
-  @slice-31
+  @slice-31 @r7
   Scenario: The client follows the links out of an artifact
     Pins the simplest traversal: what an artifact points at comes back as stubs, enough to show without reading each target whole.
     Given a store where a decision supersedes an older decision
@@ -83,7 +83,7 @@ Feature: Query the store
     When the client follows the links out of the decision
     Then the client is given a stub of the older decision
 
-  @slice-31
+  @slice-31 @r8
   Scenario: The client follows the links into an artifact
     Pins that the store knows who points at a thing as well as what it points at, which is the question no single artifact can answer by itself.
     Given a store where a decision supersedes an older decision
@@ -92,7 +92,7 @@ Feature: Query the store
     When the client follows the links into the decision
     Then the client is given a stub of each work item
 
-  @slice-89
+  @slice-89 @r9
   Scenario: The client narrows the links to one link and one kind
     Pins that a traversal can be narrowed to one link and one kind, so a client asks its real question instead of filtering everything afterwards.
     Given a store where a decision supersedes an older decision
@@ -103,7 +103,7 @@ Feature: Query the store
     When the client follows the links into the decision, only through the link a work item uses, and only from work items
     Then the client is given both work items and nothing else
 
-  @slice-11
+  @slice-11 @r10
   Scenario: The client follows the links two steps out
     Pins that a traversal can go more than one step and reports the route to each thing found, so a client can explain why something turned up.
     Given a store where a decision supersedes an older decision
@@ -113,7 +113,7 @@ Feature: Query the store
     Then the client is given the older decision and the tag
     And each of them comes with the route taken to it
 
-  @slice-89.2
+  @slice-89.2 @r11
   Scenario: The client follows the links out of one place inside an artifact
     Pins that a traversal can start at a place inside an artifact rather than the whole of it, so a client can ask what one step points at and get only that.
     Given a store where a decision supersedes an older decision
@@ -123,7 +123,7 @@ Feature: Query the store
     When the client follows the links out of that step of the process
     Then the client is given a stub of that tag and nothing else the process points at
 
-  @slice-72
+  @slice-72 @r12
   Scenario: A link into a part counts as a link into the artifact holding it
     Pins that pointing at a part is pointing at the artifact it sits in, so the count at a glance, the links coming in, and what blocks a removal all agree with one another.
     Given a store where a decision supersedes an older decision
@@ -135,7 +135,7 @@ Feature: Query the store
     And reading the process at a glance counts that work item among the things pointing at it
     And removing the process is refused while that work item points into it
 
-  @slice-10
+  @slice-10 @r13
   Scenario: The client searches the prose
     Pins what a result has to carry to be useful: which section matched and a glimpse of it, with the strongest match first.
     Given a store where two decisions and a process mention restocking in their prose
@@ -143,14 +143,14 @@ Feature: Query the store
     Then each result comes with the title of the section it matched and a snippet of it
     And the one whose section mentions restocking most often comes first
 
-  @slice-33
+  @slice-33 @r14
   Scenario: The client searches within one kind
     Pins that a search can be held to one kind, so a client looking for a decision is not handed everything else that says the same word.
     Given a store where two decisions and a process mention restocking in their prose
     When the client searches the prose for restocking among decisions only
     Then the client is given the two decisions and not the process
 
-  @slice-33
+  @slice-33 @r15
   Scenario: The client searches the fields as well as the prose
     Pins that a search can reach beyond prose into the typed fields, catching matches that live in a title rather than a body.
     Given a store where two decisions and a process mention restocking in their prose

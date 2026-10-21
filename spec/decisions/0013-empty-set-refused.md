@@ -4,6 +4,7 @@ summary: "Apply with no operations is refused before anything is written, so kb 
 date: 2026-09-27
 status: accepted
 by: ".shop/records/decision-arguments/0013-empty-set-refused.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0013-empty-set-refused
 ---
 
 # empty-set-refused

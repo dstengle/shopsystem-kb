@@ -4,6 +4,7 @@ summary: "A set lands in one database transaction, so a failure part-way leaves 
 date: 2026-10-01
 status: accepted
 by: ".shop/records/archive/design-notes/2026-10-01-kb-storage-sqlite-design.md"
+source: decision-argument/missingmass.io/shopsystem/kb/2026-10-01-kb-storage-sqlite-design
 supersedes: design-decision/missingmass.io/shopsystem/kb/restore-on-commit-failure
 ---
 

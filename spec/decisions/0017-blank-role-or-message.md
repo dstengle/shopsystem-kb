@@ -4,6 +4,7 @@ summary: "A role or message that is nothing once `str.isspace` blank space is st
 date: 2026-09-27
 status: accepted
 by: ".shop/records/decision-arguments/0017-blank-role-or-message.md"
+source: decision-argument/missingmass.io/shopsystem/kb/0017-blank-role-or-message
 ---
 
 # blank-role-or-message
